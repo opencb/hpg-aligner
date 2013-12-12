@@ -48,7 +48,7 @@ alig_bam_file(const char *bam_path, const char *ref_name, const char *ref_path)
 }
 
 int
-alig_bam_batch(const bam_batch_t* batch, const genome_t* ref)
+alig_bam_batch(bam_batch_t* batch, genome_t* ref)
 {
 	int i;
 	bam1_t *alig;
@@ -62,7 +62,7 @@ alig_bam_batch(const bam_batch_t* batch, const genome_t* ref)
 	uint32_t flag;
 
 	//CIGAR
-	uint32_t new_cigar[30];
+	uint32_t new_cigar[60];
 	size_t new_cigar_l;
 
 	assert(batch);
@@ -76,8 +76,8 @@ alig_bam_batch(const bam_batch_t* batch, const genome_t* ref)
 		if(alig->core.qual != 0 && !(alig->core.flag & BAM_FSECONDARY) && alig->core.mtid == alig->core.tid)
 		{
 			//Allocate
-			ref_seq = (char *)malloc(sizeof(char) * alig->core.l_qseq);
-			bam_seq = (char *)malloc(sizeof(char) * alig->core.l_qseq);
+			ref_seq = (char *)malloc(sizeof(char) * alig->core.l_qseq + 30);
+			bam_seq = (char *)malloc(sizeof(char) * alig->core.l_qseq + 1);
 
 			//Get sequence
 			new_sequence_from_bam_ref(alig, bam_seq, alig->core.l_qseq);
@@ -85,12 +85,23 @@ alig_bam_batch(const bam_batch_t* batch, const genome_t* ref)
 			//Get reference
 			flag = (uint32_t) alig->core.flag;
 			init_pos = alig->core.pos + 1;
-			end_pos = alig->core.pos + alig->core.l_qseq;
+			end_pos = alig->core.pos + alig->core.l_qseq + 30;
 			genome_read_sequence_by_chr_index(ref_seq, (flag & BAM_FREVERSE) ? 1 : 0, (unsigned int)alig->core.tid, &init_pos, &end_pos, ref);
 
 			//Leftmost CIGARS
 			alig_cigar_leftmost(ref_seq, bam_seq, alig->core.l_qseq, bam1_cigar(alig), alig->core.n_cigar, new_cigar, &new_cigar_l);
-			printf("***********************\n");
+
+			//ERASE
+			if(memcmp(bam1_cigar(alig), new_cigar, sizeof(uint32_t) * alig->core.n_cigar) != 0)
+			{
+				char str_cigar[200];
+				char str_new_cigar[200];
+				alig_aux_cigar32_to_string(bam1_cigar(alig), alig->core.n_cigar, str_cigar);
+				alig_aux_cigar32_to_string(new_cigar, new_cigar_l, str_new_cigar);
+				printf("NEW CIGAR: %s => %s, %d => %d\n", str_cigar, str_new_cigar, alig->core.n_cigar,new_cigar_l);
+				printf("POSITION: %d \n", alig->core.pos);
+				printf("***********************\n");
+			}
 
 			//Free reference seq
 			free(bam_seq);
@@ -129,6 +140,7 @@ alig_cigar_leftmost(char *ref, char *read, size_t read_l, uint32_t *cigar, size_
 	//ERASE
 	char str_cigar[200];
 	char str_new_cigar[200];
+	int printed = 0;
 
 	assert(ref);
 	assert(read);
@@ -147,8 +159,9 @@ alig_cigar_leftmost(char *ref, char *read, size_t read_l, uint32_t *cigar, size_
 	//Get indel length
 	indel_l = unclip_cigar[indel_index] >> BAM_CIGAR_SHIFT;
 
-	//Set default output
-	*new_cigar_l = 0;
+	//By default return original CIGAR
+	memcpy(new_cigar, cigar, cigar_l * sizeof(uint32_t));
+	*new_cigar_l = cigar_l;
 
 	//Only procceed if 1 indel (2 M blocks)
 	if(blocks_c == 2 && indels_c == 1 && indel_l)
@@ -159,18 +172,6 @@ alig_cigar_leftmost(char *ref, char *read, size_t read_l, uint32_t *cigar, size_
 			orig_ref = (char *)malloc(sizeof(char) * (read_l + 1));
 			aux_ref = (char *)malloc(sizeof(char) * (read_l + 1));
 			alig_aux_cigar32_create_ref(unclip_cigar, unclip_cigar_l, ref, read, read_l, orig_ref);
-
-			//ERASE
-			{
-				orig_ref[read_l] = '\0';
-				alig_aux_cigar32_to_string(unclip_cigar, unclip_cigar_l, str_new_cigar);
-				alig_aux_cigar32_to_string(cigar, cigar_l, str_cigar);
-				printf("CIGAR = %s, Indel L: %d\n", str_cigar, indel_l);
-				printf("CIGAR*= %s\n", str_new_cigar);
-				printf("READ -> %s - L: %d\n", read, read_l);
-				printf("REF  -> %s\n", ref);
-				printf("REF* -> %s - %s\n", orig_ref, str_new_cigar);
-			}
 
 			//Shift left CIGAR
 			alig_aux_cigar32_shift_left_indel(unclip_cigar, unclip_cigar_l, indel_index, aux_cigar);
@@ -184,22 +185,32 @@ alig_cigar_leftmost(char *ref, char *read, size_t read_l, uint32_t *cigar, size_
 				//Equal so is a valid CIGAR
 				memcpy(new_cigar, aux_cigar, sizeof(uint32_t) * unclip_cigar_l);
 				*new_cigar_l = unclip_cigar_l;
-				count = indel_l - 1;
+				count = indel_l;
+
+				//ERASE
+				{
+					read[read_l] = '\0';
+					orig_ref[read_l] = '\0';
+					alig_aux_cigar32_to_string(unclip_cigar, unclip_cigar_l, str_new_cigar);
+					alig_aux_cigar32_to_string(cigar, cigar_l, str_cigar);
+					printf("CIGAR = %s, Indel L: %d\n", str_cigar, indel_l);
+					printf("CIGAR*= %s\n", str_new_cigar);
+					printf("READ -> %s - L: %d\n", read, read_l);
+					printf("REF  -> %s\n", ref);
+					printf("REF* -> %s - %s\n", orig_ref, str_new_cigar);
+					aux_ref[read_l] = '\0';
+					alig_aux_cigar32_to_string(aux_cigar, unclip_cigar_l, str_new_cigar);
+					printf("REF%d -> %s - %s ::: Retry - %d\n", 1, aux_ref, str_new_cigar, count);
+					printed = 1;
+				}
 			}
 			else
 			{
-				count = indel_l - 2;
+				count = indel_l - 1;
 			}
 
 			if((aux_cigar[indel_index - 1] >> BAM_CIGAR_SHIFT) == 0)
 				count = 0;
-
-			//ERASE
-			{
-				aux_ref[read_l] = '\0';
-				alig_aux_cigar32_to_string(aux_cigar, unclip_cigar_l, str_new_cigar);
-				printf("REF%d -> %s - %s ::: Retry - %d\n", 1, aux_ref, str_new_cigar, count);
-			}
 
 			int j = 1;
 			while(count > 0)
@@ -219,24 +230,37 @@ alig_cigar_leftmost(char *ref, char *read, size_t read_l, uint32_t *cigar, size_
 					//Equal so is a valid CIGAR
 					memcpy(new_cigar, aux_cigar, sizeof(uint32_t) * unclip_cigar_l);
 					*new_cigar_l = unclip_cigar_l;
-					count = indel_l - 1;
+					count = indel_l;
+
+					//ERASE
+					{
+						if(!printed)
+						{
+							read[read_l] = '\0';
+							orig_ref[read_l] = '\0';
+							alig_aux_cigar32_to_string(unclip_cigar, unclip_cigar_l, str_new_cigar);
+							alig_aux_cigar32_to_string(cigar, cigar_l, str_cigar);
+							printf("CIGAR = %s, Indel L: %d\n", str_cigar, indel_l);
+							printf("CIGAR*= %s\n", str_new_cigar);
+							printf("READ -> %s - L: %d\n", read, read_l);
+							printf("REF  -> %s\n", ref);
+							printf("REF* -> %s - %s\n", orig_ref, str_new_cigar);
+							printed = 1;
+						}
+						aux_ref[read_l] = '\0';
+						alig_aux_cigar32_to_string(aux_cigar, unclip_cigar_l, str_new_cigar);
+						printf("REF%d -> %s - %s ::: Retry - %d\n", j, aux_ref, str_new_cigar, count);
+					}
 				}
 
 				if((aux_cigar[indel_index - 1] >> BAM_CIGAR_SHIFT) == 0)
 					count = 0;
-
-				//ERASE
-				{
-					aux_ref[read_l] = '\0';
-					alig_aux_cigar32_to_string(aux_cigar, unclip_cigar_l, str_new_cigar);
-					printf("REF%d -> %s - %s ::: Retry - %d\n", j, aux_ref, str_new_cigar, count);
-				}
 			}
-		}
 
-		//Free
-		free(orig_ref);
-		free(aux_ref);
+			//Free
+			free(orig_ref);
+			free(aux_ref);
+		}
 	}
 	else
 	{

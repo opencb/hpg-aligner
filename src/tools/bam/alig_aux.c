@@ -55,7 +55,7 @@ alig_aux_cigar32_to_string(uint32_t *cigar, size_t cigar_l, char* str_cigar)
 int
 alig_aux_cigar32_create_ref(uint32_t *cigar, size_t cigar_l, char *ref, char *read, size_t length, char *new_ref)
 {
-	int i, elem, type;
+	int i, elem, type, extra;
 	char *aux_str;
 
 	//Index
@@ -63,6 +63,7 @@ alig_aux_cigar32_create_ref(uint32_t *cigar, size_t cigar_l, char *ref, char *re
 	size_t index_read = 0;
 	size_t index_aux = 0;
 	size_t remain = 0;
+	extra = 0;
 
 	assert(cigar);
 	assert(cigar_l > 0);
@@ -93,6 +94,7 @@ alig_aux_cigar32_create_ref(uint32_t *cigar, size_t cigar_l, char *ref, char *re
 			//Increment index on reference to skip deletion
 			//printf("D:%d-%d-%d\n", index_read, index_ref, index_aux);
 			index_ref += elem;
+			extra += elem;
 			break;
 		case BAM_CMATCH:
 		case BAM_CHARD_CLIP:
@@ -115,12 +117,15 @@ alig_aux_cigar32_create_ref(uint32_t *cigar, size_t cigar_l, char *ref, char *re
 	}
 
 	//Copy last nucleotides
-	remain = length - index_aux;
+	remain = length - index_read;
 	if(remain)
 		memcpy(aux_str + index_aux, ref + index_ref, remain);
 
 	//Set output
 	memcpy(new_ref, aux_str, sizeof(char) * length);
+
+	//Free
+	free(aux_str);
 
 	return 0;
 }
