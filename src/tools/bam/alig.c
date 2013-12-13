@@ -175,7 +175,7 @@ alig_cigar_leftmost(char *ref, char *read, size_t read_l, uint32_t *cigar, size_
 	assert(read);
 	assert(read_l > 0);
 	assert(cigar);
-	assert(cigar_l < 30);
+	//assert(cigar_l < 30);
 	assert(new_cigar);
 	assert(new_cigar_l);
 
@@ -193,7 +193,7 @@ alig_cigar_leftmost(char *ref, char *read, size_t read_l, uint32_t *cigar, size_
 	*new_cigar_l = cigar_l;
 
 	//Only procceed if 1 indel (2 M blocks)
-	if(blocks_c == 2 && indels_c == 1 && indel_l)
+	if(cigar_l < 30 && blocks_c == 2 && indels_c == 1 && indel_l)
 	{
 		//Leftmost CIGAR
 		{
