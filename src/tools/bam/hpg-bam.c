@@ -35,9 +35,11 @@ void usage(char *exec_name) {
     printf("\n");
     printf("Command: stats\t\tstatistics summary\n");
     printf("         filter\t\tfilter a BAM file by using advanced criteria\n");
-    printf("         recalibrate\t\tbase quality recalibrate from a BAM file\n");
+    printf("         recalibrate\tbase quality recalibrate from a BAM file\n");
+    printf("         realign\tlocal realign from BAM file\n");
     printf("         index\t\tindex a BAM file (using the samtools 0.1.18)\n");
     printf("         sort\t\tsort a BAM file (using the samtools 0.1.18)\n");
+
     //    printf("         compare\tcompare two BAM files\n");
     //    printf("         realignment\trealign locally a BAM file\n");
     //    printf("         recalibrate\trecalibrate a BAM file\n");
