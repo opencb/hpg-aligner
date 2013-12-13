@@ -169,6 +169,16 @@ int main (int argc, char *argv[]) {
     // recalibrate
     recalibrate_bam(argc, argv);
 
+  } else if (strcmp(command_name, "realign" ) == 0) {
+
+    //--------------------------------------------------------------------
+    //           R E A L I G N M E N T     C O M M A N D
+    //--------------------------------------------------------------------
+
+    printf("***********************\n");
+    // local realignment
+    alig_bam(argc, argv);
+
   } else if (strcmp(command_name, "index" ) == 0) {
 
     //--------------------------------------------------------------------
