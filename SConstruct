@@ -17,7 +17,7 @@ env = Environment(tools = ['default', 'packaging'],
                   LIBS = ['m', 'z', 'curl'],
                   LINKFLAGS = ['-fopenmp'])
 
-if int(ARGUMENTS.get('debug', '0')) == 1:
+if int(ARGUMENTS.get('debug', '1')) == 1:
     debug = 1
     env['CFLAGS'] += ' -O0 -g'
 else:
