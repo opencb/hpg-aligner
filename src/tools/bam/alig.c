@@ -17,6 +17,7 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path)
 	bam_file_t *bam_f = NULL;
 	bam_batch_t *batch = NULL;
 	genome_t* ref = NULL;
+	uint64_t count = 0;
 	int i;
 
 	//Open bam
@@ -30,15 +31,35 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path)
 	assert(ref);
 	printf("Reference opened!...\n");
 
-	//Read batch
-	batch = bam_batch_new(10000000, SINGLE_CHROM_BATCH);
-	bam_fread_max_size(batch, 10000000, 1, bam_f);
+	do
+	{
+		if(batch)
+		{
+			//Free batch
+			bam_batch_free(batch, 1);
+		}
 
-	//Process batch
-	alig_bam_batch(batch, ref);
+		//Read batch
+		batch = bam_batch_new(100000000, SINGLE_CHROM_BATCH);
+		bam_fread_max_size(batch, 100000000, 1, bam_f);
 
-	//Free batch
-	bam_batch_free(batch, 1);
+		//Process batch
+		alig_bam_batch(batch, ref);
+
+		//Update read counter
+		count += batch->num_alignments;
+
+		//Show total progress
+		printf("Total alignments readed: %d\n", count);
+		fflush(stdout);
+
+	}while(batch && batch->num_alignments != 0);
+
+	if(batch)
+	{
+		//Free batch
+		bam_batch_free(batch, 1);
+	}
 
 	//Memory free
 	printf("\nClosing BAM file...\n");
@@ -99,7 +120,7 @@ alig_bam_batch(bam_batch_t* batch, genome_t* ref)
 				alig_aux_cigar32_to_string(bam1_cigar(alig), alig->core.n_cigar, str_cigar);
 				alig_aux_cigar32_to_string(new_cigar, new_cigar_l, str_new_cigar);
 				printf("NEW CIGAR: %s => %s, %d => %d\n", str_cigar, str_new_cigar, alig->core.n_cigar,new_cigar_l);
-				printf("POSITION: %d \n", alig->core.pos);
+				printf("POSITION: %d:%d \n", alig->core.tid, alig->core.pos);
 				printf("***********************\n");
 			}
 
