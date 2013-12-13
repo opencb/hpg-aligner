@@ -7,6 +7,8 @@
 
 #include "alig.h"
 
+uint64_t cigar_changed = 0;
+
 /**
  * BAM REALIGN
  */
@@ -50,7 +52,7 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path)
 		count += batch->num_alignments;
 
 		//Show total progress
-		printf("Total alignments readed: %d\n", count);
+		printf("Total alignments readed: %d\r", count);
 		fflush(stdout);
 
 	}while(batch && batch->num_alignments != 0);
@@ -60,6 +62,11 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path)
 		//Free batch
 		bam_batch_free(batch, 1);
 	}
+
+	//Print changed cigars
+	printf("\n");
+	printf("Total CIGAR aligned: %d\n", cigar_changed);
+	fflush(stdout);
 
 	//Memory free
 	printf("\nClosing BAM file...\n");
@@ -115,13 +122,14 @@ alig_bam_batch(bam_batch_t* batch, genome_t* ref)
 			//ERASE
 			if(memcmp(bam1_cigar(alig), new_cigar, sizeof(uint32_t) * alig->core.n_cigar) != 0)
 			{
-				char str_cigar[200];
+				/*char str_cigar[200];
 				char str_new_cigar[200];
 				alig_aux_cigar32_to_string(bam1_cigar(alig), alig->core.n_cigar, str_cigar);
 				alig_aux_cigar32_to_string(new_cigar, new_cigar_l, str_new_cigar);
 				printf("NEW CIGAR: %s => %s, %d => %d\n", str_cigar, str_new_cigar, alig->core.n_cigar,new_cigar_l);
 				printf("POSITION: %d:%d \n", alig->core.tid, alig->core.pos);
-				printf("***********************\n");
+				printf("***********************\n");*/
+				cigar_changed++;
 			}
 
 			//Free reference seq
@@ -209,7 +217,7 @@ alig_cigar_leftmost(char *ref, char *read, size_t read_l, uint32_t *cigar, size_
 				count = indel_l;
 
 				//ERASE
-				{
+				/*{
 					read[read_l] = '\0';
 					orig_ref[read_l] = '\0';
 					alig_aux_cigar32_to_string(unclip_cigar, unclip_cigar_l, str_new_cigar);
@@ -223,7 +231,7 @@ alig_cigar_leftmost(char *ref, char *read, size_t read_l, uint32_t *cigar, size_
 					alig_aux_cigar32_to_string(aux_cigar, unclip_cigar_l, str_new_cigar);
 					printf("REF%d -> %s - %s ::: Retry - %d\n", 1, aux_ref, str_new_cigar, count);
 					printed = 1;
-				}
+				}*/
 			}
 			else
 			{
@@ -254,7 +262,7 @@ alig_cigar_leftmost(char *ref, char *read, size_t read_l, uint32_t *cigar, size_
 					count = indel_l;
 
 					//ERASE
-					{
+					/*{
 						if(!printed)
 						{
 							read[read_l] = '\0';
@@ -271,7 +279,7 @@ alig_cigar_leftmost(char *ref, char *read, size_t read_l, uint32_t *cigar, size_
 						aux_ref[read_l] = '\0';
 						alig_aux_cigar32_to_string(aux_cigar, unclip_cigar_l, str_new_cigar);
 						printf("REF%d -> %s - %s ::: Retry - %d\n", j, aux_ref, str_new_cigar, count);
-					}
+					}*/
 				}
 
 				if((aux_cigar[indel_index - 1] >> BAM_CIGAR_SHIFT) == 0)
