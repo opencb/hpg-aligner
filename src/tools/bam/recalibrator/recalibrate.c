@@ -156,7 +156,7 @@ int mymain(	int full,
 			strcat(filename,sched);
 		else
 		{
-			printf("ERROR: Obtainig OMP_SCHEDULE environment value\n");
+			printf("ERROR: Obtaining OMP_SCHEDULE environment value\n");
 		}
 
 		//Create stats directory
@@ -489,7 +489,7 @@ int recalibrate_bam(int argc, char **argv)
 	/* Incorrect case: No cycles*/
     if (cycles->count == 0)
     {
-		printf("Please, specify number of cycles with -C.\n");
+		printf("Please, specify number of cycles with -c.\n");
 		exitcode = 1;
 		goto exit;
 	}
