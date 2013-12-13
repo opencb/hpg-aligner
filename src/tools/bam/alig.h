@@ -23,7 +23,7 @@
  * BAM REALIGN
  */
 
-int alig_bam_file(const char *bam_path, const char *ref_name, const char *ref_path);
+int alig_bam_file(char *bam_path, char *ref_name, char *ref_path);
 int alig_bam_batch(bam_batch_t* batch, genome_t* ref);
 
 

@@ -12,7 +12,7 @@
  */
 
 int
-alig_bam_file(const char *bam_path, const char *ref_name, const char *ref_path)
+alig_bam_file(char *bam_path, char *ref_name, char *ref_path)
 {
 	bam_file_t *bam_f = NULL;
 	bam_batch_t *batch = NULL;
@@ -76,8 +76,8 @@ alig_bam_batch(bam_batch_t* batch, genome_t* ref)
 		if(alig->core.qual != 0 && !(alig->core.flag & BAM_FSECONDARY) && alig->core.mtid == alig->core.tid)
 		{
 			//Allocate
-			ref_seq = (char *)malloc(sizeof(char) * alig->core.l_qseq + 30);
-			bam_seq = (char *)malloc(sizeof(char) * alig->core.l_qseq + 1);
+			ref_seq = (char *)malloc(sizeof(char) * alig->core.l_qseq + 32);
+			bam_seq = (char *)malloc(sizeof(char) * alig->core.l_qseq + 2);
 
 			//Get sequence
 			new_sequence_from_bam_ref(alig, bam_seq, alig->core.l_qseq);
