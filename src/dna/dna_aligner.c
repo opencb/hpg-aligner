@@ -4194,7 +4194,7 @@ void *write_sam_header(sa_genome3_t *genome, FILE *f) {
 // main 
 //--------------------------------------------------------------------
 
-void dna_aligner(int argc, char* argv[]) {
+void dna_aligner(options_t *options) {
   if (argc != 6) {
     printf("Usage: %s <sa-dirname> <fastq-filename> <output-filename-bam-or-sam> <batch-size> <num-threads>\n", argv[0]);
     exit(-1);
