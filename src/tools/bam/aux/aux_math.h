@@ -2,9 +2,9 @@
 #define AUX_MATH_H_
 
 #include <math.h>
-#include <recal_common.h>
-#include <recal_config.h>
-#include <aux_library.h>
+#include "aux_common.h"
+#include "aux_library.h"
+#include "recalibrate/recal_config.h"
 
 /**
  * Private functions

@@ -18,9 +18,10 @@
 #ifndef AUX_LIBRARY_H_
 #define AUX_LIBRARY_H_
 
-//#include "bam_recal_library.h"
-#include "bam.h"
-#include "bam_file.h"
+#include <bioformats/bam/samtools/bam.h>
+#include <bioformats/bam/bam_file.h>
+
+#include "aux_common.h"
 
 /***************************
  * MATH OPERATIONS

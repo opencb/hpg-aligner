@@ -10,8 +10,8 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <recal_common.h>
-#include <aux_library.h>
+#include "aux_common.h"
+#include "aux_library.h"
 
 /**
  * Private functions

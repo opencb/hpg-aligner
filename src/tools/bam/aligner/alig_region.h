@@ -12,7 +12,7 @@
 #include <stdint.h>
 
 #include "assert.h"
-#include "aux_library.h"
+#include "aux/aux_library.h"
 
 #include "containers/khash.h"
 #include "containers/linked_list.h"

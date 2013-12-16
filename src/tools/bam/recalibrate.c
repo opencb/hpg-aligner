@@ -22,10 +22,10 @@
 #include <libgen.h>
 #include <unistd.h>
 #include <sys/stat.h>
-#include "recal_config.h"
-#include "bam_recal_library.h"
-#include "aux_library.h"
-#include "timestats.h"
+#include "aux/aux_library.h"
+#include "aux/timestats.h"
+#include "recalibrate/recal_config.h"
+#include "recalibrate/bam_recal_library.h"
 
 int mymain(	int full,
 			int p1,

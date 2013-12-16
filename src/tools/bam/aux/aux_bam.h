@@ -8,9 +8,10 @@
 #ifndef AUX_BAM_H_
 #define AUX_BAM_H_
 
-#include <aux_library.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "aux_library.h"
 
 /**
  * Private functions

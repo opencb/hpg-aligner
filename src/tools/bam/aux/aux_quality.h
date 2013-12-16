@@ -5,8 +5,8 @@
 #include <math.h>
 #include <float.h>
 #include <fenv.h>
-#include <recal_common.h>
-#include <recal_config.h>
-#include <aux_library.h>
+#include "aux_common.h"
+#include "aux_library.h"
+#include "recalibrate/recal_config.h"
 
 #endif /* AUX_QUALITY_H_ */

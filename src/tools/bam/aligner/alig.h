@@ -13,10 +13,10 @@
 #include <stdlib.h>
 #include <stdint.h>
 
-#include "bioformats/bam/samtools/bam.h"
+#include <bioformats/bam/samtools/bam.h>
 #include <bioformats/bam/bam_file.h>
 #include <aligners/bwt/genome.h>
-#include "aux_library.h"
+#include "aux/aux_library.h"
 #include "alig_aux.h"
 
 /**

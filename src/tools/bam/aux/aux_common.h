@@ -15,8 +15,8 @@
 * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef COMMON_H_
-#define COMMON_H_
+#ifndef AUX_COMMON_H_
+#define AUX_COMMON_H_
 
 #include <stdint.h>
 
@@ -122,4 +122,4 @@ enum ERROR_C {
 };
 typedef enum ERROR_C ERROR_CODE;
 
-#endif /* COMMON_H_ */
+#endif /* AUX_COMMON_H_ */
