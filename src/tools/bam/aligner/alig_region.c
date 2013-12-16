@@ -160,7 +160,7 @@ region_table_insert(alig_region_table_t *table, alig_region_t *region)
 				}
 				else if(region->start_pos > list_region->start_pos && region->end_pos < list_region->end_pos)
 				{
-					//Nothing to do
+					//Noth-1ing to do
 					found = 1;
 					break;
 				}
@@ -242,14 +242,14 @@ region_get_from_bam1(const bam1_t *alig, size_t *r_pos, size_t *r_end_pos)
 	read_pos = alig->core.pos + 1;
 
 	//Call region get
-	region_get(cigar, cigar_l, read_pos, r_pos, r_end_pos);
+	return region_get(cigar, cigar_l, read_pos, r_pos, r_end_pos);
 }
 
 int
 region_get(uint32_t *cigar, uint32_t cigar_l, size_t pos, size_t *r_pos, size_t *r_end_pos)
 {
 	//Region
-	size_t reg_pos = -1;
+	size_t reg_pos = SIZE_MAX;
 	size_t reg_end_pos;
 
 	int i;
@@ -258,11 +258,15 @@ region_get(uint32_t *cigar, uint32_t cigar_l, size_t pos, size_t *r_pos, size_t 
 	{
 		//Check nulls
 		assert(cigar);
-		assert(cigar_l > 0);
+		//assert(cigar_l > 0);
 		assert(pos >= 0);
 		assert(r_pos);
 		assert(r_end_pos);
 	}
+
+	//If cigar length == 0 then return error
+	if(cigar_l == 0)
+		return -1;
 
 	//Search for indels
 	uint32_t elem, type;
@@ -304,23 +308,30 @@ region_get(uint32_t *cigar, uint32_t cigar_l, size_t pos, size_t *r_pos, size_t 
 			disp += elem;
 			break;
 
+		case BAM_CMATCH:
+		case BAM_CDIFF:
+		case BAM_CEQUAL:
+			//Increment displacement
+			disp += elem;
+			break;
+
 		case BAM_CHARD_CLIP:
-			if(i == 0)
-			{
-				break;
-			}
+		case BAM_CSOFT_CLIP:
+		if(i == 0)
+		{
+			break;
+		}
 
 		default:
 			//printf("X");
-			//Increment displacement
-			disp += elem;
+
 			break;
 		}
 	}
 	//printf("\n");
 
 	//Set output
-	if(reg_pos != -1)
+	if(reg_pos != SIZE_MAX)
 	{
 		*r_pos = reg_pos;
 		*r_end_pos = reg_end_pos;
@@ -328,8 +339,8 @@ region_get(uint32_t *cigar, uint32_t cigar_l, size_t pos, size_t *r_pos, size_t 
 	}
 	else
 	{
-		*r_pos = -1;
-		return -1;
+		*r_pos = SIZE_MAX;
+		return 0;
 	}
 
 }
