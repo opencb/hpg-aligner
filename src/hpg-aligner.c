@@ -144,15 +144,10 @@ int main(int argc, char* argv[]) {
   // parsing options
   options_t *options = parse_options(argc, argv);
 
-  printf("input-file = %s\n", options->in_filename);
-  printf("index-dir = %s\n", options->bwt_dirname);
-
   // now, we can set logs according to the command-line
   init_log_custom(options->log_level, 1, "hpg-aligner.log", "w");
 
-  printf("3333333333333 *********************\n");
-
-  validate_options(options, command);
+  validate_options(options);
   LOG_DEBUG_F("Command Mode: %s\n", command);
 
 
