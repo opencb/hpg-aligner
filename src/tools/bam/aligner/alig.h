@@ -21,7 +21,7 @@
 #include "aux/aux_library.h"
 #include "alig_region.h"
 
-#define ALIG_LIST_COUNT_THRESHOLD_TO_WRITE 1000
+#define ALIG_LIST_COUNT_THRESHOLD_TO_WRITE 10000
 
 /**
  * BAM REALIGN

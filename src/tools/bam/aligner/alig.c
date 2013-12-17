@@ -117,7 +117,7 @@ alig_bam_batch(bam_batch_t* batch, genome_t* ref)
 			genome_read_sequence_by_chr_index(ref_seq, (flag & BAM_FREVERSE) ? 1 : 0, (unsigned int)alig->core.tid, &init_pos, &end_pos, ref);
 
 			//Leftmost CIGARS
-			cigar_leftmost(ref_seq, bam_seq, alig->core.l_qseq, bam1_cigar(alig), alig->core.n_cigar, new_cigar, &new_cigar_l);
+			cigar32_leftmost(ref_seq, bam_seq, alig->core.l_qseq, bam1_cigar(alig), alig->core.n_cigar, new_cigar, &new_cigar_l);
 
 			//ERASE
 			if(memcmp(bam1_cigar(alig), new_cigar, sizeof(uint32_t) * alig->core.n_cigar) != 0)
@@ -151,7 +151,7 @@ alig_bam_file2(char *bam_path, char *ref_name, char *ref_path)
 
 	//BAM alignment
 	bam1_t* bam_read = NULL;
-	size_t bytes;
+	int bytes;
 	uint64_t read_pos = 0;
 	int32_t last_read_chrom = -1;
 
@@ -195,20 +195,20 @@ alig_bam_file2(char *bam_path, char *ref_name, char *ref_path)
 	}
 
 	//Create lists
-	write_list = array_list_new(100, 1.5f, COLLECTION_MODE_SYNCHRONIZED);
-	process_list = array_list_new(100, 1.5f, COLLECTION_MODE_SYNCHRONIZED);
+	write_list = array_list_new(11000, 1.2f, COLLECTION_MODE_SYNCHRONIZED);
+	process_list = array_list_new(11000, 1.2f, COLLECTION_MODE_SYNCHRONIZED);
 
 	//Read first alignment
 	bam_read = bam_init1();
 	bytes = bam_read1(bam_f->bam_fd, bam_read);
 	last_read_chrom = bam_read->core.tid;
 
-	//Put alignment to write list
-	array_list_insert(bam_read, write_list);
-
 	count = 1;
-	while(bytes > 0 /*&& count < 10000*/)
+	while(bytes > 0 /*&& count < 500000*/)
 	{
+		//Put alignment to write list
+		array_list_insert(bam_read, write_list);
+
 		//FILTERS: MAP QUALITY = 0, NOT PRIMARY ALIGNMENT, DIFFERENT MATE CHROM
 		if(bam_read
 				&& bam_read->core.qual != 0
@@ -238,7 +238,7 @@ alig_bam_file2(char *bam_path, char *ref_name, char *ref_path)
 			{
 				//ERROR HAPPENED
 				char cigarro[100];
-				cigar_to_string(bam1_cigar(bam_read), bam_read->core.n_cigar, cigarro);
+				cigar32_to_string(bam1_cigar(bam_read), bam_read->core.n_cigar, cigarro);
 				//Invalid CIGAR
 				printf("WARNING: Invalid CIGAR in %s - P:%d - l:%d - %s\n",
 						bam1_qname(bam_read), bam_read->core.pos, bam_read->core.n_cigar, cigarro);
@@ -311,9 +311,6 @@ alig_bam_file2(char *bam_path, char *ref_name, char *ref_path)
 		bam_read = bam_init1();
 		bytes = bam_read1(bam_f->bam_fd, bam_read);
 
-		//Put alignment to write list
-		array_list_insert(bam_read, write_list);
-
 		//If write list is big enought and process list is empty: write to disk
 		if(array_list_size(write_list) > ALIG_LIST_COUNT_THRESHOLD_TO_WRITE
 				&& array_list_size(process_list) == 0)
@@ -332,6 +329,8 @@ alig_bam_file2(char *bam_path, char *ref_name, char *ref_path)
 
 	//Write lastest reads
 	alig_bam_list_to_disk(write_list, out_bam_f);
+	printf("Total alignments readed: %d\r", count);
+	fflush(stdout);
 
 	//Print changed cigars
 	//printf("\n");
@@ -360,10 +359,106 @@ alig_bam_file2(char *bam_path, char *ref_name, char *ref_path)
 	return NO_ERROR;
 }
 
+typedef struct {
+	uint32_t *cigar;
+	size_t ops;
+} aux_cigar_t;
+
 ERROR_CODE
 alig_bam_list(array_list_t *bam_list)
 {
+	//Haplotypes list
+	array_list_t *haplo_list;
+
+	//Haplotype
+	aux_cigar_t *haplo;
+	size_t indels;
+
+	//Read
+	bam1_t *read;
+	uint32_t *read_cigar;
+
+	int i;
+
 	assert(bam_list);
+
+	//Init haplotype list
+	haplo_list = array_list_new(100, 1.2f, COLLECTION_MODE_SYNCHRONIZED);
+
+	//Get all haplotypes
+	for(i = 0; i < array_list_size(bam_list); i++)
+	{
+		//Get read
+		read = array_list_get(i, bam_list);
+
+		//This read have indels?
+		cigar32_count_indels(bam1_cigar(read), read->core.n_cigar, &indels);
+
+		if(indels == 1)	//Only one indel support
+		{
+			char cigar_str[100];
+			char cigar_str2[100];
+			char ref_str[200];
+			char read_str[200];
+			char ref_strx[200];
+			char ref_strx2[200];
+
+			//Set this cigar as haplotype
+			read_cigar = bam1_cigar(read);
+
+			//Allocate haplotype
+			haplo = (aux_cigar_t *)malloc(sizeof(aux_cigar_t));
+			haplo->cigar = (uint32_t *)malloc(sizeof(uint32_t) * read->core.n_cigar);
+			haplo->ops = read->core.n_cigar;
+			memcpy(haplo->cigar, read_cigar, sizeof(uint32_t) * read->core.n_cigar);
+
+			//Convert sequence to string
+			new_sequence_from_bam_ref(read, read_str, read->core.l_qseq);
+			new_sequence_from_bam_ref(read, ref_str, read->core.l_qseq);
+
+			//Leftmost cigar
+			cigar32_to_string(read_cigar, read->core.n_cigar, cigar_str);
+			cigar32_leftmost(ref_str, read_str, read->core.l_qseq, read_cigar, read->core.n_cigar, haplo->cigar, &haplo->ops);
+			cigar32_to_string(haplo->cigar, haplo->ops, cigar_str2);
+			if(memcmp(cigar_str, cigar_str2, strlen(cigar_str)))
+			{
+				cigar32_create_ref(read_cigar, read->core.n_cigar, ref_str, read_str, read->core.l_qseq, ref_strx);
+				cigar32_create_ref(haplo->cigar, haplo->ops, ref_str, read_str, read->core.l_qseq, ref_strx2);
+				printf("CIGAR LEFTALIGNED: %s - %s === %d:%d\n", cigar_str, cigar_str2, read->core.tid, read->core.pos);
+				printf("Ref  : %s\n", ref_str);
+				printf("Read : %s\n", read_str);
+				printf("Ref 1: %s\n", ref_strx);
+				printf("Red 2: %s\n", ref_strx2);
+			}
+
+			//Add to haplotype list
+			array_list_insert(haplo, haplo_list);
+		}
+	}
+
+	//ERASE
+	if(array_list_size(haplo_list))
+	{
+		char cigar_str[100];
+		aux_cigar_t *cigarro;
+
+		printf("Align %d reads\n", array_list_size(bam_list));
+		printf("%d haplotypes\n", array_list_size(haplo_list));
+		for(i = 0; i < array_list_size(haplo_list); i++)
+		{
+			cigarro = array_list_get(i, haplo_list);
+			cigar32_to_string(cigarro->cigar, cigarro->ops, cigar_str);
+			printf("H%d: %s\n", i, cigar_str);
+		}
+		printf("Press...\n");
+		getchar();
+	}
+
+
+	//Free memory
+	{
+		array_list_free(haplo_list, free);
+	}
 
 	return NO_ERROR;
 }
