@@ -12,11 +12,16 @@
 
 #include <stdlib.h>
 #include <stdint.h>
+#include <limits.h>
 
 #include <bioformats/bam/samtools/bam.h>
 #include <bioformats/bam/bam_file.h>
 #include <aligners/bwt/genome.h>
+#include "aux/aux_common.h"
 #include "aux/aux_library.h"
+#include "alig_region.h"
+
+#define ALIG_LIST_COUNT_THRESHOLD_TO_WRITE 1000
 
 /**
  * BAM REALIGN
@@ -24,6 +29,10 @@
 
 int alig_bam_file(char *bam_path, char *ref_name, char *ref_path);
 int alig_bam_batch(bam_batch_t* batch, genome_t* ref);
+
+EXTERNC ERROR_CODE alig_bam_file2(char *bam_path, char *ref_name, char *ref_path);
+EXTERNC ERROR_CODE alig_bam_list(array_list_t *bam_list);
+EXTERNC ERROR_CODE alig_bam_list_to_disk(array_list_t *bam_list, bam_file_t *bam_f);
 
 
 #endif /* ALIG_H_ */

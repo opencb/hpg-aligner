@@ -177,8 +177,9 @@ align_launch(char *reference, char *bam, char *output)
 	bamc = strdup(bam);
 	printf("Reference dir: %s\n", dir);
 	printf("Reference name: %s\n", base);
-	alig_bam_file(bamc, base, dir);
+	alig_bam_file2(bamc, base, dir);
 	free(bamc);
+	free(dir);
 
 	stop_log();
 
