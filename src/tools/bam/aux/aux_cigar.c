@@ -84,15 +84,15 @@ cigar32_leftmost(char *ref, char *read, size_t read_l, uint32_t *cigar, size_t c
 				/*{
 					read[read_l] = '\0';
 					orig_ref[read_l] = '\0';
-					alig_aux_cigar32_to_string(unclip_cigar, unclip_cigar_l, str_new_cigar);
-					alig_aux_cigar32_to_string(cigar, cigar_l, str_cigar);
+					cigar32_to_string(unclip_cigar, unclip_cigar_l, str_new_cigar);
+					cigar32_to_string(cigar, cigar_l, str_cigar);
 					printf("CIGAR = %s, Indel L: %d\n", str_cigar, indel_l);
 					printf("CIGAR*= %s\n", str_new_cigar);
 					printf("READ -> %s - L: %d\n", read, read_l);
 					printf("REF  -> %s\n", ref);
 					printf("REF* -> %s - %s\n", orig_ref, str_new_cigar);
 					aux_ref[read_l] = '\0';
-					alig_aux_cigar32_to_string(aux_cigar, unclip_cigar_l, str_new_cigar);
+					cigar32_to_string(aux_cigar, unclip_cigar_l, str_new_cigar);
 					printf("REF%d -> %s - %s ::: Retry - %d\n", 1, aux_ref, str_new_cigar, count);
 					printed = 1;
 				}*/
@@ -131,8 +131,8 @@ cigar32_leftmost(char *ref, char *read, size_t read_l, uint32_t *cigar, size_t c
 						{
 							read[read_l] = '\0';
 							orig_ref[read_l] = '\0';
-							alig_aux_cigar32_to_string(unclip_cigar, unclip_cigar_l, str_new_cigar);
-							alig_aux_cigar32_to_string(cigar, cigar_l, str_cigar);
+							cigar32_to_string(unclip_cigar, unclip_cigar_l, str_new_cigar);
+							cigar32_to_string(cigar, cigar_l, str_cigar);
 							printf("CIGAR = %s, Indel L: %d\n", str_cigar, indel_l);
 							printf("CIGAR*= %s\n", str_new_cigar);
 							printf("READ -> %s - L: %d\n", read, read_l);
@@ -141,7 +141,7 @@ cigar32_leftmost(char *ref, char *read, size_t read_l, uint32_t *cigar, size_t c
 							printed = 1;
 						}
 						aux_ref[read_l] = '\0';
-						alig_aux_cigar32_to_string(aux_cigar, unclip_cigar_l, str_new_cigar);
+						cigar32_to_string(aux_cigar, unclip_cigar_l, str_new_cigar);
 						printf("REF%d -> %s - %s ::: Retry - %d\n", j, aux_ref, str_new_cigar, count);
 					}*/
 				}
