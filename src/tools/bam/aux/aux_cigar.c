@@ -423,9 +423,7 @@ cigar32_create_ref(uint32_t *cigar, size_t cigar_l, char *ref, char *read, size_
 			extra += elem;
 			break;
 		case BAM_CMATCH:
-		case BAM_CHARD_CLIP:
-		case BAM_CSOFT_CLIP:
-		case BAM_CPAD:
+		case BAM_CDIFF:
 		case BAM_CEQUAL:
 			//Copy reference as it is
 			memcpy(aux_str + index_aux, ref + index_ref, elem);
@@ -433,6 +431,13 @@ cigar32_create_ref(uint32_t *cigar, size_t cigar_l, char *ref, char *read, size_
 			index_ref += elem;
 			index_read += elem;
 			index_aux += elem;
+			break;
+
+		case BAM_CHARD_CLIP:
+		case BAM_CSOFT_CLIP:
+		case BAM_CPAD:
+			//Clips
+			index_read += elem;
 			break;
 
 		default:
@@ -443,12 +448,13 @@ cigar32_create_ref(uint32_t *cigar, size_t cigar_l, char *ref, char *read, size_
 	}
 
 	//Copy last nucleotides
-	remain = length - index_read;
-	if(remain)
-		memcpy(aux_str + index_aux, ref + index_ref, remain);
+	//remain = length - index_read;
+	//if(remain)
+	//	memcpy(aux_str + index_aux, ref + index_ref, remain);
 
 	//Set output
-	memcpy(new_ref, aux_str, sizeof(char) * length);
+	aux_str[index_aux + 1] = '\0';
+	memcpy(new_ref, aux_str, sizeof(char) * index_aux + 2);
 
 	//Free
 	free(aux_str);
