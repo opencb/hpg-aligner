@@ -1,0 +1,19 @@
+# File formats
+*.a
+*.o
+*.so
+*.test
+*.gch
+*~
+
+# Build folders
+bin/*
+build/*
+
+# IDE and build systems
+*anjuta*
+*sonar*
+*kdev*
+.sconsign.dblite
+.sconf_temp
+
