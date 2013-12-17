@@ -28,6 +28,12 @@ else:
     debug = 0
     env['CFLAGS'] += ' -O3'
 
+if int(ARGUMENTS.get('verbose', '0')) == 1:
+    env['CFLAGS'] += ' -D_VERBOSE'
+
+if int(ARGUMENTS.get('timing', '0')) == 1:
+    env['CFLAGS'] += ' -D_TIMING'
+
 env['objects'] = []
 
 # Targets
@@ -35,6 +41,18 @@ env['objects'] = []
 SConscript(['%s/SConscript' % bioinfo_path,
             '%s/SConscript' % commons_path
             ], exports = ['env', 'debug', 'compiler'])
+
+env.Program('#bin/hpg-aligner',
+             source = [Glob('src/*.c'),
+		       Glob('src/build-index/*.c'),
+		       Glob('src/dna/*.c'),
+	               Glob('src/rna/*.c'),
+	               Glob('src/bs/*.c'),
+	               Glob('src/sa/*.c'),
+		       "%s/libcommon.a" % commons_path,
+		       "%s/libbioinfo.a" % bioinfo_path
+                      ]
+           )
 
 env.Program('#bin/hpg-bam',
              source = [Glob('src/tools/bam/*.c'), 
