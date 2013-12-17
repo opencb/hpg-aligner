@@ -154,8 +154,10 @@ int main(int argc, char* argv[]) {
   printf("3333333333333 *********************\n");
 
   validate_options(options, command);
+
   LOG_DEBUG_F("Command Mode: %s\n", command);
 
+  printf("Mode %s\n", command);
 
   if (strcmp(command, "dna") == 0) {
     dna_aligner(options);
@@ -170,8 +172,7 @@ int main(int argc, char* argv[]) {
 			options->index_ratio, false, "ACGT");
       LOG_DEBUG("Done !!\n");
       exit(0);
-    }
-    else { // bisulphite index generation
+    } else { // bisulphite index generation
       printf("\nBisulphite index generation\n");
       
       /** **************************************************************************	*
@@ -238,17 +239,20 @@ int main(int argc, char* argv[]) {
   // load index for dna/rna or for bisulfite case
 
   start_timer(time_genome_s);
-  if (strcmp(command, "bs" ) != 0)
-  {
+  if (strcmp(command, "bs" ) != 0) {
     // genome parameters
     LOG_DEBUG("Reading genome...");
     //genome_t* genome = genome_new("dna_compression.bin", options->bwt_dirname);
+
+    printf("Load genome %s\n", options->bwt_dirname);
     genome = genome_new("dna_compression.bin", options->bwt_dirname);
+    printf("Load genome 2\n");
+
     LOG_DEBUG("Done !!");
     
     // Metaexons structure
     metaexons = metaexons_new(genome);
-
+    printf("Load genome 1\n");
     // BWT index
     LOG_DEBUG("Reading bwt index...");
     //if (time_on) { timing_start(INIT_BWT_INDEX, 0, timing_p); }
@@ -348,6 +352,7 @@ int main(int argc, char* argv[]) {
     //    initTable();
     //    LOG_DEBUG("init table done !!");
     // RNA version
+    printf("RUN RNA\n");
     run_rna_aligner(genome, bwt_index, pair_mng, bwt_optarg, cal_optarg, report_optarg, metaexons, options);
   } else if (!strcmp(command, "dna")) {
     //    LOG_DEBUG("init table...");
