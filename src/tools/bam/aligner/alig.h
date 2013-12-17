@@ -27,11 +27,8 @@
  * BAM REALIGN
  */
 
-int alig_bam_file(char *bam_path, char *ref_name, char *ref_path);
-int alig_bam_batch(bam_batch_t* batch, genome_t* ref);
-
 EXTERNC ERROR_CODE alig_bam_file2(char *bam_path, char *ref_name, char *ref_path);
-EXTERNC ERROR_CODE alig_bam_list(array_list_t *bam_list);
+EXTERNC ERROR_CODE alig_bam_list(array_list_t *bam_list, char *ref, size_t ref_pos, size_t ref_l);
 EXTERNC ERROR_CODE alig_bam_list_to_disk(array_list_t *bam_list, bam_file_t *bam_f);
 
 
