@@ -1,0 +1,20 @@
+#ifndef _SA_IO_STAGES_H
+#define _SA_IO_STAGES_H
+
+#include "sa/sa_index3.h"
+
+#include "batch_writer.h"
+
+#include "dna/sa_dna_commons.h"
+
+//--------------------------------------------------------------------
+
+void *sa_fq_reader(void *input);
+int sa_sam_writer(void *data);
+
+void *write_sam_header(sa_genome3_t *genome, FILE *f);
+
+//--------------------------------------------------------------------
+//--------------------------------------------------------------------
+
+#endif // _SA_IO_STAGES_H

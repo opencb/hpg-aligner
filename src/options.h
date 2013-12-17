@@ -50,11 +50,17 @@
 #define DEFAULT_FILTER_SEED_MAPPINGS_BS 500
 //=====================================================================
 
-//#define NUM_OPTIONS			45
-#define NUM_OPTIONS			46
+#define DNA_MODE 0
+#define RNA_MODE 1
+#define BS_MODE  2
+
+#define NUM_OPTIONS			26
+#define NUM_RNA_OPTIONS			 5
+
 
 typedef struct options {
-  char mode[64];
+  int mode;
+  int gzip;
   unsigned char bwt_set;
   unsigned char reg_set;
   unsigned char cal_set;
@@ -99,6 +105,7 @@ typedef struct options {
   double mismatch;
   double gap_open;
   double gap_extend;
+  char str_mode[32];
   char* prefix_name;
   char* in_filename;
   char* in_filename2;
@@ -118,9 +125,9 @@ void options_free(options_t *options);
 
 void options_display(options_t *options);
 
-void usage_cli();
+void usage_cli(int mode);
 
-void validate_options(options_t *options, char *mode);
+void validate_options(options_t *options, int mode);
 
 /**
  * @brief Initializes an global_options_t structure mandatory members.
@@ -128,7 +135,7 @@ void validate_options(options_t *options, char *mode);
  *
  * Initializes the only mandatory member of a global_options_t, which is the output directory.
  */
-void** argtable_options_new(void);
+void** argtable_options_new(int mode);
 
 
 /**
@@ -137,7 +144,7 @@ void** argtable_options_new(void);
  *
  * Free memory associated to a global_options_data_t structure, including its text buffers.
  */
-void argtable_options_free(void **argtable_options);
+void argtable_options_free(void **argtable_options, int num_options);
 
 
 /**
