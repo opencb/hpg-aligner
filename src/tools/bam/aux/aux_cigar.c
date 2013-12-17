@@ -8,7 +8,7 @@
 #include "aux_cigar.h"
 
 ERROR_CODE
-cigar_leftmost(char *ref, char *read, size_t read_l, uint32_t *cigar, size_t cigar_l, uint32_t *new_cigar, size_t *new_cigar_l)
+cigar32_leftmost(char *ref, char *read, size_t read_l, uint32_t *cigar, size_t cigar_l, uint32_t *new_cigar, size_t *new_cigar_l)
 {
 	//M blocks
 	size_t blocks_c;
@@ -44,10 +44,10 @@ cigar_leftmost(char *ref, char *read, size_t read_l, uint32_t *cigar, size_t cig
 	assert(new_cigar_l);
 
 	//Unclip cigar
-	cigar_unclip(cigar, cigar_l, unclip_cigar, &unclip_cigar_l);
+	cigar32_unclip(cigar, cigar_l, unclip_cigar, &unclip_cigar_l);
 
 	//Count blocks and indels
-	cigar_count_all(unclip_cigar, unclip_cigar_l, &blocks_c, &indels_c, &indel_index);
+	cigar32_count_all(unclip_cigar, unclip_cigar_l, &blocks_c, &indels_c, &indel_index);
 
 	//Get indel length
 	indel_l = unclip_cigar[indel_index] >> BAM_CIGAR_SHIFT;
@@ -64,13 +64,13 @@ cigar_leftmost(char *ref, char *read, size_t read_l, uint32_t *cigar, size_t cig
 			//Get reference for original CIGAR
 			orig_ref = (char *)malloc(sizeof(char) * (read_l + 1));
 			aux_ref = (char *)malloc(sizeof(char) * (read_l + 1));
-			cigar_create_ref(unclip_cigar, unclip_cigar_l, ref, read, read_l, orig_ref);
+			cigar32_create_ref(unclip_cigar, unclip_cigar_l, ref, read, read_l, orig_ref);
 
 			//Shift left CIGAR
-			cigar_shift_left_indel(unclip_cigar, unclip_cigar_l, indel_index, aux_cigar);
+			cigar32_shift_left_indel(unclip_cigar, unclip_cigar_l, indel_index, aux_cigar);
 
 			//Get new CIGAR ref
-			cigar_create_ref(aux_cigar, unclip_cigar_l, ref, read, read_l, aux_ref);
+			cigar32_create_ref(aux_cigar, unclip_cigar_l, ref, read, read_l, aux_ref);
 
 			//Is a valid ref?
 			if(!memcmp(aux_ref, orig_ref, read_l * sizeof(char)))
@@ -112,10 +112,10 @@ cigar_leftmost(char *ref, char *read, size_t read_l, uint32_t *cigar, size_t cig
 				j++;
 
 				//Shift left CIGAR
-				cigar_shift_left_indel(aux_cigar, unclip_cigar_l, indel_index, aux_cigar);
+				cigar32_shift_left_indel(aux_cigar, unclip_cigar_l, indel_index, aux_cigar);
 
 				//Get new CIGAR ref
-				cigar_create_ref(aux_cigar, unclip_cigar_l, ref, read, read_l, aux_ref);
+				cigar32_create_ref(aux_cigar, unclip_cigar_l, ref, read, read_l, aux_ref);
 
 				//Is a valid ref?
 				if(!memcmp(aux_ref, orig_ref, read_l * sizeof(char)))
@@ -167,7 +167,7 @@ cigar_leftmost(char *ref, char *read, size_t read_l, uint32_t *cigar, size_t cig
 
 
 ERROR_CODE
-cigar_unclip(uint32_t *cigar, size_t cigar_l, uint32_t *new_cigar, size_t *new_cigar_l)
+cigar32_unclip(uint32_t *cigar, size_t cigar_l, uint32_t *new_cigar, size_t *new_cigar_l)
 {
 	int i;
 	int c_count;
@@ -208,7 +208,7 @@ cigar_unclip(uint32_t *cigar, size_t cigar_l, uint32_t *new_cigar, size_t *new_c
 }
 
 ERROR_CODE
-cigar_count_m_blocks(uint32_t *cigar, size_t cigar_l, size_t *blocks)
+cigar32_count_m_blocks(uint32_t *cigar, size_t cigar_l, size_t *blocks)
 {
 	int i;
 	int c_count;
@@ -245,7 +245,7 @@ cigar_count_m_blocks(uint32_t *cigar, size_t cigar_l, size_t *blocks)
 }
 
 ERROR_CODE
-cigar_count_indels(uint32_t *cigar, size_t cigar_l, size_t *indels)
+cigar32_count_indels(uint32_t *cigar, size_t cigar_l, size_t *indels)
 {
 	int i;
 	int c_count;
@@ -280,7 +280,7 @@ cigar_count_indels(uint32_t *cigar, size_t cigar_l, size_t *indels)
 }
 
 ERROR_CODE
-cigar_count_all(uint32_t *cigar, size_t cigar_l, size_t *m_blocks, size_t *indels, size_t *first_indel_index)
+cigar32_count_all(uint32_t *cigar, size_t cigar_l, size_t *m_blocks, size_t *indels, size_t *first_indel_index)
 {
 	int i;
 	int c_count;
@@ -333,7 +333,7 @@ cigar_count_all(uint32_t *cigar, size_t cigar_l, size_t *m_blocks, size_t *indel
 }
 
 ERROR_CODE
-cigar_to_string(uint32_t *cigar, size_t cigar_l, char* str_cigar)
+cigar32_to_string(uint32_t *cigar, size_t cigar_l, char* str_cigar)
 {
 	int i, elem, type;
 
@@ -379,7 +379,7 @@ cigar_to_string(uint32_t *cigar, size_t cigar_l, char* str_cigar)
 }
 
 ERROR_CODE
-cigar_create_ref(uint32_t *cigar, size_t cigar_l, char *ref, char *read, size_t length, char *new_ref)
+cigar32_create_ref(uint32_t *cigar, size_t cigar_l, char *ref, char *read, size_t length, char *new_ref)
 {
 	int i, elem, type, extra;
 	char *aux_str;
@@ -457,7 +457,7 @@ cigar_create_ref(uint32_t *cigar, size_t cigar_l, char *ref, char *read, size_t 
 }
 
 ERROR_CODE
-cigar_shift_left_indel(uint32_t *cigar, size_t cigar_l, size_t indel_index, uint32_t *new_cigar)
+cigar32_shift_left_indel(uint32_t *cigar, size_t cigar_l, size_t indel_index, uint32_t *new_cigar)
 {
 	int i, elem, type;
 

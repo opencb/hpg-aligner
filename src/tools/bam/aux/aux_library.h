@@ -127,14 +127,14 @@ EXTERNC ERROR_CODE log10_Qemp_likelihood(double Qemp, U_BASES obs, U_BASES err, 
  * CIGAR OPERATIONS
  **************************/
 
-EXTERNC ERROR_CODE cigar_leftmost(char *ref, char *read, size_t read_l, uint32_t *cigar, size_t cigar_l, uint32_t *new_cigar, size_t *new_cigar_l);
-EXTERNC ERROR_CODE cigar_unclip(uint32_t *cigar, size_t cigar_l, uint32_t *new_cigar, size_t *new_cigar_l);
-EXTERNC ERROR_CODE cigar_count_m_blocks(uint32_t *cigar, size_t cigar_l, size_t *blocks);
-EXTERNC ERROR_CODE cigar_count_indels(uint32_t *cigar, size_t cigar_l, size_t *indels);
-EXTERNC ERROR_CODE cigar_count_all(uint32_t *cigar, size_t cigar_l, size_t *m_blocks, size_t *indels, size_t *first_indel_index);
-EXTERNC ERROR_CODE cigar_to_string(uint32_t *cigar, size_t cigar_l, char* str_cigar);
-EXTERNC ERROR_CODE cigar_create_ref(uint32_t *cigar, size_t cigar_l, char *ref, char *read, size_t length, char *new_ref);
-EXTERNC ERROR_CODE cigar_shift_left_indel(uint32_t *cigar, size_t cigar_l, size_t indel_index, uint32_t *new_cigar);
+EXTERNC ERROR_CODE cigar32_leftmost(char *ref, char *read, size_t read_l, uint32_t *cigar, size_t cigar_l, uint32_t *new_cigar, size_t *new_cigar_l);
+EXTERNC ERROR_CODE cigar32_unclip(uint32_t *cigar, size_t cigar_l, uint32_t *new_cigar, size_t *new_cigar_l);
+EXTERNC ERROR_CODE cigar32_count_m_blocks(uint32_t *cigar, size_t cigar_l, size_t *blocks);
+EXTERNC ERROR_CODE cigar32_count_indels(uint32_t *cigar, size_t cigar_l, size_t *indels);
+EXTERNC ERROR_CODE cigar32_count_all(uint32_t *cigar, size_t cigar_l, size_t *m_blocks, size_t *indels, size_t *first_indel_index);
+EXTERNC ERROR_CODE cigar32_to_string(uint32_t *cigar, size_t cigar_l, char* str_cigar);
+EXTERNC ERROR_CODE cigar32_create_ref(uint32_t *cigar, size_t cigar_l, char *ref, char *read, size_t length, char *new_ref);
+EXTERNC ERROR_CODE cigar32_shift_left_indel(uint32_t *cigar, size_t cigar_l, size_t indel_index, uint32_t *new_cigar);
 
 
 /***************************
