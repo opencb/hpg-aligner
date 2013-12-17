@@ -466,9 +466,10 @@ options_t *parse_options(int argc, char **argv) {
   if (argc < 2) {
     usage(argtable);
     exit(-1);
-  }else {
-
+  } else {
     int num_errors = arg_parse(argc, argv, argtable);
+    
+    printf("-----------> num_errors = %i\n", num_errors);
 
     if (((struct arg_int*)argtable[29])->count) {
       usage(argtable);
