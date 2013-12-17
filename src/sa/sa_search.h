@@ -13,7 +13,7 @@ size_t search_suffix(char *seq, uint len, int max_num_suffixes,
 		     sa_index3_t *sa_index, 
 		     size_t *low, size_t *high, size_t *suffix_len
                      #ifdef _TIMING
-		     , sa_mapping_batch_t *mapping_batch
+		     , double *prefix_time, double *suffix_time
                      #endif
 		     );
 

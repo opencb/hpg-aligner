@@ -282,7 +282,6 @@ int generate_cals_from_suffixes(int strand, fastq_read_t *read, char *revcomp,
   gettimeofday(&start, NULL);
   #endif
 
-
   size_t r_start_suf, r_end_suf, g_start_suf, g_end_suf;
   size_t r_start, r_end, r_len, g_start, g_end, g_len;
   int found_cal, chrom, diff, max_map_len = 0, num_mismatches = 0;
@@ -349,6 +348,8 @@ int generate_cals_from_suffixes(int strand, fastq_read_t *read, char *revcomp,
 	   g_start, r_start, r_end, g_end, (strand == 0 ? '+' : '-'), 
 	   sa_index->genome->chrom_names[chrom]);
     #endif
+
+    // right-side
     if (r_end >= read->length - 10) {
       // create seed
       #ifdef _TIMING
@@ -438,6 +439,7 @@ int generate_cals_from_suffixes(int strand, fastq_read_t *read, char *revcomp,
       }
     }
 
+    // left-side
     if (read_pos > 0) {
       // extend suffix to left side
       r_start = 0;
@@ -581,6 +583,7 @@ array_list_t *step_one(fastq_read_t *read, char *revcomp_seq,
   struct timeval stop, start;
   #endif
 
+  double prefix_time, suffix_time;
   int suffix_len, num_suffixes;
   char *r_seq = read->sequence;
 
@@ -633,13 +636,16 @@ array_list_t *step_one(fastq_read_t *read, char *revcomp_seq,
 				   MAX_NUM_SUFFIXES, sa_index, 
 				   &low, &high, &suffix_len
                                    #ifdef _TIMING
-				   , mapping_batch
+				   , &prefix_time, &suffix_time
                                    #endif
 				   );
       #ifdef _TIMING
       gettimeofday(&stop, NULL);
       mapping_batch->func_times[FUNC_SEARCH_SUFFIX] += 
 	((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);  
+
+      mapping_batch->func_times[FUNC_SEARCH_PREFIX] += prefix_time;
+      mapping_batch->func_times[FUNC_SEARCH_SA] +=  suffix_time;
       #endif
       
       #ifdef _VERBOSE	  
@@ -1223,7 +1229,7 @@ int sa_mapper(void *data) {
       filter_cals_by_max_num_mismatches(min_num_mismatches, &cal_list);
       #ifdef _TIMING
       gettimeofday(&stop, NULL);
-      mapping_batch->func_times[FUNC_FILTER_BY_READ_AREA] += 
+      mapping_batch->func_times[FUNC_FILTER_BY_NUM_MISMATCHES] += 
 	((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);  
       #endif
 
@@ -1241,7 +1247,7 @@ int sa_mapper(void *data) {
       filter_cals_by_max_num_mismatches(min_num_mismatches, &cal_list);
       #ifdef _TIMING
       gettimeofday(&stop, NULL);
-      mapping_batch->func_times[FUNC_FILTER_BY_READ_AREA] += 
+      mapping_batch->func_times[FUNC_FILTER_BY_NUM_MISMATCHES] += 
 	((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);  
       #endif
     }

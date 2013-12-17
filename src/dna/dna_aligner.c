@@ -7,6 +7,7 @@
 
 void dna_aligner(options_t *options) {
   #ifdef _TIMING
+  init_func_names();
   for (int i = 0; i < NUM_TIMING; i++) {
     func_times[i] = 0;
   }
