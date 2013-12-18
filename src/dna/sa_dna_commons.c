@@ -4,6 +4,34 @@
 // utils
 //--------------------------------------------------------------------
 
+#ifdef _TIMING
+void init_func_names() {
+  strcpy(func_names[0], "search_suffix");
+  strcpy(func_names[1], "search_prefix");
+  strcpy(func_names[2], "search_sa");
+  strcpy(func_names[3], "generate_cals_from_exact_read");
+  strcpy(func_names[4], "generate_cals_from_suffixes");
+  strcpy(func_names[5], "init_cals_from_suffixes");
+  strcpy(func_names[6], "set_positions");
+  strcpy(func_names[7], "set_reference_sequence");
+  strcpy(func_names[8], "skip_suffixes");
+  strcpy(func_names[9], "mini_sw_right_side");
+  strcpy(func_names[10], "mini_sw_left_side");
+  strcpy(func_names[11], "seed_region_new");
+  strcpy(func_names[12], "seed_list_insert");
+  strcpy(func_names[13], "cal_new");
+  strcpy(func_names[14], "cal_mng_insert");
+  strcpy(func_names[15], "cal_mng_to_array_list");
+  strcpy(func_names[16], "filter_by_read_area");
+  strcpy(func_names[17], "filter_by_num_mismatches");
+  strcpy(func_names[18], "sw_pre_processing");
+  strcpy(func_names[19], "sw_execution");
+  strcpy(func_names[20], "sw_post_processing");
+  strcpy(func_names[21], "other functions");
+  strcpy(func_names[22], "create_alignments");
+}
+#endif
+
 int get_min_num_mismatches(array_list_t *cal_list) {
   cal_t *cal;
   size_t num_cals = array_list_size(cal_list);

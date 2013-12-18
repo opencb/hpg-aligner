@@ -141,19 +141,13 @@ int main(int argc, char* argv[]) {
     LOG_FATAL("Command unknown.\nValid commands are:\n\tdna: to map DNA sequences\n\trna: to map RNA sequences\n\tbs: to map BS sequences\n\tbuild-index: to create the genome index.\nUse -h or --help to display hpg-aligner options.");
   }
 
-  printf("11111111111 *********************\n");
-
   // parsing options
   options_t *options = parse_options(argc, argv);
-
-  printf("222222222222 *********************\n");
 
   // now, we can set logs according to the command-line
   init_log_custom(options->log_level, 1, "hpg-aligner.log", "w");
 
-  printf("3333333333333 *********************\n");
-
-  validate_options(options, command);
+  validate_options(options);
   LOG_DEBUG_F("Command Mode: %s\n", command);
 
 
