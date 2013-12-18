@@ -153,6 +153,7 @@ int main(int argc, char* argv[]) {
 
   if (strcmp(command, "dna") == 0) {
     dna_aligner(options);
+    options_free(options);
     exit(-1);
   }
 
@@ -280,12 +281,10 @@ int main(int argc, char* argv[]) {
     LOG_DEBUG("Loading AGT index...");
     bwt_index1 = bwt_index_new(bs_dir1, false);
     //printf("Load index1 done\n");
-    /*
-    printf("+++bwt_index1 -> %s\n" ,bwt_index1->nucleotides);
-    bwt_index1->nucleotides = strdup(readNucleotide(bs_dir1, "Nucleotide"));
-    bwt_init_replace_table(bwt_index1->nucleotides, bwt_index1->table, bwt_index1->rev_table);
-    printf("***bwt_index1 -> %s\n" ,bwt_index1->nucleotides);
-    */
+    //printf("+++bwt_index1 -> %s\n" ,bwt_index1->nucleotides);
+    //bwt_index1->nucleotides = strdup(readNucleotide(bs_dir1, "Nucleotide"));
+    //bwt_init_replace_table(bwt_index1->nucleotides, bwt_index1->table, bwt_index1->rev_table);
+    //printf("***bwt_index1 -> %s\n" ,bwt_index1->nucleotides);
     LOG_DEBUG("Loading AGT index done !!");
 
     //printf("Load index2 (%s)\n", bs_dir2);

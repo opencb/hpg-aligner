@@ -1,5 +1,24 @@
 #include "sa_dna_commons.h"
 
+
+//--------------------------------------------------------------------
+// commons
+//--------------------------------------------------------------------
+
+void seed_free(seed_t *p) {
+  if (p) free(p);
+}
+
+//--------------------------------------------------------------------
+
+void cal_free_ex(cal_t *cal) {
+  if (cal->sr_list) {
+    linked_list_free(cal->sr_list, (void *) seed_free);
+    cal->sr_list = NULL;
+  }
+  cal_free(cal);
+}
+
 //--------------------------------------------------------------------
 // utils
 //--------------------------------------------------------------------
@@ -17,7 +36,7 @@ void init_func_names() {
   strcpy(func_names[8], "skip_suffixes");
   strcpy(func_names[9], "mini_sw_right_side");
   strcpy(func_names[10], "mini_sw_left_side");
-  strcpy(func_names[11], "seed_region_new");
+  strcpy(func_names[11], "seed_new");
   strcpy(func_names[12], "seed_list_insert");
   strcpy(func_names[13], "cal_new");
   strcpy(func_names[14], "cal_mng_insert");
@@ -76,7 +95,7 @@ void filter_cals_by_min_read_area(int read_area, array_list_t **list) {
       array_list_set(j, NULL, cal_list);
     }
   }
-  array_list_free(cal_list, (void *) cal_free);
+  array_list_free(cal_list, (void *) cal_free_ex);
   *list = new_cal_list;
 }
 
@@ -95,7 +114,7 @@ void filter_cals_by_max_read_area(int read_area, array_list_t **list) {
       array_list_set(j, NULL, cal_list);
     }
   }
-  array_list_free(cal_list, (void *) cal_free);
+  array_list_free(cal_list, (void *) cal_free_ex);
   *list = new_cal_list;
 }
 
@@ -114,7 +133,7 @@ void filter_cals_by_max_num_mismatches(int num_mismatches, array_list_t **list) 
       array_list_set(j, NULL, cal_list);
     }
   }
-  array_list_free(cal_list, (void *) cal_free);
+  array_list_free(cal_list, (void *) cal_free_ex);
   *list = new_cal_list;
 }
 
@@ -140,7 +159,7 @@ void create_alignments(array_list_t *cal_list, fastq_read_t *read,
   int AS;
   size_t i, pos;
   linked_list_item_t *list_item; 
-  seed_region_t *s_first, *s_last;
+  seed_t *s_first, *s_last;
 
   for (i = 0; i < num_cals; i++) {
     cigar[0] = 0;
@@ -237,7 +256,7 @@ void create_alignments(array_list_t *cal_list, fastq_read_t *read,
     }
     
     if (cal->info) cigar_free(cal->info);
-    cal_free(cal);
+    cal_free_ex(cal);
   }
 }
 
@@ -260,10 +279,10 @@ void display_suffix_mappings(int strand, size_t r_start, size_t suffix_len,
 
 //--------------------------------------------------------------------
 
-void print_seed_region(char *msg, seed_region_t *s) {
+void print_seed(char *msg, seed_t *s) {
   printf("%s%c:%i[%lu|%lu - %lu|%lu] (cigar: %s, num. mismatches = %i)\n",  msg, (s->strand == 0 ? '+' : '-'),
 	 s->chromosome_id, s->genome_start, s->read_start, s->read_end, s->genome_end,
-	 cigar_to_string(s->info), s->num_mismatches);
+	 cigar_to_string(&s->cigar), s->num_mismatches);
 }
 
 //--------------------------------------------------------------------

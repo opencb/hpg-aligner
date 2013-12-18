@@ -2,8 +2,9 @@
 #define _SA_DNA_COMMONS_H
 
 #include "bioformats/fastq/fastq_batch_reader.h"
-#include "buffers.h"
+#include "aligners/bwt/bwt.h"
 
+#include "buffers.h"
 #include "cal_seeker.h"
 
 #include "sa/sa_index3.h"
@@ -23,7 +24,7 @@
 #define FUNC_SKIP_SUFFIXES             8
 #define FUNC_MINI_SW_RIGHT_SIDE        9
 #define FUNC_MINI_SW_LEFT_SIDE        10
-#define FUNC_SEED_REGION_NEW          11
+#define FUNC_SEED_NEW                 11
 #define FUNC_SEED_LIST_INSERT         12
 #define FUNC_CAL_NEW                  13
 #define FUNC_CAL_MNG_INSERT           14
@@ -120,7 +121,7 @@ inline void sa_mapping_batch_free(sa_mapping_batch_t *p) {
 }  
 
 //--------------------------------------------------------------------
-// sa_wf_batch
+// sa_wf_batch_t
 //--------------------------------------------------------------------
 
 typedef struct sa_wf_batch {
@@ -149,7 +150,7 @@ inline void sa_wf_batch_free(sa_wf_batch_t *p) {
 }
 
 //--------------------------------------------------------------------
-// sa_wf_input
+// sa_wf_input_t
 //--------------------------------------------------------------------
 
 typedef struct sa_wf_input {
@@ -174,13 +175,15 @@ inline void sa_wf_input_free(sa_wf_input_t *p) {
 }
 
 //--------------------------------------------------------------------
-// cigar
+// cigar_t
 //--------------------------------------------------------------------
 
 typedef struct cigar {
   uint32_t ops[100];
   int num_ops;
 } cigar_t;
+
+//--------------------------------------------------------------------
 
 inline cigar_t *cigar_new(int value, int name) {
   cigar_t *p = (cigar_t *) malloc(sizeof(cigar_t));
@@ -190,6 +193,8 @@ inline cigar_t *cigar_new(int value, int name) {
   return p;
 }
 
+//--------------------------------------------------------------------
+
 inline cigar_t *cigar_new_empty() {
   cigar_t *p = (cigar_t *) malloc(sizeof(cigar_t));
   p->num_ops = 0;
@@ -197,11 +202,23 @@ inline cigar_t *cigar_new_empty() {
   return p;
 }
 
+//--------------------------------------------------------------------
+
+inline void cigar_init(cigar_t *p) {
+  if (p) {
+    p->num_ops = 0;
+  }
+}
+
+//--------------------------------------------------------------------
+
 inline void cigar_get_op(int index, int *value, int *name, cigar_t *p) {
   assert(index < p->num_ops);
   *name = (p->ops[index] & 255);
   *value = (p->ops[index] >> 8);
 }
+
+//--------------------------------------------------------------------
 
 inline char *cigar_to_string(cigar_t *p) {
   char *str = (char *) malloc(p->num_ops * 10);
@@ -214,24 +231,28 @@ inline char *cigar_to_string(cigar_t *p) {
   return str;
 }
 
+//--------------------------------------------------------------------
+
 inline void cigar_free(cigar_t *p) {
   //  printf("---------- cigar_free: p = %x (%s)\n", p, cigar_to_string(p));
   //  printf("---------- cigar_free: p = %x\n", p);
   if (p) free(p);
 }
 
-inline void cigar_init(cigar_t *p) {
-  p->num_ops = 0;
-}
+//--------------------------------------------------------------------
 
 inline void cigar_set_op(int index, int value, int name, cigar_t *p) {
   p->ops[index] = ((value << 8) | (name & 255));
 }
 
+//--------------------------------------------------------------------
+
 inline void _cigar_append_op(int value, int name, cigar_t *p) {
   cigar_set_op(p->num_ops, value, name, p);
   p->num_ops++;
 }
+
+//--------------------------------------------------------------------
 
 inline void cigar_append_op(int value, int name, cigar_t *p) {
   if (p->num_ops == 0) {
@@ -248,6 +269,8 @@ inline void cigar_append_op(int value, int name, cigar_t *p) {
     }
   }
 }
+
+//--------------------------------------------------------------------
 
 inline void cigar_concat(cigar_t *src, cigar_t *dst) {
   if (dst->num_ops == 0) {
@@ -271,6 +294,7 @@ inline void cigar_concat(cigar_t *src, cigar_t *dst) {
 }
 
 //--------------------------------------------------------------------
+// cigarset_t
 //--------------------------------------------------------------------
 
 typedef struct cigarset {
@@ -278,6 +302,8 @@ typedef struct cigarset {
   int *active;
   cigar_t **cigars;
 } cigarset_t;
+
+//--------------------------------------------------------------------
 
 inline cigarset_t *cigarset_new(int num_cigars) {
   cigarset_t *p = (cigarset_t *) malloc(sizeof(cigarset_t));
@@ -287,6 +313,8 @@ inline cigarset_t *cigarset_new(int num_cigars) {
   return p;
 }
 
+//--------------------------------------------------------------------
+
 inline void cigarset_free(cigarset_t *p) {
   if (p) {
     if (p->active) free(p->active);
@@ -294,6 +322,45 @@ inline void cigarset_free(cigarset_t *p) {
     free(p);
   }
 }
+
+//--------------------------------------------------------------------
+// seed_t
+//--------------------------------------------------------------------
+
+typedef struct seed {
+  size_t read_start;
+  size_t read_end;
+  size_t genome_start;
+  size_t genome_end;
+
+  int strand;
+  int chromosome_id;
+  int num_mismatches;
+
+  cigar_t cigar;
+} seed_t;
+
+//--------------------------------------------------------------------
+
+inline seed_t *seed_new(size_t read_start, size_t read_end, 
+			size_t genome_start, size_t genome_end) {
+
+  seed_t *p = (seed_t *) malloc(sizeof(seed_t));
+
+  p->read_start = read_start;
+  p->read_end = read_end;
+  p->genome_start = genome_start;
+  p->genome_end = genome_end;
+  
+  cigar_init(&p->cigar);
+
+  return p;
+}
+
+//--------------------------------------------------------------------
+
+void seed_free(seed_t *p);
+void cal_free_ex(cal_t *cal);
 
 //--------------------------------------------------------------------
 // utils
@@ -310,7 +377,7 @@ void create_alignments(array_list_t *cal_list, fastq_read_t *read,
 
 void display_suffix_mappings(int strand, size_t r_start, size_t suffix_len, 
 			     size_t low, size_t high, sa_index3_t *sa_index);
-void print_seed_region(char *msg, seed_region_t *s);
+void print_seed(char *msg, seed_t *s);
 void display_sequence(uint j, sa_index3_t *index, uint len);
 char *get_subsequence(char *seq, size_t start, size_t len);
 void display_cmp_sequences(fastq_read_t *read, char *revcomp_seq, sa_index3_t *sa_index);
