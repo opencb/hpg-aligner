@@ -164,12 +164,13 @@ new_sequence_from_bam_ref(bam1_t *bam1, char *seq, uint32_t max_l)
 {
 	char *bam_seq = (char *)bam1_seq(bam1);
 	int seq_len = bam1->core.l_qseq;
+	int i;
 
 	if(seq_len > max_l)
 		seq_len = max_l;
 
 	// nucleotide content
-	for (int i = 0; i < seq_len; i++) {
+	for (i = 0; i < seq_len; i++) {
 		switch (bam1_seqi(bam_seq, i))
 		{
 		case 1:
@@ -193,6 +194,9 @@ new_sequence_from_bam_ref(bam1_t *bam1, char *seq, uint32_t max_l)
 			break;
 		}
 	}
+
+	if(max_l > seq_len)
+		seq[i] = '\0';
 
 	return NO_ERROR;
 }

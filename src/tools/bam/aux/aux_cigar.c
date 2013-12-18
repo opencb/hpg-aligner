@@ -20,15 +20,17 @@ cigar32_leftmost(char *ref, char *read, size_t read_l, uint32_t *cigar, size_t c
 
 	//New cigar
 	uint32_t unclip_cigar[30];
+	uint32_t reclip_cigar[30];
 	uint32_t aux_cigar[30];
 	size_t unclip_cigar_l;
+	size_t reclip_cigar_l;
 
 	//References
 	char *orig_ref;
 	char *aux_ref;
 
 	//Counters
-	int count;
+	int retry;
 
 	//ERASE
 	char str_cigar[200];
@@ -64,73 +66,78 @@ cigar32_leftmost(char *ref, char *read, size_t read_l, uint32_t *cigar, size_t c
 			//Get reference for original CIGAR
 			orig_ref = (char *)malloc(sizeof(char) * (read_l + 1));
 			aux_ref = (char *)malloc(sizeof(char) * (read_l + 1));
-			cigar32_create_ref(unclip_cigar, unclip_cigar_l, ref, read, read_l, orig_ref);
+			cigar32_create_ref(cigar, cigar_l, ref, read, read_l, orig_ref);
 
 			//Shift left CIGAR
 			cigar32_shift_left_indel(unclip_cigar, unclip_cigar_l, indel_index, aux_cigar);
 
+			//Reclip cigar
+			cigar32_reclip(cigar, cigar_l, aux_cigar, unclip_cigar_l, reclip_cigar, &reclip_cigar_l);
+
 			//Get new CIGAR ref
-			cigar32_create_ref(aux_cigar, unclip_cigar_l, ref, read, read_l, aux_ref);
+			cigar32_create_ref(reclip_cigar, reclip_cigar_l, ref, read, read_l, aux_ref);
 
 			//Is a valid ref?
 			if(!memcmp(aux_ref, orig_ref, read_l * sizeof(char)))
 			{
 				//Equal so is a valid CIGAR
-				memcpy(new_cigar, aux_cigar, sizeof(uint32_t) * unclip_cigar_l);
-				*new_cigar_l = unclip_cigar_l;
-				count = indel_l;
+				memcpy(new_cigar, aux_cigar, sizeof(uint32_t) * reclip_cigar_l);
+				*new_cigar_l = reclip_cigar_l;
+				retry = indel_l;
 
 				//ERASE
 				/*{
-					read[read_l] = '\0';
-					orig_ref[read_l] = '\0';
-					cigar32_to_string(unclip_cigar, unclip_cigar_l, str_new_cigar);
+					//read[read_l] = '\0';
+					//orig_ref[read_l] = '\0';
+					cigar32_to_string(reclip_cigar, reclip_cigar_l, str_new_cigar);
 					cigar32_to_string(cigar, cigar_l, str_cigar);
 					printf("CIGAR = %s, Indel L: %d\n", str_cigar, indel_l);
 					printf("CIGAR*= %s\n", str_new_cigar);
 					printf("READ -> %s - L: %d\n", read, read_l);
 					printf("REF  -> %s\n", ref);
 					printf("REF* -> %s - %s\n", orig_ref, str_new_cigar);
-					aux_ref[read_l] = '\0';
-					cigar32_to_string(aux_cigar, unclip_cigar_l, str_new_cigar);
-					printf("REF%d -> %s - %s ::: Retry - %d\n", 1, aux_ref, str_new_cigar, count);
+					cigar32_to_string(aux_cigar, reclip_cigar_l, str_new_cigar);
+					printf("REF%d -> %s - %s ::: Retry - %d\n", 1, aux_ref, str_new_cigar, retry);
 					printed = 1;
 				}*/
 			}
 			else
 			{
-				count = indel_l - 1;
+				retry = indel_l - 1;
 			}
 
 			if((aux_cigar[indel_index - 1] >> BAM_CIGAR_SHIFT) == 0)
-				count = 0;
+				retry = 0;
 
 			int j = 1;
-			while(count > 0)
+			while(retry > 0)
 			{
-				count--;
+				retry--;
 				j++;
 
 				//Shift left CIGAR
 				cigar32_shift_left_indel(aux_cigar, unclip_cigar_l, indel_index, aux_cigar);
 
+				//Reclip cigar
+				cigar32_reclip(cigar, cigar_l, aux_cigar, unclip_cigar_l, reclip_cigar, &reclip_cigar_l);
+
 				//Get new CIGAR ref
-				cigar32_create_ref(aux_cigar, unclip_cigar_l, ref, read, read_l, aux_ref);
+				cigar32_create_ref(reclip_cigar, reclip_cigar_l, ref, read, read_l, aux_ref);
 
 				//Is a valid ref?
 				if(!memcmp(aux_ref, orig_ref, read_l * sizeof(char)))
 				{
 					//Equal so is a valid CIGAR
-					memcpy(new_cigar, aux_cigar, sizeof(uint32_t) * unclip_cigar_l);
-					*new_cigar_l = unclip_cigar_l;
-					count = indel_l;
+					memcpy(new_cigar, reclip_cigar, sizeof(uint32_t) * reclip_cigar_l);
+					*new_cigar_l = reclip_cigar_l;
+					retry = indel_l;
 
 					//ERASE
 					/*{
 						if(!printed)
 						{
-							read[read_l] = '\0';
-							orig_ref[read_l] = '\0';
+							//read[read_l] = '\0';
+							//orig_ref[read_l] = '\0';
 							cigar32_to_string(unclip_cigar, unclip_cigar_l, str_new_cigar);
 							cigar32_to_string(cigar, cigar_l, str_cigar);
 							printf("CIGAR = %s, Indel L: %d\n", str_cigar, indel_l);
@@ -140,14 +147,13 @@ cigar32_leftmost(char *ref, char *read, size_t read_l, uint32_t *cigar, size_t c
 							printf("REF* -> %s - %s\n", orig_ref, str_new_cigar);
 							printed = 1;
 						}
-						aux_ref[read_l] = '\0';
 						cigar32_to_string(aux_cigar, unclip_cigar_l, str_new_cigar);
-						printf("REF%d -> %s - %s ::: Retry - %d\n", j, aux_ref, str_new_cigar, count);
+						printf("REF%d -> %s - %s ::: Retry - %d\n", j, aux_ref, str_new_cigar, retry);
 					}*/
 				}
 
 				if((aux_cigar[indel_index - 1] >> BAM_CIGAR_SHIFT) == 0)
-					count = 0;
+					retry = 0;
 			}
 
 			//Free
@@ -205,6 +211,91 @@ cigar32_unclip(uint32_t *cigar, size_t cigar_l, uint32_t *new_cigar, size_t *new
 	*new_cigar_l = new_cigar_i;
 
 	return NO_ERROR;
+}
+
+ERROR_CODE
+cigar32_reclip(uint32_t *clip_cigar, size_t clip_cigar_l, uint32_t *unclip_cigar, size_t unclip_cigar_l, uint32_t *new_cigar, size_t *new_cigar_l)
+{
+	int i;
+	int c_count;
+	int c_type;
+	size_t new_l = 0;
+
+	assert(clip_cigar);
+	assert(clip_cigar_l > 0);
+	assert(unclip_cigar);
+	assert(unclip_cigar_l > 0);
+	assert(new_cigar);
+	assert(new_cigar_l);
+
+	//Get first clips
+	i = 0;
+	while(i < clip_cigar_l)
+	{
+		c_type = clip_cigar[i] & BAM_CIGAR_MASK;	//Get type from cigar
+
+		//Is clip?
+		if(c_type == BAM_CSOFT_CLIP
+				|| c_type == BAM_CHARD_CLIP
+				|| c_type == BAM_CPAD)
+		{
+			//Set clip in new cigar
+			new_cigar[i] = clip_cigar[i];
+			new_l++;
+		}
+		else
+		{
+			break;
+		}
+
+		//Increment index
+		i++;
+	}
+
+	//Copy unclipped cigar
+	memcpy(new_cigar + i, unclip_cigar, unclip_cigar_l * sizeof(uint32_t));
+	i += unclip_cigar_l;
+	new_l += unclip_cigar_l;
+
+	//Search for last clips
+	while(i < clip_cigar_l)
+	{
+		c_type = clip_cigar[i] & BAM_CIGAR_MASK;
+		if(c_type == BAM_CSOFT_CLIP
+						|| c_type == BAM_CHARD_CLIP
+						|| c_type == BAM_CPAD)
+		{
+			break;
+		}
+
+		i++;
+	}
+
+	//Copy last clips
+	while(i < clip_cigar_l)
+	{
+		c_type = clip_cigar[i] & BAM_CIGAR_MASK;	//Get type from cigar
+
+		//Is clip?
+		if(c_type == BAM_CSOFT_CLIP
+				|| c_type == BAM_CHARD_CLIP
+				|| c_type == BAM_CPAD)
+		{
+			//Set clip in new cigar
+			new_cigar[new_l] = clip_cigar[i];
+			new_l++;
+
+			//Increment index
+			i++;
+		}
+		else
+		{
+			break;
+		}
+	}
+
+	//Set output cigar length
+	*new_cigar_l = new_l;
 }
 
 ERROR_CODE
@@ -423,9 +514,7 @@ cigar32_create_ref(uint32_t *cigar, size_t cigar_l, char *ref, char *read, size_
 			extra += elem;
 			break;
 		case BAM_CMATCH:
-		case BAM_CHARD_CLIP:
-		case BAM_CSOFT_CLIP:
-		case BAM_CPAD:
+		case BAM_CDIFF:
 		case BAM_CEQUAL:
 			//Copy reference as it is
 			memcpy(aux_str + index_aux, ref + index_ref, elem);
@@ -433,6 +522,15 @@ cigar32_create_ref(uint32_t *cigar, size_t cigar_l, char *ref, char *read, size_
 			index_ref += elem;
 			index_read += elem;
 			index_aux += elem;
+			break;
+
+		case BAM_CSOFT_CLIP:
+			//Clips
+			index_read += elem;
+			break;
+
+		case BAM_CPAD:
+		case BAM_CHARD_CLIP:
 			break;
 
 		default:
@@ -443,12 +541,15 @@ cigar32_create_ref(uint32_t *cigar, size_t cigar_l, char *ref, char *read, size_
 	}
 
 	//Copy last nucleotides
-	remain = length - index_read;
-	if(remain)
-		memcpy(aux_str + index_aux, ref + index_ref, remain);
+	//remain = length - index_read;
+	//if(remain)
+	//	memcpy(aux_str + index_aux, ref + index_ref, remain);
 
 	//Set output
-	memcpy(new_ref, aux_str, sizeof(char) * length);
+	if(index_aux > length)
+		index_aux = length;
+	aux_str[index_aux] = '\0';
+	memcpy(new_ref, aux_str, sizeof(char) * index_aux + 1);
 
 	//Free
 	free(aux_str);
@@ -504,4 +605,53 @@ cigar32_shift_left_indel(uint32_t *cigar, size_t cigar_l, size_t indel_index, ui
 	return NO_ERROR;
 }
 
+ERROR_CODE
+cigar32_get_indels(size_t ref_pos, uint32_t *cigar, size_t cigar_l, aux_indel_t *out_indels)
+{
+	int i, elem, type, indel_index;
+	size_t current_pos;
+
+	assert(ref_pos != SIZE_MAX);
+	assert(cigar);
+	assert(cigar_l > 0);
+	assert(out_indels);
+
+	//Iterate CIGAR
+	indel_index = 0;
+	current_pos = ref_pos;
+	for(i = 0; i < cigar_l; i++)
+	{
+		elem = cigar[i] >> BAM_CIGAR_SHIFT;	//Get number of bases from cigar
+		type = cigar[i] & BAM_CIGAR_MASK;	//Get type from cigar
+
+		switch(type)
+		{
+		case BAM_CINS:	//Insertion
+		case BAM_CDEL:	//Deletion
+			//Create indel
+			out_indels[indel_index].indel = cigar[i];
+			out_indels[indel_index].ref_pos = current_pos;
+			indel_index++;
+			current_pos += elem;
+			break;
+		case BAM_CMATCH:
+		case BAM_CDIFF:
+		case BAM_CEQUAL:
+			current_pos += elem;
+			break;
+
+		case BAM_CPAD:
+		case BAM_CHARD_CLIP:
+		case BAM_CSOFT_CLIP:
+			break;
+
+		default:
+			fprintf(stderr, "WARNING: Unrecognised cigar N:%d T:%d\n", elem, type);
+			fflush(stderr);
+			abort();
+		}
+	}
+
+	return NO_ERROR;
+}
 
