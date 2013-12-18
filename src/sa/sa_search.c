@@ -72,10 +72,9 @@ size_t search_suffix(char *seq, uint len, int max_num_suffixes,
 		     sa_index3_t *sa_index, 
 		     size_t *low, size_t *high, size_t *suffix_len
                      #ifdef _TIMING
-		     , sa_mapping_batch_t *mapping_batch
+		     , double *prefix_time, double *suffix_time
                      #endif
 		     ) {
-
   #ifdef _TIMING
   struct timeval stop, start;
   #endif
@@ -93,8 +92,7 @@ size_t search_suffix(char *seq, uint len, int max_num_suffixes,
   size_t num_prefixes = search_prefix(seq, low, high, sa_index, display);
   #ifdef _TIMING
   gettimeofday(&stop, NULL);
-  mapping_batch->func_times[FUNC_SEARCH_PREFIX] += 
-    ((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);  
+  *prefix_time = ((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);  
   #endif
 
   #ifdef _VERBOSE	  
@@ -170,8 +168,7 @@ size_t search_suffix(char *seq, uint len, int max_num_suffixes,
 
     #ifdef _TIMING
     gettimeofday(&stop, NULL);
-    mapping_batch->func_times[FUNC_SEARCH_SA] += 
-      ((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);  
+    *suffix_time = ((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);  
     #endif
   }
   
