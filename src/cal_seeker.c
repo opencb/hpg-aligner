@@ -829,7 +829,7 @@ int apply_caling_rna(cal_seeker_input_t* input, batch_t *batch) {
 
   struct timeval start, end;
   double time;
-  if (time_on) { start_timer(start); }
+  //if (time_on) { start_timer(start); }
 
   metaexons_t *metaexons = input->metaexons;
   bwt_optarg_t *bwt_optarg = input->bwt_optarg;
@@ -876,12 +876,12 @@ int apply_caling_rna(cal_seeker_input_t* input, batch_t *batch) {
 					     1.25f, 
 					     COLLECTION_MODE_ASYNCHRONIZED);
   
-  extern pthread_mutex_t mutex_sp;
-  extern size_t TOTAL_READS_SEEDING, TOTAL_READS_SEEDING2;
+  //extern pthread_mutex_t mutex_sp;
+  //extern size_t TOTAL_READS_SEEDING, TOTAL_READS_SEEDING2;
 
-  pthread_mutex_lock(&mutex_sp);
-  TOTAL_READS_SEEDING += num_targets;
-  pthread_mutex_unlock(&mutex_sp);
+  //pthread_mutex_lock(&mutex_sp);
+  //TOTAL_READS_SEEDING += num_targets;
+  //pthread_mutex_unlock(&mutex_sp);
 
   for (size_t i = 0; i < num_targets; i++) {
     read = array_list_get(mapping_batch->targets[i], mapping_batch->fq_batch); 
@@ -930,9 +930,9 @@ int apply_caling_rna(cal_seeker_input_t* input, batch_t *batch) {
 
       //input->cal_optarg->min_cal_size = prev_min_cal;
 
-      pthread_mutex_lock(&mutex_sp);
-      TOTAL_READS_SEEDING2++;
-      pthread_mutex_unlock(&mutex_sp);
+      //pthread_mutex_lock(&mutex_sp);
+      //TOTAL_READS_SEEDING2++;
+      //pthread_mutex_unlock(&mutex_sp);
 
     }
     array_list_clear(region_list, (void *)region_bwt_free);
@@ -1028,7 +1028,7 @@ int apply_caling_rna(cal_seeker_input_t* input, batch_t *batch) {
 
   array_list_free(region_list, NULL);
 
-  if (time_on) { stop_timer(start, end, time); timing_add(time, CAL_SEEKER, timing); }
+  //if (time_on) { stop_timer(start, end, time); timing_add(time, CAL_SEEKER, timing); }
 
   LOG_DEBUG("========= APPLY CALING RNA END =========\n");
 
@@ -1644,7 +1644,7 @@ int apply_caling_bs(cal_seeker_input_t* input, batch_t *batch) {
   
   struct timeval start, end;
   double time;
-  if (time_on) { start_timer(start); }
+  //if (time_on) { start_timer(start); }
 
   metaexons_t *metaexons = input->metaexons;
   bwt_optarg_t *bwt_optarg = input->bwt_optarg;
@@ -1675,12 +1675,12 @@ int apply_caling_bs(cal_seeker_input_t* input, batch_t *batch) {
 
   mapping_batch->extra_stage_do = 1;
 
-  extern pthread_mutex_t mutex_sp;
-  extern size_t TOTAL_READS_SEEDING, TOTAL_READS_SEEDING2;
+  //extern pthread_mutex_t mutex_sp;
+  //extern size_t TOTAL_READS_SEEDING, TOTAL_READS_SEEDING2;
 
-  pthread_mutex_lock(&mutex_sp);
-  TOTAL_READS_SEEDING += num_targets;
-  pthread_mutex_unlock(&mutex_sp);
+  //pthread_mutex_lock(&mutex_sp);
+  //TOTAL_READS_SEEDING += num_targets;
+  //pthread_mutex_unlock(&mutex_sp);
 
   for (size_t i = 0; i < num_targets; i++) {
     target_index = targets[i];
@@ -1763,7 +1763,7 @@ int apply_caling_bs(cal_seeker_input_t* input, batch_t *batch) {
   mapping_batch->num_targets = target_pos;
   mapping_batch->num_targets2 = target_pos2;
 
-  if (time_on) { stop_timer(start, end, time); timing_add(time, CAL_SEEKER, timing); }
+  //if (time_on) { stop_timer(start, end, time); timing_add(time, CAL_SEEKER, timing); }
 
   LOG_DEBUG("========= END OF APPLYING CALING BS =========\n");
 

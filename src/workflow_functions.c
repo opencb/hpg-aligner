@@ -51,7 +51,7 @@ void *fastq_reader(void *input) {
      struct timeval start, end;
      double time;
 
-     if (time_on) { start_timer(start); }
+     //if (time_on) { start_timer(start); }
 
      wf_input_t *wf_input = (wf_input_t *) input;
      batch_t *new_batch = NULL;
@@ -59,11 +59,24 @@ void *fastq_reader(void *input) {
      fastq_batch_reader_input_t *fq_reader_input = wf_input->fq_reader_input;
      array_list_t *reads = array_list_new(10000, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
 
-     if (fq_reader_input->flags == SINGLE_END_MODE) {
-       fastq_fread_bytes_se(reads, fq_reader_input->batch_size, fq_reader_input->fq_file1);
+     if (fq_reader_input->gzip) {
+       //Gzip fastq file
+       if (fq_reader_input->flags == SINGLE_END_MODE) {
+	 fastq_gzread_bytes_se(reads, fq_reader_input->batch_size, fq_reader_input->fq_gzip_file1);
+       } else {
+	 //printf("Gzip Reader for pair-end not implemented\n");;
+	 fastq_gzread_bytes_pe(reads, fq_reader_input->batch_size, fq_reader_input->fq_gzip_file1, fq_reader_input->fq_gzip_file2);
+	 //fastq_fread_bytes_aligner_pe(reads, fq_reader_input->batch_size, 
+	 //		      fq_reader_input->fq_gzip_file1, fq_reader_input->fq_gzip_file2);
+       }
      } else {
-       fastq_fread_bytes_aligner_pe(reads, fq_reader_input->batch_size, 
-				    fq_reader_input->fq_file1, fq_reader_input->fq_file2);
+       //Fastq file
+       if (fq_reader_input->flags == SINGLE_END_MODE) {
+	 fastq_fread_bytes_se(reads, fq_reader_input->batch_size, fq_reader_input->fq_file1);
+       } else {
+	 fastq_fread_bytes_aligner_pe(reads, fq_reader_input->batch_size, 
+				      fq_reader_input->fq_file1, fq_reader_input->fq_file2);
+       }
      }
 
      size_t num_reads = array_list_size(reads);
@@ -79,7 +92,7 @@ void *fastq_reader(void *input) {
 				batch->mapping_mode, mapping_batch);
      }
 
-     if (time_on) { stop_timer(start, end, time); timing_add(time, FASTQ_READER, timing); }
+     //if (time_on) { stop_timer(start, end, time); timing_add(time, FASTQ_READER, timing); }
 
      return new_batch;
 }
@@ -494,7 +507,7 @@ int bam_writer(void *data) {
      struct timeval start, end;
      double time;
 
-     if (time_on) { start_timer(start); }
+     //if (time_on) { start_timer(start); }
 
      batch_t *batch = (batch_t *) data;
      fastq_read_t *fq_read;
@@ -558,7 +571,7 @@ int bam_writer(void *data) {
      //num_reads_map += num_mapped_reads;
  
      //fprintf(stderr, "TOTAL READS PROCESS: %lu\n", basic_st->total_reads);
-     if (basic_st->total_reads >= writer_input->limit_print) {
+     //if (basic_st->total_reads >= writer_input->limit_print) {
        //LOG_DEBUG_F("TOTAL READS PROCESS: %lu\n", basic_st->total_reads);
        //LOG_DEBUG_F("\tTotal Reads Mapped: %lu(%.2f%)\n", 
        //	   basic_st->num_mapped_reads, 
@@ -572,7 +585,7 @@ int bam_writer(void *data) {
 	      (float) (basic_st->num_mapped_reads*100)/(float)(basic_st->total_reads));
        */
 
-       writer_input->limit_print += 100000;
+       //writer_input->limit_print += 100000;
 
        //extern size_t TOTAL_SW,
        //TOTAL_READS_PROCESS,
@@ -584,7 +597,7 @@ int bam_writer(void *data) {
        //fprintf(stderr, "TOTAL READS PROCESS = %lu,\n TOTAL READS SEEDING x1 = %lu,\n TOTAL READS SEEDING x2 = %lu,\n TOTAL SW = %lu,\n TOTAL READS SINGLE ANCHOR FINAL = %lu\n\n",
        //      TOTAL_READS_PROCESS, TOTAL_READS_SEEDING, TOTAL_READS_SEEDING2, TOTAL_SW, TOTAL_READS_SA);
        
-     }
+     //}
      
      //printf("Batch Write OK!\n");     
      
@@ -596,7 +609,7 @@ int bam_writer(void *data) {
      
      basic_statistics_add(num_reads_b, num_mapped_reads, total_mappings, basic_st);
      
-     if (time_on) { stop_timer(start, end, time); timing_add(time, BAM_WRITER, timing); }
+     //if (time_on) { stop_timer(start, end, time); timing_add(time, BAM_WRITER, timing); }
 }
 
 //--------------------------------------------------------------------

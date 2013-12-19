@@ -106,8 +106,10 @@ void validate_options(options_t *options, int mode) {
     options->pair_max_distance = DEFAULT_PAIR_MAX_DISTANCE + options->max_intron_length;
   }
 
+  //printf("Value %i mode => %i == (%i|%i)\n", value_dir, mode, DNA_MODE, RNA_MODE);
   if (mode == DNA_MODE || mode == RNA_MODE) {
     if (!value_dir) {
+      //printf("Create directory %s\n", options->output_name);
       create_directory(options->output_name);
     }
     
@@ -248,9 +250,11 @@ void options_display(options_t *options) {
      } else {
        printf("\tInput FastQ filename: %s\n", in_filename);
      }
-     printf("\tBWT index directory name: %s\n", bwt_dirname);
+     printf("\tFastQ gzip mode: %s\n", options->gzip == 1 ? "Enable" : "Disable");
+     printf("\tIndex directory name: %s\n", bwt_dirname);
      printf("\tOutput directory name: %s\n", output_name);
      printf("\n");
+
      printf("Architecture parameters\n");
      printf("\tNumber of cpu threads %d\n",  num_cpu_threads);
      //printf("CAL seeker errors: %d\n",  cal_seeker_errors);
@@ -264,33 +268,22 @@ void options_display(options_t *options) {
      printf("\tReport best hits: %s\n",  report_best == 0 ? "Disable":"Enable");
      printf("\tReport unpaired reads: %s\n",  report_only_paired == 0 ? "Enable":"Disable");
      printf("\n");
+
      printf("Seeding and CAL parameters\n");
-     printf("\tNumber of seeds: %d\n",  num_seeds);
-     if (seed_size) {
-       printf("\tSeed size: %d\n",  seed_size);
-       printf("\tMin seed size: %d\n",  min_seed_size);
-     }
-     else {
-       printf("\tSeeds optimus autoconf\n");
-     }
      printf("\tMin CAL size: %d\n",  min_cal_size);
-     if (min_num_seeds_in_cal < 0) {
-       printf("\tMin. number of seeds in a CAL: the maximun\n");
-     } else {
-       printf("\tMin. number of seeds in a CAL: %d\n",  min_num_seeds_in_cal);
-     }
-     printf("\tSeeds max distance: %d\n",  seeds_max_distance);
-     printf("\tFlank length: %d\n", flank_length);
      printf("\n");
+
      printf("Mapping filters\n");
      printf("\tFor reads: %d mappings maximum, otherwise discarded\n", options->filter_read_mappings);
      printf("\tFor seeds: %d mappings maximum, otherwise discarded\n", options->filter_seed_mappings);
      printf("\n");
+
      printf("Pair-mode parameters\n");
      printf("\tPair mode: %d\n", pair_mode);
      printf("\tMin. distance: %d\n", pair_min_distance);
      printf("\tMax. distance: %d\n", pair_max_distance);
      printf("\n");
+
      printf("Smith-Waterman parameters\n");
      printf("\tMatch      : %0.4f\n", match);
      printf("\tMismatch   : %0.4f\n", mismatch);
@@ -300,6 +293,7 @@ void options_display(options_t *options) {
 
      if (options->mode == RNA_MODE) {
        printf("RNA parameters\n");
+       printf("\tSeed size: %d\n",  seed_size);
        printf("\tMax intron length: %d\n", max_intron_length);
        printf("\tMin intron length: %d\n", min_intron_length);
        printf("\tMin score        : %d\n", min_score);
@@ -319,7 +313,7 @@ void** argtable_options_new(int mode) {
   int num_options = NUM_OPTIONS;
   if (mode == RNA_MODE) num_options += NUM_RNA_OPTIONS;
 
-  printf("NUM OPTIONS: %i + %i = %i\n", NUM_OPTIONS, NUM_RNA_OPTIONS, num_options);
+
   // NUM_OPTIONS +1 to allocate end structure
   void **argtable = (void**)malloc((num_options + 1) * sizeof(void*));	
   
@@ -408,49 +402,41 @@ int read_config_file(const char *filename, options_t *options) {
  * Initializes the only default options from options_t.
  */
 options_t *read_CLI_options(void **argtable, options_t *options) {	
-  int count = 0;
 
-  if (((struct arg_file*)argtable[count])->count) { options->in_filename = strdup(*(((struct arg_file*)argtable[count++])->filename)); }
-  printf("Options 1.... (%s)\n", options->in_filename );
-  
-  if (((struct arg_file*)argtable[count])->count) { options->in_filename2 = strdup(*(((struct arg_file*)argtable[count++])->filename)); }
-  printf("Options 2.... (%s)\n", options->in_filename2 );
-  
-  if (((struct arg_int*)argtable[count])->count) { options->gzip = ((struct arg_int*)argtable[count++])->count; }
-  printf("Options 3.... (%i)\n", options->gzip);
-
-  if (((struct arg_file*)argtable[count])->count) { options->bwt_dirname = strdup(*(((struct arg_file*)argtable[count++])->filename)); }
-  printf("Options 4.... (%s)\n", options->bwt_dirname);
-  
-  if (((struct arg_file*)argtable[count])->count) { free(options->output_name); options->output_name = strdup(*(((struct arg_file*)argtable[count++])->filename)); }  
-  if (((struct arg_int*)argtable[count])->count) { options->filter_read_mappings = *(((struct arg_int*)argtable[count++])->ival); }
-  if (((struct arg_int*)argtable[count])->count) { options->filter_seed_mappings = *(((struct arg_int*)argtable[count++])->ival); }
-  if (((struct arg_int*)argtable[count])->count) { options->min_cal_size = *(((struct arg_int*)argtable[count++])->ival); }
-  if (((struct arg_int*)argtable[count])->count) { options->num_cpu_threads = *(((struct arg_int*)argtable[count++])->ival); }
-  if (((struct arg_int*)argtable[count])->count) { options->batch_size = *(((struct arg_int*)argtable[count++])->ival); }
-  if (((struct arg_dbl*)argtable[count])->count) { options->match = *((struct arg_dbl*)argtable[count++])->dval; }
-  if (((struct arg_dbl*)argtable[count])->count) { options->mismatch = *(((struct arg_dbl*)argtable[count++])->dval); }
-  if (((struct arg_dbl*)argtable[count])->count) { options->gap_open = *(((struct arg_dbl*)argtable[count++])->dval); }
-  if (((struct arg_dbl*)argtable[count])->count) { options->gap_extend = *(((struct arg_dbl*)argtable[count++])->dval); }
-  if (((struct arg_int*)argtable[count])->count) { options->min_score = *(((struct arg_int*)argtable[count++])->ival); }
-  if (((struct arg_int*)argtable[count])->count) { options->pair_mode = *(((struct arg_int*)argtable[count++])->ival); }
-  if (((struct arg_int*)argtable[count])->count) { options->pair_min_distance = *(((struct arg_int*)argtable[count++])->ival); }
-  if (((struct arg_int*)argtable[count])->count) { options->pair_max_distance = *(((struct arg_int*)argtable[count++])->ival); }
-  if (((struct arg_int*)argtable[count])->count) { options->report_best = (((struct arg_int*)argtable[count++])->count); }
-  if (((struct arg_file*)argtable[count])->count) { options->report_all = (((struct arg_int *)argtable[count++])->count); }
-  if (((struct arg_int*)argtable[count])->count) { options->report_n_best = *(((struct arg_int*)argtable[count++])->ival); }
-  if (((struct arg_int*)argtable[count])->count) { options->report_n_hits = *(((struct arg_int*)argtable[count++])->ival); }
-  if (((struct arg_int*)argtable[count])->count) { options->report_only_paired = (((struct arg_int*)argtable[count++])->count); }
-  if (((struct arg_str*)argtable[count])->count) { options->prefix_name = strdup(*(((struct arg_str*)argtable[count++])->sval)); }
-  if (((struct arg_file*)argtable[count])->count) { options->log_level = *(((struct arg_int*)argtable[count++])->ival); }
-  if (((struct arg_int*)argtable[count])->count) { options->help = ((struct arg_int*)argtable[count++])->count; }
+  int count = -1;
+  if (((struct arg_file*)argtable[++count])->count) { options->in_filename = strdup(*(((struct arg_file*)argtable[count])->filename)); }
+  if (((struct arg_file*)argtable[++count])->count) { options->in_filename2 = strdup(*(((struct arg_file*)argtable[count])->filename)); }
+  if (((struct arg_int*)argtable[++count])->count) { options->gzip = ((struct arg_int*)argtable[count])->count; }
+  if (((struct arg_file*)argtable[++count])->count) { options->bwt_dirname = strdup(*(((struct arg_file*)argtable[count])->filename)); }
+  if (((struct arg_file*)argtable[++count])->count) { free(options->output_name); options->output_name = strdup(*(((struct arg_file*)argtable[count])->filename)); }  
+  if (((struct arg_int*)argtable[++count])->count) { options->filter_read_mappings = *(((struct arg_int*)argtable[count])->ival); }
+  if (((struct arg_int*)argtable[++count])->count) { options->filter_seed_mappings = *(((struct arg_int*)argtable[count])->ival); }
+  if (((struct arg_int*)argtable[++count])->count) { options->min_cal_size = *(((struct arg_int*)argtable[count])->ival); }
+  if (((struct arg_int*)argtable[++count])->count) { options->num_cpu_threads = *(((struct arg_int*)argtable[count])->ival); }
+  if (((struct arg_int*)argtable[++count])->count) { options->batch_size = *(((struct arg_int*)argtable[count])->ival); }
+  if (((struct arg_dbl*)argtable[++count])->count) { options->match = *((struct arg_dbl*)argtable[count])->dval; }
+  if (((struct arg_dbl*)argtable[++count])->count) { options->mismatch = *(((struct arg_dbl*)argtable[count])->dval); }
+  if (((struct arg_dbl*)argtable[++count])->count) { options->gap_open = *(((struct arg_dbl*)argtable[count])->dval); }
+  if (((struct arg_dbl*)argtable[++count])->count) { options->gap_extend = *(((struct arg_dbl*)argtable[count])->dval); }
+  if (((struct arg_int*)argtable[++count])->count) { options->min_score = *(((struct arg_int*)argtable[count])->ival); }
+  if (((struct arg_int*)argtable[++count])->count) { options->pair_mode = *(((struct arg_int*)argtable[count])->ival); }
+  if (((struct arg_int*)argtable[++count])->count) { options->pair_min_distance = *(((struct arg_int*)argtable[count])->ival); }
+  if (((struct arg_int*)argtable[++count])->count) { options->pair_max_distance = *(((struct arg_int*)argtable[count])->ival); }
+  if (((struct arg_int*)argtable[++count])->count) { options->report_best = (((struct arg_int*)argtable[count])->count); }
+  if (((struct arg_file*)argtable[++count])->count) { options->report_all = (((struct arg_int *)argtable[count])->count); }
+  if (((struct arg_int*)argtable[++count])->count) { options->report_n_best = *(((struct arg_int*)argtable[count])->ival); }
+  if (((struct arg_int*)argtable[++count])->count) { options->report_n_hits = *(((struct arg_int*)argtable[count])->ival); }
+  if (((struct arg_int*)argtable[++count])->count) { options->report_only_paired = (((struct arg_int*)argtable[count])->count); }
+  if (((struct arg_str*)argtable[++count])->count) { options->prefix_name = strdup(*(((struct arg_str*)argtable[count])->sval)); }
+  if (((struct arg_file*)argtable[++count])->count) { options->log_level = *(((struct arg_int*)argtable[count])->ival); }
+  if (((struct arg_int*)argtable[++count])->count) { options->help = ((struct arg_int*)argtable[count])->count; }
 
   if (options->mode == RNA_MODE) {
-    if (((struct arg_int*)argtable[count])->count) { options->seeds_max_distance = *(((struct arg_int*)argtable[count++])->ival); }
-    if (((struct arg_file*)argtable[count])->count) { options->transcriptome_filename = strdup(*(((struct arg_file*)argtable[count++])->filename)); }
-    if (((struct arg_int*)argtable[count])->count) { options->seed_size = *(((struct arg_int*)argtable[count++])->ival); }
-    if (((struct arg_int*)argtable[count])->count) { options->max_intron_length = *(((struct arg_int*)argtable[count++])->ival); }
-    if (((struct arg_int*)argtable[count])->count) { options->min_intron_length = *(((struct arg_int*)argtable[count++])->ival); }
+    if (((struct arg_int*)argtable[++count])->count) { options->seeds_max_distance = *(((struct arg_int*)argtable[count])->ival); }
+    if (((struct arg_file*)argtable[++count])->count) { options->transcriptome_filename = strdup(*(((struct arg_file*)argtable[count])->filename)); }
+    if (((struct arg_int*)argtable[++count])->count) { options->seed_size = *(((struct arg_int*)argtable[count])->ival); }
+    if (((struct arg_int*)argtable[++count])->count) { options->max_intron_length = *(((struct arg_int*)argtable[count])->ival); }
+    if (((struct arg_int*)argtable[++count])->count) { options->min_intron_length = *(((struct arg_int*)argtable[count])->ival); }
   }
 
   return options;
@@ -477,11 +463,9 @@ options_t *parse_options(int argc, char **argv) {
     usage(argtable);
     exit(-1);
   } else {
-    int num_errors = arg_parse(argc, argv, argtable);
-    
-    printf("-----------> num_errors = %i\n", num_errors);
+    int num_errors = arg_parse(argc, argv, argtable);   
 
-    if (((struct arg_int*)argtable[29])->count) {
+    if (((struct arg_int*)argtable[25])->count) {
       usage(argtable);
       argtable_options_free(argtable, num_options);
       options_free(options);

@@ -48,14 +48,30 @@ size_t fastq_fread_se_ex(array_list_t *reads, size_t num_reads, fastq_file_t *fq
 
 void *sa_fq_reader(void *input) {
   sa_wf_input_t *wf_input = (sa_wf_input_t *) input;
-
+  
   sa_wf_batch_t *new_wf_batch = NULL;
   sa_wf_batch_t *curr_wf_batch = wf_input->wf_batch;
   
   fastq_batch_reader_input_t *fq_reader_input = wf_input->fq_reader_input;
   array_list_t *reads = array_list_new(fq_reader_input->batch_size, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
   
-  fastq_fread_se_ex(reads, fq_reader_input->batch_size, fq_reader_input->fq_file1);
+  if (fq_reader_input->gzip) {
+    //Gzip fastq file
+    if (fq_reader_input->flags == SINGLE_END_MODE) {
+      fastq_gzread_bytes_se(reads, fq_reader_input->batch_size, fq_reader_input->fq_gzip_file1);
+    } else {
+      fastq_gzread_bytes_pe(reads, fq_reader_input->batch_size, fq_reader_input->fq_gzip_file1, fq_reader_input->fq_gzip_file2);
+    }
+  } else {
+    //Fastq file
+    if (fq_reader_input->flags == SINGLE_END_MODE) {
+      fastq_fread_bytes_se(reads, fq_reader_input->batch_size, fq_reader_input->fq_file1);
+    } else {
+      fastq_fread_bytes_aligner_pe(reads, fq_reader_input->batch_size, 
+				   fq_reader_input->fq_file1, fq_reader_input->fq_file2);
+    }
+  }
+
   
   size_t num_reads = array_list_size(reads);
   
@@ -68,7 +84,9 @@ void *sa_fq_reader(void *input) {
 				   curr_wf_batch->writer_input, 
 				   sa_mapping_batch);
   }
+
   return new_wf_batch;
+
 }
 
 //====================================================================

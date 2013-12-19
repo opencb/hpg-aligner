@@ -5,12 +5,12 @@
 //--------------------------------------------------------------------
 
 //void run_bs_aligner(genome_t *genome, genome_t *genome1, genome_t *genome2,
-void run_bs_aligner(genome_t *genome2, genome_t *genome1, genome_t *genome,
-		    bwt_index_t *bwt_index2, bwt_index_t *bwt_index1, 
-		    bwt_optarg_t *bwt_optarg, cal_optarg_t *cal_optarg, 
-		    pair_mng_t *pair_mng, report_optarg_t *report_optarg, 
-		    options_t *options) {
-
+void run_bs_aligner(options_t *options) {
+  genome_t *genome2, *genome1, *genome;
+  bwt_index_t *bwt_index2, *bwt_index1;
+  //bwt_optarg_t *bwt_optarg, cal_optarg_t *cal_optarg, 
+  //pair_mng_t *pair_mng, report_optarg_t *report_optarg, 
+  //options_t *options
   //printf("index1 %s\n", bwt_index1->nucleotides);
   //printf("index2 %s\n", bwt_index2->nucleotides);
 
@@ -38,14 +38,87 @@ void run_bs_aligner(genome_t *genome2, genome_t *genome1, genome_t *genome,
   // display selected options
   LOG_DEBUG("Displaying options...\n");
   options_display(options);
+
+    char bs_dir1[256];
+    sprintf(bs_dir1, "%s/AGT_index", options->bwt_dirname);
+    char bs_dir2[256];
+    sprintf(bs_dir2, "%s/ACT_index", options->bwt_dirname);
+    // genome parameters
+    LOG_DEBUG("Reading genomes...");
+
+    ////////////////////////
+    //descomentar la siguiente linea para probar con el alfabeto de 4 letras
+    ////////////////////////
+    //printf("dir %s\n", options->bwt_dirname);
+    genome  = genome_new("dna_compression.bin", options->bwt_dirname);
+    //genome = genome_new("dna_compression.bin", bs_dir1);
+    genome1 = genome_new("dna_compression.bin", bs_dir1);
+    genome2 = genome_new("dna_compression.bin", bs_dir2);
+
+    LOG_DEBUG("Done !!");
+    
+    // BWT index
+    //if (time_on) { timing_start(INIT_BWT_INDEX, 0, timing_p); }
+
+    //printf("Load index1 (%s)\n", bs_dir1);
+    LOG_DEBUG("Loading AGT index...");
+    bwt_index1 = bwt_index_new(bs_dir1, false);
+    //printf("Load index1 done\n");
+    /*
+    printf("+++bwt_index1 -> %s\n" ,bwt_index1->nucleotides);
+    bwt_index1->nucleotides = strdup(readNucleotide(bs_dir1, "Nucleotide"));
+    bwt_init_replace_table(bwt_index1->nucleotides, bwt_index1->table, bwt_index1->rev_table);
+    printf("***bwt_index1 -> %s\n" ,bwt_index1->nucleotides);
+    */
+    LOG_DEBUG("Loading AGT index done !!");
+
+    //printf("Load index2 (%s)\n", bs_dir2);
+    LOG_DEBUG("Loading ACT index...");
+    bwt_index2 = bwt_index_new(bs_dir2, false);
+    //printf("Load index2 done\n");
+    /*
+    printf("+++bwt_index2 -> %s\n", bwt_index2->nucleotides);
+    bwt_index2->nucleotides = strdup(readNucleotide(bs_dir2, "Nucleotide"));
+    bwt_init_replace_table(bwt_index2->nucleotides, bwt_index2->table, bwt_index2->rev_table);
+    printf("***bwt_index2 -> %s\n", bwt_index2->nucleotides);
+    */
+    LOG_DEBUG("Loading ACT index done !!");
+    //exit(-1);
   
-  omp_set_nested(1);  
+  //BWT parameters
+  bwt_optarg_t *bwt_optarg = bwt_optarg_new(1, 0,
+					    options->filter_read_mappings, 
+					    options->filter_seed_mappings);
+  
+  // CAL parameters
+  //printf("%i\n", options->min_cal_size);
+  cal_optarg_t *cal_optarg = cal_optarg_new(options->min_cal_size, 
+					    options->seeds_max_distance, 
+					    options->num_seeds, 
+					    options->min_num_seeds_in_cal,
+					    options->seed_size, 
+					    options->min_seed_size, 
+					    options->cal_seeker_errors, 
+					    options->max_intron_length, 
+					    options->min_intron_length);
+  
+  // paired mode parameters
+  pair_mng_t *pair_mng = pair_mng_new(options->pair_mode, options->pair_min_distance, 
+				      options->pair_max_distance, options->report_only_paired);
+  
+  // report parameters
+  report_optarg_t *report_optarg = report_optarg_new(options->report_all,
+						     options->report_n_best,
+						     options->report_n_hits, 
+						     options->report_only_paired,
+						     options->report_best);  
+
   
   // preparing input FastQ file
   fastq_batch_reader_input_t reader_input;
   fastq_batch_reader_input_init(options->in_filename, options->in_filename2, 
 				options->pair_mode, options->batch_size, 
-				NULL, &reader_input);
+				NULL, options->gzip, &reader_input);
   
   if (options->pair_mode == SINGLE_END_MODE) {
     reader_input.fq_file1 = fastq_fopen(options->in_filename);
@@ -109,7 +182,7 @@ void run_bs_aligner(genome_t *genome2, genome_t *genome1, genome_t *genome,
   //
   // timing
   struct timeval start, end;
-  extern double main_time;
+  double main_time;
 
   batch_t *batch = batch_new(&bwt_input, &region_input, &cal_input, 
 			     &pair_input, NULL, &sw_input, &writer_input, BS_MODE, NULL);
@@ -235,8 +308,18 @@ void run_bs_aligner(genome_t *genome2, genome_t *genome1, genome_t *genome,
   bam_fclose(writer_input.bam_file);
   
   free(output_filename);
+    genome_free(genome);
+    bwt_index_free(bwt_index1);
+    genome_free(genome1);
+    bwt_index_free(bwt_index2);
+    genome_free(genome2);
+  bwt_optarg_free(bwt_optarg);
+  cal_optarg_free(cal_optarg);
+  pair_mng_free(pair_mng);
+  report_optarg_free(report_optarg);
+
   
-  if (statistics_on) {
+  if (0) {
     size_t total_item = 0;
     double max_time = 0, total_throughput = 0;
     printf("\nBWT time:\n");
