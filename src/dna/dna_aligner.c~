@@ -33,7 +33,8 @@ void dna_aligner(options_t *options) {
   fastq_batch_reader_input_t reader_input;
   fastq_batch_reader_input_init(fastq_filename, NULL, 
 				0, batch_size, 
-				NULL, &reader_input);
+				NULL, options->gzip, 
+				&reader_input);
   
   reader_input.fq_file1 = fastq_fopen(fastq_filename);
   reader_input.fq_file2 = NULL;

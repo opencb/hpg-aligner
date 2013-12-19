@@ -34,6 +34,7 @@ int w3_function(void *data) {
 
 
 
+
 void rna_aligner(options_t *options) {
   int path_length = strlen(options->output_name);
   int prefix_length = 0;
@@ -146,8 +147,7 @@ void rna_aligner(options_t *options) {
   LOG_DEBUG("Reading bwt index done !!");
   stop_timer(time_genome_s, time_genome_e, time_genome);
 
-  //============================= INPUT INITIALIZATIONS =========================
-  
+  //============================= INPUT INITIALIZATIONS =========================//  
   //BWT parameters
   bwt_optarg_t *bwt_optarg = bwt_optarg_new(1, 0,
 					    options->filter_read_mappings, 
@@ -188,37 +188,6 @@ void rna_aligner(options_t *options) {
   linked_list_t *buffer_hc = linked_list_new(COLLECTION_MODE_SYNCHRONIZED);
 
   FILE *f_sa, *f_hc;
-
-  f_sa = fopen("buffer_sa.tmp", "w+b");
-  if (f_sa == NULL) {
-    LOG_FATAL("Error opening file 'buffer_sa.tmp' \n");
-  }
-
-  f_hc = fopen("buffer_hc.tmp", "w+b");
-  if (f_hc == NULL) {
-    LOG_FATAL("Error opening file 'buffer_hc.tmp' \n");
-  }
-
-  fastq_batch_reader_input_t reader_input;
-  fastq_batch_reader_input_init(options->in_filename, options->in_filename2, 
-				options->pair_mode, options->batch_size, 
-				NULL, options->gzip, &reader_input);  
-
-  if (options->pair_mode == SINGLE_END_MODE) {
-    if (options->gzip) {
-      reader_input.fq_gzip_file1 = fastq_gzopen(options->in_filename);
-    } else {
-      reader_input.fq_file1 = fastq_fopen(options->in_filename);
-    }
-  } else {
-    if (options->gzip) {
-      reader_input.fq_gzip_file1 = fastq_gzopen(options->in_filename);
-      reader_input.fq_gzip_file2 = fastq_gzopen(options->in_filename2);
-    } else {
-      reader_input.fq_file1 = fastq_fopen(options->in_filename);
-      reader_input.fq_file2 = fastq_fopen(options->in_filename2);
-    }
-  }
 
   linked_list_t *alignments_list = linked_list_new(COLLECTION_MODE_SYNCHRONIZED);
   linked_list_set_flag(options->pair_mode, alignments_list);
@@ -280,11 +249,91 @@ void rna_aligner(options_t *options) {
   batch_t *batch = batch_new(&bwt_input, &region_input, &cal_input, 
 			     &pair_input, &preprocess_rna, &sw_input, &writer_input, RNA_MODE, NULL);
 
-  wf_input_t *wf_input = wf_input_new(&reader_input, batch);
-  wf_input_file_t *wf_input_file = wf_input_file_new(f_sa, batch);   
-  wf_input_file_t *wf_input_file_hc = wf_input_file_new(f_hc, batch);  
+  fastq_batch_reader_input_t reader_input;
+
+  //Parse input for more than one file
+  char *fq_list1 = options->in_filename, *fq_list2 = options->in_filename2;
+  char token[2] = ",";
+  char *ptr;
+
+  array_list_t *files_fq1 = array_list_new(50,
+					   1.25f,
+					   COLLECTION_MODE_ASYNCHRONIZED);
+  array_list_t *files_fq2 = array_list_new(50,
+					   1.25f,
+					   COLLECTION_MODE_ASYNCHRONIZED);
+  int num_files1, num_files2;
+
+  if (fq_list1) {
+    ptr = strtok(fq_list1, token);    // Primera llamada => Primer token
+    array_list_insert(strdup(ptr), files_fq1);
+    while( (ptr = strtok( NULL, token)) != NULL ) {    // Posteriores llamadas
+      array_list_insert(strdup(ptr), files_fq1);
+    }
+    num_files1 = array_list_size(files_fq1);
+  }
+
+  if (fq_list2) {
+    ptr = strtok(fq_list2, token);    // Primera llamada => Primer token
+    array_list_insert(strdup(ptr), files_fq2);
+    while( (ptr = strtok( NULL, token)) != NULL ) {    // Posteriores llamadas
+      array_list_insert(strdup(ptr), files_fq2);
+    }    
+    num_files2 = array_list_size(files_fq2);
+  }
+
   
-  if (workflow_enable) {
+  if (fq_list2 && (num_files1 != num_files2)) {
+    LOG_FATAL("Diferent number of files in paired-end/mate-pair mode");
+  }
+  
+  extern double main_time;
+  double time_alig;
+  struct timeval time_start_alig, time_end_alig;
+  
+  char *file1, *file2;
+  for (int f = 0; f < num_files1; f++) {
+    file1 = array_list_get(f, files_fq1);
+    
+    if (num_files2) {
+      file2 = array_list_get(f, files_fq2);
+    } else {
+      file2 = NULL;
+    }
+
+    fastq_batch_reader_input_init(file1, file2, 
+				  options->pair_mode, options->batch_size, 
+				  NULL, options->gzip, &reader_input);  
+    
+    if (options->pair_mode == SINGLE_END_MODE) {
+      if (options->gzip) {
+	reader_input.fq_gzip_file1 = fastq_gzopen(file1);
+      } else {
+	reader_input.fq_file1 = fastq_fopen(file1);
+      }
+    } else {
+      if (options->gzip) {
+	reader_input.fq_gzip_file1 = fastq_gzopen(file1);
+	reader_input.fq_gzip_file2 = fastq_gzopen(file2);
+      } else {
+	reader_input.fq_file1 = fastq_fopen(file1);
+	reader_input.fq_file2 = fastq_fopen(file2);
+      }
+    }
+
+
+    f_sa = fopen("buffer_sa.tmp", "w+b");
+    if (f_sa == NULL) {
+      LOG_FATAL("Error opening file 'buffer_sa.tmp' \n");
+    }
+    
+    f_hc = fopen("buffer_hc.tmp", "w+b");
+    if (f_hc == NULL) {
+      LOG_FATAL("Error opening file 'buffer_hc.tmp' \n");
+    }
+
+    sw_input.f_sa = f_sa;
+    sw_input.f_hc = f_hc;
     //===================================================================================
     //-----------------------------------------------------------------------------------
     // workflow management
@@ -292,7 +341,10 @@ void rna_aligner(options_t *options) {
     //
     // timing
     //struct timeval start, end;
-    extern double main_time;
+
+    wf_input_t *wf_input = wf_input_new(&reader_input, batch);
+    wf_input_file_t *wf_input_file = wf_input_file_new(f_sa, batch);   
+    wf_input_file_t *wf_input_file_hc = wf_input_file_new(f_hc, batch);  
 
     //create and initialize workflow
     workflow_t *wf = workflow_new();
@@ -333,427 +385,376 @@ void rna_aligner(options_t *options) {
     tot_reads_in = 0;
     tot_reads_out = 0;
 
-    double time_alig;
-    struct timeval time_start_alig, time_end_alig;
 
     start_timer(time_start_alig);
     fprintf(stderr, "START WORKWFLOW '1ph'\n");
     workflow_run_with(options->num_cpu_threads, wf_input, wf);
     fprintf(stderr, "END WORKWFLOW '1ph'\n\n");
   
-    //tot_reads_in = 0;
-    //tot_reads_out = 0;  
-
     fprintf(stderr, "START WORKWFLOW '2ph'\n");
     rewind(f_sa);
     workflow_run_with(options->num_cpu_threads, wf_input_file, wf_last);
     fprintf(stderr, "END WORKWFLOW '2ph'\n\n");
 
 
-    //tot_reads_in = 0;
-    //tot_reads_out = 0;  
     fprintf(stderr, "START WORKWFLOW '3ph'\n");
     rewind(f_hc);
     workflow_run_with(options->num_cpu_threads, wf_input_file_hc, wf_hc);
     fprintf(stderr, "END WORKWFLOW '3ph'\n\n");
   
+    // free memory
+    workflow_free(wf);
+    workflow_free(wf_last);
+    workflow_free(wf_hc);
 
-    //Write chromosome avls
-    write_chromosome_avls(extend_filename,
-			  exact_filename, genome->num_chromosomes, avls_list);
+    wf_input_free(wf_input);
+    wf_input_file_free(wf_input_file);
+    wf_input_file_free(wf_input_file_hc);
 
+    if (file1) { free(file1); }
+    if (file2) { free(file2); }
 
-    stop_timer(time_start_alig, time_end_alig, time_alig);
+    fclose(f_sa);
+    fclose(f_hc);
 
-    printf("= = = = T I M I N G    W O R K F L O W    '1' = = = =\n");
-    workflow_display_timing(wf);
-    printf("= = = = - - - - - - - - - - - - - - - - - - - = = = =\n\n");
-
-    printf("= = = = T I M I N G    W O R K F L O W    '2' = = = =\n");
-    workflow_display_timing(wf_last);
-    printf("= = = = - - - - - - - - - - - - - - - - - - - = = = =\n\n");
-
-    printf("= = = = T I M I N G    W O R K F L O W    '3' = = = =\n");
-    workflow_display_timing(wf_hc); 
-    printf("= = = = - - - - - - - - - - - - - - - - - - - = = = =\n\n");
-
-
-    basic_statistics_display(basic_st, 1, time_alig / 1000000, time_genome / 1000000);
-
-    /*
-  if (!strcmp(command, "rna") && fd_log != NULL) {
-    char str_log[2048];
-    if (options->in_filename) {
-      sprintf(str_log, "FILE INPUT 0: %s\n\0", options->in_filename);
-      fwrite(str_log, sizeof(char), strlen(str_log), fd_log);
+    //closing files
+    if (options->gzip) {
+      if (options->pair_mode == SINGLE_END_MODE) {
+	fastq_gzclose(reader_input.fq_gzip_file1);
+      } else {
+	fastq_gzclose(reader_input.fq_gzip_file1);
+	fastq_gzclose(reader_input.fq_gzip_file2);
+      }
+    } else {
+      if (options->pair_mode == SINGLE_END_MODE) {
+	fastq_fclose(reader_input.fq_file1);
+      } else {
+	fastq_fclose(reader_input.fq_file1);
+	fastq_fclose(reader_input.fq_file2);
+      }
     }
-
-    if (options->in_filename2) {
-      sprintf(str_log, "FILE INPUT 1: %s\n\0", options->in_filename2);
-      fwrite(str_log, sizeof(char), strlen(str_log), fd_log);
-    }
-
-    sprintf(str_log, "TOTAL READS PROCESSED: %i\n\0", basic_st->total_reads);
-    fwrite(str_log, sizeof(char), strlen(str_log), fd_log);
-
-    sprintf(str_log, "    TOTAL READS MAPPED: %0.2f%%\n\0", basic_st->num_mapped_reads * 100.0 / basic_st->total_reads);
-    fwrite(str_log, sizeof(char), strlen(str_log), fd_log);
-
-    sprintf(str_log, "    TOTAL READS UNMAPPED: %0.2f%%\n\0", (basic_st->total_reads - basic_st->num_mapped_reads) * 100.0 / basic_st->total_reads);
-    fwrite(str_log, sizeof(char), strlen(str_log), fd_log);
-
-    sprintf(str_log, "    TOTAL SPLICE JUNCTIONS FOUND: %i\n\0", junction_id);
-    fwrite(str_log, sizeof(char), strlen(str_log), fd_log);
-
-    sprintf(str_log, "TIME ALIGNER: %0.2f (s)\n\0", time_alig / 1000000);
-    fwrite(str_log, sizeof(char), strlen(str_log), fd_log);
-
-    sprintf(str_log, "TOTAL TIME: %0.2f (s)\n\0", (time_alig + time_genome) / 1000000);
-    fwrite(str_log, sizeof(char), strlen(str_log), fd_log);
-
-    fclose(fd_log);
-
+    
   }
-    */
 
+  array_list_free(files_fq1, NULL);
+  array_list_free(files_fq2, NULL);
+
+  //Write chromosome avls
+  write_chromosome_avls(extend_filename,
+			exact_filename, genome->num_chromosomes, avls_list);
+  
+  
+  stop_timer(time_start_alig, time_end_alig, time_alig);
+
+  /*  
+  printf("= = = = T I M I N G    W O R K F L O W    '1' = = = =\n");
+  workflow_display_timing(wf);
+  printf("= = = = - - - - - - - - - - - - - - - - - - - = = = =\n\n");
+  
+  printf("= = = = T I M I N G    W O R K F L O W    '2' = = = =\n");
+  workflow_display_timing(wf_last);
+  printf("= = = = - - - - - - - - - - - - - - - - - - - = = = =\n\n");
+  
+  printf("= = = = T I M I N G    W O R K F L O W    '3' = = = =\n");
+  workflow_display_timing(wf_hc); 
+  printf("= = = = - - - - - - - - - - - - - - - - - - - = = = =\n\n");
+  */
+  
+  basic_statistics_display(basic_st, 1, time_alig / 1000000, time_genome / 1000000);
+  
   free(basic_st);
-
+  
   //if (time_on){ timing_free(timing); }
   metaexons_free(metaexons);
-
-  // free memory
-  workflow_free(wf);
-  workflow_free(wf_last);
-  workflow_free(wf_hc);    
-  } else {
-    //**************************************************************************************//
-    //========================= O P E N M P    P I P E L I N E =============================//
-    //**************************************************************************************//
-    batch_t *batch = batch_new(&bwt_input, &region_input, &cal_input, 
-			       &pair_input, &preprocess_rna, &sw_input, &writer_input, RNA_MODE, NULL);
-
-
-    int num_threads = options->num_cpu_threads - 2;
-
-    list_t fastq_list;
-    list_init("fastq-list", 1, options->num_cpu_threads * 3, &fastq_list);
-    
-    list_t bam_list;
-    list_init("bam-list", num_threads, options->num_cpu_threads * 3, &bam_list);
-    //  list_init("bam-list", 1, num_threads * 3, &bam_list);
-    
-    //omp_set_num_threads(num_threads);
-    
-    int num_cpus = 64;
-    int cpuArray[num_cpus];    
-    for (int i = 0; i < num_cpus; i++) {
-      cpuArray[i] = i;
-    }
-    /*
-    #pragma omp parallel 
-    {
-      cpu_set_t cpu_set;
-      int id = omp_get_thread_num();
-      printf("Thread %i to CPU %i\n", id, cpuArray[ id % num_cpus]);
-      CPU_ZERO( &cpu_set);
-      CPU_SET( cpuArray[ id % num_cpus], &cpu_set);
-      sched_setaffinity(syscall(SYS_gettid), sizeof(cpu_set), &cpu_set);
-    }
-    */
-    omp_set_nested(1);
-    
-    double time_alig;
-    struct timeval time_start_alig, time_end_alig;
-    start_timer(time_start_alig);
-    
-    #pragma omp parallel sections num_threads (3)
-    {      
-        #pragma omp section
-        {
-	  printf("OMP_THREAD (%i): START READER\n", omp_get_thread_num());
-	  //testing_reader(fastq_filename, &reader_input, in);	  
-	  // FastQ batch reader
-	  //struct timeval start_time, end_time;
-	  //double reading_time = 0, total_reading_time = 0;	  
-	  //int id = omp_get_thread_num();
-	  cpu_set_t cpu_set;
-	  CPU_ZERO(&cpu_set);
-	  CPU_SET(0, &cpu_set);
-	  sched_setaffinity(syscall(SYS_gettid), sizeof(cpu_set), &cpu_set);
-
-	  list_item_t *item;
-	  void *data;
-	  size_t num_batches = 0;
-	  while (1) {
-	    //reading_time = 0;
-	    data = fastq_reader(wf_input);
-	    
-	    if ((data) == NULL) break;
-	    
-	    item = list_item_new(num_batches, 0, data);
-	    list_insert_item(item, &fastq_list);
-	    num_batches++;
-	  }
-	  //printf("OMP_THREAD: END READER\n");
-	  list_decr_writers(&fastq_list);
-	  //printf("Reading time: %0.4f sec\n", total_reading_time / 1000000.0f);
-       }
-       #pragma omp section
-       {
-	 // batch mapper
-         #pragma omp parallel num_threads(num_threads)
-	 {
-	   cpu_set_t cpu_set;
-	   CPU_ZERO( &cpu_set);
-	   int id = omp_get_thread_num() + 2;
-	   CPU_SET( cpuArray[ id % num_cpus], &cpu_set);
-	   sched_setaffinity(syscall(SYS_gettid), sizeof(cpu_set), &cpu_set);
-
-	   printf("START WORKER: %i\n", omp_get_thread_num());
-	   list_item_t *item;
-	   while ((item = list_remove_item(&fastq_list)) != NULL) {
-	     bwt_stage(item->data_p);
-	     cal_stage(item->data_p);
-	     sw_stage(item->data_p);
-	     post_pair_stage(item->data_p);
-	     list_insert_item(item, &bam_list);
-	   }
-	   //printf("END WORKER %i\n", omp_get_thread_num());
-	   list_decr_writers(&bam_list);
-	 }
-       }
-       #pragma omp section
-       {
-	 /*cpu_set_t cpu_set;
-	 CPU_ZERO( &cpu_set);
-	 int id = omp_get_thread_num();
-	 CPU_SET( cpuArray[ id % num_cpus], &cpu_set);
-	 sched_setaffinity(syscall(SYS_gettid), sizeof(cpu_set), &cpu_set);	 
-	 // BAM batch writer
-	 //struct timeval start_time, end_time;
-	 //double writing_time = 0, total_writing_time = 0;*/
-	 cpu_set_t cpu_set;
-	 //int id = omp_get_thread_num();
-	 CPU_ZERO(&cpu_set);
-	 CPU_SET(1, &cpu_set);
-	 sched_setaffinity(syscall(SYS_gettid), sizeof(cpu_set), &cpu_set);
-	 //printf("OMP_THREAD (%i): START WRITER\n", omp_get_thread_num());
-	 list_item_t *item;
-	 //wf_batch_t *wf_batch;
-	 size_t num_batches = 0;
-	 while ((item = list_remove_item(&bam_list)) != NULL) {
-	   //writing_time = 0;
-	   //start_timer(start_time);
-	   //bam_writer1(item->data_p);
-	   //stop_timer(start_time, end_time, writing_time);
-	   //total_writing_time += writing_time;
-	   bam_writer(item->data_p);
-	   list_item_free(item);
-	 }
-	 //printf("OMP_THREAD: END WRITER\n");
-	 //printf("Writing time: %0.4f sec\n", total_writing_time / 1000000.0f);
-       }
-    }
-
-    rewind(f_sa);
-    fastq_list.writers = 1;
-    bam_list.writers  = num_threads;
-
-    #pragma omp parallel sections num_threads (3)
-    {
-        #pragma omp section
-        {
-	  printf("OMP_THREAD: START READER\n");
-	  //testing_reader(fastq_filename, &reader_input, in);	  
-	  // FastQ batch reader
-	  //struct timeval start_time, end_time;
-	  //double reading_time = 0, total_reading_time = 0;	  
-	  cpu_set_t cpu_set;
-	  CPU_ZERO(&cpu_set);
-	  CPU_SET(0, &cpu_set);
-	  sched_setaffinity(syscall(SYS_gettid), sizeof(cpu_set), &cpu_set);
-
-	  list_item_t *item;
-	  void *data;
-	  size_t num_batches = 0;
-	  while (1) {
-	    //reading_time = 0;
-	    data = file_reader(wf_input_file);
-	    if ((data) == NULL) break;
-	    
-	    item = list_item_new(num_batches, 0, data);
-	    list_insert_item(item, &fastq_list);
-	    num_batches++;
-	  }
-	  printf("OMP_THREAD: END READER\n");
-	  list_decr_writers(&fastq_list);
-	  //printf("Reading time: %0.4f sec\n", total_reading_time / 1000000.0f);
-	}
-       #pragma omp section
-       {
-	 // batch mapper
-         #pragma omp parallel num_threads(num_threads)
-	 {
-	   cpu_set_t cpu_set;
-	   CPU_ZERO( &cpu_set);
-	   int id = omp_get_thread_num() + 2;
-	   CPU_SET( cpuArray[ id % num_cpus], &cpu_set);
-	   sched_setaffinity(syscall(SYS_gettid), sizeof(cpu_set), &cpu_set);
-
-	   printf("START WORKER: %i\n", omp_get_thread_num());
-	   list_item_t *item;
-	   while ((item = list_remove_item(&fastq_list)) != NULL) {
-	     rna_last_stage(item->data_p);
-	     post_pair_stage(item->data_p);
-	     list_insert_item(item, &bam_list);
-	   }
-	   printf("END WORKER %i\n", omp_get_thread_num());
-	   list_decr_writers(&bam_list);
-	 }
-       }
-       #pragma omp section
-       {
-	 // BAM batch writer
-	 //struct timeval start_time, end_time;
-	 //double writing_time = 0, total_writing_time = 0;
-	 cpu_set_t cpu_set;
-	 //int id = omp_get_thread_num();
-	 CPU_ZERO(&cpu_set);
-	 CPU_SET(1, &cpu_set);
-	 sched_setaffinity(syscall(SYS_gettid), sizeof(cpu_set), &cpu_set);
-
-	 printf("OMP_THREAD: START WRITER\n");
-	 list_item_t *item;
-	 //wf_batch_t *wf_batch;
-	 size_t num_batches = 0;
-	 while ((item = list_remove_item(&bam_list)) != NULL) {
-	   //writing_time = 0;
-	   //start_timer(start_time);
-	   //bam_writer1(item->data_p);
-	   //stop_timer(start_time, end_time, writing_time);
-	   //total_writing_time += writing_time;
-	   bam_writer(item->data_p);
-	   list_item_free(item);
-	 }
-	 printf("OMP_THREAD: END WRITER\n");
-	 //printf("Writing time: %0.4f sec\n", total_writing_time / 1000000.0f);
-       }
-    }
-
-    rewind(f_hc);
-    fastq_list.writers = 1;
-    bam_list.writers  = num_threads;
-
-    #pragma omp parallel sections num_threads (3)
-    {
-        #pragma omp section
-        {
-	  cpu_set_t cpu_set;
-	  CPU_ZERO(&cpu_set);
-	  CPU_SET(0, &cpu_set);
-	  sched_setaffinity(syscall(SYS_gettid), sizeof(cpu_set), &cpu_set);
-
-	  printf("OMP_THREAD: START READER\n");
-	  //testing_reader(fastq_filename, &reader_input, in);	  
-	  // FastQ batch reader
-	  //struct timeval start_time, end_time;
-	  //double reading_time = 0, total_reading_time = 0;	  
-	  list_item_t *item;
-	  void *data;
-	  size_t num_batches = 0;
-	  while (1) {
-	    //reading_time = 0;
-	    data = file_reader_2(wf_input_file_hc);
-	    
-	    if ((data) == NULL) break;
-	    
-	    item = list_item_new(num_batches, 0, data);
-	    list_insert_item(item, &fastq_list);
-	    num_batches++;
-	  }
-	  printf("OMP_THREAD: END READER\n");
-	  list_decr_writers(&fastq_list);
-	  //printf("Reading time: %0.4f sec\n", total_reading_time / 1000000.0f);
-	}
-       #pragma omp section
-       {
-	 // batch mapper
-         #pragma omp parallel num_threads(num_threads)
-	 {
-	   cpu_set_t cpu_set;
-	   CPU_ZERO( &cpu_set);
-	   int id = omp_get_thread_num() + 2;
-	   CPU_SET( cpuArray[ id % num_cpus], &cpu_set);
-	   sched_setaffinity(syscall(SYS_gettid), sizeof(cpu_set), &cpu_set);
-
-	   printf("START WORKER: %i\n", omp_get_thread_num());
-	   list_item_t *item;
-	   while ((item = list_remove_item(&fastq_list)) != NULL) {
-	     rna_last_hc_stage(item->data_p);
-	     post_pair_stage(item->data_p);
-	     list_insert_item(item, &bam_list);
-	   }
-	   printf("END WORKER %i\n", omp_get_thread_num());
-	   list_decr_writers(&bam_list);
-	 }
-       }
-       #pragma omp section
-       {
-	 // BAM batch writer
-	 //struct timeval start_time, end_time;
-	 //double writing_time = 0, total_writing_time = 0;
-	 cpu_set_t cpu_set;
-	 //int id = omp_get_thread_num();
-	 CPU_ZERO(&cpu_set);
-	 CPU_SET(1, &cpu_set);
-	 sched_setaffinity(syscall(SYS_gettid), sizeof(cpu_set), &cpu_set);
-
-	 printf("OMP_THREAD: START WRITER\n");
-	 list_item_t *item;
-	 //wf_batch_t *wf_batch;
-	 size_t num_batches = 0;
-	 while ((item = list_remove_item(&bam_list)) != NULL) {
-	   //writing_time = 0;
-	   //start_timer(start_time);
-	   //bam_writer1(item->data_p);
-	   //stop_timer(start_time, end_time, writing_time);
-	   //total_writing_time += writing_time;
-	   bam_writer(item->data_p);
-	   list_item_free(item);
-	 }
-	 printf("OMP_THREAD: END WRITER\n");
-	 //printf("Writing time: %0.4f sec\n", total_writing_time / 1000000.0f);
-       }
-    }
-    //Write chromosome avls
-    write_chromosome_avls(extend_filename,
-			  exact_filename, genome->num_chromosomes, avls_list);
-    stop_timer(time_start_alig, time_end_alig, time_alig);
-
-  }
-
-  wf_input_free(wf_input);
-  wf_input_file_free(wf_input_file);
-  wf_input_file_free(wf_input_file_hc);
+  /*  
+  //========================= O P E N M P    P I P E L I N E =============================//
+  
+  batch_t *batch = batch_new(&bwt_input, &region_input, &cal_input, 
+  &pair_input, &preprocess_rna, &sw_input, &writer_input, RNA_MODE, NULL);
 
   
-  //closing files
-  if (options->gzip) {
-    if (options->pair_mode == SINGLE_END_MODE) {
-      fastq_gzclose(reader_input.fq_gzip_file1);
-    } else {
-      fastq_gzclose(reader_input.fq_gzip_file1);
-      fastq_gzclose(reader_input.fq_gzip_file2);
-    }
-  } else {
-    if (options->pair_mode == SINGLE_END_MODE) {
-      fastq_fclose(reader_input.fq_file1);
-    } else {
-      fastq_fclose(reader_input.fq_file1);
-      fastq_fclose(reader_input.fq_file2);
-    }
+  int num_threads = options->num_cpu_threads - 2;
+  
+  list_t fastq_list;
+  list_init("fastq-list", 1, options->num_cpu_threads * 3, &fastq_list);
+  
+  list_t bam_list;
+  list_init("bam-list", num_threads, options->num_cpu_threads * 3, &bam_list);
+  //  list_init("bam-list", 1, num_threads * 3, &bam_list);
+  
+  //omp_set_num_threads(num_threads);
+  
+  int num_cpus = 64;
+  int cpuArray[num_cpus];    
+  for (int i = 0; i < num_cpus; i++) {
+  cpuArray[i] = i;
   }
+  omp_set_nested(1);
+    
+  double time_alig;
+  struct timeval time_start_alig, time_end_alig;
+  start_timer(time_start_alig);
+  
+  #pragma omp parallel sections num_threads (3)
+  {      
+  #pragma omp section
+  {
+  printf("OMP_THREAD (%i): START READER\n", omp_get_thread_num());
+  //testing_reader(fastq_filename, &reader_input, in);	  
+  // FastQ batch reader
+  //struct timeval start_time, end_time;
+  //double reading_time = 0, total_reading_time = 0;	  
+  //int id = omp_get_thread_num();
+  cpu_set_t cpu_set;
+  CPU_ZERO(&cpu_set);
+  CPU_SET(0, &cpu_set);
+  sched_setaffinity(syscall(SYS_gettid), sizeof(cpu_set), &cpu_set);
+  
+  list_item_t *item;
+  void *data;
+  size_t num_batches = 0;
+  while (1) {
+  //reading_time = 0;
+  data = fastq_reader(wf_input);
+  
+  if ((data) == NULL) break;
+  
+  item = list_item_new(num_batches, 0, data);
+  list_insert_item(item, &fastq_list);
+  num_batches++;
+  }
+  //printf("OMP_THREAD: END READER\n");
+  list_decr_writers(&fastq_list);
+  //printf("Reading time: %0.4f sec\n", total_reading_time / 1000000.0f);
+  }
+  #pragma omp section
+  {
+  // batch mapper
+  #pragma omp parallel num_threads(num_threads)
+  {
+  cpu_set_t cpu_set;
+  CPU_ZERO( &cpu_set);
+  int id = omp_get_thread_num() + 2;
+  CPU_SET( cpuArray[ id % num_cpus], &cpu_set);
+  sched_setaffinity(syscall(SYS_gettid), sizeof(cpu_set), &cpu_set);
+  
+  printf("START WORKER: %i\n", omp_get_thread_num());
+  list_item_t *item;
+  while ((item = list_remove_item(&fastq_list)) != NULL) {
+  bwt_stage(item->data_p);
+  cal_stage(item->data_p);
+  sw_stage(item->data_p);
+  post_pair_stage(item->data_p);
+  list_insert_item(item, &bam_list);
+  }
+  //printf("END WORKER %i\n", omp_get_thread_num());
+  list_decr_writers(&bam_list);
+  }
+  }
+  #pragma omp section
+  {
+  cpu_set_t cpu_set;
+  //int id = omp_get_thread_num();
+  CPU_ZERO(&cpu_set);
+  CPU_SET(1, &cpu_set);
+  sched_setaffinity(syscall(SYS_gettid), sizeof(cpu_set), &cpu_set);
+  //printf("OMP_THREAD (%i): START WRITER\n", omp_get_thread_num());
+  list_item_t *item;
+  //wf_batch_t *wf_batch;
+  size_t num_batches = 0;
+  while ((item = list_remove_item(&bam_list)) != NULL) {
+  //writing_time = 0;
+  //start_timer(start_time);
+  //bam_writer1(item->data_p);
+  //stop_timer(start_time, end_time, writing_time);
+  //total_writing_time += writing_time;
+  bam_writer(item->data_p);
+  list_item_free(item);
+  }
+  //printf("OMP_THREAD: END WRITER\n");
+  //printf("Writing time: %0.4f sec\n", total_writing_time / 1000000.0f);
+  }
+  }
+  
+  rewind(f_sa);
+  fastq_list.writers = 1;
+  bam_list.writers  = num_threads;
+  
+  #pragma omp parallel sections num_threads (3)
+  {
+  #pragma omp section
+  {
+  printf("OMP_THREAD: START READER\n");
+  //testing_reader(fastq_filename, &reader_input, in);	  
+  // FastQ batch reader
+  //struct timeval start_time, end_time;
+  //double reading_time = 0, total_reading_time = 0;	  
+  cpu_set_t cpu_set;
+  CPU_ZERO(&cpu_set);
+  CPU_SET(0, &cpu_set);
+  sched_setaffinity(syscall(SYS_gettid), sizeof(cpu_set), &cpu_set);
+  
+  list_item_t *item;
+  void *data;
+  size_t num_batches = 0;
+  while (1) {
+  //reading_time = 0;
+  data = file_reader(wf_input_file);
+  if ((data) == NULL) break;
+  
+  item = list_item_new(num_batches, 0, data);
+  list_insert_item(item, &fastq_list);
+  num_batches++;
+  }
+  printf("OMP_THREAD: END READER\n");
+  list_decr_writers(&fastq_list);
+  //printf("Reading time: %0.4f sec\n", total_reading_time / 1000000.0f);
+  }
+  #pragma omp section
+  {
+  // batch mapper
+  #pragma omp parallel num_threads(num_threads)
+  {
+  cpu_set_t cpu_set;
+  CPU_ZERO( &cpu_set);
+  int id = omp_get_thread_num() + 2;
+  CPU_SET( cpuArray[ id % num_cpus], &cpu_set);
+  sched_setaffinity(syscall(SYS_gettid), sizeof(cpu_set), &cpu_set);
+  
+  printf("START WORKER: %i\n", omp_get_thread_num());
+  list_item_t *item;
+  while ((item = list_remove_item(&fastq_list)) != NULL) {
+  rna_last_stage(item->data_p);
+  post_pair_stage(item->data_p);
+  list_insert_item(item, &bam_list);
+  }
+  printf("END WORKER %i\n", omp_get_thread_num());
+  list_decr_writers(&bam_list);
+  }
+  }
+  #pragma omp section
+  {
+  // BAM batch writer
+  //struct timeval start_time, end_time;
+  //double writing_time = 0, total_writing_time = 0;
+  cpu_set_t cpu_set;
+  //int id = omp_get_thread_num();
+  CPU_ZERO(&cpu_set);
+  CPU_SET(1, &cpu_set);
+  sched_setaffinity(syscall(SYS_gettid), sizeof(cpu_set), &cpu_set);
+  
+  printf("OMP_THREAD: START WRITER\n");
+  list_item_t *item;
+  //wf_batch_t *wf_batch;
+  size_t num_batches = 0;
+  while ((item = list_remove_item(&bam_list)) != NULL) {
+  //writing_time = 0;
+  //start_timer(start_time);
+  //bam_writer1(item->data_p);
+  //stop_timer(start_time, end_time, writing_time);
+  //total_writing_time += writing_time;
+  bam_writer(item->data_p);
+  list_item_free(item);
+  }
+  printf("OMP_THREAD: END WRITER\n");
+  //printf("Writing time: %0.4f sec\n", total_writing_time / 1000000.0f);
+  }
+  }
+  
+  rewind(f_hc);
+  fastq_list.writers = 1;
+  bam_list.writers  = num_threads;
+  
+  #pragma omp parallel sections num_threads (3)
+  {
+  #pragma omp section
+  {
+  cpu_set_t cpu_set;
+  CPU_ZERO(&cpu_set);
+  CPU_SET(0, &cpu_set);
+  sched_setaffinity(syscall(SYS_gettid), sizeof(cpu_set), &cpu_set);
 
+  printf("OMP_THREAD: START READER\n");
+  //testing_reader(fastq_filename, &reader_input, in);	  
+  // FastQ batch reader
+  //struct timeval start_time, end_time;
+  //double reading_time = 0, total_reading_time = 0;	  
+  list_item_t *item;
+  void *data;
+  size_t num_batches = 0;
+  while (1) {
+  //reading_time = 0;
+  data = file_reader_2(wf_input_file_hc);
+  
+  if ((data) == NULL) break;
+  
+  item = list_item_new(num_batches, 0, data);
+  list_insert_item(item, &fastq_list);
+  num_batches++;
+  }
+  printf("OMP_THREAD: END READER\n");
+  list_decr_writers(&fastq_list);
+  //printf("Reading time: %0.4f sec\n", total_reading_time / 1000000.0f);
+  }
+  #pragma omp section
+  {
+  // batch mapper
+  #pragma omp parallel num_threads(num_threads)
+  {
+  cpu_set_t cpu_set;
+  CPU_ZERO( &cpu_set);
+  int id = omp_get_thread_num() + 2;
+  CPU_SET( cpuArray[ id % num_cpus], &cpu_set);
+  sched_setaffinity(syscall(SYS_gettid), sizeof(cpu_set), &cpu_set);
+  
+  printf("START WORKER: %i\n", omp_get_thread_num());
+  list_item_t *item;
+  while ((item = list_remove_item(&fastq_list)) != NULL) {
+  rna_last_hc_stage(item->data_p);
+  post_pair_stage(item->data_p);
+  list_insert_item(item, &bam_list);
+  }
+  printf("END WORKER %i\n", omp_get_thread_num());
+  list_decr_writers(&bam_list);
+  }
+  }
+  #pragma omp section
+  {
+  // BAM batch writer
+  //struct timeval start_time, end_time;
+  //double writing_time = 0, total_writing_time = 0;
+  cpu_set_t cpu_set;
+  //int id = omp_get_thread_num();
+  CPU_ZERO(&cpu_set);
+  CPU_SET(1, &cpu_set);
+  sched_setaffinity(syscall(SYS_gettid), sizeof(cpu_set), &cpu_set);
+  
+  printf("OMP_THREAD: START WRITER\n");
+  list_item_t *item;
+  //wf_batch_t *wf_batch;
+  size_t num_batches = 0;
+  while ((item = list_remove_item(&bam_list)) != NULL) {
+  //writing_time = 0;
+  //start_timer(start_time);
+  //bam_writer1(item->data_p);
+  //stop_timer(start_time, end_time, writing_time);
+  //total_writing_time += writing_time;
+  bam_writer(item->data_p);
+  list_item_free(item);
+  }
+  printf("OMP_THREAD: END WRITER\n");
+  //printf("Writing time: %0.4f sec\n", total_writing_time / 1000000.0f);
+  }
+  }
+  //Write chromosome avls
+  write_chromosome_avls(extend_filename,
+  exact_filename, genome->num_chromosomes, avls_list);
+  stop_timer(time_start_alig, time_end_alig, time_alig);
+  
+  //}
+  */
+
+  
   options_free(options);
   bam_fclose(writer_input.bam_file);
   
