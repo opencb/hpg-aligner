@@ -33,5 +33,7 @@ EXTERNC ERROR_CODE alig_bam_file2(char *bam_path, char *ref_name, char *ref_path
 EXTERNC ERROR_CODE alig_bam_list(array_list_t *bam_list, genome_t* ref);
 EXTERNC ERROR_CODE alig_bam_list_to_disk(array_list_t *bam_list, bam_file_t *bam_f);
 
+EXTERNC ERROR_CODE alig_bam_list_realign(array_list_t *bam_list, array_list_t *haplotype_list, genome_t* ref);
+
 
 #endif /* ALIG_H_ */

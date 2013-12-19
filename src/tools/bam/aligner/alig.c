@@ -307,7 +307,9 @@ alig_bam_list(array_list_t *bam_list, genome_t* ref)
 			char cigar_str2[100];
 			char cigar_str3[100];
 			char ref_strx[200];
+			size_t ref_strx_l;
 			char ref_strx2[200];
+			size_t ref_strx2_l;
 			uint32_t clip_cigar[50];
 			size_t clip_cigar_l;
 			uint32_t unclip_cigar[50];
@@ -338,8 +340,8 @@ alig_bam_list(array_list_t *bam_list, genome_t* ref)
 					printf("INTERVAL: %d:%d-%d\n", read->core.tid, ref_pos_begin, ref_pos_end);
 				}
 
-				cigar32_create_ref(read_cigar, read->core.n_cigar, ref_seq + read_disp_ref, read_seq, read->core.l_qseq, ref_strx);
-				cigar32_create_ref(clip_cigar, clip_cigar_l, ref_seq + read_disp_ref, read_seq, read->core.l_qseq, ref_strx2);
+				cigar32_create_ref(read_cigar, read->core.n_cigar, ref_seq + read_disp_ref, read_seq, read->core.l_qseq, ref_strx, &ref_strx_l);
+				cigar32_create_ref(clip_cigar, clip_cigar_l, ref_seq + read_disp_ref, read_seq, read->core.l_qseq, ref_strx2, &ref_strx2_l);
 				printf("************************************************\n");
 				printf("CIGAR LEFTALIGNED: %s - %s - %s === %d:%d\n", cigar_str, cigar_str2, cigar_str3, read->core.tid, read->core.pos);
 				printf("Read pos: %d === Disp: %d\n", read->core.pos, read_disp_ref);
@@ -384,14 +386,20 @@ alig_bam_list(array_list_t *bam_list, genome_t* ref)
 			cigar32_to_string(&indel_aux->indel, 1, cigar_str);
 			printf("H%d: %s === Pos -> %d:%d\n", i, cigar_str, read->core.tid, indel_aux->ref_pos);
 		}
+	}
 
+	//Indel local realignment
+	alig_bam_list_realign(bam_list, haplo_list, ref);
+
+	//ERASE
+	if(array_list_size(haplo_list))
+	{
 		if(cond)
 		{
 			printf("Press...\n");
 			getchar();
 		}
 	}
-
 
 	//Free memory
 	{
@@ -426,6 +434,151 @@ alig_bam_list_to_disk(array_list_t *bam_list, bam_file_t *bam_f)
 
 	//Clear list
 	array_list_clear(bam_list, NULL);
+
+	return NO_ERROR;
+}
+
+ERROR_CODE
+alig_bam_list_realign(array_list_t *bam_list, array_list_t *haplotype_list, genome_t* ref)
+{
+	int i, j;
+	uint32_t *H_miss;
+	uint32_t *ref_miss;
+
+	//Reference
+	char *ref_seq = NULL;
+	uint32_t flag;
+	size_t ref_pos_begin = SIZE_MAX;
+	size_t ref_pos_end = SIZE_MAX;
+	size_t aux_pos_begin = SIZE_MAX;
+	size_t aux_pos_end = SIZE_MAX;
+
+	//Read
+	bam1_t *read;
+	char *read_seq = NULL;
+	char *read_seq_ref = NULL;
+	size_t read_seq_ref_l;
+	size_t read_disp_ref = SIZE_MAX;
+
+	//Comparation
+	char *comp_aux = NULL;
+	uint32_t *comp_cigar = NULL;
+	size_t comp_cigar_l;
+
+	//Haplotype
+	aux_indel_t *haplo;
+
+	assert(bam_list);
+	assert(haplotype_list);
+	assert(ref);
+
+	//Empty lists?
+	if(array_list_size(bam_list) == 0 || array_list_size(haplotype_list) == 0)
+	{
+		return NO_ERROR;
+	}
+
+	//Get reference
+	{
+		//Get first read position
+		ref_pos_begin = ((bam1_t *)array_list_get(0, bam_list))->core.pos;
+
+		//Get last read position + length
+		read = (bam1_t *) array_list_get(array_list_size(bam_list) - 1, bam_list);
+		ref_pos_end = (read->core.pos + read->core.l_qseq) + ALIG_REFERENCE_ADDITIONAL_OFFSET;
+
+		//Auxiliar
+		aux_pos_begin = ref_pos_begin + 1;
+		aux_pos_end = ref_pos_end + 1;
+
+		//Get reference
+		ref_seq = (char *) malloc(((ref_pos_end - ref_pos_begin) + 2) * sizeof(char));
+		read_seq_ref = (char *) malloc(((ref_pos_end - ref_pos_begin) + 2) * sizeof(char));
+		comp_aux = (char *) malloc(((ref_pos_end - ref_pos_begin) + 2) * sizeof(char));
+		flag = (uint32_t) read->core.flag;
+		genome_read_sequence_by_chr_index(ref_seq, (flag & BAM_FREVERSE) ? 1 : 0, (unsigned int)read->core.tid, &aux_pos_begin, &aux_pos_end, ref);
+		assert(ref);
+	}
+
+	//Allocate miss arrays
+	H_miss = (size_t *)malloc(sizeof(size_t) * array_list_size(bam_list));
+	ref_miss = (size_t *)malloc(sizeof(size_t) * array_list_size(bam_list));
+	for(i = 0; i < array_list_size(bam_list); i++)
+	{
+		H_miss[i] = 0;
+		ref_miss[i] = 0;
+	}
+
+	//Allocate cigar auxiliar
+	comp_cigar = (uint32_t *)malloc(sizeof(uint32_t) * 50);
+
+	//Iterate bam list
+	for(i = 0; i < array_list_size(bam_list); i++)
+	{
+		//Get read
+		read = array_list_get(i, bam_list);
+
+		//Convert read sequence to string
+		read_seq = (char *) malloc((read->core.l_qseq + 1) * sizeof(char));
+		new_sequence_from_bam_ref(read, read_seq, read->core.l_qseq + 1);
+
+		//Get relative displacement from reference
+		read_disp_ref = read->core.pos - ref_pos_begin;
+
+		//Get reference transform for this read
+		cigar32_create_ref(bam1_cigar(read), read->core.n_cigar, ref_seq + read_disp_ref, read_seq, read->core.l_qseq, read_seq_ref, &read_seq_ref_l);
+
+		//Test with reference
+		nucleotide_compare(ref_seq + read_disp_ref, read_seq_ref, read_seq_ref_l, comp_aux, ref_miss + i);
+
+		//ERASE Print things
+		{
+			printf("**********\n");
+			printf("Test with reference === MISS: %d\n", ref_miss[i]);
+			//cigar32_to_string(&indel_aux->indel, 1, cigar_str);
+		}
+
+		//Dont match reference perfectly?
+		if(ref_miss[i])
+		{
+			//Iterate haplotypes
+			for(j = 0; j < array_list_size(haplotype_list); j++)
+			{
+				//Get haplotype
+				haplo = array_list_get(j, haplotype_list);
+				assert(haplo);
+
+				//Create cigar for this haplotype
+				cigar32_from_haplo(bam1_cigar(read), read->core.n_cigar, haplo, read->core.pos, comp_cigar, &comp_cigar_l);
+
+				char cigar_str[20];
+				cigar32_to_string(bam1_cigar(read), read->core.n_cigar, cigar_str);
+				printf("Orig CIGAR: %s\n", cigar_str);
+				cigar32_to_string(comp_cigar, comp_cigar_l, cigar_str);
+				printf("Comp CIGAR: %s\n", cigar_str);
+
+				//Get haplotype reference transform
+				cigar32_create_ref(comp_cigar, comp_cigar_l, ref_seq + read_disp_ref, read_seq, read->core.l_qseq, read_seq_ref, &read_seq_ref_l);
+
+				//Compare and miss with haplotype
+				nucleotide_compare(ref_seq + read_disp_ref, read_seq_ref, read_seq_ref_l, comp_aux, H_miss + i);
+
+				//ERASE Print things
+				{
+					printf("Test with H%d === MISS: %d\n", j, H_miss[i]);
+				}
+			}
+		}
+	}
+
+	//Free
+	{
+		free(ref_seq);
+		free(read_seq_ref);
+		free(H_miss);
+		free(ref_miss);
+		free(comp_cigar);
+	}
 
 	return NO_ERROR;
 }
