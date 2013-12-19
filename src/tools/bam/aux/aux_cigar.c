@@ -373,6 +373,95 @@ cigar32_count_indels(uint32_t *cigar, size_t cigar_l, size_t *indels)
 }
 
 ERROR_CODE
+cigar32_count_nucleotides(uint32_t *cigar, size_t cigar_l, size_t *bases)
+{
+	int i;
+	int c_count;
+	int c_type;
+	size_t bases_c;
+
+	assert(cigar);
+	assert(cigar_l > 0);
+	assert(bases);
+
+	//Iterate cigar elements
+	bases_c = 0;
+	for(i = 0; i < cigar_l; i++)
+	{
+		c_count = cigar[i] >> BAM_CIGAR_SHIFT;	//Get number of bases from cigar
+		c_type = cigar[i] & BAM_CIGAR_MASK;	//Get type from cigar
+
+		switch(c_type)
+		{
+		case BAM_CMATCH:
+		case BAM_CEQUAL:
+		case BAM_CDIFF:
+		case BAM_CINS:
+		case BAM_CSOFT_CLIP:
+			//Count bases
+			bases_c += c_count;
+			break;
+
+		case BAM_CHARD_CLIP:
+		case BAM_CDEL:
+		case BAM_CREF_SKIP:
+		case BAM_CPAD:
+			//No bases
+			break;
+		}
+	}
+
+	//Set output
+	*bases = bases_c;
+
+	return NO_ERROR;
+}
+ERROR_CODE
+cigar32_count_nucleotides_not_clip(uint32_t *cigar, size_t cigar_l, size_t *bases)
+{
+	int i;
+	int c_count;
+	int c_type;
+	size_t bases_c;
+
+	assert(cigar);
+	assert(cigar_l > 0);
+	assert(bases);
+
+	//Iterate cigar elements
+	bases_c = 0;
+	for(i = 0; i < cigar_l; i++)
+	{
+		c_count = cigar[i] >> BAM_CIGAR_SHIFT;	//Get number of bases from cigar
+		c_type = cigar[i] & BAM_CIGAR_MASK;	//Get type from cigar
+
+		switch(c_type)
+		{
+		case BAM_CMATCH:
+		case BAM_CEQUAL:
+		case BAM_CDIFF:
+		case BAM_CINS:
+			//Count bases
+			bases_c += c_count;
+			break;
+
+		case BAM_CHARD_CLIP:
+		case BAM_CDEL:
+		case BAM_CREF_SKIP:
+		case BAM_CPAD:
+		case BAM_CSOFT_CLIP:
+			//No bases
+			break;
+		}
+	}
+
+	//Set output
+	*bases = bases_c;
+
+	return NO_ERROR;
+}
+
+ERROR_CODE
 cigar32_count_all(uint32_t *cigar, size_t cigar_l, size_t *m_blocks, size_t *indels, size_t *first_indel_index)
 {
 	int i;
@@ -493,7 +582,7 @@ cigar32_create_ref(uint32_t *cigar, size_t cigar_l, char *ref, char *read, size_
 	assert(new_ref_l);
 
 	//Allocate output
-	aux_str = (char *)malloc(sizeof(char) * length);
+	aux_str = (char *)malloc(sizeof(char) * (length + 1));
 
 	//Iterate CIGAR
 	for(i = 0; i < cigar_l; i++)
@@ -657,6 +746,52 @@ cigar32_get_indels(size_t ref_pos, uint32_t *cigar, size_t cigar_l, aux_indel_t 
 			abort();
 		}
 	}
+
+	return NO_ERROR;
+}
+
+ERROR_CODE
+cigar32_from_haplo(uint32_t *cigar, size_t cigar_l, aux_indel_t *haplo, size_t read_pos, uint32_t *new_cigar, size_t *new_cigar_l)
+{
+	int i, elem, type;
+	size_t current_pos;
+	size_t disp_ref;
+	size_t current_cigar_elem;
+	size_t bases;
+
+	//Generated cigar
+	uint32_t *gen_cigar;
+	size_t gen_cigar_l;
+
+	assert(cigar);
+	assert(cigar_l > 0);
+	assert(haplo);
+	assert(read_pos != SIZE_MAX);
+	assert(new_cigar);
+	assert(new_cigar_l);
+
+	//Haplotype position must be posterior to read position
+	if(haplo->ref_pos < read_pos)
+		return NO_ERROR;
+
+	//Get read displacement from haplotype
+	disp_ref = haplo->ref_pos - read_pos;
+
+	//Create new cigar from haplotype (ex: 20M1I14M)
+	gen_cigar = (uint32_t *)malloc(sizeof(uint32_t) * 3);
+	gen_cigar[0] = (disp_ref << BAM_CIGAR_SHIFT) + BAM_CMATCH;
+	gen_cigar[1] = haplo->indel;
+	if(haplo->indel & BAM_CIGAR_MASK == BAM_CINS)	//Insertion?
+		disp_ref += haplo->indel >> BAM_CIGAR_SHIFT;	//Is insertion
+	cigar32_count_nucleotides_not_clip(cigar, cigar_l, &bases);
+	gen_cigar[2] = ((bases - disp_ref) << BAM_CIGAR_SHIFT) + BAM_CMATCH;
+	gen_cigar_l = 3;
+
+	//Set output
+	cigar32_reclip(cigar, cigar_l, gen_cigar, gen_cigar_l, new_cigar, new_cigar_l);
+
+	//Free memory
+	free(gen_cigar);
 
 	return NO_ERROR;
 }

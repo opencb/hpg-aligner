@@ -1,9 +1,16 @@
 #include "aux_nucleotide.h"
 
 ERROR_CODE
-nucleotide_compare(char *ref_seq, char *bam_seq, size_t bam_seq_l, char *comp_res)
+nucleotide_compare(char *ref_seq, char *bam_seq, size_t bam_seq_l, char *comp_res, size_t *miss_count)
 {
 	int i;
+	size_t count;
+
+	assert(ref_seq);
+	assert(bam_seq);
+	assert(bam_seq_l > 0);
+	assert(comp_res);
+	assert(miss_count);
 
 	//SSE
 	#ifdef __SSE2__
@@ -13,7 +20,7 @@ nucleotide_compare(char *ref_seq, char *bam_seq, size_t bam_seq_l, char *comp_re
 	//Iterates nucleotides in this read
 	for(i = 0; i < bam_seq_l; i++)
 	{
-#ifdef __SSE2__
+/*#ifdef __SSE2__
 		//#ifdef __SSE2__ //SSE Block
 		if( (i + 16) < bam_seq_l)
 		{
@@ -34,7 +41,7 @@ nucleotide_compare(char *ref_seq, char *bam_seq, size_t bam_seq_l, char *comp_re
 			i += 15;
 		}
 		else
-#endif //SSE Block
+#endif //SSE Block*/
 		{
 			if(ref_seq[i] != bam_seq[i])
 			{
@@ -45,5 +52,18 @@ nucleotide_compare(char *ref_seq, char *bam_seq, size_t bam_seq_l, char *comp_re
 				comp_res[i] = 0xFF;	//Equals
 			}
 		}
+	}
+
+	if(miss_count)
+	{
+		count = 0;
+		for(i = 0; i < bam_seq_l; i++)
+		{
+			if(!comp_res[i])
+			{
+				count++;
+			}
+		}
+		*miss_count = count;
 	}
 }
