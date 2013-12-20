@@ -64,7 +64,7 @@ int apply_seeding(region_seeker_input_t* input, batch_t *batch) {
   //printf("APPLY SEEDING...\n");
   struct timeval start, end;
   double time;
-  if (time_on) { start_timer(start); }
+  //if (time_on) { start_timer(start); }
 
   metaexons_t *metaexons = input->metaexons;
   mapping_batch_t *mapping_batch = batch->mapping_batch;
@@ -402,7 +402,7 @@ int apply_seeding(region_seeker_input_t* input, batch_t *batch) {
 
   array_list_free(array_list_aux, NULL);
 
-  if (time_on) { stop_timer(start, end, time); timing_add(time, REGION_SEEKER, timing); }
+  //if (time_on) { stop_timer(start, end, time); timing_add(time, REGION_SEEKER, timing); }
 
   //printf("APPLY SEEDING DONE!\n");
   
@@ -418,7 +418,7 @@ int apply_seeding_bs(region_seeker_input_t* input, batch_t *batch) {
   //printf("APPLY SEEDING BS...\n");
   struct timeval start, end;
   double time;
-  if (time_on) { start_timer(start); }
+  //if (time_on) { start_timer(start); }
 
   mapping_batch_t *mapping_batch = batch->mapping_batch;
   array_list_t *list = NULL;
@@ -640,7 +640,7 @@ int apply_seeding_bs(region_seeker_input_t* input, batch_t *batch) {
 	 num_targets, reads_mapp2, reads_no_mapp2);
   */
 
-  if (time_on) { stop_timer(start, end, time); timing_add(time, REGION_SEEKER, timing); }
+  //if (time_on) { stop_timer(start, end, time); timing_add(time, REGION_SEEKER, timing); }
 
   //printf("new targets1 = %lu, new targets2 = %lu\n", new_num_targets, new_num_targets2);
   //printf("APPLY SEEDING DONE!\n");
