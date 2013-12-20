@@ -112,11 +112,11 @@ int main(int argc, char* argv[]) {
 
   if(strcmp(command, "dna") == 0) { 
     // DNA command
-    validate_options(options, DNA_MODE);
+    validate_options(options);
     dna_aligner(options);
   } else if (strcmp(command, "rna") == 0)  { 
     // RNA command
-    validate_options(options, RNA_MODE);
+    validate_options(options);
     rna_aligner(options);
   } else if (strcmp(command, "bs") == 0) {
     // BS commnad
