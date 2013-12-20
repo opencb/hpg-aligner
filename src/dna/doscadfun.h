@@ -1,9 +1,14 @@
 #ifndef DOSCADFUN_H
 #define DOSCADFUN_H
 
-#define DEL_FINAL       10
-#define TOPE_ERRORES    4
+#include "dna/sa_dna_commons.h"
 
+//--------------------------------------------------------------------
+
+#define DEL_FINAL       10
+#define MAX_NUM_ERRORS   3
+
+//--------------------------------------------------------------------
 //--------------------------------------------------------------------
 
 typedef struct alig_out {
@@ -17,7 +22,22 @@ typedef struct alig_out {
   // char *st1_map;
   // char *st2_map;
   float score;
+  cigar_t cigar;
 } alig_out_t;
+
+//--------------------------------------------------------------------
+
+inline void alig_out_init(alig_out_t *out) {
+  out->map_len1 = 0;
+  out->map_len2 = 0;
+  out->match = 0;
+  out->mismatch = 0;
+  out->gap_open = 0;
+  out->gap_extend = 0;
+  out->st_map_len = 0;
+  cigar_init(&out->cigar);
+  // 	char *st1_map;	char *st2_map;
+}
 
 //--------------------------------------------------------------------
 
@@ -32,6 +52,8 @@ inline void alig_out_set(int map_l1, int map_l2, int mm, int mism,
   out->st_map_len = st_mm_len;
   // 	char *st1_map;	char *st2_map;
 }
+
+//--------------------------------------------------------------------
 
 inline void alig_out_print(alig_out_t *out) {
   printf("matches = %i, mismatches = %i, open-gaps = %i, extended-gaps = %i, (query map len, ref. map.len) = (%i, %i)\n",

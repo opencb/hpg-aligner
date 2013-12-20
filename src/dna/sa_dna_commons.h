@@ -294,6 +294,38 @@ inline void cigar_concat(cigar_t *src, cigar_t *dst) {
 }
 
 //--------------------------------------------------------------------
+
+inline void cigar_copy(cigar_t *dst, cigar_t *src) {
+  if (src->num_ops > 0) {
+    dst->num_ops = src->num_ops;
+    memcpy(dst->ops, src->ops, src->num_ops * sizeof(uint32_t));
+  }
+}
+
+//--------------------------------------------------------------------
+
+inline void cigar_revcopy(cigar_t *dst, cigar_t *src) {
+  if (src->num_ops > 0) {
+    dst->num_ops = src->num_ops;
+    for (int i = 0, j = src->num_ops - 1; i < src->num_ops; i++, j--) {
+      dst->ops[i] = src->ops[j];
+    }
+  }
+}
+
+//--------------------------------------------------------------------
+
+inline void cigar_rev(cigar_t *p) {
+  if (p->num_ops > 0) {
+    cigar_t aux;
+    cigar_copy(&aux, p);
+    for (int i = 0, j = p->num_ops - 1; i < p->num_ops; i++, j--) {
+      p->ops[i] = aux.ops[j];
+    }
+  }
+}
+
+//--------------------------------------------------------------------
 // cigarset_t
 //--------------------------------------------------------------------
 
@@ -336,6 +368,8 @@ typedef struct seed {
   int strand;
   int chromosome_id;
   int num_mismatches;
+  int num_open_gaps;
+  int num_extend_gaps;
 
   cigar_t cigar;
 } seed_t;
@@ -351,7 +385,14 @@ inline seed_t *seed_new(size_t read_start, size_t read_end,
   p->read_end = read_end;
   p->genome_start = genome_start;
   p->genome_end = genome_end;
-  
+
+  p->strand = 0;
+  p->chromosome_id = 0;
+  p->num_mismatches = 0;
+  p->num_open_gaps = 0;
+  p->num_extend_gaps = 0;
+
+
   cigar_init(&p->cigar);
 
   return p;

@@ -76,7 +76,8 @@ void cal_mng_update(seed_t *seed, cal_mng_t *p) {
 	is_used = 1;
 	sr_list = linked_list_new(COLLECTION_MODE_ASYNCHRONIZED);
 	linked_list_insert(seed, sr_list);
-	cal = cal_new(seed->chromosome_id, seed->strand, seed->genome_start, seed->genome_end, 1, sr_list, NULL);
+	cal = cal_new(seed->chromosome_id, seed->strand, 
+		      seed->genome_start, seed->genome_end, 1, sr_list, NULL);
 	cal->read_area = seed->read_end - seed->read_start + 1;
 	cal->num_mismatches = seed->num_mismatches;
 	linked_list_insert(cal, cal_list);
@@ -282,12 +283,12 @@ int generate_cals_from_suffixes(int strand, fastq_read_t *read, char *revcomp,
 
   size_t r_start_suf, r_end_suf, g_start_suf, g_end_suf;
   size_t r_start, r_end, r_len, g_start, g_end, g_len;
-  int found_cal, chrom, diff, max_map_len = 0, num_mismatches = 0;
+  int found_cal, chrom, diff, max_map_len = 0;
 
   float score;
   alig_out_t alig_out;
 
-  cigar_t *cig, *cigar;
+  cigar_t cigar;
   seed_t *seed;
 
   char *g_seq, *r_seq;
@@ -305,17 +306,12 @@ int generate_cals_from_suffixes(int strand, fastq_read_t *read, char *revcomp,
     #endif
     chrom = sa_index->CHROM[suff];
 
-    num_mismatches = 0;
-    seed = NULL;
-
     // extend suffix to right side
-    r_start = read_pos;
-    r_end = r_start + suffix_len - 1;
-    r_len = read->length - r_end - 1;
+    r_start_suf = read_pos;
+    r_end_suf = r_start_suf + suffix_len - 1;
     
-    g_start = sa_index->SA[suff] - sa_index->genome->chrom_offsets[chrom];
-    g_end = g_start + suffix_len - 1;
-    g_len = r_len + 5;
+    g_start_suf = sa_index->SA[suff] - sa_index->genome->chrom_offsets[chrom];
+    g_end_suf = g_start_suf + suffix_len - 1;
 
     #ifdef _TIMING
     gettimeofday(&stop, NULL);
@@ -323,127 +319,36 @@ int generate_cals_from_suffixes(int strand, fastq_read_t *read, char *revcomp,
       ((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);  
     #endif
 
-    // skip suffixes
+    // skip suffixes, 
+    // if found cal for this suffix, then next suffix
     #ifdef _TIMING
     gettimeofday(&start, NULL);
     #endif
-    found_cal = cal_mng_find(chrom, g_start, g_end, cal_mng);
+    found_cal = cal_mng_find(chrom, g_start_suf, g_end_suf, cal_mng);
     #ifdef _TIMING
     gettimeofday(&stop, NULL);
     mapping_batch->func_times[FUNC_SKIP_SUFFIXES] += 
       ((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);  
     #endif
-    // found cal...next suffix
     if (found_cal) continue;
 
-    g_start_suf = g_start;
-    g_end_suf = g_end;
-    r_start_suf = r_start;
-    r_end_suf = r_end;
 
     #ifdef _VERBOSE
     printf("\t\tsuffix at [%lu|%lu-%lu|%lu] %c chrom %s\n",
-	   g_start, r_start, r_end, g_end, (strand == 0 ? '+' : '-'), 
+	   g_start_suf, r_start_suf, r_end_suf, g_end_suf, (strand == 0 ? '+' : '-'), 
 	   sa_index->genome->chrom_names[chrom]);
     #endif
 
-    // right-side
-    if (r_end >= read->length - 10) {
-      // create seed
-      #ifdef _TIMING
-      gettimeofday(&start, NULL);
-      #endif
-      seed = seed_new(r_start, r_end, g_start, g_end);
+    seed = seed_new(r_start_suf, r_end_suf, g_start_suf, g_end_suf);
 
-      // fill the mini-gap
-      diff = read->length - seed->read_end - 1;
-      g_seq = &sa_index->genome->S[seed->genome_end + sa_index->genome->chrom_offsets[chrom] + 1];
-      for (size_t k1 = seed->read_end + 1, k2 = 0; k1 < read->length; k1++, k2++) {
-	if (r_seq[k1] != g_seq[k2]) {
-	  num_mismatches++;
-	}
-      }
-      seed->read_end += diff;
-      seed->genome_end += diff;
-      
-      cigar_append_op(seed->read_end - seed->read_start + 1, 'M', &seed->cigar);
-      #ifdef _TIMING
-      gettimeofday(&stop, NULL);
-      mapping_batch->func_times[FUNC_SEED_NEW] += 
-	  ((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);  
-      #endif
-      #ifdef _VERBOSE
-      printf("\t\t\t creating seed (r_end >= read->length - 3)\n");
-      print_seed("\t\t\t", seed);
-      #endif  
-    } else {
-      // extend to the right side
-      #ifdef _TIMING
-      gettimeofday(&start, NULL);
-      #endif
-      g_seq = &sa_index->genome->S[g_end + sa_index->genome->chrom_offsets[chrom] + 1];
-      #ifdef _TIMING
-      gettimeofday(&stop, NULL);
-      mapping_batch->func_times[FUNC_SET_REF_SEQUENCE] += 
-	((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);  
-      #endif
-
-      #ifdef _TIMING
-      gettimeofday(&start, NULL);
-      #endif
-      score = doscadfun(&r_seq[r_end + 1], r_len, g_seq, g_len, MISMATCH_PERC,
-			&alig_out);
-      #ifdef _TIMING
-      gettimeofday(&stop, NULL);
-      mapping_batch->func_times[FUNC_MINI_SW_RIGHT_SIDE] += 
-	((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);  
-      #endif
-      if (score > 0 || (alig_out.map_len1 + suffix_len) > 20) {
-	num_mismatches = alig_out.mismatch + alig_out.gap_open + alig_out.gap_extend;
-	
-	// create seed
-        #ifdef _TIMING
-	gettimeofday(&start, NULL);
-        #endif
-	seed = seed_new(r_start, r_end + alig_out.map_len1, 
-			g_start, g_end + alig_out.map_len2);
-
-	// fill the mini-gap
-	diff = read->length - seed->read_end - 1;
-	if (diff < 10) {
-	  g_seq = &sa_index->genome->S[seed->genome_end + sa_index->genome->chrom_offsets[chrom] + 1];
-	  for (size_t k1 = seed->read_end + 1, k2 = 0; k1 < read->length; k1++, k2++) {
-	    if (r_seq[k1] != g_seq[k2]) {
-	      num_mismatches++;
-	    }
-	  }
-	  seed->read_end += diff;
-	  seed->genome_end += diff;
-	}
-
-	// it must be improved !!!
-	cigar_append_op(seed->read_end - seed->read_start + 1, 'M', &seed->cigar);
-        #ifdef _TIMING
-	gettimeofday(&stop, NULL);
-	mapping_batch->func_times[FUNC_SEED_NEW] += 
-	  ((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);  
-        #endif
-        #ifdef _VERBOSE
-        printf("\t\t\tcreating seed when extending to RIGHT side: score > 0 || (alig_out.map_len1 + suffix_len) > 20\n");
-        print_seed("\t\t\t", seed);
-        #endif
-      }
-    }
-
-    // left-side
-    if (read_pos > 0) {
-      // extend suffix to left side
+    // extend suffix to left side, if necessary
+    if (r_start_suf > 0) {
       r_start = 0;
-      r_end = read_pos - 1;
-      r_len = read_pos;
+      r_end = r_start_suf - 1;
+      r_len = r_start_suf;
 
       g_len = r_len + 5;
-      g_end = sa_index->SA[suff] - sa_index->genome->chrom_offsets[chrom] - 1;
+      g_end = g_start_suf - 1;
       g_start = g_end - g_len;
       //      printf("(g_start, g_end) = (%lu, %lu)\n", g_start, g_end);
       #ifdef _TIMING
@@ -467,77 +372,121 @@ int generate_cals_from_suffixes(int strand, fastq_read_t *read, char *revcomp,
       mapping_batch->func_times[FUNC_MINI_SW_LEFT_SIDE] += 
 	((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);  
       #endif
-      if (seed) {
-	if (score > 0) {
-	  // update seed
-	  num_mismatches += alig_out.mismatch + alig_out.gap_open + alig_out.gap_extend;
-	  seed->read_start -= alig_out.map_len1;
-	  seed->genome_start -= alig_out.map_len2;
+      if (1) {
+      //      if (score > 0 || (alig_out.map_len1 + suffix_len) > 20) {
+	// update seed
+	seed->num_mismatches += alig_out.mismatch;
+	seed->num_open_gaps += alig_out.gap_open;
+	seed->num_extend_gaps += alig_out.gap_extend;
 
-	  cigar_append_op(alig_out.map_len1, 'M', &seed->cigar);
+	seed->read_start -= alig_out.map_len1;
+	seed->genome_start -= alig_out.map_len2;
 
-	  // fill the mini-gap
-	  if (seed->read_start > 0 && seed->read_start < 10) {
-	    g_seq = &sa_index->genome->S[seed->genome_start + sa_index->genome->chrom_offsets[chrom] - seed->read_start];
-	    for (size_t k1 = 0, k2 = 0; k1 < seed->read_start; k1++, k2++) {
-	      if (r_seq[k1] != g_seq[k2]) {
-		num_mismatches++;
-	      }
-	    }
-	    cigar_append_op(seed->read_start, 'M', &seed->cigar);
-
-	    seed->genome_start -= seed->read_start;
-	    seed->read_start = 0;
-	  }
-	}
-      } else {
-	if (score > 0 || (alig_out.map_len1 + suffix_len) > 20) {
-	  num_mismatches += alig_out.mismatch + alig_out.gap_open + alig_out.gap_extend;
-	  // create seed
+	// if there's a mini-gap then try to fill the mini-gap
+	if (seed->read_start > 0 && seed->read_start < 10) {
           #ifdef _TIMING
 	  gettimeofday(&start, NULL);
           #endif
-	  r_end -= (alig_out.match + alig_out.mismatch - 1);
-	  g_end -= (alig_out.match + alig_out.mismatch - 1);
-	  seed = seed_new(r_end, r_end_suf, g_end, g_end_suf);
-	  // it must be improved !!!
-	  cigar_append_op(seed->read_end - seed->read_start + 1, 'M', &seed->cigar);
-
-	  // fill the mini-gap
-	  if (seed->read_start < 10) {
-	    g_seq = &sa_index->genome->S[seed->genome_start + sa_index->genome->chrom_offsets[chrom] - seed->read_start];
-	    for (size_t k1 = 0, k2 = 0; k1 < seed->read_start; k1++, k2++) {
-	      if (r_seq[k1] != g_seq[k2]) {
-		num_mismatches++;
-	      }
+	  g_seq = &sa_index->genome->S[seed->genome_start + sa_index->genome->chrom_offsets[chrom] - seed->read_start];
+	  for (size_t k1 = 0, k2 = 0; k1 < seed->read_start; k1++, k2++) {
+	    if (r_seq[k1] != g_seq[k2]) {
+	      seed->num_mismatches++;
 	    }
-	    cigar_append_op(seed->read_start, 'M', &seed->cigar);
-
-	    seed->genome_start -= seed->read_start;
-	    seed->read_start = 0;
 	  }
-
-	  cigar_append_op(seed->read_end - seed->read_start + 1, 'M', &seed->cigar);
+	  cigar_append_op(seed->read_start, 'M', &seed->cigar);
+	  
+	  seed->genome_start -= seed->read_start;
+	  seed->read_start = 0;
           #ifdef _TIMING
 	  gettimeofday(&stop, NULL);
 	  mapping_batch->func_times[FUNC_SEED_NEW] += 
 	    ((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);  
           #endif
-          #ifdef _VERBOSE
-	  printf("\t\t\t creating seed when extending to LEFT side: score > 0 || (alig_out.map_len1 + suffix_len) > 50\n");
-	  print_seed("\t\t\t", seed);
+	}
+
+	// update cigar with the sw output
+	if (alig_out.cigar.num_ops > 0) {
+	  cigar_concat(&alig_out.cigar, &seed->cigar);
+	}
+      }
+    }
+    // update cigar with the suffix length
+    cigar_append_op(suffix_len, 'M', &seed->cigar);
+
+    // extend suffix to left side, if necessary
+    if (r_end_suf < read->length - 1) {
+      r_start = r_end_suf + 1;
+      r_end = read->length - 1;
+      r_len = r_end - r_start + 1;
+
+      g_len = r_len + 5;
+      g_start = g_end_suf + 1;
+      g_end = g_start + g_len;
+
+      #ifdef _TIMING
+      gettimeofday(&start, NULL);
+      #endif
+      g_seq = &sa_index->genome->S[g_start + sa_index->genome->chrom_offsets[chrom]];
+      #ifdef _TIMING
+      gettimeofday(&stop, NULL);
+      mapping_batch->func_times[FUNC_SET_REF_SEQUENCE] += 
+	((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);  
+      #endif
+
+      #ifdef _TIMING
+      gettimeofday(&start, NULL);
+      #endif
+      score = doscadfun(&r_seq[r_start], r_len, g_seq, g_len, MISMATCH_PERC,
+			&alig_out);
+      #ifdef _TIMING
+      gettimeofday(&stop, NULL);
+      mapping_batch->func_times[FUNC_MINI_SW_RIGHT_SIDE] += 
+	((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);  
+      #endif
+      if (1) {
+      //      if (score > 0 || (alig_out.map_len1 + suffix_len) > 20) {
+	// update seed
+	seed->num_mismatches += alig_out.mismatch;
+	seed->num_open_gaps += alig_out.gap_open;
+	seed->num_extend_gaps += alig_out.gap_extend;
+
+	seed->read_end += alig_out.map_len1;
+	seed->genome_end += alig_out.map_len2;
+
+	// update cigar with the sw output
+	if (alig_out.cigar.num_ops > 0) {
+	  cigar_concat(&alig_out.cigar, &seed->cigar);
+	}
+
+	// if there's a mini-gap then try to fill the mini-gap
+	diff = read->length - seed->read_end - 1;
+	if (diff > 0 && diff < 10) {
+          #ifdef _TIMING
+	  gettimeofday(&start, NULL);
+          #endif
+	  g_seq = &sa_index->genome->S[seed->genome_end + sa_index->genome->chrom_offsets[chrom] + 1];
+	  for (size_t k1 = seed->read_end + 1, k2 = 0; k1 < read->length; k1++, k2++) {
+	    if (r_seq[k1] != g_seq[k2]) {
+	      seed->num_mismatches++;
+	    }
+	  }
+	  cigar_append_op(diff, 'M', &seed->cigar);
+
+	  seed->read_end += diff;
+	  seed->genome_end += diff;
+          #ifdef _TIMING
+	  gettimeofday(&stop, NULL);
+	  mapping_batch->func_times[FUNC_SEED_NEW] += 
+	    ((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);  
           #endif
 	}
-	//      } else {
-	//	num_mismatches += r_len;
       }
     }
 
     // update CAL manager with this seed
-    if (seed) {
+    if (seed->read_end - seed->read_start + 1 > 20) {
       seed->strand = strand;
       seed->chromosome_id = chrom;
-      seed->num_mismatches = num_mismatches;
       #ifdef _TIMING
       gettimeofday(&start, NULL);
       #endif
@@ -547,6 +496,9 @@ int generate_cals_from_suffixes(int strand, fastq_read_t *read, char *revcomp,
       mapping_batch->func_times[FUNC_CAL_MNG_INSERT] += 
 	((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);  
       #endif
+    } else {
+      // free seed
+      seed_free(seed);
     }
   }
 
@@ -715,7 +667,7 @@ array_list_t *step_one(fastq_read_t *read, char *revcomp_seq,
 // step two:
 //    search prefix + extend using min-sw
 //--------------------------------------------------------------------
-
+/*
 void step_two(fastq_read_t *read, char *revcomp_seq,
 	      sa_mapping_batch_t *mapping_batch, 
 	      sa_index3_t *sa_index, cal_mng_t *cal_mng,
@@ -821,19 +773,19 @@ void step_two(fastq_read_t *read, char *revcomp_seq,
     // next, - strand
     r_seq = revcomp_seq;
   } // end of for strand
-  /*  
-  #ifdef _TIMING
-  gettimeofday(&start, NULL);
-  #endif
-  filter_cals_by_max_read_area(cal_mng->min_read_area, &cal_list);
-  #ifdef _TIMING
-  gettimeofday(&stop, NULL);
-  mapping_batch->func_times[FUNC_FILTER_BY_READ_AREA] += 
-    ((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);  
-  #endif
-  */
-}
 
+  //#ifdef _TIMING
+  //gettimeofday(&start, NULL);
+  //#endif
+  //filter_cals_by_max_read_area(cal_mng->min_read_area, &cal_list);
+  //#ifdef _TIMING
+  //gettimeofday(&stop, NULL);
+  //mapping_batch->func_times[FUNC_FILTER_BY_READ_AREA] += 
+  //  ((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);  
+  //#endif
+
+}
+*/
 //--------------------------------------------------------------------
 // step three:
 //    fill gaps using sw
@@ -886,9 +838,6 @@ void step_three(fastq_read_t *read, char *revcomp_seq,
 
     // first seed
     seed = linked_list_get_first(cal->sr_list);
-
-    // to remove
-    if (((int) seed->read_start) < 0) seed->read_start = 0;
 
     if (seed->read_start > 0) {
       gap_genome_start = seed->genome_start - seed->read_start - 1;// - 10;
