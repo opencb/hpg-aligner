@@ -246,7 +246,7 @@ void run_rna_aligner(genome_t *genome, bwt_index_t *bwt_index, pair_mng_t *pair_
   fastq_batch_reader_input_t reader_input;
   fastq_batch_reader_input_init(options->in_filename, options->in_filename2, 
 				options->pair_mode, options->batch_size, 
-				NULL, &reader_input);  
+				NULL, options->gzip, &reader_input);  
 
   //buffer_reader_input_t buffer_reader_input;
   //buffer_reader_input_init(&reader_input,

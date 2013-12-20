@@ -45,7 +45,7 @@ void run_bs_aligner(genome_t *genome2, genome_t *genome1, genome_t *genome,
   fastq_batch_reader_input_t reader_input;
   fastq_batch_reader_input_init(options->in_filename, options->in_filename2, 
 				options->pair_mode, options->batch_size, 
-				NULL, &reader_input);
+				NULL, options->gzip, &reader_input);
   
   if (options->pair_mode == SINGLE_END_MODE) {
     reader_input.fq_file1 = fastq_fopen(options->in_filename);

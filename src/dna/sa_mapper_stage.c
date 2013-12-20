@@ -29,7 +29,7 @@ void cal_mng_free(cal_mng_t *p) {
     if (p->cals_lists) {
       for (unsigned int i = 0; i < p->num_chroms; i++) {
 	if (p->cals_lists[i]) {
-	  linked_list_free(p->cals_lists[i], cal_free_ex);
+	  linked_list_free(p->cals_lists[i], seed_cal_free);
 	}
       }
       free(p->cals_lists);
@@ -45,7 +45,7 @@ void cal_mng_clear(cal_mng_t *p) {
     if (p->cals_lists) {
       for (unsigned int i = 0; i < p->num_chroms; i++) {
 	if (p->cals_lists[i]) {
-	  linked_list_clear(p->cals_lists[i], cal_free_ex);
+	  linked_list_clear(p->cals_lists[i], seed_cal_free);
 	}
       }
     }
@@ -57,9 +57,9 @@ void cal_mng_clear(cal_mng_t *p) {
 void cal_mng_update(seed_t *seed, cal_mng_t *p) {
   int is_used = 0;
   if (p->cals_lists) {
-    cal_t *cal;
+    seed_cal_t *cal;
     seed_t *s_last;
-    linked_list_t *sr_list;
+    linked_list_t *seed_list;
     linked_list_t *cal_list = p->cals_lists[seed->chromosome_id];
     if (cal_list) {
       #ifdef _VERBOSE
@@ -74,31 +74,31 @@ void cal_mng_update(seed_t *seed, cal_mng_t *p) {
       if (linked_list_size(cal_list) <= 0) {
 	// create CAL and insert it into the CAL manager
 	is_used = 1;
-	sr_list = linked_list_new(COLLECTION_MODE_ASYNCHRONIZED);
-	linked_list_insert(seed, sr_list);
-	cal = cal_new(seed->chromosome_id, seed->strand, 
-		      seed->genome_start, seed->genome_end, 1, sr_list, NULL);
+	seed_list = linked_list_new(COLLECTION_MODE_ASYNCHRONIZED);
+	linked_list_insert(seed, seed_list);
+	cal = seed_cal_new(seed->chromosome_id, seed->strand, 
+			   seed->genome_start, seed->genome_end, seed_list);
 	cal->read_area = seed->read_end - seed->read_start + 1;
-	cal->num_mismatches = seed->num_mismatches;
+	cal->num_mismatches = seed->num_mismatches + seed->num_open_gaps + seed->num_extend_gaps;
 	linked_list_insert(cal, cal_list);
       } else {
 	// insert (by order)
 	linked_list_iterator_t* itr = linked_list_iterator_new(cal_list);
-	cal_t *item = (cal_t *) linked_list_iterator_curr(itr);
+	seed_cal_t *item = (cal_t *) linked_list_iterator_curr(itr);
 	while (item != NULL) {
 	  #ifdef _VERBOSE1
 	  printf("---> merging with this CAL?\n");
 	  cal_print(item);
 	  #endif
 	  //	  assert(cal->end > item->start);
-	  s_last = linked_list_get_last(item->sr_list);
+	  s_last = linked_list_get_last(item->seed_list);
 	  if (seed->read_start - s_last->read_end < 100 && 
 	      seed->genome_start - s_last->genome_end < 100) {
 	    is_used = 1;
-	    linked_list_insert_last(seed, item->sr_list);
+	    linked_list_insert_last(seed, item->seed_list);
 	    item->end = seed->genome_end;
 	    item->read_area += (seed->read_end - seed->read_start + 1);
-	    item->num_mismatches += seed->num_mismatches;
+	    item->num_mismatches += seed->num_mismatches + seed->num_open_gaps + seed->num_extend_gaps;
 
 	    //	    cal_free(cal);
             #ifdef _VERBOSE
@@ -110,12 +110,12 @@ void cal_mng_update(seed_t *seed, cal_mng_t *p) {
 	    if (seed->genome_end < item->start) {
 	      // create CAL and insert it into the CAL manager
 	      is_used = 1;
-	      sr_list = linked_list_new(COLLECTION_MODE_ASYNCHRONIZED);
-	      linked_list_insert(seed, sr_list);
-	      cal = cal_new(seed->chromosome_id, seed->strand, seed->genome_start, seed->genome_end, 
-			    1, sr_list, NULL);
+	      seed_list = linked_list_new(COLLECTION_MODE_ASYNCHRONIZED);
+	      linked_list_insert(seed, seed_list);
+	      cal = seed_cal_new(seed->chromosome_id, seed->strand, 
+				 seed->genome_start, seed->genome_end, seed_list);
 	      cal->read_area = seed->read_end - seed->read_start + 1;
-	      cal->num_mismatches = seed->num_mismatches;
+	      cal->num_mismatches = seed->num_mismatches + seed->num_open_gaps + seed->num_extend_gaps;
 	      linked_list_iterator_insert(cal, itr);
 	      linked_list_iterator_prev(itr);
 	      break;
@@ -128,11 +128,12 @@ void cal_mng_update(seed_t *seed, cal_mng_t *p) {
 	if (item == NULL) {
 	  // create CAL and insert it into the CAL manager
 	  is_used = 1;
-	  sr_list = linked_list_new(COLLECTION_MODE_ASYNCHRONIZED);
-	  linked_list_insert(seed, sr_list);
-	  cal = cal_new(seed->chromosome_id, seed->strand, seed->genome_start, seed->genome_end, 1, sr_list, NULL);
+	  seed_list = linked_list_new(COLLECTION_MODE_ASYNCHRONIZED);
+	  linked_list_insert(seed, seed_list);
+	  cal = seed_cal_new(seed->chromosome_id, seed->strand, 
+			     seed->genome_start, seed->genome_end, seed_list);
 	  cal->read_area = seed->read_end - seed->read_start + 1;
-	  cal->num_mismatches = seed->num_mismatches;
+	  cal->num_mismatches = seed->num_mismatches + seed->num_open_gaps + seed->num_extend_gaps;
 	  linked_list_insert_last(cal, cal_list);
 	}
 	linked_list_iterator_free(itr);
@@ -154,7 +155,7 @@ int cal_mng_find(int chrom, size_t start, size_t end, cal_mng_t *p) {
   if (p->cals_lists) {
     linked_list_t *cal_list = p->cals_lists[chrom];
     if (cal_list) {
-      cal_t *cal;
+      seed_cal_t *cal;
       for (linked_list_item_t *item = cal_list->first; 
 	   item != NULL; 
 	   item = item->next) {
@@ -182,19 +183,19 @@ int cal_mng_find(int chrom, size_t start, size_t end, cal_mng_t *p) {
 //--------------------------------------------------------------------
 
 void cal_mng_to_array_list(int read_area, array_list_t *out_list, cal_mng_t *p) {
-  cal_t *cal;
+  seed_cal_t *cal;
   linked_list_iterator_t itr;
 
   if (p->cals_lists) {
     linked_list_t *cal_list;
     for (unsigned int i = 0; i < p->num_chroms; i++) {
       cal_list = p->cals_lists[i];
-      while (cal = (cal_t *) linked_list_remove_last(cal_list)) {
+      while (cal = (seed_cal_t *) linked_list_remove_last(cal_list)) {
 	if ((cal->end - cal->start) >= read_area) {
 	  array_list_insert(cal, out_list);
 	} else {
 	  // free CAL
-	  cal_free_ex(cal);
+	  seed_cal_free(cal);
 	}
 	/*
 	if (p->min_read_area <= read_area && cal->read_area <= read_area) {
@@ -212,14 +213,14 @@ void cal_mng_to_array_list(int read_area, array_list_t *out_list, cal_mng_t *p) 
 
 void cal_mng_select_best(int read_area, array_list_t *valid_list, array_list_t *invalid_list, 
 			 cal_mng_t *p) {
-  cal_t *cal;
+  seed_cal_t *cal;
   linked_list_iterator_t itr;
 
   if (p->cals_lists) {
     linked_list_t *cal_list;
     for (unsigned int i = 0; i < p->num_chroms; i++) {
       cal_list = p->cals_lists[i];
-      while (cal = (cal_t *) linked_list_remove_last(cal_list)) {
+      while (cal = (seed_cal_t *) linked_list_remove_last(cal_list)) {
 	if (p->min_read_area <= read_area && cal->read_area <= read_area) {
 	  array_list_insert(cal, valid_list);
 	} else {
@@ -240,20 +241,20 @@ void generate_cals_from_exact_read(int strand, fastq_read_t *read, char *revcomp
   size_t g_start, g_end;
   int chrom;
 
-  cal_t *cal;
+  seed_cal_t *cal;
   cigar_t *cigar;
   seed_t *seed;
-  linked_list_t *sr_list;
+  linked_list_t *seed_list;
   
   for (size_t suff = low; suff <= high; suff++) {
     chrom = sa_index->CHROM[suff];
     g_start = sa_index->SA[suff] - sa_index->genome->chrom_offsets[chrom];
     g_end = g_start + read->length - 1;
-    sr_list = linked_list_new(COLLECTION_MODE_ASYNCHRONIZED);
+    seed_list = linked_list_new(COLLECTION_MODE_ASYNCHRONIZED);
     seed = seed_new(0, read->length - 1, g_start, g_end);
     cigar_append_op(read->length, 'M', &seed->cigar);
-    linked_list_insert(seed, sr_list);
-    cal = cal_new(chrom, strand, g_start, g_end, 1, sr_list, NULL);
+    linked_list_insert(seed, seed_list);
+    cal = seed_cal_new(chrom, strand, g_start, g_end, seed_list);
     cal->read_area = read->length;
     cal->num_mismatches = 0;
     array_list_insert(cal, cal_list);
@@ -818,18 +819,20 @@ void step_three(fastq_read_t *read, char *revcomp_seq,
   sw_prepare_t *sw_prepare;
   array_list_t *sw_prepare_list = array_list_new(1000, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
 
-  cal_t *cal;
+  seed_cal_t *cal;
   cigar_t *cigar;
   cigarset_t *cigarset;
 
   for (int i = 0; i < num_cals; i++) {
     cal = array_list_get(i, cal_list);
+    cal->num_mismatches = 0;
+
     #ifdef _VERBOSE
     cal_print(cal);
     #endif
 
     // if not seeds, then next cal
-    num_seeds = cal->sr_list->size;
+    num_seeds = cal->seed_list->size;
     if (num_seeds <= 0) continue;
 
     // cal cigar
@@ -837,7 +840,7 @@ void step_three(fastq_read_t *read, char *revcomp_seq,
     cal->info = (void *) cigarset;
 
     // first seed
-    seed = linked_list_get_first(cal->sr_list);
+    seed = linked_list_get_first(cal->seed_list);
 
     if (seed->read_start > 0) {
       gap_genome_start = seed->genome_start - seed->read_start - 1;// - 10;
@@ -856,13 +859,19 @@ void step_three(fastq_read_t *read, char *revcomp_seq,
       cigarset->active[0] = 1;
     }
     // seeds at the middle positions
+    cal->num_mismatches += seed->num_mismatches;
+    cal->num_open_gaps += seed->num_open_gaps;
+    cal->num_extend_gaps += seed->num_extend_gaps;
     prev_seed = seed;
     cigarset->active[1] = 2;
     cigarset->cigars[1] = &seed->cigar;
     seed_count = 0;
-    for (item = cal->sr_list->first->next; item != NULL; item = item->next) {
+    for (item = cal->seed_list->first->next; item != NULL; item = item->next) {
       seed_count++;
       seed = item->item;
+      cal->num_mismatches += seed->num_mismatches;
+      cal->num_open_gaps += seed->num_open_gaps;
+      cal->num_extend_gaps += seed->num_extend_gaps;
 
       gap_read_start = prev_seed->read_end + 1;
       gap_read_end = seed->read_start - 1;
@@ -876,6 +885,8 @@ void step_three(fastq_read_t *read, char *revcomp_seq,
 	// deletion
 	cigarset->active[seed_count * 2] = 1;
 	cigarset->cigars[seed_count * 2] = cigar_new(gap_genome_len, 'D');	
+	cal->num_open_gaps += 1;
+	cal->num_extend_gaps += (gap_genome_len - 1);
 	prev_seed = seed;
 	continue;
       }
@@ -884,6 +895,8 @@ void step_three(fastq_read_t *read, char *revcomp_seq,
 	// insertion
 	cigarset->active[seed_count * 2] = 1;
 	cigarset->cigars[seed_count * 2] = cigar_new(gap_genome_len, 'I');	
+	cal->num_open_gaps += 1;
+	cal->num_extend_gaps += (gap_genome_len - 1);
 	prev_seed = seed;
 	continue;
       }
@@ -917,7 +930,7 @@ void step_three(fastq_read_t *read, char *revcomp_seq,
       cigarset->cigars[seed_count * 2 + 1] = &seed->cigar;
     }
     // last seed
-    seed = linked_list_get_last(cal->sr_list);
+    seed = linked_list_get_last(cal->seed_list);
     if (seed->read_end < read->length - 1) {
       gap_genome_start = seed->genome_end + 1;
       gap_genome_end = gap_genome_start + (read->length - seed->read_end);// + 10;
@@ -999,6 +1012,8 @@ void step_three(fastq_read_t *read, char *revcomp_seq,
 	cigar_append_op(abs(diff), 'I', cigar);
 	op_value = sw_output->query_start_p[i];
 	op_name = 'M';
+	cal->num_open_gaps++;
+	cal->num_extend_gaps += (diff - 1);
       } else {
 	op_value = sw_output->query_start_p[i];
 	op_name = 'M';
@@ -1026,23 +1041,33 @@ void step_three(fastq_read_t *read, char *revcomp_seq,
 	// deletion (in the query)
 	if (op_name != 'D' && op_value > 0) {
 	  cigar_append_op(op_value, op_name, cigar);
+	  if (op_name == 'I') {
+	    cal->num_open_gaps++;
+	    cal->num_extend_gaps += (op_value - 1);
+	  }
 	  op_value = 0;
 	  op_name = 'D';
 	}
 	op_value++;
-	cal->num_mismatches++;	
+	//cal->num_mismatches++;	
       } else if (sw_output->ref_map_p[i][j] == '-') {
 	// insertion (in the query)
 	if (op_name != 'I' && op_value > 0) {
 	  cigar_append_op(op_value, op_name, cigar);
+	  if (op_name == 'D') {
+	    cal->num_open_gaps++;
+	    cal->num_extend_gaps += (op_value - 1);
+	  }
 	  op_value = 0;
 	  op_name = 'I';
 	}
 	op_value++;
-	cal->num_mismatches++;	
+	//	cal->num_mismatches++;	
       } else {
 	if (op_name != 'M' && op_value > 0) {
 	  cigar_append_op(op_value, op_name, cigar);
+	  cal->num_open_gaps++;
+	  cal->num_extend_gaps += (op_value - 1);
           #ifdef _VERBOSE
 	  printf("****************** (value, name) = (%i, %c) : op. change: current cigar: %s\n", 
 		 op_value, op_name, cigar_to_string(cigar));
@@ -1057,6 +1082,10 @@ void step_three(fastq_read_t *read, char *revcomp_seq,
       }
     }
     if (op_value > 0) {
+      if (op_name != 'M') {
+	cal->num_open_gaps++;
+	cal->num_extend_gaps += (op_value - 1);
+      }
       cigar_append_op(op_value, op_name, cigar);
     }
     cigarset->active[(int)sw_prepare->seed_region] = 1;
@@ -1070,10 +1099,15 @@ void step_three(fastq_read_t *read, char *revcomp_seq,
     sw_prepare_free(sw_prepare);
   }
 
+  // re-construct CIGAR for each CAL (from seed and gap CIGARS)
   for (int i = 0; i < num_cals; i++) {
     cal = array_list_get(i, cal_list);
-    cigar = cigar_new_empty();
+    cal->score = ((-4.0f) * cal->num_mismatches) + ((-10.0f) * cal->num_open_gaps) + ((-0.5f) * cal->num_extend_gaps);
+    #ifdef _VERBOSE
+    printf("\t\t\t\tcal score = %0.2f\n", cal->score);
+    #endif
     cigarset = cal->info;
+    cigar = &cal->cigar;
     for (int j = 0; j < cigarset->num_cigars; j++) {
       if (cigarset->active[j] > 0) {
 	#ifdef _VERBOSE
@@ -1087,7 +1121,7 @@ void step_three(fastq_read_t *read, char *revcomp_seq,
       }
     }
     cigarset_free(cigarset);
-    cal->info = cigar;
+    cal->info = NULL;
   }
   // free memory
   sw_multi_output_free(sw_output);
@@ -1121,10 +1155,11 @@ int sa_mapper(void *data) {
  
   size_t num_reads = mapping_batch->num_reads;
   int max_read_area, min_num_mismatches;
-  
+  float max_score;
+
   // CAL management
   size_t num_cals;
-  cal_t *cal;
+  seed_cal_t *cal;
   cal_mng_t *cal_mng;
   array_list_t *cal_list;
 
@@ -1168,15 +1203,18 @@ int sa_mapper(void *data) {
       // step three (Smith-Waterman to fill in the gaps)
       step_three(read, mapping_batch->revcomp_seqs[i], mapping_batch, sa_index, cal_list);
 
-      min_num_mismatches = get_min_num_mismatches(cal_list);
+      //      min_num_mismatches = get_min_num_mismatches(cal_list);
+      max_score = get_max_score(cal_list);
       #ifdef _VERBOSE
-      printf("\t*** after SW> min_num_mismatches = %i\n", min_num_mismatches);
+      printf("\t*** after SW> max. score = %0.2f\n", max_score);
+      //      printf("\t*** after SW> min_num_mismatches = %i\n", min_num_mismatches);
       #endif
       
       #ifdef _TIMING
       gettimeofday(&start, NULL);
       #endif
-      filter_cals_by_max_num_mismatches(min_num_mismatches, &cal_list);
+      //      filter_cals_by_max_num_mismatches(min_num_mismatches, &cal_list);
+      filter_cals_by_max_score(max_score, &cal_list);
       #ifdef _TIMING
       gettimeofday(&stop, NULL);
       mapping_batch->func_times[FUNC_FILTER_BY_NUM_MISMATCHES] += 

@@ -401,16 +401,95 @@ inline seed_t *seed_new(size_t read_start, size_t read_end,
 //--------------------------------------------------------------------
 
 void seed_free(seed_t *p);
-void cal_free_ex(cal_t *cal);
+
+//--------------------------------------------------------------------
+// seed_cal_t
+//--------------------------------------------------------------------
+
+typedef struct seed_cal {
+  size_t chromosome_id;
+  short int strand;
+  size_t start;
+  size_t end;
+
+  int read_area;
+
+  int num_mismatches;
+  int num_open_gaps;
+  int num_extend_gaps;
+
+  float score;
+  cigar_t cigar;
+
+  linked_list_t *seed_list;
+  void *info;
+} seed_cal_t;
+
+//--------------------------------------------------------------------
+
+inline seed_cal_t *seed_cal_new(const size_t chromosome_id,
+				const short int strand,
+				const size_t start,
+				const size_t end,
+				linked_list_t *seed_list) {
+
+  seed_cal_t *p = (seed_cal_t *) malloc(sizeof(seed_cal_t));
+
+  p->strand = strand;
+  p->chromosome_id = chromosome_id;
+  p->start = start;
+  p->end = end;
+
+  p->read_area = 0;
+
+  p->num_mismatches = 0;
+  p->num_open_gaps = 0;
+  p->num_extend_gaps = 0;
+
+  p->score = 0.0f;
+  cigar_init(&p->cigar);
+
+  p->seed_list = seed_list;
+  p->info = 0;
+
+  return p;
+}
+
+//--------------------------------------------------------------------
+
+void seed_cal_free(seed_cal_t *p);
+
+//--------------------------------------------------------------------
+
+inline seed_cal_print(seed_cal_t *cal) {
+  printf(" CAL (%c)[%lu:%lu-%lu]:\n", 
+	 (cal->strand == 0 ? '+' : '-'), 
+	 cal->chromosome_id, cal->start, cal->end);
+  printf("\t SEEDS LIST: ");
+  if (cal->seed_list == NULL || cal->seed_list->size == 0) {
+    printf(" NULL\n");
+  } else {
+    for (linked_list_item_t *item = cal->seed_list->first; 
+	 item != NULL; item = item->next) {
+      seed_t *seed = item->item;
+      printf(" [%lu|%lu - %lu|%lu] ", seed->genome_start, seed->read_start, 
+	     seed->read_end, seed->genome_end);
+    }
+    printf("\n");
+  }
+}
 
 //--------------------------------------------------------------------
 // utils
 //--------------------------------------------------------------------
 
+float get_max_score(array_list_t *cal_list);
 int get_min_num_mismatches(array_list_t *cal_list);
 int get_max_read_area(array_list_t *cal_list);
+
 void filter_cals_by_min_read_area(int read_area, array_list_t **list);
 void filter_cals_by_max_read_area(int read_area, array_list_t **list);
+void filter_cals_by_max_score(float score, array_list_t **list);
 void filter_cals_by_max_num_mismatches(int num_mismatches, array_list_t **list);
 
 void create_alignments(array_list_t *cal_list, fastq_read_t *read, 
