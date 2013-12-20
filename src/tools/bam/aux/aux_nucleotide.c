@@ -1,10 +1,10 @@
 #include "aux_nucleotide.h"
 
 ERROR_CODE
-nucleotide_compare(char *ref_seq, char *bam_seq, size_t bam_seq_l, char *comp_res, size_t *miss_count)
+nucleotide_compare(char *ref_seq, char *bam_seq, size_t bam_seq_l, char *comp_res, uint32_t *miss_count)
 {
 	int i;
-	size_t count;
+	uint32_t count;
 
 	assert(ref_seq);
 	assert(bam_seq);
