@@ -128,7 +128,7 @@ void options_display(options_t *options);
 
 void usage_cli(int mode);
 
-void validate_options(options_t *options, int mode);
+void validate_options(options_t *options);
 
 /**
  * @brief Initializes an global_options_t structure mandatory members.

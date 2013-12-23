@@ -1,6 +1,6 @@
 #include "options.h"
 
-const char DEFAULT_OUTPUT_NAME[30] = "hpg-aligner_output";
+const char DEFAULT_OUTPUT_NAME[30] = "hpg_aligner_output";
 //const char SPLICE_EXACT_FILENAME[30]   = "exact_junctions.bed";
 //const char SPLICE_EXTEND_FILENAME[30]  = "extend_junctions.bed";
 //const char INDEX_NAME[30]  = "index";
@@ -69,7 +69,7 @@ options_t *options_new(void) {
   return options;
 }
 
-void validate_options(options_t *options, int mode) {
+void validate_options(options_t *options) {
   int value_dir = exists(options->output_name);
   int DEFAULT_READ_BATCH_SIZE;
   int DEFAULT_SEED_SIZE;
@@ -78,7 +78,7 @@ void validate_options(options_t *options, int mode) {
   int DEFAULT_MIN_CAL_SIZE;
   int DEFAULT_SEEDS_MAX_DISTANCE;
 
-  options->mode = mode;
+  int mode = options->mode;
   if (mode == DNA_MODE) {
     strcpy(options->str_mode, "DNA");
     DEFAULT_READ_BATCH_SIZE = 20000;
@@ -464,7 +464,6 @@ options_t *parse_options(int argc, char **argv) {
     exit(-1);
   } else {
     int num_errors = arg_parse(argc, argv, argtable);   
-
     if (((struct arg_int*)argtable[25])->count) {
       usage(argtable);
       argtable_options_free(argtable, num_options);

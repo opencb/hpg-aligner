@@ -12,60 +12,34 @@
 
 #ifdef _TIMING
 
-#define FUNC_SEARCH_SUFFIX           0
-#define FUNC_SEARCH_PREFIX           1
-#define FUNC_SEARCH_SA               2
-#define FUNC_CALS_FROM_EXACT_READ    3
-#define FUNC_CALS_FROM_SUFFIXES      4
-#define FUNC_INIT_CALS_FROM_SUFFIXES 5
-#define FUNC_SET_POSITIONS           6
-#define FUNC_SET_REF_SEQUENCE        7
-#define FUNC_SKIP_SUFFIXES           8
-#define FUNC_MINI_SW_RIGHT_SIDE      9
-#define FUNC_REV_QUERY_REF          10
-#define FUNC_MINI_SW_LEFT_SIDE      11
-#define FUNC_SEED_REGION_NEW        12
-#define FUNC_SEED_LIST_INSERT       13
-#define FUNC_CAL_NEW                14
-#define FUNC_CAL_MNG_INSERT         15
-#define FUNC_CAL_MNG_TO_LIST        16
-#define FUNC_FILTER_BY_READ_AREA    17
-#define FUNC_PRE_SW                 18
-#define FUNC_SW                     19
-#define FUNC_POST_SW                20
-#define FUNC_OTHER                  21
-#define FUNC_CREATE_ALIGNMENTS      22
+#define FUNC_SEARCH_SUFFIX             0
+#define FUNC_SEARCH_PREFIX             1
+#define FUNC_SEARCH_SA                 2
+#define FUNC_CALS_FROM_EXACT_READ      3
+#define FUNC_CALS_FROM_SUFFIXES        4
+#define FUNC_INIT_CALS_FROM_SUFFIXES   5
+#define FUNC_SET_POSITIONS             6
+#define FUNC_SET_REF_SEQUENCE          7
+#define FUNC_SKIP_SUFFIXES             8
+#define FUNC_MINI_SW_RIGHT_SIDE        9
+#define FUNC_MINI_SW_LEFT_SIDE        10
+#define FUNC_SEED_REGION_NEW          11
+#define FUNC_SEED_LIST_INSERT         12
+#define FUNC_CAL_NEW                  13
+#define FUNC_CAL_MNG_INSERT           14
+#define FUNC_CAL_MNG_TO_LIST          15
+#define FUNC_FILTER_BY_READ_AREA      16
+#define FUNC_FILTER_BY_NUM_MISMATCHES 17
+#define FUNC_PRE_SW                   18
+#define FUNC_SW                       19
+#define FUNC_POST_SW                  20
+#define FUNC_OTHER                    21
+#define FUNC_CREATE_ALIGNMENTS        22
 
 
 #define NUM_TIMING (FUNC_CREATE_ALIGNMENTS + 1)
 double func_times[NUM_TIMING];
-
-const char *func_names[NUM_TIMING] = {"search_suffix", 
-				      "search_prefix",
-				      "search_sa",
-				      "generate_cals_from_exact_read",
-				      "generate_cals_from_suffixes",
-				      "init_cals_from_suffixes",
-				      "set_positions",
-				      "set_reference_sequence",
-				      "skip_suffixes",
-				      "mini_sw_right_side",
-				      "rev_query_ref",
-				      "mini_sw_left_side",
-				      "seed_region_new",
-				      "seed_list_insert",
-				      "cal_new",
-				      "cal_mng_insert",
-				      "cal_mng_to_array_list",
-				      "filter_by_read_area",
-				      "sw_pre_processing",
-				      "sw_execution",
-				      "sw_post_processing",
-				      "fill_middle_gaps",
-				      "merge_gaps",
-				      "fill_end_gaps",
-				      "other functions",
-				      "create_alignments"};
+char func_names[NUM_TIMING][1024];
 
 #endif
 

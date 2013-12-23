@@ -110,30 +110,45 @@ int main(int argc, char* argv[]) {
 
   // parsing options
   options_t *options = parse_options(argc, argv);
+
   // now, we can set logs according to the command-line
   init_log_custom(options->log_level, 1, "hpg-aligner.log", "w");
 
-  int command_id = 0;
-  if(strcmp(command, "dna") == 0) { printf("Dna %i\n", DNA_MODE); command_id = DNA_MODE; }
-  else if (strcmp(command, "rna") == 0)  { printf("Rna %i\n", RNA_MODE); command_id = RNA_MODE; }
-
-  validate_options(options, command_id);
-
   LOG_DEBUG_F("Command Mode: %s\n", command);
 
-  if (!strcmp(command, "rna")) {
-    // RNA version
-    rna_aligner(options);
-  } else if (!strcmp(command, "dna")) {
-    // DNA version
+  if(strcmp(command, "dna") == 0) { 
+    // DNA command
+    validate_options(options);
     dna_aligner(options);
-  } else if (!strcmp(command, "bs")) {
-    // BS version
+  } else if (strcmp(command, "rna") == 0)  { 
+    // RNA command
+    validate_options(options);
+    rna_aligner(options);
+  } else if (strcmp(command, "bs") == 0) {
+    // BS commnad
     printf("Run BS mode...");
     //run_bs_aligner(genome1, genome2, genome, bwt_index1, bwt_index2,
     //		   bwt_optarg, cal_optarg, pair_mng, report_optarg, options);
+  } 
+  /*else if (!strcmp(command, "build-bwt-index")) {
+    // BWT-INDEX command
+    if (options->bs_index == 0) {
+      run_index_builder(options->genome_filename, options->bwt_dirname, 
+			options->index_ratio, false, "ACGT");
+      LOG_DEBUG("Done !!\n");
+      exit(0);
+    } else { 
+      // bisulphite index generation
+      //printf("\nBisulphite index generation\n");
+      //run_index_builder(options->genome_filename, options->bwt_dirname, 
+      //		options->index_ratio, false, "ACGT");
+      //exit(0);
+    }
+  } else if (!strcmp(command, "build-sa-index")) {
+    // SA-INDEX command
+    printf("SA Index...");
   }
-
+  */
   return 0;
 
 }

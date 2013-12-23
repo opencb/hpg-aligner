@@ -7,15 +7,35 @@
 
 void dna_aligner(options_t *options) {
   #ifdef _TIMING
+  init_func_names();
   for (int i = 0; i < NUM_TIMING; i++) {
     func_times[i] = 0;
   }
   #endif
 
+  // set input parameters
   char *sa_dirname = options->bwt_dirname;
-  char *bam_filename = options->output_name;
+  char *fastq_filename = options->in_filename;
   int batch_size = options->batch_size;
   int num_threads = options->num_cpu_threads;
+
+  // setting output name
+  int len = 100;
+  if (options->prefix_name) {
+    len += strlen(options->prefix_name);
+  }
+  if (options->output_name) {
+    len += strlen(options->output_name);
+  }
+  char sam_filename[len];
+  sam_filename[0] = 0;
+  strcat(sam_filename, (options->output_name ? options->output_name : "."));
+  strcat(sam_filename, "/");
+  if (options->prefix_name) {
+    strcat(sam_filename, options->prefix_name);
+    strcat(sam_filename, "_");
+  }
+  strcat(sam_filename, "out.sam");
 
   // load SA index
   struct timeval stop, start;
@@ -33,9 +53,9 @@ void dna_aligner(options_t *options) {
   
   // preparing output BAM file
   batch_writer_input_t writer_input;
-  batch_writer_input_init(bam_filename, NULL, NULL, NULL, NULL, &writer_input);
+  batch_writer_input_init(sam_filename, NULL, NULL, NULL, NULL, &writer_input);
   
-  writer_input.bam_file = (bam_file_t *) fopen(bam_filename, "w");    
+  writer_input.bam_file = (bam_file_t *) fopen(sam_filename, "w");    
   write_sam_header(sa_index->genome, (FILE *) writer_input.bam_file);
 
   char *fq_list1 = options->in_filename, *fq_list2 = options->in_filename2;
