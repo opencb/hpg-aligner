@@ -661,7 +661,7 @@ void write_mapped_read(array_list_t *array_list, bam_file_t *bam_file) {
 //--------------------------------------------------------------------
 
 void write_unmapped_read(fastq_read_t *fq_read, bam_file_t *bam_file) {
-  static char aux[1024];
+  static char aux[1024] = "";
   alignment_t *alig;
   size_t header_len;
   char *id;
@@ -670,12 +670,12 @@ void write_unmapped_read(fastq_read_t *fq_read, bam_file_t *bam_file) {
   // calculating cigar
   sprintf(aux, "%luX", fq_read->length);	       
   alig = alignment_new();	       
-  header_len = strlen(fq_read->id);
-  id = (char *) malloc(sizeof(char) * (header_len + 1));
-  get_to_first_blank(fq_read->id, header_len, id);
+  //header_len = strlen(fq_read->id);
+  //id = (char *) malloc(sizeof(char) * (header_len + 1));
+  //get_to_first_blank(fq_read->id, header_len, id);
   //free(fq_read->id);
-  alignment_init_single_end(id, fq_read->sequence, fq_read->quality, 
-			    0, -1, -1, aux, 1, 0, 0, 0, 0, NULL, alig);
+  alignment_init_single_end(strdup(fq_read->id), fq_read->sequence, fq_read->quality,
+			    0, -1, -1, strdup(aux), 1, 0, 0, 0, 0, NULL, alig);
 
   bam1 = convert_to_bam(alig, 33);
   bam_fwrite(bam1, bam_file);

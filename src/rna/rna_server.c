@@ -5371,11 +5371,11 @@ int apply_sw_rna(sw_server_input_t* input_p, batch_t *batch) {
 
 	//printf("* * * %s * * *\n", fq_read->id);
 
-	int header_len = strlen(fq_read->id); 
-	char header_id[header_len + 1];
-	get_to_first_blank(fq_read->id, header_len, header_id);
-	char *header_match = (char *)malloc(sizeof(char)*header_len);	
-	memcpy(header_match, header_id, header_len);
+	//int header_len = strlen(fq_read->id); 
+	//char header_id[header_len + 1];
+	//get_to_first_blank(fq_read->id, header_len, header_id);
+	//char *header_match = (char *)malloc(sizeof(char)*header_len);	
+	//memcpy(header_match, header_id, header_len);
 
 	//printf("SCORE: %i\n", );
 
@@ -5386,9 +5386,9 @@ int apply_sw_rna(sw_server_input_t* input_p, batch_t *batch) {
 	}
 
 	alignment = alignment_new();
-	alignment_init_single_end(header_match/*strdup(header_id)*/, 
-				  strdup(query),//match_seq
-				  strdup(quality),//match_qual
+	alignment_init_single_end(strdup(fq_read->id),
+				  strdup(query),
+				  strdup(quality),
 				  first_cal->strand, first_cal->chromosome_id - 1, start_mapping - 1,
 				  strdup(new_cigar_code_string(cigar_code)),//strdup(cigar_fake)
 				  cigar_code_get_num_ops(cigar_code),//1
@@ -6466,12 +6466,12 @@ int apply_rna_last(sw_server_input_t* input_p, batch_t *batch) {
 	  //fprintf(stderr, "* * * (%i) M E T A    A L I G N M E N T    R E P O R T    %s* * *\n", strlen(query), new_cigar_code_string(cigar_code));
 	  alignment = alignment_new();
 	    
-	  int header_len = strlen(fq_read->id); 
-	  char header_id[header_len + 1];
-	  get_to_first_blank(fq_read->id, header_len, header_id);
-	  char *header_match = (char *)malloc(sizeof(char)*header_len);
-	  if (header_match == NULL) { exit(-1); }
-	  memcpy(header_match, header_id, header_len);
+	  //int header_len = strlen(fq_read->id); 
+	  //char header_id[header_len + 1];
+	  //get_to_first_blank(fq_read->id, header_len, header_id);
+	  //char *header_match = (char *)malloc(sizeof(char)*header_len);
+	  //if (header_match == NULL) { exit(-1); }
+	  //memcpy(header_match, header_id, header_len);
 
 	  //float score_tmp = len_read * 0.5 - cigar_code->distance * 0.4;
 	  //int score_map = (int)(score_tmp * 254) / (len_read * 0.5);
@@ -6496,7 +6496,7 @@ int apply_rna_last(sw_server_input_t* input_p, batch_t *batch) {
 	    //fprintf(stderr, "META ALIGNMENT REPORT %i: %s\n", m, new_cigar_code_string(cigar_code));
 	    //printf("WK_2ph: * * * M E T A    A L I G N M E N T    R E P O R T  [%i:%lu]  %s* * *\n", 
 	    //	   first_cal->chromosome_id, first_cal->start, new_cigar_code_string(cigar_code));
-	  alignment_init_single_end(header_match, 
+	  alignment_init_single_end(strdup(fq_read->id),
 				    strdup(query)/*match_seq*/,
 				    strdup(quality)/*match_qual*/,
 				    first_cal->strand, first_cal->chromosome_id - 1, start_mapping - 1,
@@ -7326,12 +7326,12 @@ int apply_rna_last_hc(sw_server_input_t* input_p, batch_t *batch) {
       //fprintf(stderr, "* * * (%i) M E T A    A L I G N M E N T    R E P O R T    %s* * *\n", strlen(query), new_cigar_code_string(cigar_code));
       alignment = alignment_new();
 	
-      int  header_len = strlen(fq_read->id); 
-      char header_id[header_len + 1];
-      get_to_first_blank(fq_read->id, header_len, header_id);
-      char *header_match = (char *)malloc(sizeof(char)*header_len);
-      if (header_match == NULL) { exit(-1); }
-      memcpy(header_match, header_id, header_len);
+      //int  header_len = strlen(fq_read->id); 
+      //char header_id[header_len + 1];
+      //get_to_first_blank(fq_read->id, header_len, header_id);
+      //char *header_match = (char *)malloc(sizeof(char)*header_len);
+      //if (header_match == NULL) { exit(-1); }
+      //memcpy(header_match, header_id, header_len);
 		
       memcpy(query, &query_map[h_left], len_read);
       query[len_read] = '\0';
@@ -7356,7 +7356,7 @@ int apply_rna_last_hc(sw_server_input_t* input_p, batch_t *batch) {
         pthread_mutex_unlock(&mutex_sp);
       */
 
-      alignment_init_single_end(header_match, 
+      alignment_init_single_end(strdup(fq_read->id),
 				strdup(query)/*match_seq*/,
 				strdup(quality)/*match_qual*/,
 				first_cal->strand, first_cal->chromosome_id - 1, start_mapping - 1,

@@ -82,7 +82,7 @@ int main(int argc, char* argv[]) {
   log_file = NULL;
 
   if (argc <= 1) {
-    LOG_FATAL("Missing command.\nValid commands are:\n\tdna: to map DNA sequences\n\trna: to map RNA sequences\n\tbs: to map BS sequences\n\tbuild-index: to create the genome index.\nUse -h or --help to display hpg-aligner options.");
+    LOG_FATAL("Missing command.\nValid commands are:\n\tdna: to map DNA sequences\n\trna: to map RNA sequences\n\tbs: to map BS sequences\n\tbuild-sa-index: to create the genome sa index.\n\tbuild-bwt-index: to create the genome bwt index.\nUse -h or --help to display hpg-aligner options.\n");
   }
 
   if (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") == 0) {
@@ -99,7 +99,13 @@ int main(int argc, char* argv[]) {
      strcmp(command, "bs" ) != 0 && 
      strcmp(command, "build-sa-index") != 0 &&
      strcmp(command, "build-bwt-index") != 0) {
-    LOG_FATAL("Command unknown.\nValid commands are:\n\tdna: to map DNA sequences\n\trna: to map RNA sequences\n\tbs: to map BS sequences\n\tbuild-index: to create the genome index.\nUse -h or --help to display hpg-aligner options.");    
+    LOG_FATAL("Command unknown.\nValid commands are:\n\tdna: to map DNA sequences\n\trna: to map RNA sequences\n\tbs: to map BS sequences\n\tbuild-sa-index: to create the genome sa index.\n\tbuild-bwt-index: to create the genome bwt index.\nUse -h or --help to display hpg-aligner options.\n");
+
+  }
+
+  if (!strcmp(command, "build-bwt-index") || 
+      !strcmp(command, "build-sa-index")) {
+      run_index_builder(argc, argv, command);
   }
 
   // parsing options
@@ -126,23 +132,10 @@ int main(int argc, char* argv[]) {
     printf("Run BS mode...");
     //run_bs_aligner(genome1, genome2, genome, bwt_index1, bwt_index2,
     //		   bwt_optarg, cal_optarg, pair_mng, report_optarg, options);
-  } else if (!strcmp(command, "build-bwt-index")) {
-    if (options->bs_index == 0) {
-      run_index_builder(options->genome_filename, options->bwt_dirname, 
-      		options->index_ratio, false, "ACGT");
-      LOG_DEBUG("Done !!\n");
-      exit(0);
-    } else { // bisulphite index generation
-      //printf("\nBisulphite index generation\n");
-      //run_index_builder(options->genome_filename, options->bwt_dirname, 
-      //		options->index_ratio, false, "ACGT");
-      //exit(0);
-    }
-  } else if (!strcmp(command, "build-sa-index")) {
-    printf("SA Index...");
   }
 
   return 0;
+
 }
 
 //--------------------------------------------------------------------
