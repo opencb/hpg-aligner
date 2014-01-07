@@ -6,6 +6,8 @@
 *.gch
 *~
 
+*.OLD
+
 # Build folders
 bin/*
 build/*

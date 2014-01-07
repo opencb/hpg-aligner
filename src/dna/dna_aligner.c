@@ -1,6 +1,11 @@
 #include "dna_aligner.h"
 //--------------------------------------------------------------------
 
+#ifdef _VERBOSE
+extern int num_dup_reads;
+extern int num_total_dup_reads;
+#endif
+
 //--------------------------------------------------------------------
 // main 
 //--------------------------------------------------------------------
@@ -50,6 +55,11 @@ void dna_aligner(options_t *options) {
 
   // preparing input FastQ file
   fastq_batch_reader_input_t reader_input;
+  fastq_batch_reader_input_init(fastq_filename, NULL, 0, 
+				batch_size, NULL, options->gzip, &reader_input);
+  
+  reader_input.fq_file1 = fastq_fopen(fastq_filename);
+  reader_input.fq_file2 = NULL;
   
   // preparing output BAM file
   batch_writer_input_t writer_input;
