@@ -1,5 +1,23 @@
 #include "sa_dna_commons.h"
 
+
+//--------------------------------------------------------------------
+// commons
+//--------------------------------------------------------------------
+
+void seed_free(seed_t *p) {
+  if (p) free(p);
+}
+
+//--------------------------------------------------------------------
+
+void seed_cal_free(seed_cal_t *p) {
+  if (p) {
+    if (p->seed_list) linked_list_free(p->seed_list, (void *) seed_free);
+    free(p);
+  }
+}
+
 //--------------------------------------------------------------------
 // utils
 //--------------------------------------------------------------------
@@ -17,7 +35,7 @@ void init_func_names() {
   strcpy(func_names[8], "skip_suffixes");
   strcpy(func_names[9], "mini_sw_right_side");
   strcpy(func_names[10], "mini_sw_left_side");
-  strcpy(func_names[11], "seed_region_new");
+  strcpy(func_names[11], "seed_new");
   strcpy(func_names[12], "seed_list_insert");
   strcpy(func_names[13], "cal_new");
   strcpy(func_names[14], "cal_mng_insert");
@@ -32,8 +50,25 @@ void init_func_names() {
 }
 #endif
 
+//--------------------------------------------------------------------
+
+float get_max_score(array_list_t *cal_list) {
+  seed_cal_t *cal;
+  size_t num_cals = array_list_size(cal_list);
+  float max_score = -1000000.0f;
+  for (size_t j = 0; j < num_cals; j++) {
+    cal = array_list_get(j, cal_list);
+    if (cal->score > max_score) {
+      max_score = cal->score;
+    }
+  }
+  return max_score;
+}
+
+//--------------------------------------------------------------------
+
 int get_min_num_mismatches(array_list_t *cal_list) {
-  cal_t *cal;
+  seed_cal_t *cal;
   size_t num_cals = array_list_size(cal_list);
   int min_num_mismatches = 100000;
   for (size_t j = 0; j < num_cals; j++) {
@@ -48,7 +83,7 @@ int get_min_num_mismatches(array_list_t *cal_list) {
 //--------------------------------------------------------------------
 
 int get_max_read_area(array_list_t *cal_list) {
-  cal_t *cal;
+  seed_cal_t *cal;
   size_t num_cals = array_list_size(cal_list);
   int max_read_area = 0;
   for (size_t j = 0; j < num_cals; j++) {
@@ -63,27 +98,27 @@ int get_max_read_area(array_list_t *cal_list) {
 
 //--------------------------------------------------------------------
 
-void filter_cals_by_min_read_area(int read_area, array_list_t **list) {
-  cal_t *cal;
+void filter_cals_by_max_score(float score, array_list_t **list) {
+  seed_cal_t *cal;
   array_list_t *cal_list = *list;
   size_t num_cals = array_list_size(cal_list);
   array_list_t *new_cal_list = array_list_new(MAX_CALS, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
 
   for (size_t j = 0; j < num_cals; j++) {
     cal = array_list_get(j, cal_list);
-    if (cal->read_area <= read_area) {
+    if (cal->score >= score) {
       array_list_insert(cal, new_cal_list);
       array_list_set(j, NULL, cal_list);
     }
   }
-  array_list_free(cal_list, (void *) cal_free);
+  array_list_free(cal_list, (void *) seed_cal_free);
   *list = new_cal_list;
 }
 
 //--------------------------------------------------------------------
 
 void filter_cals_by_max_read_area(int read_area, array_list_t **list) {
-  cal_t *cal;
+  seed_cal_t *cal;
   array_list_t *cal_list = *list;
   size_t num_cals = array_list_size(cal_list);
   array_list_t *new_cal_list = array_list_new(MAX_CALS, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
@@ -95,14 +130,33 @@ void filter_cals_by_max_read_area(int read_area, array_list_t **list) {
       array_list_set(j, NULL, cal_list);
     }
   }
-  array_list_free(cal_list, (void *) cal_free);
+  array_list_free(cal_list, (void *) seed_cal_free);
+  *list = new_cal_list;
+}
+
+//--------------------------------------------------------------------
+
+void filter_cals_by_min_read_area(int read_area, array_list_t **list) {
+  seed_cal_t *cal;
+  array_list_t *cal_list = *list;
+  size_t num_cals = array_list_size(cal_list);
+  array_list_t *new_cal_list = array_list_new(MAX_CALS, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
+
+  for (size_t j = 0; j < num_cals; j++) {
+    cal = array_list_get(j, cal_list);
+    if (cal->read_area <= read_area) {
+      array_list_insert(cal, new_cal_list);
+      array_list_set(j, NULL, cal_list);
+    }
+  }
+  array_list_free(cal_list, (void *) seed_cal_free);
   *list = new_cal_list;
 }
 
 //--------------------------------------------------------------------
 
 void filter_cals_by_max_num_mismatches(int num_mismatches, array_list_t **list) {
-  cal_t *cal;
+  seed_cal_t *cal;
   array_list_t *cal_list = *list;
   size_t num_cals = array_list_size(cal_list);
   array_list_t *new_cal_list = array_list_new(MAX_CALS, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
@@ -114,7 +168,7 @@ void filter_cals_by_max_num_mismatches(int num_mismatches, array_list_t **list) 
       array_list_set(j, NULL, cal_list);
     }
   }
-  array_list_free(cal_list, (void *) cal_free);
+  array_list_free(cal_list, (void *) seed_cal_free);
   *list = new_cal_list;
 }
 
@@ -124,7 +178,7 @@ void create_alignments(array_list_t *cal_list, fastq_read_t *read,
 		       array_list_t *mapping_list) {
 
   // CAL
-  cal_t *cal;
+  seed_cal_t *cal;
   uint num_cals = array_list_size(cal_list);
 
   // alignments
@@ -140,21 +194,21 @@ void create_alignments(array_list_t *cal_list, fastq_read_t *read,
   int AS;
   size_t i, pos;
   linked_list_item_t *list_item; 
-  seed_region_t *s_first, *s_last;
+  seed_t *s_first, *s_last;
 
   for (i = 0; i < num_cals; i++) {
     cigar[0] = 0;
     cal = array_list_get(i, cal_list);
 
     #ifdef _VERBOSE	  
-    printf("--> CAL #%i (cigar %s):\n", i, cigar_to_string(cal->info));
+    printf("--> CAL #%i (cigar %s):\n", i, cigar_to_string(&cal->cigar));
     cal_print(cal);
     #endif
 
     // computing aligments
     AS = read->length * 5;
-    s_first = linked_list_get_first(cal->sr_list);
-    s_last = linked_list_get_last(cal->sr_list);
+    s_first = linked_list_get_first(cal->seed_list);
+    s_last = linked_list_get_last(cal->seed_list);
 
     // sanity checking
     //    assert(s_first != NULL && s_last != NULL);
@@ -207,37 +261,9 @@ void create_alignments(array_list_t *cal_list, fastq_read_t *read,
       
       // free memory
       //      alignment_free(alignment);
-    } else if (cal->sr_duplicate_list && cal->sr_duplicate_list->size < 20) {
-      /*
-      // sr_list is empty, check sr_duplicate_list
-      for (linked_list_item_t *list_item = cal->sr_duplicate_list->first; 
-	   list_item != NULL; 
-	   list_item = list_item->next) {
-	seed_region_t *s = list_item->item;
-	if (s->read_end - s->read_start + 1 == read->length) {
-	  sprintf(cigar, "%iM", read->length);
-	  num_cigar_ops = 1;
-	  pos = s->genome_start;
-	  
-	  alignment = alignment_new();	       
-	  alignment_init_single_end(strdup(read->id), strdup(read->sequence), strdup(read->quality), 
-				    cal->strand, cal->chromosome_id, 
-				    pos,
-				    strdup(cigar), num_cigar_ops, (AS * 254) / (read->length * 5), 1, (num_cals > 1),
-				    0, 0, 0, alignment);  
-	  
-	  array_list_insert(alignment, mapping_list);
-	  //	  array_list_insert(convert_to_bam(alignment, 33), mapping_list);
-	  printf("\t\t%s\t[%i|%i - %i|%i]\n", read->id, s->genome_start, s->read_start, s->read_end, s->genome_end);
-	  
-	  // free memory
-	  //	  alignment_free(alignment);
-	}
-      */
     }
     
-    if (cal->info) cigar_free(cal->info);
-    cal_free(cal);
+    seed_cal_free(cal);
   }
 }
 
@@ -260,10 +286,10 @@ void display_suffix_mappings(int strand, size_t r_start, size_t suffix_len,
 
 //--------------------------------------------------------------------
 
-void print_seed_region(char *msg, seed_region_t *s) {
+void print_seed(char *msg, seed_t *s) {
   printf("%s%c:%i[%lu|%lu - %lu|%lu] (cigar: %s, num. mismatches = %i)\n",  msg, (s->strand == 0 ? '+' : '-'),
 	 s->chromosome_id, s->genome_start, s->read_start, s->read_end, s->genome_end,
-	 cigar_to_string(s->info), s->num_mismatches);
+	 cigar_to_string(&s->cigar), s->num_mismatches);
 }
 
 //--------------------------------------------------------------------

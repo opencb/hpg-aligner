@@ -190,6 +190,33 @@ void rna_aligner(options_t *options) {
 
   FILE *f_sa, *f_hc;
 
+  f_sa = fopen("buffer_sa.tmp", "w+b");
+  if (f_sa == NULL) {
+    LOG_FATAL("Error opening file 'buffer_sa.tmp' \n");
+  }
+
+  f_hc = fopen("buffer_hc.tmp", "w+b");
+  if (f_hc == NULL) {
+    LOG_FATAL("Error opening file 'buffer_hc.tmp' \n");
+  }
+
+  fastq_batch_reader_input_t reader_input;
+  fastq_batch_reader_input_init(options->in_filename, options->in_filename2, 
+				options->pair_mode, options->batch_size, 
+				NULL, options->gzip, &reader_input);  
+
+  //buffer_reader_input_t buffer_reader_input;
+  //buffer_reader_input_init(&reader_input,
+  //buffer,
+  //buffer_reader_input);
+
+  if (options->pair_mode == SINGLE_END_MODE) {
+    reader_input.fq_file1 = fastq_fopen(options->in_filename);
+  } else {
+    reader_input.fq_file1 = fastq_fopen(options->in_filename);
+    reader_input.fq_file2 = fastq_fopen(options->in_filename2);
+  }
+
   linked_list_t *alignments_list = linked_list_new(COLLECTION_MODE_SYNCHRONIZED);
   linked_list_set_flag(options->pair_mode, alignments_list);
 
@@ -250,7 +277,7 @@ void rna_aligner(options_t *options) {
   batch_t *batch = batch_new(&bwt_input, &region_input, &cal_input, 
 			     &pair_input, &preprocess_rna, &sw_input, &writer_input, RNA_MODE, NULL);
 
-  fastq_batch_reader_input_t reader_input;
+  //  fastq_batch_reader_input_t reader_input;
 
   //Parse input for more than one file
   char *fq_list1 = options->in_filename, *fq_list2 = options->in_filename2;

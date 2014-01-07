@@ -116,6 +116,7 @@ int main(int argc, char* argv[]) {
 
   LOG_DEBUG_F("Command Mode: %s\n", command);
 
+  
   if(strcmp(command, "dna") == 0) { 
     // DNA command
     validate_options(options);
@@ -128,20 +129,20 @@ int main(int argc, char* argv[]) {
     // BS commnad
     printf("Run BS mode...");
     //run_bs_aligner(genome1, genome2, genome, bwt_index1, bwt_index2,
-    //		   bwt_optarg, cal_optarg, pair_mng, report_optarg, options);
+    //                   bwt_optarg, cal_optarg, pair_mng, report_optarg, options);
   } 
   /*else if (!strcmp(command, "build-bwt-index")) {
     // BWT-INDEX command
     if (options->bs_index == 0) {
       run_index_builder(options->genome_filename, options->bwt_dirname, 
-			options->index_ratio, false, "ACGT");
+                        options->index_ratio, false, "ACGT");
       LOG_DEBUG("Done !!\n");
       exit(0);
     } else { 
       // bisulphite index generation
       //printf("\nBisulphite index generation\n");
       //run_index_builder(options->genome_filename, options->bwt_dirname, 
-      //		options->index_ratio, false, "ACGT");
+      //                options->index_ratio, false, "ACGT");
       //exit(0);
     }
   } else if (!strcmp(command, "build-sa-index")) {
@@ -149,8 +150,11 @@ int main(int argc, char* argv[]) {
     printf("SA Index...");
   }
   */
-  return 0;
 
+  options_free(options);
+
+  return 0;
 }
+
 
 //--------------------------------------------------------------------
