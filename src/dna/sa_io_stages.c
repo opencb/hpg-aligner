@@ -54,16 +54,16 @@ void *sa_fq_reader(void *input) {
   
   fastq_batch_reader_input_t *fq_reader_input = wf_input->fq_reader_input;
   array_list_t *reads = array_list_new(fq_reader_input->batch_size, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
-  
+
   if (fq_reader_input->gzip) {
-    //Gzip fastq file
+    // Gzip fastq file
     if (fq_reader_input->flags == SINGLE_END_MODE) {
       fastq_gzread_bytes_se(reads, fq_reader_input->batch_size, fq_reader_input->fq_gzip_file1);
     } else {
       fastq_gzread_bytes_pe(reads, fq_reader_input->batch_size, fq_reader_input->fq_gzip_file1, fq_reader_input->fq_gzip_file2);
     }
   } else {
-    //Fastq file
+    // Fastq file
     if (fq_reader_input->flags == SINGLE_END_MODE) {
       fastq_fread_bytes_se(reads, fq_reader_input->batch_size, fq_reader_input->fq_file1);
     } else {
@@ -71,7 +71,6 @@ void *sa_fq_reader(void *input) {
 				   fq_reader_input->fq_file1, fq_reader_input->fq_file2);
     }
   }
-
   
   size_t num_reads = array_list_size(reads);
   
@@ -142,23 +141,24 @@ int sa_sam_writer(void *data) {
     if (num_mappings > 0) {
       for (size_t j = 0; j < num_mappings; j++) {
 	alig = (alignment_t *) array_list_get(j, mapping_list);
-
-	flag = (alig->seq_strand ? 16 : 0);
-
-	fprintf(out_file, "%s\t%i\t%s\t%lu\t%i\t%s\t%s\t%lu\t%i\t%s\t%s\t%s\n", 
-		alig->query_name,
-		flag,
-		genome->chrom_names[alig->chromosome],
-		alig->position + 1,
-		alig->map_quality,
-		alig->cigar,
-		rnext,
-		pnext,
-		tlen,
-		alig->sequence,
-		alig->quality,
-		optional_flags
-		);
+	//if (j == 0) {
+	  flag = (alig->seq_strand ? 16 : 0);
+	  
+	  fprintf(out_file, "%s\t%i\t%s\t%lu\t%i\t%s\t%s\t%lu\t%i\t%s\t%s\t%s\n", 
+		  alig->query_name,
+		  flag,
+		  genome->chrom_names[alig->chromosome],
+		  alig->position + 1,
+		  alig->map_quality,
+		  alig->cigar,
+		  rnext,
+		  pnext,
+		  tlen,
+		  alig->sequence,
+		  alig->quality,
+		  optional_flags
+		  );
+	  //}
 	alignment_free(alig);	 
       }
     } else {

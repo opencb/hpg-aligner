@@ -84,7 +84,7 @@ void validate_options(options_t *options) {
 
   if (mode == DNA_MODE) {
     strcpy(options->str_mode, "DNA");
-    DEFAULT_READ_BATCH_SIZE = 20000;
+    DEFAULT_READ_BATCH_SIZE = 200000;
     DEFAULT_SEED_SIZE	= 20;
     DEFAULT_FLANK_LENGTH = 5;
     DEFAULT_MIN_SEED_SIZE = 16;
