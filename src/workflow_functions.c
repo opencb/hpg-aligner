@@ -668,15 +668,16 @@ void write_unmapped_read(fastq_read_t *fq_read, bam_file_t *bam_file) {
   bam1_t *bam1;
 
   // calculating cigar
-  sprintf(aux, "%luX", fq_read->length);	       
+  //sprintf(aux, "%luX", fq_read->length);	       
   alig = alignment_new();	       
   //header_len = strlen(fq_read->id);
   //id = (char *) malloc(sizeof(char) * (header_len + 1));
   //get_to_first_blank(fq_read->id, header_len, id);
   //free(fq_read->id);
+  
   alignment_init_single_end(strdup(fq_read->id), fq_read->sequence, fq_read->quality,
-			    0, -1, -1, strdup(aux), 1, 0, 0, 0, 0, NULL, alig);
-
+			    0, -1, -1, /*strdup(aux)*/"", 0, 0, 0, 0, 0, NULL, alig);
+  
   bam1 = convert_to_bam(alig, 33);
   bam_fwrite(bam1, bam_file);
   bam_destroy1(bam1);
@@ -685,6 +686,7 @@ void write_unmapped_read(fastq_read_t *fq_read, bam_file_t *bam_file) {
   alig->quality = NULL;
   alig->cigar = NULL;
   alignment_free(alig);	       
+
   //printf("\tWRITE : read %i (%d items): unmapped...done !!\n", i, num_items);
   
 }
