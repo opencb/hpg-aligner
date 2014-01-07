@@ -113,6 +113,7 @@ void rna_aligner(options_t *options) {
   //timing = timing_new((char**) labels_time, NUM_SECTIONS_TIME);
   //}
 
+  //validate_options(options);
   // display selected options
   LOG_DEBUG("Displaying options...\n");
   options_display(options);

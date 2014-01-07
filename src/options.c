@@ -79,6 +79,9 @@ void validate_options(options_t *options) {
   int DEFAULT_SEEDS_MAX_DISTANCE;
 
   int mode = options->mode;
+  
+  printf("%i == %i\n", mode, RNA_MODE);
+
   if (mode == DNA_MODE) {
     strcpy(options->str_mode, "DNA");
     DEFAULT_READ_BATCH_SIZE = 20000;
@@ -497,6 +500,7 @@ options_t *parse_options(int argc, char **argv) {
   //    options->flank_length = 5;
   //  }
 
+  options->mode = mode;
   return options;
 }
 
