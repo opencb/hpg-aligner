@@ -351,7 +351,7 @@ alig_bam_list(array_list_t *bam_list, genome_t* ref)
 			cigar32_to_string(clip_cigar, clip_cigar_l, cigar_str3);
 			if(memcmp(cigar_str, cigar_str2, strlen(cigar_str)) && memcmp(cigar_str, cigar_str3, strlen(cigar_str)))
 			{
-				if(!cond)
+				/*if(!cond)
 				{
 					cond = 1;
 					printf("================================================\n");
@@ -373,7 +373,10 @@ alig_bam_list(array_list_t *bam_list, genome_t* ref)
 				printf("%s\n", ref_strx);
 				printf("Ref A: ");
 				for(int j = 0; j < read_disp_ref && j < 300; j++) printf(" ");
-				printf("%s\n", ref_strx2);
+				printf("%s\n", ref_strx2);*/
+
+				print_log_message_with_format(LOG_INFO_LEVEL, "INFO", "alig.c", 378, "alig_bam_list",
+						"CIGAR LEFTALIGNED: %s - %s - %s === %d:%d\n", cigar_str, cigar_str2, cigar_str3, read->core.tid + 1, read->core.pos + 1);
 			}
 
 			//Allocate haplotype
@@ -396,7 +399,7 @@ alig_bam_list(array_list_t *bam_list, genome_t* ref)
 			//Duplicate?
 			if(h == array_list_size(haplo_list))
 			{
-				//Add to haplotype list
+				//Add to haplotype list (not duplicated)
 				array_list_insert(haplo, haplo_list);
 			}
 
@@ -406,7 +409,7 @@ alig_bam_list(array_list_t *bam_list, genome_t* ref)
 	}
 
 	//ERASE
-	if(array_list_size(haplo_list))
+	/*if(array_list_size(haplo_list))
 	{
 		char cigar_str[20];
 		aux_indel_t *indel_aux;
@@ -421,20 +424,20 @@ alig_bam_list(array_list_t *bam_list, genome_t* ref)
 			cigar32_to_string(&indel_aux->indel, 1, cigar_str);
 			printf("H%d: %s === Pos -> %d:%d\n", i, cigar_str, read->core.tid, indel_aux->ref_pos);
 		}
-	}
+	}*/
 
 	//Indel local realignment
 	alig_bam_list_realign(bam_list, haplo_list, ref);
 
 	//ERASE
-	if(array_list_size(haplo_list))
+	/*if(array_list_size(haplo_list))
 	{
 		if(cond)
 		{
 			printf("Press to continue...\n");
 			getchar();
 		}
-	}
+	}*/
 
 	//Free memory
 	{
@@ -581,7 +584,7 @@ alig_bam_list_realign(array_list_t *bam_list, array_list_t *haplotype_list, geno
 		nucleotide_compare(read_seq, read_seq_ref, read_seq_ref_l, comp_aux, ref_miss + i);
 
 		//ERASE Print things
-		{
+		/*{
 			char erase_str[200];
 			size_t disp;
 			cigar32_to_string(bam1_cigar(read), read->core.n_cigar, erase_str);
@@ -601,7 +604,7 @@ alig_bam_list_realign(array_list_t *bam_list, array_list_t *haplotype_list, geno
 			//printf("Read: %s\n", erase_str);
 			//printf("Ref*: %s\n", read_seq_ref);
 			//cigar32_to_string(&indel_aux->indel, 1, cigar_str);
-		}
+		}*/
 
 		//Dont match reference perfectly?
 		if(ref_miss[i])
@@ -629,7 +632,7 @@ alig_bam_list_realign(array_list_t *bam_list, array_list_t *haplotype_list, geno
 				nucleotide_compare(read_seq, read_seq_ref, read_seq_ref_l, comp_aux, H_miss + i);
 
 				//ERASE Print things
-				{
+				/*{
 					char cigar_str[50];
 					//char erase_str[200];
 					size_t disp;
@@ -645,7 +648,7 @@ alig_bam_list_realign(array_list_t *bam_list, array_list_t *haplotype_list, geno
 					//erase_str[read->core.l_qseq] = '\0';
 					//printf("Read: %s\n", erase_str);
 					//printf("Ref*: %s\n", read_seq_ref);
-				}
+				}*/
 			}
 		}
 	}
