@@ -10,7 +10,7 @@ nucleotide_compare(char *ref_seq, char *bam_seq, size_t bam_seq_l, char *comp_re
 	assert(bam_seq);
 	assert(bam_seq_l > 0);
 	assert(comp_res);
-	assert(miss_count);
+	//assert(miss_count);
 
 	//SSE
 	#ifdef __SSE2__
