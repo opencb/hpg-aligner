@@ -6,7 +6,7 @@ int bs_writer(void *data) {
   struct timeval start, end;
   double time;
   
-  if (time_on) { start_timer(start); }
+  //if (time_on) { start_timer(start); }
   
   batch_t *batch = (batch_t *) data;
   fastq_read_t *fq_read;
@@ -121,5 +121,5 @@ int bs_writer(void *data) {
 
   basic_statistics_add(num_reads, num_mapped_reads, total_mappings, basic_st);
   
-  if (time_on) { stop_timer(start, end, time); timing_add(time, BAM_WRITER, timing); }
+  //if (time_on) { stop_timer(start, end, time); timing_add(time, BAM_WRITER, timing); }
 }

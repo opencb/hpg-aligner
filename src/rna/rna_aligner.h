@@ -63,11 +63,14 @@ typedef struct buffer_pair_item {
   array_list_t *alignments_list_2;
 }buffer_pair_item_t;
 
+/*
 void run_rna_aligner(genome_t *genome, bwt_index_t *bwt_index, 
 		     pair_mng_t *pair_mng,
 		     bwt_optarg_t *bwt_optarg, cal_optarg_t *cal_optarg, 
 		     report_optarg_t *report_optarg, metaexons_t *metaexons, 
 		     options_t *options);
+*/
+void rna_aligner(options_t *options);
 
 typedef struct exon {
   int chr;

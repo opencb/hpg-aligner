@@ -121,11 +121,11 @@ const unsigned char splice_nt[4] = {'A', 'C', 'G', 'T'};
 
 int ii = -1;
 
-extern size_t TOTAL_READS_PROCESS, TOTAL_SW, TOTAL_READS_SA;
+//extern size_t TOTAL_READS_PROCESS, TOTAL_SW, TOTAL_READS_SA;
 extern pthread_mutex_t mutex_sp; 
 
-extern size_t tot_reads_in;
-extern size_t tot_reads_out;
+//extern size_t tot_reads_in;
+//extern size_t tot_reads_out;
 
 
 cigar_code_t *search_left_single_anchor(int gap_close, 
@@ -2170,9 +2170,9 @@ void sw_depth_process(sw_optarg_t *sw_optarg, sw_multi_output_t *output,
 
     smith_waterman_mqmr(sw_depth->q, sw_depth->r, sw_depth->depth, sw_optarg, 1, output);
 
-    pthread_mutex_lock(&mutex_sp);
-    TOTAL_SW += sw_depth->depth;
-    pthread_mutex_unlock(&mutex_sp);
+    //pthread_mutex_lock(&mutex_sp);
+    //TOTAL_SW += sw_depth->depth;
+    //pthread_mutex_unlock(&mutex_sp);
 
     for (int i = 0; i < sw_depth->depth; i++) {
       sw_item_t *sw_item = sw_depth->items[i];     
@@ -4456,7 +4456,7 @@ int apply_sw_rna(sw_server_input_t* input_p, batch_t *batch) {
   char q[2048];
   char r[2048];
 
-  char **rev_comp = (char **)calloc(num_reads, sizeof(char *));
+  //char **rev_comp = (char **)calloc(num_reads, sizeof(char *));
 
   char *sequence;
   char *query_ref;
@@ -4532,8 +4532,7 @@ int apply_sw_rna(sw_server_input_t* input_p, batch_t *batch) {
 
   int seed_size = cal_optarg->seed_size;
 
-  int pair_mode = input_p->pair_mode;
-  
+  int pair_mode = input_p->pair_mode;  
   // array_list flag: 0 -> Not  BWT Anchors found (NOT_ANCHORS)        *
   //                  1 -> One  BWT Anchors found (SINGLE_ANCHORS)     *
   //                  2 -> Pair BWT Anchors found (DOUBLE_ANCHORS)     *
@@ -4541,9 +4540,9 @@ int apply_sw_rna(sw_server_input_t* input_p, batch_t *batch) {
   //                  4 -> Alignments exceded     (ALIGNMENTS_EXCEEDED)
   int flag;
 
-  pthread_mutex_lock(&mutex_sp);
-  TOTAL_READS_PROCESS += num_reads;
-  pthread_mutex_unlock(&mutex_sp);
+  //pthread_mutex_lock(&mutex_sp);
+  //TOTAL_READS_PROCESS += num_reads;
+  //pthread_mutex_unlock(&mutex_sp);
   
   for (i = 0; i < num_reads; i++) {    
     cals_list = mapping_batch->mapping_lists[i];
@@ -4589,12 +4588,12 @@ int apply_sw_rna(sw_server_input_t* input_p, batch_t *batch) {
 	for (int p = 0; p < array_list_size(cals_list); p += 2) {
 	  first_cal = array_list_get(p, cals_list);
 	  if (first_cal->strand == 1) {
-	    if (!rev_comp[i]) {
-	      rev_comp[i] = (char *) calloc(fq_read->length + 1, sizeof(char));
-	      strcpy(rev_comp[i], fq_read->sequence);
-	      seq_reverse_complementary(rev_comp[i], fq_read->length);
-	    }
-	    query_map = rev_comp[i];
+	    //if (!rev_comp[i]) {
+	    //rev_comp[i] = (char *) calloc(fq_read->length + 1, sizeof(char));
+	    //strcpy(rev_comp[i], fq_read->sequence);
+	    //seq_reverse_complementary(rev_comp[i], fq_read->length);
+	    //}
+	    query_map = fq_read->revcomp;
 	  } else {
 	    query_map = fq_read->sequence;
 	  }
@@ -4640,12 +4639,13 @@ int apply_sw_rna(sw_server_input_t* input_p, batch_t *batch) {
 	last_cal  = array_list_get(p + 1, cals_list);
 	last_cal_len = last_cal->end - last_cal->start;
 	if (last_cal->strand == 1) {
-	  if (!rev_comp[i]) {
-	    rev_comp[i] = (char *) calloc(fq_read->length + 1, sizeof(char));
-	    strcpy(rev_comp[i], fq_read->sequence);
-	    seq_reverse_complementary(rev_comp[i], fq_read->length);
-	  }
-	  query_map = rev_comp[i];
+	  //if (!rev_comp[i]) {
+	  //rev_comp[i] = (char *) calloc(fq_read->length + 1, sizeof(char));
+	  //strcpy(rev_comp[i], fq_read->sequence);
+	  //seq_reverse_complementary(rev_comp[i], fq_read->length);
+	  //}
+	  query_map = fq_read->revcomp;
+	  //query_map = rev_comp[i];
 	} else {
 	  query_map = fq_read->sequence;
 	}
@@ -4842,12 +4842,13 @@ int apply_sw_rna(sw_server_input_t* input_p, batch_t *batch) {
 	cigar_code_res = NULL;
 	meta_alignment = NULL;
 	if (cal->strand == 1) {
-	  if (!rev_comp[i]) {
-	    rev_comp[i] = (char *) calloc(fq_read->length + 1, sizeof(char));
-	    strcpy(rev_comp[i], fq_read->sequence);
-	    seq_reverse_complementary(rev_comp[i], fq_read->length);
-	  }
-	  query_map = rev_comp[i];
+	  //if (!rev_comp[i]) {
+	  //rev_comp[i] = (char *) calloc(fq_read->length + 1, sizeof(char));
+	  //strcpy(rev_comp[i], fq_read->sequence);
+	  //seq_reverse_complementary(rev_comp[i], fq_read->length);
+	  //}
+	  query_map = fq_read->revcomp;
+	  //query_map = rev_comp[i];
 	} else {
 	  query_map = fq_read->sequence;
 	}
@@ -4907,19 +4908,19 @@ int apply_sw_rna(sw_server_input_t* input_p, batch_t *batch) {
 	//pthread_mutex_unlock(&mutex_sp);
 
 	//array_list_clear(cals_targets, (void*)NULL);	
-	pthread_mutex_lock(&mutex_sp);
-	extern size_t w2_r;
-	w2_r++;
+	//pthread_mutex_lock(&mutex_sp);
+	//extern size_t w2_r;
+	//w2_r++;
 	//file_write_items(fq_read, mapping_batch->mapping_lists[i],
 	//		 CAL_TYPE, f_sa, f_hc, 0);
-	pthread_mutex_unlock(&mutex_sp);
+	//pthread_mutex_unlock(&mutex_sp);
 	
 	//No clear ??
 	//array_list_clear(mapping_batch->mapping_lists[i], (void*)cal_free);
 	
-	pthread_mutex_lock(&mutex_sp);
-	TOTAL_READS_SA++;
-	pthread_mutex_unlock(&mutex_sp);
+	//pthread_mutex_lock(&mutex_sp);
+	//TOTAL_READS_SA++;
+	//pthread_mutex_unlock(&mutex_sp);
 
       } else {
 	for (t = 0; t < array_list_size(delete_targets); t++) {
@@ -5032,12 +5033,13 @@ int apply_sw_rna(sw_server_input_t* input_p, batch_t *batch) {
 	*/
 	first_cal = array_list_get(0, fusion_list); 
 	if (first_cal->strand == 1) {
-	  if (!rev_comp[i]) {
-	    rev_comp[i] = (char *) calloc(fq_read->length + 1, sizeof(char));
-	    strcpy(rev_comp[i], fq_read->sequence);
-	    seq_reverse_complementary(rev_comp[i], fq_read->length);
-	  }
-	  query_map = rev_comp[i];
+	  //if (!rev_comp[i]) {
+	  //rev_comp[i] = (char *) calloc(fq_read->length + 1, sizeof(char));
+	  //strcpy(rev_comp[i], fq_read->sequence);
+	  //seq_reverse_complementary(rev_comp[i], fq_read->length);
+	  //}
+	  //query_map = rev_comp[i];
+	  query_map = fq_read->revcomp;
 	} else {
 	  query_map = fq_read->sequence;
 	}
@@ -5313,7 +5315,8 @@ int apply_sw_rna(sw_server_input_t* input_p, batch_t *batch) {
 	int h_right = (fq_read->length - 1) - s_next->read_end;
 
 	if (first_cal->strand == 1) {
-	  query_map = rev_comp[i];
+	  //query_map = rev_comp[i];
+	  query_map = fq_read->revcomp;
 	} else {
 	  query_map = fq_read->sequence;
 	}
@@ -5368,11 +5371,11 @@ int apply_sw_rna(sw_server_input_t* input_p, batch_t *batch) {
 
 	//printf("* * * %s * * *\n", fq_read->id);
 
-	int header_len = strlen(fq_read->id); 
-	char header_id[header_len + 1];
-	get_to_first_blank(fq_read->id, header_len, header_id);
-	char *header_match = (char *)malloc(sizeof(char)*header_len);	
-	memcpy(header_match, header_id, header_len);
+	//int header_len = strlen(fq_read->id); 
+	//char header_id[header_len + 1];
+	//get_to_first_blank(fq_read->id, header_len, header_id);
+	//char *header_match = (char *)malloc(sizeof(char)*header_len);	
+	//memcpy(header_match, header_id, header_len);
 
 	//printf("SCORE: %i\n", );
 
@@ -5383,9 +5386,9 @@ int apply_sw_rna(sw_server_input_t* input_p, batch_t *batch) {
 	}
 
 	alignment = alignment_new();
-	alignment_init_single_end(header_match/*strdup(header_id)*/, 
-				  strdup(query),//match_seq
-				  strdup(quality),//match_qual
+	alignment_init_single_end(strdup(fq_read->id),
+				  strdup(query),
+				  strdup(quality),
 				  first_cal->strand, first_cal->chromosome_id - 1, start_mapping - 1,
 				  strdup(new_cigar_code_string(cigar_code)),//strdup(cigar_fake)
 				  cigar_code_get_num_ops(cigar_code),//1
@@ -5433,10 +5436,10 @@ int apply_sw_rna(sw_server_input_t* input_p, batch_t *batch) {
 	  array_list_insert(meta_alignment, mapping_batch->mapping_lists[i]);
 	}
 
-	pthread_mutex_lock(&mutex_sp);
-	extern size_t w3_r;
-	w3_r++;
-	pthread_mutex_unlock(&mutex_sp);
+	//pthread_mutex_lock(&mutex_sp);
+	//extern size_t w3_r;
+	//w3_r++;
+	//pthread_mutex_unlock(&mutex_sp);
 
 	//array_list_clear(meta_alignments_list[i], NULL);
 	//pthread_mutex_lock(&mutex_sp);
@@ -5549,18 +5552,18 @@ int apply_sw_rna(sw_server_input_t* input_p, batch_t *batch) {
       }
 
       array_list_free(meta_alignments_list[i], NULL);
-      if (rev_comp[i]) { free(rev_comp[i]); }
+      //if (rev_comp[i]) { free(rev_comp[i]); }
       free(scores_ranking[i]);
 
       array_list_free(meta_alignments_list[i + 1], NULL);
-      if (rev_comp[i + 1]) { free(rev_comp[i + 1]); }
+      //if (rev_comp[i + 1]) { free(rev_comp[i + 1]); }
       free(scores_ranking[i + 1]);
 
       if (post_process_reads[i] == 1 || post_process_reads[i + 1] == 1) {
-	pthread_mutex_lock(&mutex_sp);
-	extern size_t tot_reads_out;
-	tot_reads_out += 2;
-	pthread_mutex_unlock(&mutex_sp);
+	//pthread_mutex_lock(&mutex_sp);
+	//extern size_t tot_reads_out;
+	//tot_reads_out += 2;
+	//pthread_mutex_unlock(&mutex_sp);
 
 	fastq_read_free(fq_read0);
 	array_list_free(mapping_batch->mapping_lists[i], NULL);
@@ -5568,10 +5571,10 @@ int apply_sw_rna(sw_server_input_t* input_p, batch_t *batch) {
 	fastq_read_free(fq_read1);
 	array_list_free(mapping_batch->mapping_lists[i + 1], NULL);
       } else {
-	pthread_mutex_lock(&mutex_sp);
-	extern size_t tot_reads_in;
-	tot_reads_in += 2;
-	pthread_mutex_unlock(&mutex_sp);
+	//pthread_mutex_lock(&mutex_sp);
+	//extern size_t tot_reads_in;
+	//tot_reads_in += 2;
+	//pthread_mutex_unlock(&mutex_sp);
 
 	array_list_set_flag(1, mapping_batch->mapping_lists[i]);
 	mapping_batch->mapping_lists[num_new_reads++] = mapping_batch->mapping_lists[i];
@@ -5586,7 +5589,7 @@ int apply_sw_rna(sw_server_input_t* input_p, batch_t *batch) {
     //Single end mode
     for (i = 0; i < num_reads; i++) {
       array_list_free(meta_alignments_list[i], NULL);
-      if (rev_comp[i]) { free(rev_comp[i]); }
+      //if (rev_comp[i]) { free(rev_comp[i]); }
       free(scores_ranking[i]);
 
       fq_read = array_list_get(i, mapping_batch->fq_batch);      
@@ -5634,7 +5637,7 @@ int apply_sw_rna(sw_server_input_t* input_p, batch_t *batch) {
 
   
   free(meta_alignments_list);
-  free(rev_comp);
+  //free(rev_comp);
 
   LOG_DEBUG("========= SPLICE JUNCTION SEARCH END =========\n");
 
@@ -5687,7 +5690,7 @@ int apply_rna_last(sw_server_input_t* input_p, batch_t *batch) {
   char q[2048];
   char r[2048];
 
-  char **rev_comp = (char **)calloc(num_reads, sizeof(char *));
+  //char **rev_comp = (char **)calloc(num_reads, sizeof(char *));
 
   //fusion_coords_t *extrem_coords[2*40*num_reads];
   //fusion_coords_t *sp_coords[2*40*num_reads];
@@ -5830,12 +5833,13 @@ int apply_rna_last(sw_server_input_t* input_p, batch_t *batch) {
       cigar_code_res = NULL;
       make_seeds = 0;
       if (cal->strand == 1) {
-	if (!rev_comp[i]) {
-	  rev_comp[i] = (char *) calloc(fq_read->length + 1, sizeof(char));
-	  strcpy(rev_comp[i], fq_read->sequence);
-	  seq_reverse_complementary(rev_comp[i], fq_read->length);
-	}
-	query_map = rev_comp[i];
+	//if (!rev_comp[i]) {
+	//rev_comp[i] = (char *) calloc(fq_read->length + 1, sizeof(char));
+	//strcpy(rev_comp[i], fq_read->sequence);
+	//seq_reverse_complementary(rev_comp[i], fq_read->length);
+	//}
+	//query_map = rev_comp[i];
+	query_map = fq_read->revcomp;
       } else {
 	query_map = fq_read->sequence;
       }
@@ -5890,7 +5894,6 @@ int apply_rna_last(sw_server_input_t* input_p, batch_t *batch) {
     if (array_list_size(meta_alignments_list[i]) <= 0) {	
       //Make Seeding and Caling
       array_list_clear(mapping_batch->mapping_lists[i], (void*)cal_free);
-
       //array_list_clear(cals_list, NULL);
       array_list_t *new_cals_list = mapping_batch->mapping_lists[i];
       //int seed_size = 16;
@@ -6056,12 +6059,13 @@ int apply_rna_last(sw_server_input_t* input_p, batch_t *batch) {
 	  first_cal = array_list_get(0, fusion_list);
 	  last_cal = array_list_get(array_list_size(fusion_list) - 1, fusion_list);
 	  if (first_cal->strand == 1) {
-	    if (!rev_comp[i]) {
-	      rev_comp[i] = (char *) calloc(fq_read->length + 1, sizeof(char));
-	      strcpy(rev_comp[i], fq_read->sequence);
-	      seq_reverse_complementary(rev_comp[i], fq_read->length);
-	    }
-	    query_map = rev_comp[i];
+	    //if (!rev_comp[i]) {
+	    //rev_comp[i] = (char *) calloc(fq_read->length + 1, sizeof(char));
+	    //strcpy(rev_comp[i], fq_read->sequence);
+	    //seq_reverse_complementary(rev_comp[i], fq_read->length);
+	    //}
+	    //query_map = rev_comp[i];
+	    query_map = fq_read->revcomp;
 	  } else {
 	    query_map = fq_read->sequence;
 	  }
@@ -6210,7 +6214,7 @@ int apply_rna_last(sw_server_input_t* input_p, batch_t *batch) {
     }
   
     array_list_clear(mapping_batch->mapping_lists[i], (void*)NULL);
-	
+
     //printf("::::AFTER CALS %i\n", num_process);
     //stop_timer(t_start, t_end, time_s);
     //extern double seeding_time_2;
@@ -6392,7 +6396,8 @@ int apply_rna_last(sw_server_input_t* input_p, batch_t *batch) {
 	  int h_right = (fq_read->length - 1) - s_next->read_end;
 	    
 	  if (first_cal->strand == 1) {
-	    query_map = rev_comp[i];
+	    //query_map = rev_comp[i];
+	    query_map = fq_read->revcomp;
 	  } else {
 	    query_map = fq_read->sequence;
 	  }
@@ -6460,12 +6465,12 @@ int apply_rna_last(sw_server_input_t* input_p, batch_t *batch) {
 	  //fprintf(stderr, "* * * (%i) M E T A    A L I G N M E N T    R E P O R T    %s* * *\n", strlen(query), new_cigar_code_string(cigar_code));
 	  alignment = alignment_new();
 	    
-	  int header_len = strlen(fq_read->id); 
-	  char header_id[header_len + 1];
-	  get_to_first_blank(fq_read->id, header_len, header_id);
-	  char *header_match = (char *)malloc(sizeof(char)*header_len);
-	  if (header_match == NULL) { exit(-1); }
-	  memcpy(header_match, header_id, header_len);
+	  //int header_len = strlen(fq_read->id); 
+	  //char header_id[header_len + 1];
+	  //get_to_first_blank(fq_read->id, header_len, header_id);
+	  //char *header_match = (char *)malloc(sizeof(char)*header_len);
+	  //if (header_match == NULL) { exit(-1); }
+	  //memcpy(header_match, header_id, header_len);
 
 	  //float score_tmp = len_read * 0.5 - cigar_code->distance * 0.4;
 	  //int score_map = (int)(score_tmp * 254) / (len_read * 0.5);
@@ -6490,7 +6495,7 @@ int apply_rna_last(sw_server_input_t* input_p, batch_t *batch) {
 	    //fprintf(stderr, "META ALIGNMENT REPORT %i: %s\n", m, new_cigar_code_string(cigar_code));
 	    //printf("WK_2ph: * * * M E T A    A L I G N M E N T    R E P O R T  [%i:%lu]  %s* * *\n", 
 	    //	   first_cal->chromosome_id, first_cal->start, new_cigar_code_string(cigar_code));
-	  alignment_init_single_end(header_match, 
+	  alignment_init_single_end(strdup(fq_read->id),
 				    strdup(query)/*match_seq*/,
 				    strdup(quality)/*match_qual*/,
 				    first_cal->strand, first_cal->chromosome_id - 1, start_mapping - 1,
@@ -6640,18 +6645,18 @@ int apply_rna_last(sw_server_input_t* input_p, batch_t *batch) {
       }
 
       array_list_free(meta_alignments_list[i], NULL);
-      if (rev_comp[i]) { free(rev_comp[i]); }
+      //if (rev_comp[i]) { free(rev_comp[i]); }
       free(scores_ranking[i]);
 
       array_list_free(meta_alignments_list[i + 1], NULL);
-      if (rev_comp[i + 1]) { free(rev_comp[i + 1]); }
+      //if (rev_comp[i + 1]) { free(rev_comp[i + 1]); }
       free(scores_ranking[i + 1]);
 
       if (post_process_reads[i] == 1 || post_process_reads[i + 1] == 1) {
-	pthread_mutex_lock(&mutex_sp);
-	extern size_t tot_reads_out;
-	tot_reads_out += 2;
-	pthread_mutex_unlock(&mutex_sp);
+	//pthread_mutex_lock(&mutex_sp);
+	//extern size_t tot_reads_out;
+	//tot_reads_out += 2;
+	//pthread_mutex_unlock(&mutex_sp);
 
 	fastq_read_free(fq_read0);
 	array_list_free(mapping_batch->mapping_lists[i], NULL);
@@ -6659,10 +6664,10 @@ int apply_rna_last(sw_server_input_t* input_p, batch_t *batch) {
 	fastq_read_free(fq_read1);
 	array_list_free(mapping_batch->mapping_lists[i + 1], NULL);
       } else {
-	pthread_mutex_lock(&mutex_sp);
-	extern size_t tot_reads_in;
-	tot_reads_in += 2;
-	pthread_mutex_unlock(&mutex_sp);
+	//pthread_mutex_lock(&mutex_sp);
+	//extern size_t tot_reads_in;
+	//tot_reads_in += 2;
+	//pthread_mutex_unlock(&mutex_sp);
 
 	array_list_set_flag(1, mapping_batch->mapping_lists[i]);
 	mapping_batch->mapping_lists[num_new_reads++] = mapping_batch->mapping_lists[i];
@@ -6677,7 +6682,7 @@ int apply_rna_last(sw_server_input_t* input_p, batch_t *batch) {
     //Single end mode
     for (i = 0; i < num_reads; i++) {
       array_list_free(meta_alignments_list[i], NULL);
-      if (rev_comp[i]) { free(rev_comp[i]); }
+      //if (rev_comp[i]) { free(rev_comp[i]); }
       free(scores_ranking[i]);
 
       fq_read = array_list_get(i, mapping_batch->fq_batch);      
@@ -6728,7 +6733,7 @@ int apply_rna_last(sw_server_input_t* input_p, batch_t *batch) {
   free(scores_ranking);
   //array_list_free(cals_targets, NULL);
   free(meta_alignments_list);
-  free(rev_comp);
+  //free(rev_comp);
 
   //============================= Delete!!! ===============================
   //For debug... Validate Reads
@@ -6859,7 +6864,7 @@ int apply_rna_last_hc(sw_server_input_t* input_p, batch_t *batch) {
   char q[2048];
   char r[2048];
 
-  char **rev_comp = (char **)calloc(num_reads, sizeof(char *));
+  //char **rev_comp = (char **)calloc(num_reads, sizeof(char *));
   /*
   fusion_coords_t *extrem_coords[2*40*mapping_batch->num_allocated_targets];
   fusion_coords_t *sp_coords[2*40*mapping_batch->num_allocated_targets];
@@ -6937,10 +6942,10 @@ int apply_rna_last_hc(sw_server_input_t* input_p, batch_t *batch) {
   int read_nt;
   int seed_size = cal_optarg->seed_size;
 
-  pthread_mutex_lock(&mutex_sp);
-  extern size_t tot_reads_in;
-  tot_reads_in += num_reads;
-  pthread_mutex_unlock(&mutex_sp);
+  //pthread_mutex_lock(&mutex_sp);
+  //extern size_t tot_reads_in;
+  //tot_reads_in += num_reads;
+  //pthread_mutex_unlock(&mutex_sp);
   
   //Convert CALs in META_ALIGNMENTS 
   for (int i = 0; i < num_reads; i++) {
@@ -6964,12 +6969,13 @@ int apply_rna_last_hc(sw_server_input_t* input_p, batch_t *batch) {
       //cal_print(last_cal);
 
       if (first_cal->strand == 1) {
-	if (!rev_comp[i]) {
-	  rev_comp[i] = (char *) calloc(fq_read->length + 1, sizeof(char));
-	  strcpy(rev_comp[i], fq_read->sequence);
-	  seq_reverse_complementary(rev_comp[i], fq_read->length);
-	}
-	query_map = rev_comp[i];
+	//if (!rev_comp[i]) {
+	//rev_comp[i] = (char *) calloc(fq_read->length + 1, sizeof(char));
+	//strcpy(rev_comp[i], fq_read->sequence);
+	//seq_reverse_complementary(rev_comp[i], fq_read->length);
+	//}
+	query_map = fq_read->revcomp;
+	//query_map = rev_comp[i];
       } else {
 	query_map = fq_read->sequence;
       }
@@ -7189,12 +7195,13 @@ int apply_rna_last_hc(sw_server_input_t* input_p, batch_t *batch) {
       
       first_cal = meta_alignment_get_first_cal(meta_alignment);
       if (first_cal->strand == 1) {
-	if (!rev_comp[i]) {
-	  rev_comp[i] = (char *) calloc(fq_read->length + 1, sizeof(char));
-	  strcpy(rev_comp[i], fq_read->sequence);
-	  seq_reverse_complementary(rev_comp[i], fq_read->length);
-	}
-	query_map = rev_comp[i];
+	//if (!rev_comp[i]) {
+	//rev_comp[i] = (char *) calloc(fq_read->length + 1, sizeof(char));
+	//strcpy(rev_comp[i], fq_read->sequence);
+	//seq_reverse_complementary(rev_comp[i], fq_read->length);
+	//}
+	query_map = fq_read->revcomp;
+	//query_map = rev_comp[i];
       } else {
 	query_map = fq_read->sequence;
       }
@@ -7269,7 +7276,8 @@ int apply_rna_last_hc(sw_server_input_t* input_p, batch_t *batch) {
 
 
       if (first_cal->strand == 1) {
-	query_map = rev_comp[i];
+	//query_map = rev_comp[i];
+	query_map = fq_read->revcomp;
       } else {
 	query_map = fq_read->sequence;
       }
@@ -7317,12 +7325,12 @@ int apply_rna_last_hc(sw_server_input_t* input_p, batch_t *batch) {
       //fprintf(stderr, "* * * (%i) M E T A    A L I G N M E N T    R E P O R T    %s* * *\n", strlen(query), new_cigar_code_string(cigar_code));
       alignment = alignment_new();
 	
-      int  header_len = strlen(fq_read->id); 
-      char header_id[header_len + 1];
-      get_to_first_blank(fq_read->id, header_len, header_id);
-      char *header_match = (char *)malloc(sizeof(char)*header_len);
-      if (header_match == NULL) { exit(-1); }
-      memcpy(header_match, header_id, header_len);
+      //int  header_len = strlen(fq_read->id); 
+      //char header_id[header_len + 1];
+      //get_to_first_blank(fq_read->id, header_len, header_id);
+      //char *header_match = (char *)malloc(sizeof(char)*header_len);
+      //if (header_match == NULL) { exit(-1); }
+      //memcpy(header_match, header_id, header_len);
 		
       memcpy(query, &query_map[h_left], len_read);
       query[len_read] = '\0';
@@ -7347,7 +7355,7 @@ int apply_rna_last_hc(sw_server_input_t* input_p, batch_t *batch) {
         pthread_mutex_unlock(&mutex_sp);
       */
 
-      alignment_init_single_end(header_match, 
+      alignment_init_single_end(strdup(fq_read->id),
 				strdup(query)/*match_seq*/,
 				strdup(quality)/*match_qual*/,
 				first_cal->strand, first_cal->chromosome_id - 1, start_mapping - 1,
@@ -7401,11 +7409,11 @@ int apply_rna_last_hc(sw_server_input_t* input_p, batch_t *batch) {
       alignment->optional_fields_length = optional_fields_length;
       alignment->optional_fields = optional_fields;
     }
-    if (rev_comp[i]) { free(rev_comp[i]); }
+    //if (rev_comp[i]) { free(rev_comp[i]); }
   }
 
   sw_multi_output_free(output);
-  free(rev_comp);
+  //free(rev_comp);
   
   return LAST_RNA_POST_PAIR_STAGE;
   

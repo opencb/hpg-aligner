@@ -16,6 +16,7 @@
 #include "commons/log.h"
 #include "commons/system_utils.h"
 #include "commons/file_utils.h"
+#include "buffers.h"
 
 //============================ DEFAULT VALUES ============================
 #define DEFAULT_GPU_THREADS		32
@@ -50,9 +51,9 @@
 #define DEFAULT_FILTER_SEED_MAPPINGS_BS 500
 //=====================================================================
 
-#define DNA_MODE 0
-#define RNA_MODE 1
-#define BS_MODE  2
+//#define DNA_MODE 0
+//#define RNA_MODE 1
+//#define BS_MODE  2
 
 #define NUM_OPTIONS			26
 #define NUM_RNA_OPTIONS			 5

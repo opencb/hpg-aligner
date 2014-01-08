@@ -373,7 +373,6 @@ int apply_bwt_rna(bwt_server_input_t* input, batch_t *batch) {
 					input->bwt_optarg_p,
 					input->bwt_index_p,
 					list);
-
     if (array_list_get_flag(list) != 2) { //If flag 2, the read exceded the max number of mappings
       if (array_list_get_flag(list) == 1) {
 	if (num_mappings > 0) {
@@ -460,7 +459,7 @@ int apply_bwt_bs(bwt_server_input_t* input, batch_t *batch) {
   struct timeval start, end;
   double time;
   
-  if (time_on) { start_timer(start); }
+  //if (time_on) { start_timer(start); }
 
   mapping_batch_t *mapping_batch = batch->mapping_batch;
   // bs variables
@@ -692,7 +691,7 @@ int apply_bwt_bs(bwt_server_input_t* input, batch_t *batch) {
   //revert_mappings_seqs(mapping_batch->mapping_lists,  mapping_batch->fq_batch);
   //revert_mappings_seqs(mapping_batch->mapping_lists2, mapping_batch->fq_batch);
 
-  if (time_on) { stop_timer(start, end, time); timing_add(time, BWT_SERVER, timing); }
+  //if (time_on) { stop_timer(start, end, time); timing_add(time, BWT_SERVER, timing); }
   
   //printf("APPLY BWT SERVER DONE!\n");
   //return CONSUMER_STAGE;

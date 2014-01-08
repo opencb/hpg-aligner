@@ -1,57 +1,57 @@
-#include <stdio.h>
-#include <stdlib.h>
-
-#include "commons/workflow_scheduler.h"
-#include "bioformats/bam/bam_file.h"
-
-#include "batch_writer.h"
-
-#include "dna/commons.h"
-#include "dna/doscadfun.h"
-
-#include "sa/sa_index3.h"
-#include "sa/sa_search.h"
-
-#include "dna/sa_io_stages.h"
-#include "dna/sa_mapper_stage.h"
-
+#include "dna_aligner.h"
 //--------------------------------------------------------------------
+<<<<<<< HEAD
+=======
 
-#define MISMATCH_PERC 0.10f
-
-#define MAX_NUM_MISMATCHES   4
-#define MAX_NUM_SUFFIXES   2000
-
-//--------------------------------------------------------------------
-
-//--------------------------------------------------------------------
-
-
-//--------------------------------------------------------------------
+#ifdef _VERBOSE
+extern int num_dup_reads;
+extern int num_total_dup_reads;
+#endif
+>>>>>>> new-seeding
 
 //--------------------------------------------------------------------
 // main 
 //--------------------------------------------------------------------
 
 void dna_aligner(options_t *options) {
-  if (argc != 6) {
-    printf("Usage: %s <sa-dirname> <fastq-filename> <output-filename-bam-or-sam> <batch-size> <num-threads>\n", argv[0]);
-    exit(-1);
-  }
-
   #ifdef _TIMING
+  init_func_names();
   for (int i = 0; i < NUM_TIMING; i++) {
     func_times[i] = 0;
   }
   #endif
 
-  char *sa_dirname = argv[1];
-  char *fastq_filename = argv[2];
-  char *bam_filename = argv[3];
-  int batch_size = atoi(argv[4]);
-  int num_threads = atoi(argv[5]);
+<<<<<<< HEAD
+  char *sa_dirname = options->bwt_dirname;
+  char *fastq_filename = options->in_filename;
+  char *bam_filename = options->output_name;
+  int batch_size = options->batch_size;
+  int num_threads = options->num_cpu_threads;
+=======
+  // set input parameters
+  char *sa_dirname = options->bwt_dirname;
+  char *fastq_filename = options->in_filename;
+  int batch_size = options->batch_size;
+  int num_threads = options->num_cpu_threads;
 
-  genome_t *genome = NULL;
+  // setting output name
+  int len = 100;
+  if (options->prefix_name) {
+    len += strlen(options->prefix_name);
+  }
+  if (options->output_name) {
+    len += strlen(options->output_name);
+  }
+  char sam_filename[len];
+  sam_filename[0] = 0;
+  strcat(sam_filename, (options->output_name ? options->output_name : "."));
+  strcat(sam_filename, "/");
+  if (options->prefix_name) {
+    strcat(sam_filename, options->prefix_name);
+    strcat(sam_filename, "_");
+  }
+  strcat(sam_filename, "out.sam");
+>>>>>>> new-seeding
 
   // load SA index
   struct timeval stop, start;
@@ -68,17 +68,22 @@ void dna_aligner(options_t *options) {
   fastq_batch_reader_input_t reader_input;
   fastq_batch_reader_input_init(fastq_filename, NULL, 
 				0, batch_size, 
-				NULL, &reader_input);
+				NULL, options->gzip, 
+				&reader_input);
   
   reader_input.fq_file1 = fastq_fopen(fastq_filename);
   reader_input.fq_file2 = NULL;
   
   // preparing output BAM file
   batch_writer_input_t writer_input;
-  batch_writer_input_init(bam_filename, NULL, NULL, NULL, NULL, &writer_input);
+  batch_writer_input_init(sam_filename, NULL, NULL, NULL, NULL, &writer_input);
   
+<<<<<<< HEAD
   writer_input.bam_file = (bam_file_t *) fopen(bam_filename, "w");    
-  write_sam_header(sa_index->genome, writer_input.bam_file);
+=======
+  writer_input.bam_file = (bam_file_t *) fopen(sam_filename, "w");    
+>>>>>>> new-seeding
+  write_sam_header(sa_index->genome, (FILE *) writer_input.bam_file);
   
   //--------------------------------------------------------------------------------------
   // workflow management
