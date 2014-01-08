@@ -650,6 +650,23 @@ alig_bam_list_realign(array_list_t *bam_list, array_list_t *haplotype_list, geno
 					//printf("Ref*: %s\n", read_seq_ref);
 				}*/
 			}
+
+			//Get best haplotype
+			//TODO
+
+			//Iterate bams to change its CIGARS
+			for(j = 0; j < array_list_size(haplotype_list); j++)
+			{
+				//Change CIGAR
+				//TODO
+			}
+		}
+		else
+		{
+			//Match reference so this read will be written with reference CIGAR
+
+			//Change read CIGAR
+			//TODO
 		}
 	}
 
