@@ -14,7 +14,7 @@ uint64_t cigar_changed = 0;
  */
 
 ERROR_CODE
-alig_bam_file2(char *bam_path, char *ref_name, char *ref_path)
+alig_bam_file(char *bam_path, char *ref_name, char *ref_path)
 {
 	bam_file_t *bam_f = NULL;
 	bam_file_t *out_bam_f = NULL;
