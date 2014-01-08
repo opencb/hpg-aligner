@@ -193,7 +193,7 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path)
 		bam_read = bam_init1();
 		bytes = bam_read1(bam_f->bam_fd, bam_read);
 
-		//If write list is big enought and process list is empty: write to disk
+		//If write list is big enough and process list is empty: write to disk
 		if(array_list_size(write_list) > ALIG_LIST_COUNT_THRESHOLD_TO_WRITE
 				&& array_list_size(process_list) == 0)
 		{
@@ -395,6 +395,7 @@ alig_bam_list(array_list_t *bam_list, genome_t* ref)
 		char cigar_str[20];
 		aux_indel_t *indel_aux;
 
+		printf("===========================\n");
 		printf("Align %d reads\n", array_list_size(bam_list));
 		printf("%d haplotypes\n", array_list_size(haplo_list));
 		for(i = 0; i < array_list_size(haplo_list); i++)
@@ -414,7 +415,7 @@ alig_bam_list(array_list_t *bam_list, genome_t* ref)
 	{
 		if(cond)
 		{
-			printf("Press...\n");
+			printf("Press to continue...\n");
 			getchar();
 		}
 	}
@@ -568,21 +569,21 @@ alig_bam_list_realign(array_list_t *bam_list, array_list_t *haplotype_list, geno
 			char erase_str[200];
 			size_t disp;
 			cigar32_to_string(bam1_cigar(read), read->core.n_cigar, erase_str);
-			printf("====================\n", bam1_qname(read));
+			printf("---------\n", bam1_qname(read));
 			printf("Test %s - %d:%d - %s\n", bam1_qname(read), read->core.tid + 1, read->core.pos + 1, erase_str);
 			printf("---------\n");
 			cigar32_count_clip_displacement(comp_cigar, comp_cigar_l, &disp);
 			cigar32_to_string(comp_cigar, comp_cigar_l, erase_str);
 			printf("Test with reference === MISS: %d - Using CIGAR: %s\n", ref_miss[i], erase_str);
-			memcpy(erase_str, ref_seq + read_disp_ref, sizeof(char) * read->core.l_qseq);
-			erase_str[read->core.l_qseq] = '\0';
-			printf("Ref : ");
-			for(int z = 0; z < disp; z++) printf(" ");
-			printf("%s\n", erase_str);
-			memcpy(erase_str, read_seq, sizeof(char) * read->core.l_qseq);
-			erase_str[read->core.l_qseq] = '\0';
-			printf("Read: %s\n", erase_str);
-			printf("Ref*: %s\n", read_seq_ref);
+			//memcpy(erase_str, ref_seq + read_disp_ref, sizeof(char) * read->core.l_qseq);
+			//erase_str[read->core.l_qseq] = '\0';
+			//printf("Ref : ");
+			//for(int z = 0; z < disp; z++) printf(" ");
+			//printf("%s\n", erase_str);
+			//memcpy(erase_str, read_seq, sizeof(char) * read->core.l_qseq);
+			//erase_str[read->core.l_qseq] = '\0';
+			//printf("Read: %s\n", erase_str);
+			//printf("Ref*: %s\n", read_seq_ref);
 			//cigar32_to_string(&indel_aux->indel, 1, cigar_str);
 		}
 
@@ -599,11 +600,11 @@ alig_bam_list_realign(array_list_t *bam_list, array_list_t *haplotype_list, geno
 				//Create cigar for this haplotype
 				cigar32_from_haplo(bam1_cigar(read), read->core.n_cigar, haplo, read->core.pos, comp_cigar, &comp_cigar_l);
 
-				char cigar_str[50];
-				printf("---------\n");
+
+				//printf("---------\n");
 				//printf("Orig CIGAR: %s\n", cigar_str);
-				cigar32_to_string(comp_cigar, comp_cigar_l, cigar_str);
-				printf("Comp CIGAR: %s\n", cigar_str);
+
+				//printf("Comp CIGAR: %s\n", cigar_str);
 
 				//Get haplotype reference transform
 				cigar32_create_ref(comp_cigar, comp_cigar_l, ref_seq + read_disp_ref, ref_length - read_disp_ref, read_seq, read->core.l_qseq, read_seq_ref, &read_seq_ref_l);
@@ -613,19 +614,21 @@ alig_bam_list_realign(array_list_t *bam_list, array_list_t *haplotype_list, geno
 
 				//ERASE Print things
 				{
-					char erase_str[200];
+					char cigar_str[50];
+					//char erase_str[200];
 					size_t disp;
 					cigar32_count_clip_displacement(comp_cigar, comp_cigar_l, &disp);
-					printf("Test with H%d === MISS: %d\n", j, H_miss[i]);
-					memcpy(erase_str, ref_seq + read_disp_ref, sizeof(char) * read->core.l_qseq);
-					erase_str[read->core.l_qseq] = '\0';
-					printf("Ref : ");
-					for(int z = 0; z < disp; z++) printf(" ");
-					printf("%s\n", erase_str);
-					memcpy(erase_str, read_seq, sizeof(char) * read->core.l_qseq);
-					erase_str[read->core.l_qseq] = '\0';
-					printf("Read: %s\n", erase_str);
-					printf("Ref*: %s\n", read_seq_ref);
+					cigar32_to_string(comp_cigar, comp_cigar_l, cigar_str);
+					printf("Test with H%d === MISS: %d - Using CIGAR: %s\n", j+1, H_miss[i], cigar_str);
+					//memcpy(erase_str, ref_seq + read_disp_ref, sizeof(char) * read->core.l_qseq);
+					//erase_str[read->core.l_qseq] = '\0';
+					//printf("Ref : ");
+					//for(int z = 0; z < disp; z++) printf(" ");
+					//printf("%s\n", erase_str);
+					//memcpy(erase_str, read_seq, sizeof(char) * read->core.l_qseq);
+					//erase_str[read->core.l_qseq] = '\0';
+					//printf("Read: %s\n", erase_str);
+					//printf("Ref*: %s\n", read_seq_ref);
 				}
 			}
 		}
