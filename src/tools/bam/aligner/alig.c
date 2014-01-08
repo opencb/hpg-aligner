@@ -256,6 +256,7 @@ alig_bam_list(array_list_t *bam_list, genome_t* ref)
 
 	//Haplotype
 	aux_indel_t *haplo = NULL;
+	aux_indel_t *aux_haplo = NULL;
 
 	//Read
 	bam1_t *read = NULL;
@@ -381,8 +382,23 @@ alig_bam_list(array_list_t *bam_list, genome_t* ref)
 			//Fill haplotype
 			cigar32_get_indels(read->core.pos, clip_cigar, clip_cigar_l, haplo);
 
-			//Add to haplotype list
-			array_list_insert(haplo, haplo_list);
+			//Check if haplotype is present in list
+			aux_haplo = NULL;
+			int h;
+			for(h = 0; h < array_list_size(haplo_list); h++)
+			{
+				aux_haplo = array_list_get(h, haplo_list);
+				assert(aux_haplo);
+				if(aux_haplo->indel == haplo->indel && aux_haplo->ref_pos == haplo->ref_pos)
+					break;
+			}
+
+			//Duplicate?
+			if(h == array_list_size(haplo_list))
+			{
+				//Add to haplotype list
+				array_list_insert(haplo, haplo_list);
+			}
 
 			//Free read
 			free(read_seq);
@@ -569,7 +585,7 @@ alig_bam_list_realign(array_list_t *bam_list, array_list_t *haplotype_list, geno
 			char erase_str[200];
 			size_t disp;
 			cigar32_to_string(bam1_cigar(read), read->core.n_cigar, erase_str);
-			printf("---------\n", bam1_qname(read));
+			printf("---------------------\n", bam1_qname(read));
 			printf("Test %s - %d:%d - %s\n", bam1_qname(read), read->core.tid + 1, read->core.pos + 1, erase_str);
 			printf("---------\n");
 			cigar32_count_clip_displacement(comp_cigar, comp_cigar_l, &disp);
