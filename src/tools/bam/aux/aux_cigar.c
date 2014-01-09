@@ -860,3 +860,47 @@ cigar32_from_haplo(uint32_t *cigar, size_t cigar_l, aux_indel_t *haplo, size_t r
 	return NO_ERROR;
 }
 
+ERROR_CODE
+cigar32_replace(bam1_t *read, uint32_t *cigar, size_t cigar_l)
+{
+	size_t new_data_l;
+	uint8_t *new_data;
+	size_t n_offset;
+	size_t r_offset;
+
+	assert(read);
+	assert(cigar);
+	assert(cigar_l > 0);
+
+	if(cigar_l == read->core.n_cigar)
+	{
+		//Same length so memcpy
+		memcpy(bam1_cigar(read), cigar, read->core.n_cigar * sizeof(uint32_t));
+	}
+	else
+	{
+		//Get new length for bam data
+		new_data_l = (read->data_len - (read->core.n_cigar * sizeof(uint32_t))) + (cigar_l * sizeof(uint32_t));
+
+		//Different length so reallocate
+		new_data = (uint8_t *)malloc(read->m_data * sizeof(uint8_t));
+
+		//Copy contents
+		memcpy(new_data, bam1_qname(read), read->core.l_qname);
+		r_offset = read->core.l_qname;
+		n_offset = read->core.l_qname;
+		memcpy(new_data + n_offset, cigar, cigar_l * sizeof(uint32_t));
+		r_offset += read->core.n_cigar * sizeof(uint32_t);
+		n_offset += cigar_l * sizeof(uint32_t);
+		memcpy(new_data + n_offset, bam1_seq(read), read->data_len - r_offset);
+
+		//Replace data
+		free(read->data);
+		read->data = new_data;
+		read->data_len = new_data_l;
+		read->core.n_cigar = cigar_l;
+	}
+
+	return NO_ERROR;
+}
+

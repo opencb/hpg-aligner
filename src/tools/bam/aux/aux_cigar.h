@@ -48,5 +48,6 @@ EXTERNC ERROR_CODE cigar32_to_string(uint32_t *cigar, size_t cigar_l, char* str_
 EXTERNC ERROR_CODE cigar32_create_ref(uint32_t *cigar, size_t cigar_l, char *ref, size_t ref_l, char *read, size_t read_l, char *new_ref, size_t *new_ref_l);
 EXTERNC ERROR_CODE cigar32_get_indels(size_t ref_pos, uint32_t *cigar, size_t cigar_l, aux_indel_t *out_indels);
 EXTERNC ERROR_CODE cigar32_from_haplo(uint32_t *cigar, size_t cigar_l, aux_indel_t *haplo, size_t read_pos, uint32_t *new_cigar, size_t *new_cigar_l);
+EXTERNC ERROR_CODE cigar32_replace(bam1_t *read, uint32_t *cigar, size_t cigar_l);
 
 #endif /* AUX_CIGAR_H_ */
