@@ -3,10 +3,6 @@
 bioinfo_path = '#lib/hpg-libs/bioinfo-libs'
 commons_path = '#lib/hpg-libs/common-libs'
 #math_path = '#libs/math'
-bam_path = "#src/tools/bam"
-aux_path = "#src/tools/bam/aux"
-recal_path = "#src/tools/bam/recalibrate"
-alig_path = "#src/tools/bam/aligner"
 
 vars = Variables('buildvars.py')
 
@@ -16,7 +12,7 @@ env = Environment(tools = ['default', 'packaging'],
       		  CC = compiler,
                   variables = vars,
                   CFLAGS = '-std=c99 -D_XOPEN_SOURCE=600 -D_GNU_SOURCE -fopenmp',
-                  CPPPATH = ['#', '#src', bam_path, bioinfo_path, commons_path, "%s/commons/argtable" % commons_path, "%s/commons/config" % commons_path ],
+                  CPPPATH = ['#', '#src', '#src/tools/bam', bioinfo_path, commons_path, "%s/commons/argtable" % commons_path, "%s/commons/config" % commons_path ],
                   LIBPATH = [commons_path, bioinfo_path],
                   LIBS = ['m', 'z', 'curl'],
                   LINKFLAGS = ['-fopenmp'])
@@ -42,23 +38,23 @@ SConscript(['%s/SConscript' % bioinfo_path,
             '%s/SConscript' % commons_path
             ], exports = ['env', 'debug', 'compiler'])
 
-env.Program('#bin/hpg-aligner',
-             source = [Glob('src/*.c'),
-		       Glob('src/build-index/*.c'),
-		       Glob('src/dna/*.c'),
-	               Glob('src/rna/*.c'),
-	               Glob('src/bs/*.c'),
-	               Glob('src/sa/*.c'),
-		       "%s/libcommon.a" % commons_path,
-		       "%s/libbioinfo.a" % bioinfo_path
-                      ]
-           )
+#env.Program('#bin/hpg-aligner',
+#             source = [Glob('src/*.c'),
+#		       Glob('src/build-index/*.c'),
+#		       Glob('src/dna/*.c'),
+#	               Glob('src/rna/*.c'),
+#	               Glob('src/bs/*.c'),
+#	               Glob('src/sa/*.c'),
+#		       "%s/libcommon.a" % commons_path,
+#		       "%s/libbioinfo.a" % bioinfo_path
+#                      ]
+#           )
 
 env.Program('#bin/hpg-bam',
              source = [Glob('src/tools/bam/*.c'), 
-	     	       Glob('%s/*.c' % aux_path),
-	     	       Glob('%s/*.c' % recal_path),
-	     	       Glob('%s/*.c' % alig_path),
+	     	       Glob('src/tools/bam/aux/*.c'),
+	     	       Glob('src/tools/bam/recalibrate/*.c'),
+	     	       Glob('src/tools/bam/aligner/*.c'),
                        "%s/libbioinfo.a" % bioinfo_path,
                        "%s/libcommon.a" % commons_path
                       ]
