@@ -409,7 +409,7 @@ alig_bam_list(array_list_t *bam_list, genome_t* ref)
 	}
 
 	//ERASE
-	if(array_list_size(haplo_list))
+	/*if(array_list_size(haplo_list))
 	{
 		char cigar_str[20];
 		aux_indel_t *indel_aux;
@@ -424,7 +424,7 @@ alig_bam_list(array_list_t *bam_list, genome_t* ref)
 			cigar32_to_string(&indel_aux->indel, 1, cigar_str);
 			printf("H%d: %s === Pos -> %d:%d\n", i + 1, cigar_str, read->core.tid, indel_aux->ref_pos);
 		}
-	}
+	}*/
 
 	//Indel local realignment
 	alig_bam_list_realign(bam_list, haplo_list, ref);
@@ -502,11 +502,16 @@ alig_bam_list_realign(array_list_t *bam_list, array_list_t *haplotype_list, geno
 	//Comparation
 	char *comp_aux = NULL;
 	uint32_t comp_cigar[MAX_CIGAR_LENGTH];
+	uint32_t comp_cigar2[MAX_CIGAR_LENGTH];
 	size_t comp_cigar_l;
+	size_t comp_cigar_l2;
 	size_t bases;
 	uint32_t score = 0;
+	uint32_t score2 = 0;
 	uint32_t best_score;
 	size_t best_haplo_index;
+	uint32_t miss;
+	uint32_t miss2;
 
 	//Haplotype
 	aux_indel_t *haplo;
@@ -571,13 +576,13 @@ alig_bam_list_realign(array_list_t *bam_list, array_list_t *haplotype_list, geno
 		read_disp_ref = read->core.pos - ref_pos_begin;
 
 		//ERASE Print things
-		{
+		/*{
 			char erase_str[200];
 			size_t disp;
 			cigar32_to_string(bam1_cigar(read), read->core.n_cigar, erase_str);
 			printf("---------------------\n");
 			printf("Test %s - %d:%d - %s\n", bam1_qname(read), read->core.tid + 1, read->core.pos + 1, erase_str);
-		}
+		}*/
 
 		//Iterate haplotypes
 		for(j = 0; j < array_list_size(haplotype_list); j++)
@@ -593,28 +598,29 @@ alig_bam_list_realign(array_list_t *bam_list, array_list_t *haplotype_list, geno
 			cigar32_create_ref(comp_cigar, comp_cigar_l, ref_seq + read_disp_ref, ref_length - read_disp_ref, read_seq, read->core.l_qseq, read_seq_ref, &read_seq_ref_l);
 
 			//Compare and miss with haplotype
-			nucleotide_compare(read_seq, read_seq_ref, read_seq_ref_l, comp_aux, &score);
+			nucleotide_compare(read_seq, read_seq_ref, read_seq_ref_l, comp_aux, &miss);
 
 			//Calculate H miss score
-			if(score)
+			score = 0;
+			if(miss)
 			{
 				int z;
-				score = 0;
 				for(z = 0; z < read_seq_ref_l; z++)
 				{
-					score += comp_aux[z] & read_quals[z];
+					if(comp_aux[z] == 0)
+						score += read_quals[z];
 				}
+				H_miss[j] += score;
 			}
-			H_miss[j] += score;
 
 			//ERASE Print things
-			{
+			/*{
 				char cigar_str[50];
 				//char erase_str[200];
 				size_t disp;
 				cigar32_count_clip_displacement(comp_cigar, comp_cigar_l, &disp);
 				cigar32_to_string(comp_cigar, comp_cigar_l, cigar_str);
-				printf("H%d === MISS SCORE: %d - Using CIGAR: %s\n", j+1, score, cigar_str);
+				printf("H%d === MISS SCORE: %d:%d - Using CIGAR: %s\n", j+1, score, miss, cigar_str);
 				//memcpy(erase_str, ref_seq + read_disp_ref, sizeof(char) * read->core.l_qseq);
 				//erase_str[read->core.l_qseq] = '\0';
 				//printf("Ref : ");
@@ -624,7 +630,7 @@ alig_bam_list_realign(array_list_t *bam_list, array_list_t *haplotype_list, geno
 				//erase_str[read->core.l_qseq] = '\0';
 				//printf("Read: %s\n", erase_str);
 				//printf("Ref*: %s\n", read_seq_ref);
-			}
+			}*/
 		}
 
 		//Free
@@ -633,7 +639,7 @@ alig_bam_list_realign(array_list_t *bam_list, array_list_t *haplotype_list, geno
 	}
 
 	//Get best haplotype
-	printf("---------------------\n");
+	//printf("---------------------\n");
 	best_score = UINT32_MAX;
 	for(j = 0; j < array_list_size(haplotype_list); j++)
 	{
@@ -646,7 +652,7 @@ alig_bam_list_realign(array_list_t *bam_list, array_list_t *haplotype_list, geno
 		//ERASE
 		{
 			//Print haplotype score
-			printf("H%d === total score = %d\n", j + 1, H_miss[j]);
+			//printf("H%d === total score = %d\n", j + 1, H_miss[j]);
 		}
 	}
 	haplo = array_list_get(best_haplo_index, haplotype_list);
@@ -687,39 +693,40 @@ alig_bam_list_realign(array_list_t *bam_list, array_list_t *haplotype_list, geno
 			cigar32_create_ref(comp_cigar, comp_cigar_l, ref_seq + read_disp_ref, ref_length - read_disp_ref, read_seq, read->core.l_qseq, read_seq_ref, &read_seq_ref_l);
 
 			//Test with reference
-			nucleotide_compare(read_seq, read_seq_ref, read_seq_ref_l, comp_aux, &score);
+			nucleotide_compare(read_seq, read_seq_ref, read_seq_ref_l, comp_aux, &miss);
 		}
 
 		//Dont match reference perfectly?
-		if(score)
+		if(miss)
 		{
 			//Calculate reference haplotype score
 			score = 0;
 			for(j = 0; j < read_seq_ref_l; j++)
 			{
-				score += comp_aux[j] & read_quals[j];
+				if(comp_aux[j] == 0)
+					score += read_quals[j];
 			}
 
 			//Calculate alternative haplotype score
-			uint32_t score2;
 			{
 				//Create cigar for this haplotype
-				cigar32_from_haplo(bam1_cigar(read), read->core.n_cigar, haplo, read->core.pos, comp_cigar, &comp_cigar_l);
+				cigar32_from_haplo(bam1_cigar(read), read->core.n_cigar, haplo, read->core.pos, comp_cigar2, &comp_cigar_l2);
 
 				//Get haplotype reference transform
-				cigar32_create_ref(comp_cigar, comp_cigar_l, ref_seq + read_disp_ref, ref_length - read_disp_ref, read_seq, read->core.l_qseq, read_seq_ref, &read_seq_ref_l);
+				cigar32_create_ref(comp_cigar2, comp_cigar_l2, ref_seq + read_disp_ref, ref_length - read_disp_ref, read_seq, read->core.l_qseq, read_seq_ref, &read_seq_ref_l);
 
 				//Compare and miss with haplotype
-				nucleotide_compare(read_seq, read_seq_ref, read_seq_ref_l, comp_aux, &score2);
+				nucleotide_compare(read_seq, read_seq_ref, read_seq_ref_l, comp_aux, &miss2);
 
 				//Calculate H miss score
-				if(score2)
+				score2 = 0;
+				if(miss2)
 				{
 					int z;
-					score2 = 0;
 					for(z = 0; z < read_seq_ref_l; z++)
 					{
-						score2 += comp_aux[z] & read_quals[z];
+						if(comp_aux[z] == 0)
+							score2 += read_quals[z];
 					}
 				}
 			}
@@ -728,29 +735,68 @@ alig_bam_list_realign(array_list_t *bam_list, array_list_t *haplotype_list, geno
 			if(score > score2)
 			{
 				//Alternative haplotype wins
-				printf("H%d is the best haplotype for read %d with score: %d vs Ref score: %d\n", best_haplo_index + 1, i + 1, score2, score);
+				if(comp_cigar_l2 != read->core.n_cigar || memcmp(bam1_cigar(read), comp_cigar2, comp_cigar_l2 * sizeof(uint32_t)))
+				{
+					//ERASE
+					{
+						char cigar_str[50];
+						char cigar_str2[50];
+						char cigar_str3[50];
+						cigar32_to_string(bam1_cigar(read), read->core.n_cigar, cigar_str);
+						cigar32_to_string(comp_cigar2, comp_cigar_l2, cigar_str2);
+						cigar32_to_string(&haplo->indel, 1, cigar_str3);
+						//printf("H%d is the best haplotype for read %d with score: %d:%d vs Ref score: %d:%d\n", best_haplo_index + 1, i + 1, score2, miss2, score, miss);
+						//printf("New CIGAR - %s\n", cigar_str);
+						print_log_message_with_format(LOG_INFO_LEVEL, "INFO", "alig.c", 748, "alig_bam_list_realign",
+								"%20s %3d:%8d:%8d %20s \trealigned -> %20s %4s\n", bam1_qname(read), read->core.tid + 1, read->core.pos + 1, haplo->ref_pos + 1, cigar_str, cigar_str2, cigar_str3);
+					}
 
-				//Change read CIGAR
-				//TODO
+					//Change read CIGAR
+					cigar32_replace(read, comp_cigar2, comp_cigar_l2);
+				}
 			}
 			else
 			{
 				//Reference wins
-				printf("H0 is the best haplotype for read %d with score: %d\n", i + 1, score);
+				if(comp_cigar_l != read->core.n_cigar || memcmp(bam1_cigar(read), comp_cigar, comp_cigar_l * sizeof(uint32_t)))
+				{
+					//ERASE
+					{
+						char cigar_str[50];
+						char cigar_str2[50];
+						cigar32_to_string(bam1_cigar(read), read->core.n_cigar, cigar_str);
+						cigar32_to_string(comp_cigar, comp_cigar_l, cigar_str2);
+						//printf("H0 is the best haplotype for read %d with score: %d:%d\n", i + 1, score, miss);
+						//printf("New CIGAR - %s\n", cigar_str);
+						print_log_message_with_format(LOG_INFO_LEVEL, "INFO", "alig.c", 769, "alig_bam_list_realign",
+								"%20s %3d:%8d          %20s \trealigned -> %20s\n", bam1_qname(read), read->core.tid + 1, read->core.pos + 1, cigar_str, cigar_str2);
+					}
 
-				//Change read CIGAR
-				//TODO
+					//Change read CIGAR
+					cigar32_replace(read, comp_cigar, comp_cigar_l);
+				}
 			}
 		}
 		else
 		{
-			//Match reference so this read will be written with reference CIGAR H0
+			//Match reference so this read will be written with reference haplotype H0
+			if(comp_cigar_l2 != read->core.n_cigar || memcmp(bam1_cigar(read), comp_cigar2, comp_cigar_l2 * sizeof(uint32_t)))
+			{
+				//Print best haplotype
+				//ERASE
+				{
+					char cigar_str[50];
+					char cigar_str2[50];
+					cigar32_to_string(bam1_cigar(read), read->core.n_cigar, cigar_str);
+					cigar32_to_string(comp_cigar, comp_cigar_l, cigar_str2);
+					//printf("H0 is the best haplotype for read %d with score: %d\n", i + 1, 0);
+					print_log_message_with_format(LOG_INFO_LEVEL, "INFO", "alig.c", 791, "alig_bam_list_realign",
+							"%20s %3d:%8d           %20s \trealigned -> %20s\n", bam1_qname(read), read->core.tid + 1, read->core.pos + 1, cigar_str, cigar_str2);
+				}
 
-			//Change read CIGAR
-			//TODO
-
-			//Print best haplotype
-			printf("H0 is the best haplotype for read %d with score: %d\n", i + 1, 0);
+				//Change CIGAR
+				cigar32_replace(read, comp_cigar, comp_cigar_l);
+			}
 		}
 
 		//Free
