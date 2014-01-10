@@ -26,6 +26,15 @@
 #define ALIG_REFERENCE_ADDITIONAL_OFFSET 100
 
 /**
+ * INTERVAL STATUS
+ */
+
+typedef enum {
+	NO_INTERVAL,
+	INTERVAL
+} alig_status;
+
+/**
  * BAM REALIGN
  */
 
