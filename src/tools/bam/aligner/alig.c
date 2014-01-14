@@ -87,9 +87,9 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path)
 		if(bam_read
 				&& bam_read->core.qual != 0
 				&& !(bam_read->core.flag & BAM_DEF_MASK)
-				&& bam_read->core.mtid == bam_read->core.tid)
+				&& bam_read->core.mtid == bam_read->core.tid
+				)
 		{
-
 			//Get read position
 			read_pos = bam_read->core.pos;
 
@@ -174,7 +174,7 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path)
 				//ALIGNMENT PAST INTERVAL
 
 				//ERASE
-				{
+				/*{
 					printf("INTERVAL %d:%d-%d %d\n", last_read_chrom + 1, interval_begin, interval_end, array_list_size(process_list));
 					for(i = 0; i < array_list_size(process_list); i++)
 					{
@@ -183,7 +183,7 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path)
 
 						printf("%s\n", bam1_qname(read));
 					}
-				}
+				}*/
 
 				//Realign alignments in process list
 				alig_bam_list(process_list, ref);
@@ -192,6 +192,10 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path)
 				//Reset interval
 				interval_begin = SIZE_MAX;
 				interval_end = SIZE_MAX;
+
+				//Continue from this read
+				last_read_chrom = bam_read->core.tid;
+				continue;
 			}
 
 			//Save last read chrom
@@ -230,6 +234,18 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path)
 
 	//Destroy last empty read
 	bam_destroy1(bam_read);
+
+	//ERASE
+	{
+		printf("INTERVAL %d:%d-%d %d\n", last_read_chrom + 1, interval_begin, interval_end, array_list_size(process_list));
+		for(i = 0; i < array_list_size(process_list); i++)
+		{
+			//Get read
+			bam1_t *read = array_list_get(i, process_list);
+
+			printf("%s\n", bam1_qname(read));
+		}
+	}
 
 	//Realign lastest alignments
 	alig_bam_list(process_list, ref);
@@ -600,10 +616,7 @@ alig_bam_list_realign(array_list_t *bam_list, array_list_t *haplotype_list, geno
 
 	//Allocate miss arrays
 	v_hscore = (uint32_t *)malloc((sizeof(size_t) * h_list_l));	//H0 is reference haplotype
-	for(i = 0; i < h_list_l; i++)
-	{
-		v_hscore[i] = 0;
-	}
+	memset(v_hscore, 0, sizeof(size_t) * h_list_l);
 
 	//Allocate score matrix
 	m_ldim = h_list_l + 1;
@@ -689,7 +702,7 @@ alig_bam_list_realign(array_list_t *bam_list, array_list_t *haplotype_list, geno
 				else
 				{
 					//Found perfect match
-					m_score[i * m_ldim] = score;
+					m_score[i * m_ldim] = 0;
 					m_pos[i * m_ldim] = curr_pos;
 					break;
 				}
@@ -700,9 +713,13 @@ alig_bam_list_realign(array_list_t *bam_list, array_list_t *haplotype_list, geno
 				char cigar_str[50];
 				//char erase_str[200];
 				size_t disp;
-				cigar32_count_clip_displacement(comp_cigar, comp_cigar_l, &disp);
+				//cigar32_count_clip_displacement(comp_cigar, comp_cigar_l, &disp);
 				cigar32_to_string(comp_cigar, comp_cigar_l, cigar_str);
-				printf("H0 === MISS SCORE: %d:%d - Using CIGAR: %s\n", m_score[i * m_ldim] = score, m_pos[i * m_ldim] + 1, cigar_str);
+				printf("H0 === MISS SCORE: %d:%d - Using CIGAR: %s\n", m_score[i * m_ldim], m_pos[i * m_ldim] + 1, cigar_str);
+				//read_disp_ref = m_pos[i * m_ldim] - ref_pos_begin;
+				//cigar32_create_ref(comp_cigar, comp_cigar_l, ref_seq + read_disp_ref, ref_length - read_disp_ref, read_seq, read->core.l_qseq, read_seq_ref, &read_seq_ref_l);
+				//printf("%s\n%s\n", read_seq, read_seq_ref);
+
 				//memcpy(erase_str, ref_seq + read_disp_ref, sizeof(char) * read->core.l_qseq);
 				//erase_str[read->core.l_qseq] = '\0';
 				//printf("Ref : ");
@@ -725,20 +742,37 @@ alig_bam_list_realign(array_list_t *bam_list, array_list_t *haplotype_list, geno
 				haplo = array_list_get(j, haplotype_list);
 				assert(haplo);
 
-				//Iterate positions
-				for(curr_pos = read->core.pos; curr_pos < ref_pos_end - read->core.l_qseq; curr_pos++)
-				{
-					//Get relative displacement from reference
-					read_disp_ref = curr_pos - ref_pos_begin;
+				//IMPLEMENTAR FORWARD PRIMERO Y SI NO BACKWARD
+				//TODO
 
+				//Iterate positions
+				read_disp_ref = SIZE_MAX;
+				for(curr_pos = haplo->ref_pos - read->core.l_qseq; curr_pos < ref_pos_end - read->core.l_qseq; curr_pos++)
+				{
 					//Create cigar for this haplotype
-					cigar32_from_haplo(bam1_cigar(read), read->core.n_cigar, haplo, curr_pos, comp_cigar, &comp_cigar_l);
+					if(cigar32_from_haplo(bam1_cigar(read), read->core.n_cigar, haplo, curr_pos, comp_cigar, &comp_cigar_l))
+					{
+						//Cant displace anymore
+						break;
+					}
+
+					//Get relative displacement from reference
+					if(curr_pos < haplo->ref_pos)
+					{
+						read_disp_ref = curr_pos - ref_pos_begin;
+					}
+					else
+					{
+						read_disp_ref = haplo->ref_pos - ref_pos_begin;
+					}
+
 					//ERASE Print things
 					/*{
 						char cigar_str[50];
 						cigar32_to_string(comp_cigar, comp_cigar_l, cigar_str);
 						printf("Testing %s\n", cigar_str);
 					}*/
+
 					//Get haplotype reference transform
 					cigar32_create_ref(comp_cigar, comp_cigar_l, ref_seq + read_disp_ref, ref_length - read_disp_ref, read_seq, read->core.l_qseq, read_seq_ref, &read_seq_ref_l);
 
@@ -769,13 +803,42 @@ alig_bam_list_realign(array_list_t *bam_list, array_list_t *haplotype_list, geno
 						m_pos[(i * m_ldim) + (j+1)] = curr_pos;
 						break;
 					}
+
+					//ERASE
+					{
+						char cigar_str[50];
+						//char erase_str[200];
+						size_t disp;
+						cigar32_from_haplo(bam1_cigar(read), read->core.n_cigar, haplo, curr_pos, comp_cigar, &comp_cigar_l);
+						cigar32_count_clip_displacement(comp_cigar, comp_cigar_l, &disp);
+						cigar32_to_string(comp_cigar, comp_cigar_l, cigar_str);
+						printf("H%d === MISS SCORE: %d:%d - Using CIGAR: %s\n", j+1, score, curr_pos + 1, cigar_str);
+						//memcpy(erase_str, ref_seq + read_disp_ref, sizeof(char) * read->core.l_qseq);
+						//erase_str[read->core.l_qseq] = '\0';
+						//printf("Ref : ");
+						//for(int z = 0; z < disp; z++) printf(" ");
+						//printf("%s\n", erase_str);
+						//memcpy(erase_str, read_seq, sizeof(char) * read->core.l_qseq);
+						//erase_str[read->core.l_qseq] = '\0';
+						//printf("Read: %s\n", erase_str);
+						//printf("Ref*: %s\n", read_seq_ref);
+					}
+				}
+
+				//If reference maps better, not count haplotype score
+				if(m_score[(i * m_ldim) + (j+1)] > m_score[(i * m_ldim)])
+				{
+					m_score[(i * m_ldim) + (j+1)] = UINT32_MAX;
+					m_pos[(i * m_ldim) + (j+1)] = SIZE_MAX;
 				}
 
 				//ERASE Print things
+				/*if(read_disp_ref != SIZE_MAX)
 				{
 					char cigar_str[50];
 					//char erase_str[200];
 					size_t disp;
+					cigar32_from_haplo(bam1_cigar(read), read->core.n_cigar, haplo, m_pos[(i * m_ldim) + (j+1)], comp_cigar, &comp_cigar_l);
 					cigar32_count_clip_displacement(comp_cigar, comp_cigar_l, &disp);
 					cigar32_to_string(comp_cigar, comp_cigar_l, cigar_str);
 					printf("H%d === MISS SCORE: %d:%d - Using CIGAR: %s\n", j+1, m_score[(i * m_ldim) + (j+1)], m_pos[(i * m_ldim) + (j+1)] + 1, cigar_str);
@@ -788,7 +851,7 @@ alig_bam_list_realign(array_list_t *bam_list, array_list_t *haplotype_list, geno
 					//erase_str[read->core.l_qseq] = '\0';
 					//printf("Read: %s\n", erase_str);
 					//printf("Ref*: %s\n", read_seq_ref);
-				}
+				}*/
 			}
 		}
 
@@ -844,15 +907,25 @@ alig_bam_list_realign(array_list_t *bam_list, array_list_t *haplotype_list, geno
 	}
 
 	//Find best haplotype
-	printf("---------------------\n");
+	//printf("---------------------\n");
 	best_score = UINT32_MAX;
+	int count;
 	for(j = 0; j < h_list_l; j++)
 	{
 		//Sum scores
+		count = 0;
 		for(i = 0; i < bam_list_l; i++)
 		{
-			if(m_score[(i * m_ldim)] != 0)	//If match reference this score not count
+			if(m_score[(i * m_ldim)] != UINT32_MAX)	//If match reference this score not count
+			{
+				count++;
 				v_hscore[j] += m_score[(i * m_ldim) + (j+1)];
+			}
+		}
+
+		if(count != 0)
+		{
+			v_hscore[j] = v_hscore[j] / count;
 		}
 
 		if(v_hscore[j] < best_score)
@@ -876,6 +949,7 @@ alig_bam_list_realign(array_list_t *bam_list, array_list_t *haplotype_list, geno
 	{
 		//Get read
 		read = array_list_get(i, bam_list);
+		assert(read);
 
 		//Is reference matching better?
 		score = m_score[(i * m_ldim)];
@@ -905,6 +979,12 @@ alig_bam_list_realign(array_list_t *bam_list, array_list_t *haplotype_list, geno
 
 			//Create cigar for this haplotype
 			cigar32_from_haplo(bam1_cigar(read), read->core.n_cigar, haplo, best_pos, best_cigar, &best_cigar_l);
+
+			//If haplotype position is minor then adjust
+			if(best_pos > haplo->ref_pos)
+			{
+				best_pos = haplo->ref_pos;	//ex: 12M3D1M => 1D13M
+			}
 		}
 
 		//ERASE
@@ -929,6 +1009,7 @@ alig_bam_list_realign(array_list_t *bam_list, array_list_t *haplotype_list, geno
 		free(v_hscore);
 		free(m_score);
 		free(m_pos);
+		free(comp_aux);
 		//free(comp_cigar);
 	}
 

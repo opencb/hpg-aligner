@@ -819,7 +819,8 @@ cigar32_from_haplo(uint32_t *cigar, size_t cigar_l, aux_indel_t *haplo, size_t r
 {
 	int i, elem, type;
 	size_t current_pos;
-	size_t disp_ref;
+	int disp_ref;
+	int aux;
 	size_t current_cigar_elem;
 	size_t bases;
 
@@ -835,21 +836,76 @@ cigar32_from_haplo(uint32_t *cigar, size_t cigar_l, aux_indel_t *haplo, size_t r
 	assert(new_cigar_l);
 
 	//Haplotype position must be posterior to read position
-	if(haplo->ref_pos < read_pos)
-		return NO_ERROR;
+	if(haplo->ref_pos < read_pos - (haplo->indel >> BAM_CIGAR_SHIFT))
+	{
+		memcpy(new_cigar, cigar, cigar_l * sizeof(uint32_t));
+		*new_cigar_l = cigar_l;
+		return INVALID_INPUT_PARAMS;
+	}
 
 	//Get read displacement from haplotype
 	disp_ref = haplo->ref_pos - read_pos;
 
+	//Count unclipped bases
+	cigar32_count_nucleotides_not_clip(cigar, cigar_l, &bases);
+
 	//Create new cigar from haplotype (ex: 20M1I14M)
 	gen_cigar = (uint32_t *)malloc(sizeof(uint32_t) * 3);
-	gen_cigar[0] = (disp_ref << BAM_CIGAR_SHIFT) + BAM_CMATCH;
-	gen_cigar[1] = haplo->indel;
-	if((haplo->indel & BAM_CIGAR_MASK) == BAM_CINS)	//Insertion?
-		disp_ref += haplo->indel >> BAM_CIGAR_SHIFT;	//Is insertion
-	cigar32_count_nucleotides_not_clip(cigar, cigar_l, &bases);
-	gen_cigar[2] = ((bases - disp_ref) << BAM_CIGAR_SHIFT) + BAM_CMATCH;
-	gen_cigar_l = 3;
+
+	//Indel
+	if(disp_ref > 0)
+	{
+		aux = haplo->indel >> BAM_CIGAR_SHIFT;
+		if((haplo->indel & BAM_CIGAR_MASK) == BAM_CINS)	//Insertion?
+		{
+			disp_ref += aux;	//Is insertion
+		}
+
+		if((int)bases - disp_ref > 0)
+		{
+			gen_cigar[0] = (disp_ref << BAM_CIGAR_SHIFT) + BAM_CMATCH;
+			gen_cigar[1] = haplo->indel;
+			gen_cigar[2] = ((bases - disp_ref) << BAM_CIGAR_SHIFT) + BAM_CMATCH;
+			gen_cigar_l = 3;
+		}
+		else
+		{
+			aux -= disp_ref - bases;
+			if(aux != 0 && (haplo->indel & BAM_CIGAR_MASK) != BAM_CDEL)
+			{
+				gen_cigar_l = 2;
+				gen_cigar[0] = ((bases - aux) << BAM_CIGAR_SHIFT) + BAM_CMATCH;
+				gen_cigar[1] = (aux << BAM_CIGAR_SHIFT) + (haplo->indel & BAM_CIGAR_MASK);
+			}
+			else
+			{
+				//Deletion dont count
+				gen_cigar[0] = (bases << BAM_CIGAR_SHIFT) + BAM_CMATCH;
+				gen_cigar_l = 1;
+			}
+		}
+	}
+	else
+	{
+		//gen_cigar[0] = 0; //0M
+		aux = haplo->indel >> BAM_CIGAR_SHIFT;
+		aux += disp_ref;
+		gen_cigar[0] = (aux << BAM_CIGAR_SHIFT) + (haplo->indel & BAM_CIGAR_MASK);
+		if((haplo->indel & BAM_CIGAR_MASK) == BAM_CINS)	//Insertion?
+			 bases -= aux;
+		//printf("Aux  %d\n", aux);
+		//printf("Disp %d\n", disp_ref);
+		if(aux > 0 && (haplo->indel & BAM_CIGAR_MASK) != BAM_CDEL)
+		{
+			gen_cigar[1] = (bases << BAM_CIGAR_SHIFT) + BAM_CMATCH;
+			gen_cigar_l = 2;
+		}
+		else
+		{
+			gen_cigar[0] = (bases << BAM_CIGAR_SHIFT) + BAM_CMATCH;
+			gen_cigar_l = 1;
+		}
+	}
 
 	//Set output
 	cigar32_reclip(cigar, cigar_l, gen_cigar, gen_cigar_l, new_cigar, new_cigar_l);
@@ -864,14 +920,21 @@ ERROR_CODE
 cigar32_replace(bam1_t *read, uint32_t *cigar, size_t cigar_l)
 {
 	size_t new_data_l;
+	size_t new_data_ml;
 	uint8_t *new_data;
 	size_t n_offset;
 	size_t r_offset;
 
 	assert(read);
 	assert(cigar);
-	assert(cigar_l > 0);
 
+	//Do nothing
+	if(cigar_l == 0 || cigar_l >= MAX_CIGAR_LENGTH)
+	{
+		return NO_ERROR;
+	}
+
+	//Check if same length cigar
 	if(cigar_l == read->core.n_cigar)
 	{
 		//Same length so memcpy
@@ -882,8 +945,18 @@ cigar32_replace(bam1_t *read, uint32_t *cigar, size_t cigar_l)
 		//Get new length for bam data
 		new_data_l = (read->data_len - (read->core.n_cigar * sizeof(uint32_t))) + (cigar_l * sizeof(uint32_t));
 
+		//Get allocate size
+		if (read->m_data < new_data_l) {
+			new_data_ml = new_data_l;
+			kroundup32(new_data_ml);
+		}
+		else
+		{
+			new_data_ml = read->m_data;
+		}
+
 		//Different length so reallocate
-		new_data = (uint8_t *)malloc(read->m_data * sizeof(uint8_t));
+		new_data = (uint8_t *)malloc(new_data_ml * sizeof(uint8_t));
 
 		//Copy contents
 		memcpy(new_data, bam1_qname(read), read->core.l_qname);
@@ -898,6 +971,7 @@ cigar32_replace(bam1_t *read, uint32_t *cigar, size_t cigar_l)
 		free(read->data);
 		read->data = new_data;
 		read->data_len = new_data_l;
+		read->m_data = new_data_ml;
 		read->core.n_cigar = cigar_l;
 	}
 
