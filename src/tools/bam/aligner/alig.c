@@ -1002,19 +1002,11 @@ alig_bam_list_realign(array_list_t *bam_list, array_list_t *haplotype_list, geno
 			int mn = min(m_score[(i * m_ldim)], m_score[(i * m_ldim) + (best_haplo_index + 1)]);
 			if(mn != 0)
 			{
-				if(score == 0)
+				float ratio = (float)score/(float)mn;
+				if(ratio < 0.5f)
 				{
-					//Can not divide by 0
+					//Dont change reading
 					continue;
-				}
-				else
-				{
-					float ratio = (float)mn/(float)score;
-					if(ratio > 1.0f)
-					{
-						//Dont change reading
-						continue;
-					}
 				}
 			}
 		}
