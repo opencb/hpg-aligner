@@ -179,7 +179,7 @@ inline void sa_wf_input_free(sa_wf_input_t *p) {
 //--------------------------------------------------------------------
 
 typedef struct cigar {
-  uint32_t ops[100];
+  uint32_t ops[400];
   int num_ops;
 } cigar_t;
 

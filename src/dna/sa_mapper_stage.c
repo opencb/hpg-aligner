@@ -54,7 +54,7 @@ void cal_mng_clear(cal_mng_t *p) {
 
 //--------------------------------------------------------------------
 
-void cal_mng_update(seed_t *seed, cal_mng_t *p) {
+void cal_mng_update(seed_t *seed, int read_length, cal_mng_t *p) {
   int is_used = 0;
   if (p->cals_lists) {
     seed_cal_t *cal;
@@ -86,14 +86,14 @@ void cal_mng_update(seed_t *seed, cal_mng_t *p) {
 	linked_list_iterator_t* itr = linked_list_iterator_new(cal_list);
 	seed_cal_t *item = (cal_t *) linked_list_iterator_curr(itr);
 	while (item != NULL) {
-	  #ifdef _VERBOSE1
+	  #ifdef _VERBOSE
 	  printf("---> merging with this CAL?\n");
-	  cal_print(item);
+	  seed_cal_print(item);
 	  #endif
 	  //	  assert(cal->end > item->start);
 	  s_last = linked_list_get_last(item->seed_list);
-	  if (seed->read_start - s_last->read_end < 100 && 
-	      seed->genome_start - s_last->genome_end < 100) {
+	  if (seed->read_start - s_last->read_end < read_length && 
+	      seed->genome_start - s_last->genome_end < read_length) {
 	    is_used = 1;
 	    linked_list_insert_last(seed, item->seed_list);
 	    item->end = seed->genome_end;
@@ -103,7 +103,7 @@ void cal_mng_update(seed_t *seed, cal_mng_t *p) {
 	    //	    cal_free(cal);
             #ifdef _VERBOSE
 	    printf("---> yes, merging CAL, result:\n");
-	    cal_print(item);
+	    seed_cal_print(item);
 	    #endif
 	    break;
 	  } else {
@@ -186,11 +186,18 @@ void cal_mng_to_array_list(int read_area, array_list_t *out_list, cal_mng_t *p) 
   seed_cal_t *cal;
   linked_list_iterator_t itr;
 
+  #ifdef _VERBOSE
+  printf("-----> cal_mng_to_array_list\n");
+  #endif
+
   if (p->cals_lists) {
     linked_list_t *cal_list;
     for (unsigned int i = 0; i < p->num_chroms; i++) {
       cal_list = p->cals_lists[i];
       while (cal = (seed_cal_t *) linked_list_remove_last(cal_list)) {
+	#ifdef _VERBOSE
+	seed_cal_print(cal);
+	#endif
 	if ((cal->end - cal->start) >= read_area) {
 	  array_list_insert(cal, out_list);
 	} else {
@@ -491,7 +498,7 @@ int generate_cals_from_suffixes(int strand, fastq_read_t *read, char *revcomp,
       #ifdef _TIMING
       gettimeofday(&start, NULL);
       #endif
-      cal_mng_update(seed, cal_mng);
+      cal_mng_update(seed, read->length, cal_mng);
       #ifdef _TIMING
       gettimeofday(&stop, NULL);
       mapping_batch->func_times[FUNC_CAL_MNG_INSERT] += 
@@ -536,15 +543,17 @@ array_list_t *step_one(fastq_read_t *read, char *revcomp_seq,
   cal_mng->read_length = read->length;
 
   int max_read_area;// = read->length * MISMATCH_PERC;
-  int read_pos, read_end_pos, read_inc = sa_index->k_value / 2;
- 
+  int read_pos, read_inc = sa_index->k_value / 2;
+
+  // fill in the CAL manager structure
+  int read_end_pos = read->length - sa_index->k_value;
+  int extra_seed = (read->length - sa_index->k_value) % read_inc;
+
   #ifdef _VERBOSE	  
   printf("\n\n====>>>> STEP ONE <<<<====\n");
   display_cmp_sequences(read, revcomp_seq, sa_index);
   #endif
 
-  // fill in the CAL manager structure
-  read_end_pos = read->length - sa_index->k_value;
   //    memset(saved_pos, 0, sizeof(saved_pos));
 
   #ifdef _TIMING
@@ -554,10 +563,10 @@ array_list_t *step_one(fastq_read_t *read, char *revcomp_seq,
   #endif
 
   // first step, searching mappings in both strands
-  // distnce between seeds >= prefix value (sa_index->k_value)
+  // distance between seeds >= prefix value (sa_index->k_value)
   for (int strand = 0; strand < 2; strand++) {
     #ifdef _VERBOSE	  
-    printf("=======> STRAND %c\n", (strand == 0 ? '+' : '-'));
+    printf("=======> STRAND %c (read_end_pos = %i)\n", (strand == 0 ? '+' : '-'), read_end_pos);
     #endif
 
     for (read_pos = 0; read_pos < read_end_pos; )  {	
@@ -628,7 +637,57 @@ array_list_t *step_one(fastq_read_t *read, char *revcomp_seq,
       }
     } // end of for read_pos
     
-      // update cal list from cal manager
+    if (extra_seed) {
+      read_pos = read->length - sa_index->k_value;
+      #ifdef _VERBOSE	  
+      printf("\tread pos. = %lu\n", read_pos);
+      #endif
+
+      #ifdef _TIMING
+      gettimeofday(&start, NULL);
+      #endif
+      num_suffixes = search_suffix(&r_seq[read_pos], sa_index->k_value, 
+				   MAX_NUM_SUFFIXES, sa_index, 
+				   &low, &high, &suffix_len
+                                   #ifdef _TIMING
+				   , &prefix_time, &suffix_time
+                                   #endif
+				   );
+      #ifdef _TIMING
+      gettimeofday(&stop, NULL);
+      mapping_batch->func_times[FUNC_SEARCH_SUFFIX] += 
+	((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);  
+
+      mapping_batch->func_times[FUNC_SEARCH_PREFIX] += prefix_time;
+      mapping_batch->func_times[FUNC_SEARCH_SA] +=  suffix_time;
+      #endif
+      
+      #ifdef _VERBOSE	  
+      printf("\t\tnum. suffixes = %lu (suffix length = %lu)\n", num_suffixes, suffix_len);
+      #endif
+      if (num_suffixes < MAX_NUM_SUFFIXES && suffix_len) {
+        #ifdef _VERBOSE	  
+	//display_suffix_mappings(strand, read_pos, suffix_len, low, high, sa_index);
+        #endif 
+	
+        #ifdef _TIMING
+	gettimeofday(&start, NULL);
+        #endif
+	read_pos += generate_cals_from_suffixes(strand, read, revcomp_seq,
+						read_pos, suffix_len, low, high, sa_index, cal_mng
+                                                #ifdef _TIMING
+						, mapping_batch
+                                                #endif
+						);
+        #ifdef _TIMING
+	gettimeofday(&stop, NULL);
+	mapping_batch->func_times[FUNC_CALS_FROM_SUFFIXES] += 
+	  ((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);  
+        #endif
+      }
+    }
+
+    // update cal list from cal manager
     #ifdef _TIMING
     gettimeofday(&start, NULL);
     #endif
@@ -828,7 +887,7 @@ void step_three(fastq_read_t *read, char *revcomp_seq,
     cal->num_mismatches = 0;
 
     #ifdef _VERBOSE
-    cal_print(cal);
+    seed_cal_print(cal);
     #endif
 
     // if not seeds, then next cal

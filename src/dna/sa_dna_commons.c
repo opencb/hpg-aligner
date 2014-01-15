@@ -202,7 +202,7 @@ void create_alignments(array_list_t *cal_list, fastq_read_t *read,
 
     #ifdef _VERBOSE	  
     printf("--> CAL #%i (cigar %s):\n", i, cigar_to_string(&cal->cigar));
-    cal_print(cal);
+    seed_cal_print(cal);
     #endif
 
     // computing aligments
