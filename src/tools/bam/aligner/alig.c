@@ -841,7 +841,7 @@ alig_bam_list_realign(array_list_t *bam_list, array_list_t *haplotype_list, geno
 				}
 
 				//ERASE Print things
-				/*if(read_disp_ref != SIZE_MAX)
+				/*if(read_disp_ref != SIZE_MAX && m_pos[(i * m_ldim) + (j+1)] != SIZE_MAX)
 				{
 					char cigar_str[50];
 					//char erase_str[200];
@@ -924,7 +924,7 @@ alig_bam_list_realign(array_list_t *bam_list, array_list_t *haplotype_list, geno
 		count = 0;
 		for(i = 0; i < bam_list_l; i++)
 		{
-			if(m_score[(i * m_ldim)] != UINT32_MAX)	//If match reference this score not count
+			if(m_score[(i * m_ldim) + (j+1)] != UINT32_MAX)	//If valid score
 			{
 				count++;
 				v_hscore[j] += m_score[(i * m_ldim) + (j+1)];
