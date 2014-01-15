@@ -856,23 +856,26 @@ cigar32_from_haplo(uint32_t *cigar, size_t cigar_l, aux_indel_t *haplo, size_t r
 	if(disp_ref > 0)
 	{
 		aux = haplo->indel >> BAM_CIGAR_SHIFT;
-		if((haplo->indel & BAM_CIGAR_MASK) == BAM_CINS)	//Insertion?
-		{
-			disp_ref += aux;	//Is insertion
-		}
 
 		if((int)bases - disp_ref > 0)
 		{
+			//Indel inside read
 			gen_cigar[0] = (disp_ref << BAM_CIGAR_SHIFT) + BAM_CMATCH;
 			gen_cigar[1] = haplo->indel;
+			if((haplo->indel & BAM_CIGAR_MASK) == BAM_CINS)	//Insertion?
+			{
+				disp_ref += aux;	//Is insertion
+			}
 			gen_cigar[2] = ((bases - disp_ref) << BAM_CIGAR_SHIFT) + BAM_CMATCH;
 			gen_cigar_l = 3;
 		}
 		else
 		{
+			//Indel at read end
 			aux -= disp_ref - bases;
 			if(aux != 0 && (haplo->indel & BAM_CIGAR_MASK) != BAM_CDEL)
 			{
+				//Insertion
 				gen_cigar_l = 2;
 				gen_cigar[0] = ((bases - aux) << BAM_CIGAR_SHIFT) + BAM_CMATCH;
 				gen_cigar[1] = (aux << BAM_CIGAR_SHIFT) + (haplo->indel & BAM_CIGAR_MASK);
@@ -887,21 +890,23 @@ cigar32_from_haplo(uint32_t *cigar, size_t cigar_l, aux_indel_t *haplo, size_t r
 	}
 	else
 	{
-		//gen_cigar[0] = 0; //0M
-		aux = haplo->indel >> BAM_CIGAR_SHIFT;
-		aux += disp_ref;
-		gen_cigar[0] = (aux << BAM_CIGAR_SHIFT) + (haplo->indel & BAM_CIGAR_MASK);
-		if((haplo->indel & BAM_CIGAR_MASK) == BAM_CINS)	//Insertion?
-			 bases -= aux;
-		//printf("Aux  %d\n", aux);
-		//printf("Disp %d\n", disp_ref);
-		if(aux > 0 && (haplo->indel & BAM_CIGAR_MASK) != BAM_CDEL)
+		if((haplo->indel & BAM_CIGAR_MASK) == BAM_CINS)
 		{
+			//Insertion
+			//gen_cigar[0] = 0; //0M
+			aux = haplo->indel >> BAM_CIGAR_SHIFT;
+			aux += disp_ref;
+			gen_cigar[0] = (aux << BAM_CIGAR_SHIFT) + (haplo->indel & BAM_CIGAR_MASK);
+			if((haplo->indel & BAM_CIGAR_MASK) == BAM_CINS)	//Insertion?
+				 bases -= aux;
+			//printf("Aux  %d\n", aux);
+			//printf("Disp %d\n", disp_ref);
 			gen_cigar[1] = (bases << BAM_CIGAR_SHIFT) + BAM_CMATCH;
 			gen_cigar_l = 2;
 		}
 		else
 		{
+			//Deletion
 			gen_cigar[0] = (bases << BAM_CIGAR_SHIFT) + BAM_CMATCH;
 			gen_cigar_l = 1;
 		}
