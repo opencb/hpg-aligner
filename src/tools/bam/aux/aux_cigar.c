@@ -896,13 +896,21 @@ cigar32_from_haplo(uint32_t *cigar, size_t cigar_l, aux_indel_t *haplo, size_t r
 			//gen_cigar[0] = 0; //0M
 			aux = haplo->indel >> BAM_CIGAR_SHIFT;
 			aux += disp_ref;
-			gen_cigar[0] = (aux << BAM_CIGAR_SHIFT) + (haplo->indel & BAM_CIGAR_MASK);
-			if((haplo->indel & BAM_CIGAR_MASK) == BAM_CINS)	//Insertion?
-				 bases -= aux;
-			//printf("Aux  %d\n", aux);
-			//printf("Disp %d\n", disp_ref);
-			gen_cigar[1] = (bases << BAM_CIGAR_SHIFT) + BAM_CMATCH;
-			gen_cigar_l = 2;
+			if(aux != 0)
+			{
+				gen_cigar[0] = (aux << BAM_CIGAR_SHIFT) + (haplo->indel & BAM_CIGAR_MASK);
+				if((haplo->indel & BAM_CIGAR_MASK) == BAM_CINS)	//Insertion?
+					 bases -= aux;
+				//printf("Aux  %d\n", aux);
+				//printf("Disp %d\n", disp_ref);
+				gen_cigar[1] = (bases << BAM_CIGAR_SHIFT) + BAM_CMATCH;
+				gen_cigar_l = 2;
+			}
+			else
+			{
+				gen_cigar[0] = (bases << BAM_CIGAR_SHIFT) + BAM_CMATCH;
+				gen_cigar_l = 1;
+			}
 		}
 		else
 		{
