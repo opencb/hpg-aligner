@@ -13,8 +13,12 @@
 #include <libgen.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <errno.h>
 
-int align_launch(char *reference, char *bam, char *output);
+#include "aux/timestats.h"
+#include "aligner/alig.h"
+
+int align_launch(char *reference, char *bam, char *output, int threads);
 
 int alig_bam(int argc, char **argv)
 {
@@ -147,7 +151,7 @@ int alig_bam(int argc, char **argv)
 
     /* normal case: realignment */
 	{
-		exitcode = align_launch(refile->filename[0], infile->filename[0], outfile->filename[0]);
+		exitcode = align_launch(refile->filename[0], infile->filename[0], outfile->filename[0], 1);
 	}
 
     exit:
@@ -158,15 +162,81 @@ int alig_bam(int argc, char **argv)
 }
 
 int
-align_launch(char *reference, char *bam, char *output)
+align_launch(char *reference, char *bam, char *output, int threads)
 {
-	char *dir, *base, *bamc, *outputc, *infofilec, *datafilec;
+	char *dir, *base, *bamc, *outputc, *infofilec, *datafilec, *sched;
+	int err;
+	double init_time, end_time;
 
 	assert(reference);
 	assert(bam);
 	assert(output);
 
 	init_log();
+
+	//Set schedule if not defined
+	setenv("OMP_SCHEDULE", "static", 0);
+	sched = getenv("OMP_SCHEDULE");
+
+	//Time measures
+	#ifdef D_TIME_DEBUG
+
+		char filename[100];
+		char intaux[20];
+		char cwd[1024];
+
+		//Initialize stats
+		if(time_new_stats(20, &TIME_GLOBAL_STATS))
+		{
+			printf("ERROR: FAILED TO INITIALIZE TIME STATS\n");
+		}
+
+
+		if (getcwd(cwd, sizeof(cwd)) != NULL)
+		{
+			printf("Current working dir: %s\n", cwd);
+		}
+		else
+		{
+			perror("WARNING: getcwd() dont work");
+		}
+
+		strcpy(filename, cwd);
+		strcat(filename,"/stats/");
+		/*if(sched)
+			strcat(filename,sched);
+		else
+		{
+			printf("ERROR: Obtaining OMP_SCHEDULE environment value\n");
+		}*/
+
+		//Create stats directory
+		printf("Creating stats directory: %s\n", filename);
+		err = mkdir(filename, S_IRWXU);
+		if(err != 0 && errno != EEXIST)
+		{
+			perror("WARNING: failed to create stats directory");
+		}
+		else
+		{
+			//strcat(filename,"_");
+			//sprintf(intaux, "%d", MAX_BATCH_SIZE);
+			//strcat(filename, intaux);
+			strcat(filename, "_");
+			sprintf(intaux, "%d", threads);
+			strcat(filename, intaux);
+			strcat(filename, "_.stats");
+
+			//Initialize stats file output
+			if(time_set_output_file(filename, TIME_GLOBAL_STATS))
+			{
+				printf("ERROR: FAILED TO INITIALIZE TIME STATS FILE OUTPUT\n");
+			}
+
+			printf("STATISTICS ACTIVATED, output file: %s\n\n", filename);
+		}
+
+	#endif
 
 	//Obtain reference filename and dirpath from full path
 	dir = strdup(reference);
@@ -177,9 +247,71 @@ align_launch(char *reference, char *bam, char *output)
 	bamc = strdup(bam);
 	printf("Reference dir: %s\n", dir);
 	printf("Reference name: %s\n", base);
+#ifdef D_TIME_DEBUG
+	init_time = omp_get_wtime();
+#endif
 	alig_bam_file(bamc, base, dir);
+#ifdef D_TIME_DEBUG
+	end_time = omp_get_wtime();
+	time_add_time_slot(D_SLOT_TOTAL, TIME_GLOBAL_STATS, end_time - init_time);
+#endif
 	free(bamc);
 	free(dir);
+
+	//Print times
+#ifdef D_TIME_DEBUG
+	double min, max, mean;
+
+	//Print time stats
+	printf("----------------------------\nTIME STATS: \n");
+
+	printf("\n====== General times ======\n");
+	time_get_mean_slot(D_SLOT_TOTAL, TIME_GLOBAL_STATS, &mean);
+	time_get_min_slot(D_SLOT_TOTAL, TIME_GLOBAL_STATS, &min);
+	time_get_max_slot(D_SLOT_TOTAL, TIME_GLOBAL_STATS, &max);
+	printf("Total time to realign -> %.2f s - min/max = %.2f/%.2f\n",
+			mean, min, max);
+
+	time_get_mean_slot(D_SLOT_INIT, TIME_GLOBAL_STATS, &mean);
+	time_get_min_slot(D_SLOT_INIT, TIME_GLOBAL_STATS, &min);
+	time_get_max_slot(D_SLOT_INIT, TIME_GLOBAL_STATS, &max);
+	printf("Time used to initialize aligner -> %.2f s - min/max = %.2f/%.2f\n",
+			mean, min, max);
+
+	time_get_mean_slot(D_SLOT_PROCCESS, TIME_GLOBAL_STATS, &mean);
+	time_get_min_slot(D_SLOT_PROCCESS, TIME_GLOBAL_STATS, &min);
+	time_get_max_slot(D_SLOT_PROCCESS, TIME_GLOBAL_STATS, &max);
+	printf("Time used to proccess every read -> %.2f us - min/max = %.2f/%.2f\n",
+			mean*1000000.0, min*1000000.0, max*1000000.0);
+
+	printf("\n====== Haplotype ======\n");
+	time_get_mean_slot(D_SLOT_HAPLO_GET, TIME_GLOBAL_STATS, &mean);
+	time_get_min_slot(D_SLOT_HAPLO_GET, TIME_GLOBAL_STATS, &min);
+	time_get_max_slot(D_SLOT_HAPLO_GET, TIME_GLOBAL_STATS, &max);
+	printf("Time used for read haplotype extraction -> %.2f us - min/max = %.2f/%.2f\n",
+			mean*1000000.0, min*1000000.0, max*1000000.0);
+
+	time_get_mean_slot(D_SLOT_REALIG_PER_HAPLO, TIME_GLOBAL_STATS, &mean);
+	time_get_min_slot(D_SLOT_REALIG_PER_HAPLO, TIME_GLOBAL_STATS, &min);
+	time_get_max_slot(D_SLOT_REALIG_PER_HAPLO, TIME_GLOBAL_STATS, &max);
+	printf("Time used for read realign per haplotype -> %.2f us - min/max = %.2f/%.2f\n",
+			mean*1000000.0, min*1000000.0, max*1000000.0);
+
+
+	printf("\n====== I/O ======\n");
+	time_get_mean_slot(D_SLOT_READ, TIME_GLOBAL_STATS, &mean);
+	time_get_min_slot(D_SLOT_READ, TIME_GLOBAL_STATS, &min);
+	time_get_max_slot(D_SLOT_READ, TIME_GLOBAL_STATS, &max);
+	printf("Time used for read alignment (mean) -> %.2f us - min/max = %.2f/%.2f\n",
+			mean*1000000.0, min*1000000.0, max*1000000.0);
+
+	time_get_mean_slot(D_SLOT_WRITE, TIME_GLOBAL_STATS, &mean);
+	time_get_min_slot(D_SLOT_WRITE, TIME_GLOBAL_STATS, &min);
+	time_get_max_slot(D_SLOT_WRITE, TIME_GLOBAL_STATS, &max);
+	printf("Time used for write alignment (mean) -> %.2f us - min/max = %.2f/%.2f\n",
+			mean*1000000.0, min*1000000.0, max*1000000.0);
+
+#endif
 
 	stop_log();
 

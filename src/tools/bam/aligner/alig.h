@@ -14,16 +14,42 @@
 #include <stdint.h>
 #include <limits.h>
 
+#include <omp.h>
+
 #include <bioformats/bam/samtools/bam.h>
 #include <bioformats/bam/bam_file.h>
 #include <aligners/bwt/genome.h>
 #include "aux/aux_common.h"
 #include "aux/aux_library.h"
+#include "aux/timestats.h"
 #include "alig_region.h"
 
 #define ALIG_LIST_COUNT_THRESHOLD_TO_WRITE 1000
 
 #define ALIG_REFERENCE_ADDITIONAL_OFFSET 100
+
+/**
+ * Time measures
+ */
+#define D_TIME_DEBUG
+#ifdef D_TIME_DEBUG
+	//BAM I/0
+	#define D_SLOT_READ 			0
+	#define D_SLOT_WRITE 			1
+
+	//GENERAL
+	#define D_SLOT_TOTAL			2			//Total time elapsed
+	#define D_SLOT_PROCCESS			3			//General processing for every read (realigned or not)
+	#define D_SLOT_INIT				4			//Initialization aligner time
+
+
+	//REALIGN
+	#define D_SLOT_HAPLO_GET 		5			//Obtaining haplos from one read
+	#define D_SLOT_REALIG_PER_HAPLO 6			//Read alig time / number haplotypes
+
+#endif
+
+
 
 /**
  * INTERVAL STATUS
