@@ -13,8 +13,12 @@
 #include <libgen.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <errno.h>
 
-int align_launch(char *reference, char *bam, char *output);
+#include "aux/timestats.h"
+#include "aligner/alig.h"
+
+int align_launch(char *reference, char *bam, char *output, int threads);
 
 int alig_bam(int argc, char **argv)
 {
@@ -147,7 +151,7 @@ int alig_bam(int argc, char **argv)
 
     /* normal case: realignment */
 	{
-		exitcode = align_launch(refile->filename[0], infile->filename[0], outfile->filename[0]);
+		exitcode = align_launch(refile->filename[0], infile->filename[0], outfile->filename[0], 1);
 	}
 
     exit:
@@ -158,15 +162,80 @@ int alig_bam(int argc, char **argv)
 }
 
 int
-align_launch(char *reference, char *bam, char *output)
+align_launch(char *reference, char *bam, char *output, int threads)
 {
-	char *dir, *base, *bamc, *outputc, *infofilec, *datafilec;
+	char *dir, *base, *bamc, *outputc, *infofilec, *datafilec, *sched;
+	int err;
 
 	assert(reference);
 	assert(bam);
 	assert(output);
 
 	init_log();
+
+	//Set schedule if not defined
+	setenv("OMP_SCHEDULE", "static", 0);
+	sched = getenv("OMP_SCHEDULE");
+
+	//Time measures
+	#ifdef D_TIME_DEBUG
+
+		char filename[100];
+		char intaux[20];
+		char cwd[1024];
+
+		//Initialize stats
+		if(time_new_stats(20, &TIME_GLOBAL_STATS))
+		{
+			printf("ERROR: FAILED TO INITIALIZE TIME STATS\n");
+		}
+
+
+		if (getcwd(cwd, sizeof(cwd)) != NULL)
+		{
+			printf("Current working dir: %s\n", cwd);
+		}
+		else
+		{
+			perror("WARNING: getcwd() dont work");
+		}
+
+		strcpy(filename, cwd);
+		strcat(filename,"/stats/");
+		/*if(sched)
+			strcat(filename,sched);
+		else
+		{
+			printf("ERROR: Obtaining OMP_SCHEDULE environment value\n");
+		}*/
+
+		//Create stats directory
+		printf("Creating stats directory: %s\n", filename);
+		err = mkdir(filename, S_IRWXU);
+		if(err != 0 && errno != EEXIST)
+		{
+			perror("WARNING: failed to create stats directory");
+		}
+		else
+		{
+			//strcat(filename,"_");
+			//sprintf(intaux, "%d", MAX_BATCH_SIZE);
+			//strcat(filename, intaux);
+			strcat(filename, "_");
+			sprintf(intaux, "%d", threads);
+			strcat(filename, intaux);
+			strcat(filename, "_.stats");
+
+			//Initialize stats file output
+			if(time_set_output_file(filename, TIME_GLOBAL_STATS))
+			{
+				printf("ERROR: FAILED TO INITIALIZE TIME STATS FILE OUTPUT\n");
+			}
+
+			printf("STATISTICS ACTIVATED, output file: %s\n\n", filename);
+		}
+
+	#endif
 
 	//Obtain reference filename and dirpath from full path
 	dir = strdup(reference);

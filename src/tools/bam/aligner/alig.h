@@ -26,6 +26,18 @@
 #define ALIG_REFERENCE_ADDITIONAL_OFFSET 100
 
 /**
+ * Time measures
+ */
+#define D_TIME_DEBUG
+#ifdef D_TIME_DEBUG
+	//DELTAS
+	#define D_SLOT_PROCCESS_DELTAS 0
+
+#endif
+
+
+
+/**
  * INTERVAL STATUS
  */
 
