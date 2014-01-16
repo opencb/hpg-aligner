@@ -166,6 +166,7 @@ align_launch(char *reference, char *bam, char *output, int threads)
 {
 	char *dir, *base, *bamc, *outputc, *infofilec, *datafilec, *sched;
 	int err;
+	double init_time, end_time;
 
 	assert(reference);
 	assert(bam);
@@ -246,9 +247,71 @@ align_launch(char *reference, char *bam, char *output, int threads)
 	bamc = strdup(bam);
 	printf("Reference dir: %s\n", dir);
 	printf("Reference name: %s\n", base);
+#ifdef D_TIME_DEBUG
+	init_time = omp_get_wtime();
+#endif
 	alig_bam_file(bamc, base, dir);
+#ifdef D_TIME_DEBUG
+	end_time = omp_get_wtime();
+	time_add_time_slot(D_SLOT_TOTAL, TIME_GLOBAL_STATS, end_time - init_time);
+#endif
 	free(bamc);
 	free(dir);
+
+	//Print times
+#ifdef D_TIME_DEBUG
+	double min, max, mean;
+
+	//Print time stats
+	printf("----------------------------\nTIME STATS: \n");
+
+	printf("\n====== General times ======\n");
+	time_get_mean_slot(D_SLOT_TOTAL, TIME_GLOBAL_STATS, &mean);
+	time_get_min_slot(D_SLOT_TOTAL, TIME_GLOBAL_STATS, &min);
+	time_get_max_slot(D_SLOT_TOTAL, TIME_GLOBAL_STATS, &max);
+	printf("Total time to realign -> %.2f s - min/max = %.2f/%.2f\n",
+			mean, min, max);
+
+	time_get_mean_slot(D_SLOT_INIT, TIME_GLOBAL_STATS, &mean);
+	time_get_min_slot(D_SLOT_INIT, TIME_GLOBAL_STATS, &min);
+	time_get_max_slot(D_SLOT_INIT, TIME_GLOBAL_STATS, &max);
+	printf("Time used to initialize aligner -> %.2f s - min/max = %.2f/%.2f\n",
+			mean, min, max);
+
+	time_get_mean_slot(D_SLOT_PROCCESS, TIME_GLOBAL_STATS, &mean);
+	time_get_min_slot(D_SLOT_PROCCESS, TIME_GLOBAL_STATS, &min);
+	time_get_max_slot(D_SLOT_PROCCESS, TIME_GLOBAL_STATS, &max);
+	printf("Time used to proccess every read -> %.2f us - min/max = %.2f/%.2f\n",
+			mean*1000000.0, min*1000000.0, max*1000000.0);
+
+	printf("\n====== Haplotype ======\n");
+	time_get_mean_slot(D_SLOT_HAPLO_GET, TIME_GLOBAL_STATS, &mean);
+	time_get_min_slot(D_SLOT_HAPLO_GET, TIME_GLOBAL_STATS, &min);
+	time_get_max_slot(D_SLOT_HAPLO_GET, TIME_GLOBAL_STATS, &max);
+	printf("Time used for read haplotype extraction -> %.2f us - min/max = %.2f/%.2f\n",
+			mean*1000000.0, min*1000000.0, max*1000000.0);
+
+	time_get_mean_slot(D_SLOT_REALIG_PER_HAPLO, TIME_GLOBAL_STATS, &mean);
+	time_get_min_slot(D_SLOT_REALIG_PER_HAPLO, TIME_GLOBAL_STATS, &min);
+	time_get_max_slot(D_SLOT_REALIG_PER_HAPLO, TIME_GLOBAL_STATS, &max);
+	printf("Time used for read realign per haplotype -> %.2f us - min/max = %.2f/%.2f\n",
+			mean*1000000.0, min*1000000.0, max*1000000.0);
+
+
+	printf("\n====== I/O ======\n");
+	time_get_mean_slot(D_SLOT_READ, TIME_GLOBAL_STATS, &mean);
+	time_get_min_slot(D_SLOT_READ, TIME_GLOBAL_STATS, &min);
+	time_get_max_slot(D_SLOT_READ, TIME_GLOBAL_STATS, &max);
+	printf("Time used for read alignment (mean) -> %.2f us - min/max = %.2f/%.2f\n",
+			mean*1000000.0, min*1000000.0, max*1000000.0);
+
+	time_get_mean_slot(D_SLOT_WRITE, TIME_GLOBAL_STATS, &mean);
+	time_get_min_slot(D_SLOT_WRITE, TIME_GLOBAL_STATS, &min);
+	time_get_max_slot(D_SLOT_WRITE, TIME_GLOBAL_STATS, &max);
+	printf("Time used for write alignment (mean) -> %.2f us - min/max = %.2f/%.2f\n",
+			mean*1000000.0, min*1000000.0, max*1000000.0);
+
+#endif
 
 	stop_log();
 

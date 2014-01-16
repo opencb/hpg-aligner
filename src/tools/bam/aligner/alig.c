@@ -44,6 +44,13 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path)
 	uint64_t count = 0;
 	int i;
 
+	//Time measures
+	double init_time, end_time;
+	double init_time2, end_time2;
+
+#ifdef D_TIME_DEBUG
+	init_time = omp_get_wtime();
+#endif
 	//Open bam
 	{
 		printf("Opening BAM from \"%s\" ...\n", bam_path);
@@ -74,9 +81,22 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path)
 	write_list = array_list_new(ALIG_LIST_COUNT_THRESHOLD_TO_WRITE, 1.2f, COLLECTION_MODE_SYNCHRONIZED);
 	process_list = array_list_new(ALIG_LIST_COUNT_THRESHOLD_TO_WRITE, 1.2f, COLLECTION_MODE_SYNCHRONIZED);
 
+#ifdef D_TIME_DEBUG
+	end_time = omp_get_wtime();
+	time_add_time_slot(D_SLOT_INIT, TIME_GLOBAL_STATS, end_time - init_time);
+#endif
+
 	//Read first alignment
 	bam_read = bam_init1();
+#ifdef D_TIME_DEBUG
+	init_time2 = omp_get_wtime();
+	init_time = omp_get_wtime();
+#endif
 	bytes = bam_read1(bam_f->bam_fd, bam_read);
+#ifdef D_TIME_DEBUG
+	end_time = omp_get_wtime();
+	time_add_time_slot(D_SLOT_READ, TIME_GLOBAL_STATS, end_time - init_time);
+#endif
 	last_read_chrom = bam_read->core.tid;
 
 	count = 1;
@@ -214,13 +234,27 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path)
 
 		//Read next alignment
 		bam_read = bam_init1();
+#ifdef D_TIME_DEBUG
+		init_time = omp_get_wtime();
+#endif
 		bytes = bam_read1(bam_f->bam_fd, bam_read);
+#ifdef D_TIME_DEBUG
+		end_time = omp_get_wtime();
+		time_add_time_slot(D_SLOT_READ, TIME_GLOBAL_STATS, end_time - init_time);
+#endif
 
 		//If write list is big enough and process list is empty: write to disk
 		if(array_list_size(write_list) > ALIG_LIST_COUNT_THRESHOLD_TO_WRITE
 				&& array_list_size(process_list) == 0)
 		{
+#ifdef D_TIME_DEBUG
+			end_time2 = omp_get_wtime();
+			time_add_time_slot(D_SLOT_PROCCESS, TIME_GLOBAL_STATS, (end_time2 - init_time2)/(double)array_list_size(write_list));
+#endif
 			alig_bam_list_to_disk(write_list, out_bam_f);
+#ifdef D_TIME_DEBUG
+			init_time2 = omp_get_wtime();
+#endif
 		}
 
 		//Show total progress
@@ -249,10 +283,15 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path)
 
 	//Realign lastest alignments
 	alig_bam_list(process_list, ref);
+#ifdef D_TIME_DEBUG
+	end_time2 = omp_get_wtime();
+	time_add_time_slot(D_SLOT_PROCCESS, TIME_GLOBAL_STATS, (end_time2 - init_time2)/(double)array_list_size(write_list));
+#endif
 	array_list_clear(process_list, NULL);
 
 	//Write lastest reads
 	alig_bam_list_to_disk(write_list, out_bam_f);
+
 	printf("Total alignments readed: %d\r", count);
 	fflush(stdout);
 
@@ -310,6 +349,7 @@ alig_bam_list(array_list_t *bam_list, genome_t* ref)
 	size_t ref_length = SIZE_MAX;
 
 	int i, cond = 0;
+	double init_time, end_time;
 
 	assert(bam_list);
 	assert(ref);
@@ -342,6 +382,10 @@ alig_bam_list(array_list_t *bam_list, genome_t* ref)
 
 	//Init haplotype list
 	haplo_list = array_list_new(100, 1.2f, COLLECTION_MODE_SYNCHRONIZED);
+
+#ifdef D_TIME_DEBUG
+	init_time = omp_get_wtime();
+#endif
 
 	//Get all haplotypes
 	for(i = 0; i < array_list_size(bam_list); i++)
@@ -443,6 +487,11 @@ alig_bam_list(array_list_t *bam_list, genome_t* ref)
 		}
 	}
 
+#ifdef D_TIME_DEBUG
+	end_time = omp_get_wtime();
+	time_add_time_slot(D_SLOT_HAPLO_GET, TIME_GLOBAL_STATS, (end_time - init_time)/(double)array_list_size(bam_list));
+#endif
+
 	//ERASE
 	/*if(array_list_size(haplo_list))
 	{
@@ -461,8 +510,15 @@ alig_bam_list(array_list_t *bam_list, genome_t* ref)
 		}
 	}*/
 
+#ifdef D_TIME_DEBUG
+	init_time = omp_get_wtime();
+#endif
 	//Indel local realignment
 	alig_bam_list_realign(bam_list, haplo_list, ref);
+#ifdef D_TIME_DEBUG
+	end_time = omp_get_wtime();
+	time_add_time_slot(D_SLOT_REALIG_PER_HAPLO, TIME_GLOBAL_STATS, (end_time - init_time)/(double)array_list_size(bam_list));
+#endif
 
 	//ERASE
 	/*if(array_list_size(haplo_list))
@@ -488,11 +544,15 @@ alig_bam_list_to_disk(array_list_t *bam_list, bam_file_t *bam_f)
 {
 	int i;
 	bam1_t *read;
+	double init_time, end_time;
 
 	assert(bam_list);
 	assert(bam_f);
 
 	//Iterate bams
+#ifdef D_TIME_DEBUG
+	init_time = omp_get_wtime();
+#endif
 	for(i = 0; i < array_list_size(bam_list); i++)
 	{
 		//Get read
@@ -504,6 +564,10 @@ alig_bam_list_to_disk(array_list_t *bam_list, bam_file_t *bam_f)
 		//Free read
 		bam_destroy1(read);
 	}
+#ifdef D_TIME_DEBUG
+	end_time = omp_get_wtime();
+	time_add_time_slot(D_SLOT_WRITE, TIME_GLOBAL_STATS, (end_time - init_time)/(double)array_list_size(bam_list));
+#endif
 
 	//Clear list
 	array_list_clear(bam_list, NULL);
