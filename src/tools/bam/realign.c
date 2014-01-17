@@ -250,7 +250,8 @@ align_launch(char *reference, char *bam, char *output, int threads)
 #ifdef D_TIME_DEBUG
 	init_time = omp_get_wtime();
 #endif
-	alig_bam_file(bamc, base, dir);
+	//alig_bam_file(bamc, base, dir);
+	alig_bam_file2(bamc, base, dir);
 #ifdef D_TIME_DEBUG
 	end_time = omp_get_wtime();
 	time_add_time_slot(D_SLOT_TOTAL, TIME_GLOBAL_STATS, end_time - init_time);
@@ -263,7 +264,7 @@ align_launch(char *reference, char *bam, char *output, int threads)
 	double min, max, mean;
 
 	//Print time stats
-	printf("----------------------------\nTIME STATS: \n");
+	/*printf("----------------------------\nTIME STATS: \n");
 
 	printf("\n====== General times ======\n");
 	time_get_mean_slot(D_SLOT_TOTAL, TIME_GLOBAL_STATS, &mean);
@@ -309,7 +310,7 @@ align_launch(char *reference, char *bam, char *output, int threads)
 	time_get_min_slot(D_SLOT_WRITE, TIME_GLOBAL_STATS, &min);
 	time_get_max_slot(D_SLOT_WRITE, TIME_GLOBAL_STATS, &max);
 	printf("Time used for write alignment (mean) -> %.2f us - min/max = %.2f/%.2f\n",
-			mean*1000000.0, min*1000000.0, max*1000000.0);
+			mean*1000000.0, min*1000000.0, max*1000000.0);*/
 
 #endif
 

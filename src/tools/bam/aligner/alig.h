@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <limits.h>
+#include <stddef.h>
 
 #include <omp.h>
 
@@ -50,6 +51,32 @@
 #endif
 
 
+/**
+ * REALIGNMENT CONTEXT
+ */
+
+typedef struct {
+	//BAM files
+	bam_file_t *in_bam_f;
+	bam_file_t *out_bam_f;
+
+	//Reference genome
+	genome_t *genome;
+
+	//BAM lists
+	array_list_t *process_list;
+
+	//Alignments readed
+	size_t read_count;
+
+	//Auxiliar read ptr
+	bam1_t *last_read;
+	size_t last_read_bytes;
+
+	//Current region
+	alig_region_t region;
+} alig_context_t;
+
 
 /**
  * INTERVAL STATUS
@@ -61,6 +88,24 @@ typedef enum {
 } alig_status;
 
 /**
+ * CONTEXT
+ */
+
+EXTERNC ERROR_CODE alig_init(alig_context_t *context, bam_file_t *in_bam_f, bam_file_t *out_bam_f, genome_t *genome);
+EXTERNC ERROR_CODE alig_destroy(alig_context_t *context);
+EXTERNC ERROR_CODE alig_validate(alig_context_t *context);
+
+/**
+ * REGION OPERATIONS
+ */
+
+EXTERNC ERROR_CODE alig_region_next(alig_context_t *context);
+EXTERNC ERROR_CODE alig_region_indel_realignment(alig_context_t *context);
+EXTERNC ERROR_CODE alig_region_write(alig_context_t *context);
+
+EXTERNC ERROR_CODE alig_bam_file2(char *bam_path, char *ref_name, char *ref_path);
+
+/**
  * BAM REALIGN
  */
 
@@ -69,6 +114,8 @@ EXTERNC ERROR_CODE alig_bam_list(array_list_t *bam_list, genome_t* ref);
 EXTERNC ERROR_CODE alig_bam_list_to_disk(array_list_t *bam_list, bam_file_t *bam_f);
 
 EXTERNC ERROR_CODE alig_bam_list_realign(array_list_t *bam_list, array_list_t *haplotype_list, genome_t* ref);
+
+EXTERNC ERROR_CODE alig_bam_list_get_next(bam_file_t *bam_f, array_list_t *out_list);
 
 
 #endif /* ALIG_H_ */

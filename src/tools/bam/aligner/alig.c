@@ -10,6 +10,460 @@
 uint64_t cigar_changed = 0;
 
 /**
+ * CONTEXT
+ */
+
+ERROR_CODE
+alig_init(alig_context_t *context, bam_file_t *in_bam_f, bam_file_t *out_bam_f, genome_t *genome)
+{
+	ERROR_CODE err;
+
+	assert(context);
+	assert(in_bam_f);
+	assert(out_bam_f);
+	assert(genome);
+
+	//Set all to 0 / NULL
+	memset(context, 0, sizeof(alig_context_t));
+
+	//Set fields
+	context->in_bam_f = in_bam_f;
+	context->out_bam_f = out_bam_f;
+	context->genome = genome;
+
+	//Create process list
+	context->process_list = array_list_new(ALIG_LIST_COUNT_THRESHOLD_TO_WRITE + 100, 1.2f, COLLECTION_MODE_SYNCHRONIZED);
+	if(context->process_list == NULL)
+	{
+		return ALIG_INIT_FAIL;
+	}
+
+	return NO_ERROR;
+}
+
+ERROR_CODE
+alig_destroy(alig_context_t *context)
+{
+	int i;
+	bam1_t *read;
+
+	assert(context);
+
+	//Free proccess list
+	if(context->process_list)
+	{
+		//Free alignments
+		for(i = 0; i < array_list_size(context->process_list); i++)
+		{
+			//Get read
+			read = array_list_get(i, context->process_list);
+
+			//Free read
+			bam_destroy1(read);
+		}
+
+		//Free list
+		array_list_free(context->process_list, NULL);
+	}
+
+	//Set all to NULL
+	memset(context, 0, sizeof(alig_context_t));
+
+	return NO_ERROR;
+}
+
+ERROR_CODE
+alig_validate(alig_context_t *context)
+{
+	if(context == NULL)
+		return ALIG_INVALID_CONTEXT;
+
+	if(context->in_bam_f == NULL)
+		return INVALID_INPUT_BAM;
+	if(context->out_bam_f == NULL)
+		return INVALID_OUTPUT_BAM;
+	if(context->genome == NULL)
+		return INVALID_GENOME;
+
+	//Have process list?
+	if(context->process_list == NULL)
+		return ALIG_INVALID_CONTEXT;
+
+	return NO_ERROR;
+}
+
+/**
+ * REGION OPERATIONS
+ */
+
+ERROR_CODE
+alig_region_next(alig_context_t *context)
+{
+	ERROR_CODE err;
+
+	//Read
+	bam1_t* read = NULL;
+	int bytes = 0;
+	int32_t read_pos;
+	int32_t last_read_chrom = -1;
+	size_t indels;
+	size_t interval_read_begin;
+	size_t interval_read_end;
+
+	assert(context);
+
+	//Validate context
+	err = alig_validate(context);
+	if(err)
+	{
+		return err;
+	}
+
+	//Init
+	if(context->last_read)
+	{
+		//Proceed from last read
+		read = context->last_read;
+		bytes = context->last_read_bytes;
+		context->last_read = NULL;
+		context->last_read_bytes = 0;
+		assert(read);
+	}
+	else
+	{
+		//Need to read from file
+		read = bam_init1();
+		assert(read);
+		bytes = bam_read1(context->in_bam_f->bam_fd, read);
+	}
+
+	if(bytes)
+		last_read_chrom = read->core.tid;
+
+	//Reset interval
+	memset(&context->region, 0, sizeof(alig_region_t));
+
+	//Read alignments until interval reached
+	while(read != NULL && bytes > 0)
+	{
+		//FILTERS: MAP QUALITY = 0, BAM_FUNMAP | BAM_FSECONDARY | BAM_FQCFAIL | BAM_FDUP, DIFFERENT MATE CHROM, 1 INDEL
+		if( read->core.qual != 0
+			&& !(read->core.flag & BAM_DEF_MASK)
+			&& read->core.mtid == read->core.tid
+			)
+		{
+			//Count indels
+			cigar32_count_indels(bam1_cigar(read), read->core.n_cigar, &indels);
+
+			if(indels == 1)
+			{
+				//Get read position
+				read_pos = read->core.pos;
+
+				//Check if chrom is different
+				if(last_read_chrom != read->core.tid)
+				{
+					//Interval end!
+
+					//Set last read pointer in context
+					context->last_read = read;
+
+					//Return
+					return NO_ERROR;
+				}
+
+				//Cases
+				if(context->region.valid == 0)
+				{
+					//NO INTERVAL CASE
+
+					//Get interval for this alignment
+					region_get_from_bam1(read, &interval_read_begin, &interval_read_end);
+
+					//This alignment have an interval?
+					if(interval_read_begin != SIZE_MAX)
+					{
+						//Interval found
+						//Set interval values
+						context->region.start_pos = interval_read_begin;
+						context->region.end_pos = interval_read_end;
+						context->region.chrom = read->core.tid;
+						context->region.valid = 1;
+
+						assert(context->region.start_pos <= context->region.end_pos);
+					}
+
+				}
+				else if (context->region.end_pos > read_pos)
+				{
+					//ALIGNMENT INSIDE INTERVAL CASE
+
+					//Get interval for this alignment
+					region_get_from_bam1(read, &interval_read_begin, &interval_read_end);
+
+					//This alignment have an interval?
+					if(interval_read_begin != SIZE_MAX)
+					{
+						//Interval found
+						//Set interval begin
+						if(interval_read_begin < context->region.start_pos)
+							context->region.start_pos = interval_read_begin;
+
+						//Set interval end
+						if(interval_read_end > context->region.end_pos)
+							context->region.end_pos = interval_read_end;
+
+						//Check
+						assert(context->region.start_pos <= context->region.end_pos);
+					}
+				}
+				else if (context->region.end_pos < read_pos)
+				{
+					//ALIGNMENT PAST INTERVAL
+
+					//ERASE
+					{
+						printf("INTERVAL %d:%d-%d %d\n", last_read_chrom + 1, context->region.start_pos, context->region.end_pos, array_list_size(context->process_list));
+						/*int i;
+						for(i = 0; i < array_list_size(context->process_list); i++)
+						{
+							//Get read
+							bam1_t *rread = array_list_get(i, context->process_list);
+
+							printf("%s\n", bam1_qname(rread));
+						}*/
+					}
+
+					//Interval end!
+
+					//Set last read pointer in context
+					context->last_read = read;
+					context->last_read_bytes = bytes;
+
+					//Return
+					return NO_ERROR;
+
+				}
+			} //End indels
+
+			//Save last read chrom
+			last_read_chrom = read->core.tid;
+
+		}	// Filters if
+
+		//Increment progress
+		context->read_count++;
+
+		//Add read to process list
+		array_list_insert(read, context->process_list);
+
+		//Read next alignment
+		read = bam_init1();
+		bytes = bam_read1(context->in_bam_f->bam_fd, read);
+	}
+
+	if(context->region.valid)
+	{
+		//There is an open interval
+		//ERASE
+		{
+			printf("INTERVAL %d:%d-%d %d\n", last_read_chrom + 1, context->region.start_pos, context->region.end_pos, array_list_size(context->process_list));
+		}
+	}
+
+	return NO_ERROR;
+}
+
+ERROR_CODE
+alig_region_indel_realignment(alig_context_t *context)
+{
+	ERROR_CODE err;
+	int i;
+
+	//List
+	array_list_t *list;
+	size_t list_l;
+
+	//Read
+	bam1_t* read;
+	int32_t read_pos;
+
+	assert(context);
+
+	//Validate context
+	err = alig_validate(context);
+	if(err)
+	{
+		return err;
+	}
+
+	//Get list ptr
+	list = context->process_list;
+	list_l = array_list_size(list);
+
+	//Realign only if a region is present
+	if(context->region.valid)
+	{
+		printf("Alig..\n");
+		//alig_bam_list(list, context->genome);
+	}
+
+	//Iterate list
+	/*for(i = 0; i < list_l; i++)
+	{
+		//Get read
+		read = array_list_get(i, list);
+		assert(read);
+
+		//Is in region?
+		//region_bam_overlap(read, &context->region);
+	}*/
+
+	return NO_ERROR;
+}
+
+ERROR_CODE
+alig_region_write(alig_context_t *context)
+{
+	ERROR_CODE err;
+
+	assert(context);
+
+	//Validate context
+	err = alig_validate(context);
+	if(err)
+	{
+		return err;
+	}
+
+	//Write to disk
+	alig_bam_list_to_disk(context->process_list, context->out_bam_f);
+
+	return NO_ERROR;
+}
+
+ERROR_CODE
+alig_bam_file2(char *bam_path, char *ref_name, char *ref_path)
+{
+	ERROR_CODE err;
+	unsigned char outbam[30] = "output.bam";
+
+	//Files
+	bam_file_t *bam_f;
+	bam_file_t *out_bam_f;
+	genome_t* ref;
+
+	//Alignment context
+	alig_context_t context;
+
+	assert(bam_path);
+	assert(ref_name);
+	assert(ref_path);
+
+	//Open bam
+	{
+		printf("Opening BAM from \"%s\" ...\n", bam_path);
+		bam_f = bam_fopen(bam_path);
+		assert(bam_f);
+		printf("BAM opened!...\n");
+	}
+
+	//Open reference genome
+	{
+		printf("Opening reference genome from \"%s%s\" ...\n", ref_path, ref_name);
+		ref = genome_new(ref_name, ref_path);
+		assert(ref);
+		printf("Reference opened!...\n");
+	}
+
+	//Create new bam
+	{
+		printf("Creating new bam file in \"%s\"...\n", outbam);
+		//init_empty_bam_header(orig_bam_f->bam_header_p->n_targets, recal_bam_header);
+		out_bam_f = bam_fopen_mode(outbam, bam_f->bam_header_p, "w");
+		assert(out_bam_f);
+		bam_fwrite_header(out_bam_f->bam_header_p, out_bam_f);
+		out_bam_f->bam_header_p = NULL;
+		printf("New BAM initialized!...\n");
+	}
+
+	//Flush
+	fflush(stdout);
+
+	//Create context
+	printf("Creating context...\n");
+	fflush(stdout);
+	alig_init(&context, bam_f, out_bam_f, ref);
+
+	//Validate context
+	err = alig_validate(&context);
+	if(err)
+	{
+		fprintf(stderr, "ERROR: Error creating alignment context, error code = %d\n", err);
+		fflush(stdout);
+		return err;
+	}
+
+	//Get next reads
+	err = alig_region_next(&context);
+	if(err)
+	{
+		fprintf(stderr, "ERROR: Cannot obtain next region, error code = %d\n", err);
+		fflush(stdout);
+		return err;
+	}
+
+	//Iterate
+	while(array_list_size(context.process_list) > 0)
+	{
+		//Realign
+		alig_region_indel_realignment(&context);
+
+		//Sort
+		//TODO
+
+		//Write to disk
+		err = alig_region_write(&context);
+		if(err)
+		{
+			fprintf(stderr, "ERROR: Cannot write region to disk, error code = %d\n", err);
+			fflush(stdout);
+			return err;
+		}
+
+		//Print progress
+		printf("Total alignments readed: %d\r", (int)context.read_count);
+		fflush(stdout);
+
+		//Get next reads
+		err = alig_region_next(&context);
+		if(err)
+		{
+			fprintf(stderr, "ERROR: Cannot obtain next region, error code = %d\n", err);
+			fflush(stdout);
+			return err;
+		}
+	}
+
+	//Free context
+	printf("\nDestroying context...\n");
+	fflush(stdout);
+	alig_destroy(&context);
+
+	printf("\nClosing BAM file...\n");
+	bam_fclose(bam_f);
+	printf("BAM closed.\n");
+
+	printf("\nClosing reference file...\n");
+	genome_free(ref);
+	printf("Reference closed.\n");
+
+	printf("Closing \"%s\" BAM file...\n", outbam);
+	bam_fclose(out_bam_f);
+	printf("BAM closed.\n");
+}
+
+/**
  * BAM REALIGN
  */
 
