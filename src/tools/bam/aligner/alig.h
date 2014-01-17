@@ -73,8 +73,13 @@ typedef struct {
 	bam1_t *last_read;
 	size_t last_read_bytes;
 
+	//Haplotypes
+	array_list_t *haplo_list;
+
 	//Current region
 	alig_region_t region;
+
+
 } alig_context_t;
 
 
@@ -104,6 +109,12 @@ EXTERNC ERROR_CODE alig_region_indel_realignment(alig_context_t *context);
 EXTERNC ERROR_CODE alig_region_write(alig_context_t *context);
 
 EXTERNC ERROR_CODE alig_bam_file2(char *bam_path, char *ref_name, char *ref_path);
+
+/**
+ * HAPLO OPERATIONS
+ */
+
+EXTERNC ERROR_CODE alig_haplo_process(alig_context_t *context);
 
 /**
  * BAM REALIGN
