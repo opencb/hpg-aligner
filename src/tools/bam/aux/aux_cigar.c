@@ -422,8 +422,11 @@ cigar32_count_indels(uint32_t *cigar, size_t cigar_l, size_t *indels)
 	char *str_cigar;
 
 	assert(cigar);
-	assert(cigar_l > 0);
+	//assert(cigar_l > 0);
 	assert(indels);
+
+	if(cigar_l == 0)
+		return 0;
 
 	//Iterate cigar elements
 	indel_c = 0;
