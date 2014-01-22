@@ -25,6 +25,10 @@
 #include "aux/timestats.h"
 #include "alig_region.h"
 
+//OPTIONS
+#define ALIG_LEFT_ALIGN 0x01
+
+#define ALIG_LIST_IN_SIZE	10000
 #define ALIG_LIST_COUNT_THRESHOLD_TO_WRITE 1000
 
 #define ALIG_REFERENCE_ADDITIONAL_OFFSET 100
@@ -56,9 +60,8 @@
  */
 
 typedef struct {
-	//BAM files
-	bam_file_t *in_bam_f;
-	bam_file_t *out_bam_f;
+	//Input list
+	linked_list_t *in_list;
 
 	//Reference genome
 	genome_t *genome;
@@ -69,16 +72,14 @@ typedef struct {
 	//Alignments readed
 	size_t read_count;
 
-	//Auxiliar read ptr
-	bam1_t *last_read;
-	size_t last_read_bytes;
-
 	//Haplotypes
 	array_list_t *haplo_list;
 
 	//Current region
 	alig_region_t region;
 
+	//Left align
+	uint8_t flags;
 
 } alig_context_t;
 
@@ -96,7 +97,7 @@ typedef enum {
  * CONTEXT
  */
 
-EXTERNC ERROR_CODE alig_init(alig_context_t *context, bam_file_t *in_bam_f, bam_file_t *out_bam_f, genome_t *genome);
+EXTERNC ERROR_CODE alig_init(alig_context_t *context, linked_list_t *in_list, genome_t *genome);
 EXTERNC ERROR_CODE alig_destroy(alig_context_t *context);
 EXTERNC ERROR_CODE alig_validate(alig_context_t *context);
 
@@ -105,16 +106,11 @@ EXTERNC ERROR_CODE alig_validate(alig_context_t *context);
  */
 
 EXTERNC ERROR_CODE alig_region_next(alig_context_t *context);
+EXTERNC ERROR_CODE alig_region_haplotype_process(alig_context_t *context);
 EXTERNC ERROR_CODE alig_region_indel_realignment(alig_context_t *context);
-EXTERNC ERROR_CODE alig_region_write(alig_context_t *context);
+EXTERNC ERROR_CODE alig_region_clear(alig_context_t *context);
 
 EXTERNC ERROR_CODE alig_bam_file2(char *bam_path, char *ref_name, char *ref_path);
-
-/**
- * HAPLO OPERATIONS
- */
-
-EXTERNC ERROR_CODE alig_haplo_process(alig_context_t *context);
 
 /**
  * BAM REALIGN
