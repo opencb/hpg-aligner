@@ -38,19 +38,21 @@
  */
 #define D_TIME_DEBUG
 #ifdef D_TIME_DEBUG
-	//BAM I/0
-	#define D_SLOT_READ 			0
-	#define D_SLOT_WRITE 			1
+	enum alig_slots {
+		//GENERAL
+		D_SLOT_TOTAL,
+		D_SLOT_PROCCESS,
+		D_SLOT_INIT,
 
-	//GENERAL
-	#define D_SLOT_TOTAL			2			//Total time elapsed
-	#define D_SLOT_PROCCESS			3			//General processing for every read (realigned or not)
-	#define D_SLOT_INIT				4			//Initialization aligner time
+		//BAM I/0
+		D_SLOT_READ,
+		D_SLOT_WRITE,
 
-
-	//REALIGN
-	#define D_SLOT_HAPLO_GET 		5			//Obtaining haplos from one read
-	#define D_SLOT_REALIG_PER_HAPLO 6			//Read alig time / number haplotypes
+		//REALIGN
+		D_SLOT_NEXT,
+		D_SLOT_HAPLO_GET,
+		D_SLOT_REALIG_PER_HAPLO
+	};
 
 #endif
 

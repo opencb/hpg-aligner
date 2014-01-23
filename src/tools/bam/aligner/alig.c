@@ -623,6 +623,10 @@ alig_bam_file2(char *bam_path, char *ref_name, char *ref_path)
 	genome_t* ref;
 	int bytes;
 
+#ifdef D_TIME_DEBUG
+	double init_time, end_time;
+#endif
+
 	//Read
 	bam1_t *read;
 
@@ -640,6 +644,9 @@ alig_bam_file2(char *bam_path, char *ref_name, char *ref_path)
 	assert(ref_name);
 	assert(ref_path);
 
+#ifdef D_TIME_DEBUG
+    init_time = omp_get_wtime();
+#endif
 	//Open bam
 	{
 		printf("Opening BAM from \"%s\" ...\n", bam_path);
@@ -667,6 +674,11 @@ alig_bam_file2(char *bam_path, char *ref_name, char *ref_path)
 		printf("New BAM initialized!...\n");
 	}
 
+#ifdef D_TIME_DEBUG
+	end_time = omp_get_wtime();
+	time_add_time_slot(D_SLOT_INIT, TIME_GLOBAL_STATS, end_time - init_time);
+#endif
+
 	//Flush
 	fflush(stdout);
 
@@ -675,6 +687,9 @@ alig_bam_file2(char *bam_path, char *ref_name, char *ref_path)
 	assert(in_list);
 
 	//Fill input list
+#ifdef D_TIME_DEBUG
+    init_time = omp_get_wtime();
+#endif
 	bytes = 1;
 	for(i = 0; i < ALIG_LIST_IN_SIZE && bytes > 0; i++)
 	{
@@ -692,6 +707,12 @@ alig_bam_file2(char *bam_path, char *ref_name, char *ref_path)
 			bam_destroy1(read);
 		}
 	}
+#ifdef D_TIME_DEBUG
+	end_time = omp_get_wtime();
+	list_l = linked_list_size(in_list);
+	if(list_l > 0)
+		time_add_time_slot(D_SLOT_READ, TIME_GLOBAL_STATS, (double)(end_time - init_time)/(double)list_l);
+#endif
 
 	//Create context
 	//printf("Creating context...\n");
@@ -708,7 +729,9 @@ alig_bam_file2(char *bam_path, char *ref_name, char *ref_path)
 	}
 
 	//Get next reads
-	//printf("Getting next reads...\n");
+#ifdef D_TIME_DEBUG
+    init_time = omp_get_wtime();
+#endif
 	err = alig_region_next(&context);
 	if(err)
 	{
@@ -716,12 +739,19 @@ alig_bam_file2(char *bam_path, char *ref_name, char *ref_path)
 		fflush(stdout);
 		return err;
 	}
+#ifdef D_TIME_DEBUG
+	end_time = omp_get_wtime();
+	list_l = array_list_size(context.process_list);
+	time_add_time_slot(D_SLOT_NEXT, TIME_GLOBAL_STATS, (double)(end_time - init_time)/(double)list_l);
+#endif
 
 	//Iterate
 	while(array_list_size(context.process_list) > 0)
 	{
 		//Generate haplotype list
-		//printf("Getting haplotypes...\n");
+#ifdef D_TIME_DEBUG
+		init_time = omp_get_wtime();
+#endif
 		err = alig_region_haplotype_process(&context);
 		if(err)
 		{
@@ -729,6 +759,11 @@ alig_bam_file2(char *bam_path, char *ref_name, char *ref_path)
 			fflush(stdout);
 			return err;
 		}
+#ifdef D_TIME_DEBUG
+		end_time = omp_get_wtime();
+		list_l = array_list_size(context.process_list);
+		time_add_time_slot(D_SLOT_HAPLO_GET, TIME_GLOBAL_STATS, (double)(end_time - init_time)/(double)list_l);
+#endif
 
 		//ERASE
 		/*{
@@ -751,7 +786,9 @@ alig_bam_file2(char *bam_path, char *ref_name, char *ref_path)
 		}*/
 
 		//Realign
-		//printf("Realigning...\n");
+#ifdef D_TIME_DEBUG
+		init_time = omp_get_wtime();
+#endif
 		err = alig_region_indel_realignment(&context);
 		if(err)
 		{
@@ -759,9 +796,13 @@ alig_bam_file2(char *bam_path, char *ref_name, char *ref_path)
 			fflush(stdout);
 			return err;
 		}
-
-		//Sort
-		//TODO
+#ifdef D_TIME_DEBUG
+		end_time = omp_get_wtime();
+		list_l = array_list_size(context.process_list);
+		end_time = (double)(end_time - init_time)/(double)list_l;
+		list_l = array_list_size(context.haplo_list);
+		time_add_time_slot(D_SLOT_REALIG_PER_HAPLO, TIME_GLOBAL_STATS, end_time/(double)list_l);
+#endif
 
 		//Print progress
 		if(context.read_count / 10000 > aux_count)
@@ -772,7 +813,9 @@ alig_bam_file2(char *bam_path, char *ref_name, char *ref_path)
 		}
 
 		//Write processed to disk
-		//printf("Writing to disk...\n");
+#ifdef D_TIME_DEBUG
+		init_time = omp_get_wtime();
+#endif
 		list_l = array_list_size(context.process_list);
 		for(i = 0; i < list_l; i++)
 		{
@@ -789,9 +832,15 @@ alig_bam_file2(char *bam_path, char *ref_name, char *ref_path)
 			//Update input list
 			linked_list_remove_first(in_list);
 		}
+#ifdef D_TIME_DEBUG
+		end_time = omp_get_wtime();
+		time_add_time_slot(D_SLOT_WRITE, TIME_GLOBAL_STATS, (double)(end_time - init_time)/(double)list_l);
+#endif
 
 		//Refill buffer
-		//printf("Refilling input buffer...\n");
+#ifdef D_TIME_DEBUG
+		init_time = omp_get_wtime();
+#endif
 		list_l = linked_list_size(in_list);
 		for(i = list_l; i < ALIG_LIST_IN_SIZE && bytes > 0; i++)
 		{
@@ -808,14 +857,20 @@ alig_bam_file2(char *bam_path, char *ref_name, char *ref_path)
 				bam_destroy1(read);
 			}
 		}
-		list_l = linked_list_size(in_list);
+#ifdef D_TIME_DEBUG
+		end_time = omp_get_wtime();
+		list_l = linked_list_size(in_list) - list_l;
+		if(list_l > 0)
+			time_add_time_slot(D_SLOT_READ, TIME_GLOBAL_STATS, (double)(end_time - init_time)/(double)list_l);
+#endif
 
 		//Clear context
-		//printf("Clearing context...\n");
 		alig_region_clear(&context);
 
 		//Get next reads
-		//printf("Getting next reads...\n");
+#ifdef D_TIME_DEBUG
+		init_time = omp_get_wtime();
+#endif
 		err = alig_region_next(&context);
 		if(err)
 		{
@@ -823,6 +878,12 @@ alig_bam_file2(char *bam_path, char *ref_name, char *ref_path)
 			fflush(stdout);
 			return err;
 		}
+#ifdef D_TIME_DEBUG
+		end_time = omp_get_wtime();
+		list_l = array_list_size(context.process_list);
+		if(list_l > 0)
+			time_add_time_slot(D_SLOT_NEXT, TIME_GLOBAL_STATS, (double)(end_time - init_time)/(double)list_l);
+#endif
 	}
 
 	//Free context
