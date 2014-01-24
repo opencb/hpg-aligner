@@ -23,6 +23,7 @@ typedef struct {
 	size_t start_pos;
 	size_t end_pos;
 	int32_t chrom;
+	uint8_t valid;
 } alig_region_t;
 
 KHASH_MAP_INIT_INT(32, linked_list_t*);
@@ -57,5 +58,7 @@ int region_get_from_bam1(const bam1_t *alig, size_t *r_pos, size_t *r_end_pos);
 int region_get(uint32_t *cigar, uint32_t cigar_l, size_t pos, size_t *r_pos, size_t *r_end_pos);
 int region_get_from_batch(const bam_batch_t* batch, alig_region_table_t *region_table);
 int region_get_from_file(const char *bam_path);
+
+int region_bam_overlap(bam1_t *read, alig_region_t *region);
 
 #endif /* ALIG_REGION_H_ */

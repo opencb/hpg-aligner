@@ -460,3 +460,34 @@ region_get_from_file(const char *bam_path)
 	printf("BAM closed.\n");
 }
 
+int
+region_bam_overlap(bam1_t *read, alig_region_t *region)
+{
+	size_t read_pos;
+	size_t read_end;
+
+	assert(read);
+	assert(region);
+
+	//Same chrom?
+	if(read->core.tid != region->chrom)
+	{
+		//Dont overlap
+		return 0;
+	}
+
+	//Get read position
+	read_pos = read->core.pos;
+	read_end = read_pos + read->core.l_qseq;
+
+	//Is in region?
+	if(read_end < region->start_pos || read_pos > region->end_pos)
+	{
+		//Dont overlap
+		return 0;
+	}
+
+	//Overlap
+	return 1;
+}
+

@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <limits.h>
+#include <stddef.h>
 
 #include <omp.h>
 
@@ -24,6 +25,10 @@
 #include "aux/timestats.h"
 #include "alig_region.h"
 
+//OPTIONS
+#define ALIG_LEFT_ALIGN 0x01
+
+#define ALIG_LIST_IN_SIZE	10000
 #define ALIG_LIST_COUNT_THRESHOLD_TO_WRITE 1000
 
 #define ALIG_REFERENCE_ADDITIONAL_OFFSET 100
@@ -33,22 +38,52 @@
  */
 #define D_TIME_DEBUG
 #ifdef D_TIME_DEBUG
-	//BAM I/0
-	#define D_SLOT_READ 			0
-	#define D_SLOT_WRITE 			1
+	enum alig_slots {
+		//GENERAL
+		D_SLOT_TOTAL,
+		D_SLOT_PROCCESS,
+		D_SLOT_INIT,
 
-	//GENERAL
-	#define D_SLOT_TOTAL			2			//Total time elapsed
-	#define D_SLOT_PROCCESS			3			//General processing for every read (realigned or not)
-	#define D_SLOT_INIT				4			//Initialization aligner time
+		//BAM I/0
+		D_SLOT_READ,
+		D_SLOT_WRITE,
 
-
-	//REALIGN
-	#define D_SLOT_HAPLO_GET 		5			//Obtaining haplos from one read
-	#define D_SLOT_REALIG_PER_HAPLO 6			//Read alig time / number haplotypes
+		//REALIGN
+		D_SLOT_NEXT,
+		D_SLOT_HAPLO_GET,
+		D_SLOT_REALIG_PER_HAPLO
+	};
 
 #endif
 
+
+/**
+ * REALIGNMENT CONTEXT
+ */
+
+typedef struct {
+	//Input list
+	linked_list_t *in_list;
+
+	//Reference genome
+	genome_t *genome;
+
+	//BAM lists
+	array_list_t *process_list;
+
+	//Alignments readed
+	size_t read_count;
+
+	//Haplotypes
+	array_list_t *haplo_list;
+
+	//Current region
+	alig_region_t region;
+
+	//Left align
+	uint8_t flags;
+
+} alig_context_t;
 
 
 /**
@@ -61,14 +96,30 @@ typedef enum {
 } alig_status;
 
 /**
+ * CONTEXT
+ */
+
+EXTERNC ERROR_CODE alig_init(alig_context_t *context, linked_list_t *in_list, genome_t *genome);
+EXTERNC ERROR_CODE alig_destroy(alig_context_t *context);
+EXTERNC ERROR_CODE alig_validate(alig_context_t *context);
+
+/**
+ * REGION OPERATIONS
+ */
+
+EXTERNC ERROR_CODE alig_region_next(alig_context_t *context);
+EXTERNC ERROR_CODE alig_region_haplotype_process(alig_context_t *context);
+EXTERNC ERROR_CODE alig_region_indel_realignment(alig_context_t *context);
+EXTERNC ERROR_CODE alig_region_clear(alig_context_t *context);
+
+EXTERNC ERROR_CODE alig_bam_file2(char *bam_path, char *ref_name, char *ref_path);
+
+/**
  * BAM REALIGN
  */
 
-EXTERNC ERROR_CODE alig_bam_file(char *bam_path, char *ref_name, char *ref_path);
-EXTERNC ERROR_CODE alig_bam_list(array_list_t *bam_list, genome_t* ref);
-EXTERNC ERROR_CODE alig_bam_list_to_disk(array_list_t *bam_list, bam_file_t *bam_f);
-
 EXTERNC ERROR_CODE alig_bam_list_realign(array_list_t *bam_list, array_list_t *haplotype_list, genome_t* ref);
+
 
 
 #endif /* ALIG_H_ */
