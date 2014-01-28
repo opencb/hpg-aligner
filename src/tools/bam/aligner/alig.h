@@ -50,6 +50,7 @@
 
 		//REALIGN
 		D_SLOT_NEXT,
+		D_SLOT_REFERENCE_LOAD,
 		D_SLOT_HAPLO_GET,
 		D_SLOT_REALIG_PER_HAPLO
 	};
@@ -60,6 +61,12 @@
 /**
  * REALIGNMENT CONTEXT
  */
+
+typedef struct {
+	char *reference;
+	size_t position;
+	size_t length;
+} alig_reference_t;
 
 typedef struct {
 	//Input list
@@ -73,12 +80,16 @@ typedef struct {
 
 	//Alignments readed
 	size_t read_count;
+	size_t last_readed_count;
 
 	//Haplotypes
 	array_list_t *haplo_list;
 
 	//Current region
 	alig_region_t region;
+
+	//Current reference
+	alig_reference_t reference;
 
 	//Left align
 	uint8_t flags;
@@ -108,6 +119,7 @@ EXTERNC ERROR_CODE alig_validate(alig_context_t *context);
  */
 
 EXTERNC ERROR_CODE alig_region_next(alig_context_t *context);
+EXTERNC ERROR_CODE alig_region_load_reference(alig_context_t *context);
 EXTERNC ERROR_CODE alig_region_haplotype_process(alig_context_t *context);
 EXTERNC ERROR_CODE alig_region_indel_realignment(alig_context_t *context);
 EXTERNC ERROR_CODE alig_region_clear(alig_context_t *context);

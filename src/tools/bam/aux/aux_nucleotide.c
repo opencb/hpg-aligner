@@ -65,4 +65,42 @@ nucleotide_compare(char *ref_seq, char *bam_seq, size_t bam_seq_l, char *comp_re
 		}
 		*miss_count = count;
 	}
+
+	return NO_ERROR;
+}
+
+
+ERROR_CODE
+nucleotide_miss_qual_sum(char *ref_seq, char *bam_seq, char *bam_qual, size_t bam_seq_l, char *comp_seq, uint32_t *out_miss_count, uint32_t *out_sum_quals)
+{
+	uint32_t sum;
+
+	//Get missmatches
+	nucleotide_compare(ref_seq, bam_seq, bam_seq_l, comp_seq, out_miss_count);
+
+	//If wants quality sum
+	if(out_sum_quals)
+	{
+		//Calculate miss sum
+		sum = 0;
+		if(*out_miss_count != 0)
+		{
+			int z;
+			for(z = 0; z < bam_seq_l; z++)
+			{
+				if(comp_seq[z] == 0)
+					sum += bam_qual[z];
+			}
+
+			//Set output
+			*out_sum_quals = sum;
+		}
+		else
+		{
+			//Perfect match
+			*out_sum_quals = 0;
+		}
+	}
+
+	return NO_ERROR;
 }
