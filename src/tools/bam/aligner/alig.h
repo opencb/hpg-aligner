@@ -69,6 +69,13 @@ typedef struct {
 } alig_reference_t;
 
 typedef struct {
+	uint32_t *m_scores;
+	size_t *m_positions;
+	size_t m_total;
+	size_t m_ldim;
+} alig_scores_t;
+
+typedef struct {
 	//Input list
 	linked_list_t *in_list;
 
@@ -76,7 +83,7 @@ typedef struct {
 	genome_t *genome;
 
 	//BAM lists
-	array_list_t *process_list;
+	linked_list_t *process_list;
 
 	//Alignments readed
 	size_t read_count;
@@ -90,6 +97,9 @@ typedef struct {
 
 	//Current reference
 	alig_reference_t reference;
+
+	//Scores
+	alig_scores_t scores;
 
 	//Left align
 	uint8_t flags;
@@ -132,6 +142,12 @@ EXTERNC ERROR_CODE alig_bam_file2(char *bam_path, char *ref_name, char *ref_path
 
 EXTERNC ERROR_CODE alig_bam_list_realign(array_list_t *bam_list, array_list_t *haplotype_list, genome_t* ref);
 
+/**
+ * PRIVATE FUNCTIONS
+ */
+
+static ERROR_CODE alig_get_scores(alig_context_t *context);
+static ERROR_CODE alig_get_best_haplotype(alig_scores_t *scores, int *out_haplo_index);
 
 
 #endif /* ALIG_H_ */
