@@ -147,7 +147,7 @@ EXTERNC ERROR_CODE alig_bam_list_realign(array_list_t *bam_list, array_list_t *h
  */
 
 static ERROR_CODE alig_get_scores(alig_context_t *context);
-static ERROR_CODE alig_get_best_haplotype(alig_scores_t *scores, int *out_haplo_index);
+static ERROR_CODE alig_get_alternative_haplotype(alig_scores_t *scores, int *out_haplo_index, uint32_t *out_haplo_score, uint32_t *out_ref_score);
 
 
 #endif /* ALIG_H_ */

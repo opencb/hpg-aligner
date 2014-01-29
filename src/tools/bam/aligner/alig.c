@@ -589,6 +589,9 @@ alig_region_indel_realignment(alig_context_t *context)
 	//Haplotype
 	aux_indel_t *haplo = NULL;
 	aux_indel_t *aux_haplo = NULL;
+	int best_haplo_index;
+	uint32_t best_haplo_score;
+	uint32_t ref_haplo_score;
 
 	//Realign list
 	array_list_t *alig_list;
@@ -646,7 +649,11 @@ alig_region_indel_realignment(alig_context_t *context)
 		}
 
 		//Get scores tables
-		alig_get_scores(context);
+		//alig_get_scores(context);
+		//alig_get_alternative_haplotype(&context->scores, &best_haplo_index, &best_haplo_score, &ref_haplo_score);
+		//printf("BEST HAPLO: H%d\n", best_haplo_index);
+		//printf("H0 score: %d, H%d score: %d\n", ref_haplo_score, best_haplo_index, best_haplo_score);
+		//getchar();
 
 		//Align region reads
 		alig_bam_list_realign(alig_list, context->haplo_list, context->genome);
@@ -1769,7 +1776,7 @@ alig_get_scores(alig_context_t *context)
 	}
 
 	//ERASE
-	{
+	/*{
 		int j;
 		size_t indels;
 		//Print table
@@ -1816,9 +1823,99 @@ alig_get_scores(alig_context_t *context)
 			cigar32_count_indels(bam1_cigar(read), read->core.n_cigar, &indels);
 			printf("%s \tIndels: %d\n", bam1_qname(read), indels);
 		}
+	}*/
+
+	return NO_ERROR;
+}
+
+static inline ERROR_CODE
+alig_get_alternative_haplotype(alig_scores_t *scores, int *out_haplo_index, uint32_t *out_haplo_score, uint32_t *out_ref_score)
+{
+	int i, j;
+	uint32_t best_score;
+	int best_haplo_index;
+	size_t haplo_l;
+	size_t bam_l;
+
+	//Scores
+	uint32_t *m_scores;
+	size_t *m_positions;
+	uint32_t aux_score;
+
+	assert(scores);
+
+	//Valid scores?
+	if(scores->m_total == 0)
+		return ALIG_INVALID_SCORES;
+
+	//Set lengths
+	haplo_l = scores->m_ldim;
+	bam_l = scores->m_total / scores->m_ldim;
+
+	//Set matrix
+	m_scores = scores->m_scores;
+	m_positions = scores->m_positions;
+	assert(m_scores);
+	assert(m_positions);
+
+	//Get reference score
+
+
+	//Output ref score
+	if(out_ref_score)
+	{
+		//Sum scores
+		aux_score = 0;
+		for(i = 0; i < bam_l; i++)
+		{
+			if(m_scores[(i * haplo_l)] != UINT32_MAX)	//If valid score
+			{
+				aux_score += m_scores[(i * haplo_l)];
+			}
+		}
+
+		//Output
+		*out_ref_score = aux_score;
 	}
 
-	getchar();
+
+	//Find best haplotype
+	best_score = UINT32_MAX;
+	for(j = 1; j < haplo_l; j++)
+	{
+		//Sum scores
+		aux_score = 0;
+		for(i = 0; i < bam_l; i++)
+		{
+			if(m_scores[(i * haplo_l) + j] != UINT32_MAX)	//If valid score
+			{
+				aux_score += m_scores[(i * haplo_l) + j];
+			}
+		}
+
+		if(aux_score < best_score)
+		{
+			best_score = aux_score;
+			best_haplo_index = j;
+		}
+
+		//ERASE
+		/*{
+			//Print haplotype score
+			printf("H%d === total score = %d\n", j, aux_score);
+		}*/
+
+		//Found perfect match
+		if(best_score == 0)
+			break;
+	}
+
+	//Set output
+	if(out_haplo_score)
+		*out_haplo_score = best_score;
+
+	if(out_haplo_index)
+		*out_haplo_index = best_haplo_index;
 
 	return NO_ERROR;
 }
