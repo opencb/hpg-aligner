@@ -414,119 +414,130 @@ alig_region_haplotype_process(alig_context_t *context)
 		return err;
 	}
 
-	//Get all haplotypes
-	for(i = 0; i < array_list_size(context->process_list); i++)
+	//Realign only if a region is present
+	if(context->region.valid)
 	{
-		//Get read
-		read = array_list_get(i, context->process_list);
-		assert(read);
-
-		//FILTERS: MAP QUALITY = 0, BAM_FUNMAP | BAM_FSECONDARY | BAM_FQCFAIL | BAM_FDUP, DIFFERENT MATE CHROM, 1 INDEL, CIGAR PRESENT
-		if( read->core.qual != 0
-			&& !(read->core.flag & BAM_DEF_MASK)
-			&& read->core.mtid == read->core.tid
-			&& read->core.n_cigar != 0
-			)
+		//Valid reference?
+		if(!context->reference.reference)
 		{
-			//Get read cigar
-			read_cigar = bam1_cigar(read);
-			if(read_cigar)	//Valid cigar?
+			fprintf(stderr, "Warning: Trying to extract haplotypes with uninitialized reference\n");
+			return ALIG_INVALID_REFERENCE;
+		}
+
+		//Get all haplotypes
+		for(i = 0; i < array_list_size(context->process_list); i++)
+		{
+			//Get read
+			read = array_list_get(i, context->process_list);
+			assert(read);
+
+			//FILTERS: MAP QUALITY = 0, BAM_FUNMAP | BAM_FSECONDARY | BAM_FQCFAIL | BAM_FDUP, DIFFERENT MATE CHROM, 1 INDEL, CIGAR PRESENT
+			if( read->core.qual != 0
+				&& !(read->core.flag & BAM_DEF_MASK)
+				&& read->core.mtid == read->core.tid
+				&& read->core.n_cigar != 0
+				)
 			{
-				//This read have indels?
-				cigar32_count_indels(read_cigar, read->core.n_cigar, &read_indels);
-				if(read_indels == 1)	//Only one indel leftalign
+				//Get read cigar
+				read_cigar = bam1_cigar(read);
+				if(read_cigar)	//Valid cigar?
 				{
-					//Convert read sequence and qualities to string
-					read_seq_l = read->core.l_qseq;
-					read_seq = (char *) malloc((read_seq_l + 1) * sizeof(char));
-					comp_seq = (char *) malloc((read_seq_l + 1) * sizeof(char));
-					assert(read);
-					new_sequence_from_bam_ref(read, read_seq, read_seq_l + 1);
-
-					//Get reference
-					ref_seq = context->reference.reference;
-
-					//Get relative displacement from reference
-					read_disp_ref = read->core.pos - context->reference.position;
-					if(read_disp_ref < 0)
-						read_disp_ref = 0;
-
-					//Get raw missmatch
-					nucleotide_compare(ref_seq + read_disp_ref, read_seq, read_seq_l, comp_seq, &ref_miss);
-
-					//If match reference perfectly, realign to reference and extract from process list
-					if(ref_miss == 0)
+					//This read have indels?
+					cigar32_count_indels(read_cigar, read->core.n_cigar, &read_indels);
+					if(read_indels == 1)	//Only one indel leftalign
 					{
-						//Count unclipped bases
-						cigar32_count_nucleotides_not_clip(read_cigar, read->core.n_cigar, &read_bases);
+						//Convert read sequence and qualities to string
+						read_seq_l = read->core.l_qseq;
+						read_seq = (char *) malloc((read_seq_l + 1) * sizeof(char));
+						comp_seq = (char *) malloc((read_seq_l + 1) * sizeof(char));
+						assert(read);
+						new_sequence_from_bam_ref(read, read_seq, read_seq_l + 1);
 
-						//Create new cigar with '$bases'M
-						aux_cigar[0] = read_bases << BAM_CIGAR_SHIFT;	//ex: 108M
-						aux_cigar_l = 1;
+						//Get reference
+						ref_seq = context->reference.reference;
 
-						//Reclip cigar
-						cigar32_reclip(read_cigar, read->core.n_cigar, aux_cigar, aux_cigar_l, aux_cigar, &aux_cigar_l);
+						//Get relative displacement from reference
+						read_disp_ref = read->core.pos - context->reference.position;
+						if(read_disp_ref < 0)
+							read_disp_ref = 0;
 
-						//Replace read cigar
-						cigar32_replace(read, aux_cigar, aux_cigar_l);
+						//Get raw missmatch
+						nucleotide_compare(ref_seq + read_disp_ref, read_seq, read_seq_l, comp_seq, &ref_miss);
 
-						//Extract this read from proccess list
-						array_list_remove_at(i, context->process_list);
-						i--;
-					}
-					//Obtain haplotype
-					else
-					{
-						//Left align cigar first
-						if(context->flags & ALIG_LEFT_ALIGN)
+						//If match reference perfectly, realign to reference and extract from process list
+						if(ref_miss == 0)
 						{
-							//Leftmost cigar
-							cigar32_leftmost(ref_seq + read_disp_ref, (context->reference.length) - read_disp_ref,
-									read_seq, read->core.l_qseq,
-									read_cigar, read->core.n_cigar,
-									aux_cigar, &aux_cigar_l);
-						} //Leftalign
+							//Count unclipped bases
+							cigar32_count_nucleotides_not_clip(read_cigar, read->core.n_cigar, &read_bases);
+
+							//Create new cigar with '$bases'M
+							aux_cigar[0] = read_bases << BAM_CIGAR_SHIFT;	//ex: 108M
+							aux_cigar_l = 1;
+
+							//Reclip cigar
+							cigar32_reclip(read_cigar, read->core.n_cigar, aux_cigar, aux_cigar_l, aux_cigar, &aux_cigar_l);
+
+							//Replace read cigar
+							cigar32_replace(read, aux_cigar, aux_cigar_l);
+
+							//Extract this read from proccess list
+							array_list_remove_at(i, context->process_list);
+							i--;
+						}
+						//Obtain haplotype
 						else
 						{
-							//Use original cigar
-							memcpy(aux_cigar, read_cigar, read->core.n_cigar * sizeof(uint32_t));
-							aux_cigar_l = read->core.n_cigar;
+							//Left align cigar first
+							if(context->flags & ALIG_LEFT_ALIGN)
+							{
+								//Leftmost cigar
+								cigar32_leftmost(ref_seq + read_disp_ref, (context->reference.length) - read_disp_ref,
+										read_seq, read->core.l_qseq,
+										read_cigar, read->core.n_cigar,
+										aux_cigar, &aux_cigar_l);
+							} //Leftalign
+							else
+							{
+								//Use original cigar
+								memcpy(aux_cigar, read_cigar, read->core.n_cigar * sizeof(uint32_t));
+								aux_cigar_l = read->core.n_cigar;
+							}
+
+							//Allocate haplotype
+							haplo = (aux_indel_t *)malloc(sizeof(aux_indel_t) * read_indels);	//For now is only 1
+
+							//Fill haplotype
+							cigar32_get_indels(read->core.pos, aux_cigar, aux_cigar_l, haplo);
+
+							//Check if haplotype is present in list
+							aux_haplo = NULL;
+							int h;
+							haplo_l = array_list_size(context->haplo_list);
+							for(h = 0; h < haplo_l; h++)
+							{
+								aux_haplo = array_list_get(h, context->haplo_list);
+								assert(aux_haplo);
+								if(aux_haplo->indel == haplo->indel && aux_haplo->ref_pos == haplo->ref_pos)
+									break;
+							}
+
+							//Duplicate?
+							if(h == haplo_l)
+							{
+								//Add to haplotype list (not duplicated)
+								array_list_insert(haplo, context->haplo_list);
+							}
 						}
 
-						//Allocate haplotype
-						haplo = (aux_indel_t *)malloc(sizeof(aux_indel_t) * read_indels);	//For now is only 1
+						//Free
+						free(read_seq);
+						free(comp_seq);
 
-						//Fill haplotype
-						cigar32_get_indels(read->core.pos, aux_cigar, aux_cigar_l, haplo);
-
-						//Check if haplotype is present in list
-						aux_haplo = NULL;
-						int h;
-						haplo_l = array_list_size(context->haplo_list);
-						for(h = 0; h < haplo_l; h++)
-						{
-							aux_haplo = array_list_get(h, context->haplo_list);
-							assert(aux_haplo);
-							if(aux_haplo->indel == haplo->indel && aux_haplo->ref_pos == haplo->ref_pos)
-								break;
-						}
-
-						//Duplicate?
-						if(h == haplo_l)
-						{
-							//Add to haplotype list (not duplicated)
-							array_list_insert(haplo, context->haplo_list);
-						}
-					}
-
-					//Free
-					free(read_seq);
-					free(comp_seq);
-
-				} //Indel == 1
-			} //Valid cigar end if
-		}//Filters if
-	}
+					} //Indel == 1
+				} //Valid cigar end if
+			}//Filters if
+		} //Haplotypes for
+	} //Region if
 
 	return NO_ERROR;
 }
@@ -577,8 +588,11 @@ alig_region_indel_realignment(alig_context_t *context)
 	//Realign only if a region is present
 	if(context->region.valid)
 	{
-		//printf("Alig..\n");
-		//alig_bam_list(list, context->genome);
+		if(!context->reference.reference)
+		{
+			fprintf(stderr, "Warning: Trying to indel realign with uninitialized reference\n");
+			return ALIG_INVALID_REFERENCE;
+		}
 
 		//Allocate list
 		alig_list = array_list_new(list_l, 1.2f, 0);
@@ -640,6 +654,11 @@ alig_region_clear(alig_context_t *context)
 
 	//Clear haplotype list
 	array_list_clear(context->haplo_list, free);
+
+	//Clear reference
+	if(context->reference.reference)
+		free(context->reference.reference);
+	memset(&context->reference, 0, sizeof(alig_reference_t));
 
 	return NO_ERROR;
 }
