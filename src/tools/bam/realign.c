@@ -173,6 +173,7 @@ align_launch(char *reference, char *bam, char *output, int threads)
 	assert(output);
 
 	init_log();
+	LOG_FILE("realign.log","w");
 
 	//Set schedule if not defined
 	setenv("OMP_SCHEDULE", "static", 0);

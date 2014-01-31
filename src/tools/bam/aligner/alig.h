@@ -26,14 +26,18 @@
 #include "alig_region.h"
 
 //OPTIONS
-#define ALIG_LEFT_ALIGN 0x01
-
 #define ALIG_LIST_IN_SIZE	10000
+#define ALIG_LIST_NEXT_SIZE 1000
 #define ALIG_LIST_COUNT_THRESHOLD_TO_WRITE 1000
 
 #define ALIG_REFERENCE_ADDITIONAL_OFFSET 100
 
 #define ALIG_IMPROVEMENT_THREHOLD 0.0
+
+//FLAGS
+#define ALIG_LEFT_ALIGN 0x01	//Left align cigars?
+#define ALIG_REFERENCE_PRIORITY 0x02	//Reference haplotype have priority over alternative? (if equals case)
+#define ALIG_ORIGINAL_PRIORITY 0x03	//Original cigar have preference over realigned one? (if equals case)
 
 /**
  * Time measures
@@ -85,7 +89,8 @@ typedef struct {
 	genome_t *genome;
 
 	//BAM lists
-	linked_list_t *process_list;
+	array_list_t *filtered_list;
+	array_list_t *realign_list;
 
 	//Alignments readed
 	size_t read_count;

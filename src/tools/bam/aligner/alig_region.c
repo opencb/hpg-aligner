@@ -285,7 +285,7 @@ region_get(uint32_t *cigar, uint32_t cigar_l, size_t pos, size_t *r_pos, size_t 
 				break;
 
 			//Set initial position
-			if(reg_pos == -1)
+			if(reg_pos == SIZE_MAX)
 			{
 				reg_pos = pos + disp - 1;
 			}
@@ -297,7 +297,7 @@ region_get(uint32_t *cigar, uint32_t cigar_l, size_t pos, size_t *r_pos, size_t 
 		case BAM_CDEL:	//Deletion
 			//printf("D");
 			//Set initial position
-			if(reg_pos == -1)
+			if(reg_pos == SIZE_MAX)
 			{
 				reg_pos = pos + disp;
 			}
