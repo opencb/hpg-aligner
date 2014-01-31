@@ -315,7 +315,7 @@ char *get_subsequence(char *seq, size_t start, size_t len) {
 }
 //--------------------------------------------------------------------
 
-void display_cmp_sequences(fastq_read_t *read, char *revcomp_seq, sa_index3_t *sa_index) {
+void display_cmp_sequences(fastq_read_t *read, sa_index3_t *sa_index) {
   size_t pos, chrom, strand;
   char *ref, *seq, *chrom_str, *aux, *p1, *p2;
   
@@ -354,7 +354,7 @@ void display_cmp_sequences(fastq_read_t *read, char *revcomp_seq, sa_index3_t *s
   }
   printf("\n");
   if (strand) {
-    seq = revcomp_seq;
+    seq = read->revcomp;
   } else {
    seq = read->sequence;
   }

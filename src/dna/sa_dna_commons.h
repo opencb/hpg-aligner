@@ -4,6 +4,7 @@
 #include "bioformats/fastq/fastq_batch_reader.h"
 #include "aligners/bwt/bwt.h"
 
+#include "options.h"
 #include "buffers.h"
 #include "cal_seeker.h"
 
@@ -56,43 +57,36 @@ char func_names[NUM_TIMING][1024];
 //--------------------------------------------------------------------
 
 typedef struct sa_mapping_batch {
+
+  size_t num_gap_reads;
+  size_t num_sw_reads;
+  size_t num_sws;
+
   size_t num_reads;
   #ifdef _TIMING
   double func_times[NUM_TIMING];
   #endif
   array_list_t *fq_reads;
-  char **revcomp_seqs;
   array_list_t **mapping_lists;
 } sa_mapping_batch_t;
 
 //--------------------------------------------------------------------
 
 inline sa_mapping_batch_t *sa_mapping_batch_new(array_list_t *fq_reads) {
-  char *revcomp, c;
   fastq_read_t *read;
   size_t read_length, num_reads = array_list_size(fq_reads);
 
   sa_mapping_batch_t *p = (sa_mapping_batch_t *) malloc(sizeof(sa_mapping_batch_t));
+
+  p->num_gap_reads = 0;
+  p->num_sw_reads = 0;
+  p->num_sws = 0;
+
   p->num_reads = num_reads;
   p->fq_reads = fq_reads;
-  p->revcomp_seqs = (char **) malloc(num_reads * sizeof(char *));
   p->mapping_lists = (array_list_t **) malloc(num_reads * sizeof(array_list_t *));
   for (size_t i = 0; i < num_reads; i++) {
-    read = array_list_get(i, fq_reads);
-    read_length = read->length;
     p->mapping_lists[i] = array_list_new(10, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
-    // prepare reverse complementary sequence
-    revcomp = (char *) malloc(read_length + 1);
-    for (int src = 0, dest = read_length - 1; src < read_length; src++, dest--) {
-      c = read->sequence[src];
-      if      (c == 'A') { revcomp[dest] = 'T'; }
-      else if (c == 'T') { revcomp[dest] = 'A'; }
-      else if (c == 'G') { revcomp[dest] = 'C'; }
-      else if (c == 'C') { revcomp[dest] = 'G'; }
-      else               { revcomp[dest] = c; }
-    }
-    revcomp[read_length] = 0;
-    p->revcomp_seqs[i] = revcomp;
   }
 
   #ifdef _TIMING
@@ -110,12 +104,6 @@ inline void sa_mapping_batch_free(sa_mapping_batch_t *p) {
   if (p) {
     if (p->fq_reads) { array_list_free(p->fq_reads, (void *) fastq_read_free); }
     if (p->mapping_lists) { free(p->mapping_lists); }
-    if (p->revcomp_seqs) {
-      for (size_t i = 0; i < p->num_reads; i++) {
-	free(p->revcomp_seqs[i]);
-      }
-      free(p->revcomp_seqs);
-    }
     free(p);
   }
 }  
@@ -125,6 +113,7 @@ inline void sa_mapping_batch_free(sa_mapping_batch_t *p) {
 //--------------------------------------------------------------------
 
 typedef struct sa_wf_batch {
+  options_t *options;
   sa_index3_t *sa_index;
   batch_writer_input_t *writer_input;
   sa_mapping_batch_t *mapping_batch;  
@@ -132,11 +121,13 @@ typedef struct sa_wf_batch {
 
 //--------------------------------------------------------------------
 
-inline sa_wf_batch_t *sa_wf_batch_new(sa_index3_t *sa_index,
+inline sa_wf_batch_t *sa_wf_batch_new(options_t *options,
+				      sa_index3_t *sa_index,
 				      batch_writer_input_t *writer_input,
 				      sa_mapping_batch_t *mapping_batch) {
   
   sa_wf_batch_t *p = (sa_wf_batch_t *) malloc(sizeof(sa_wf_batch_t));
+  p->options = options;
   p->sa_index = sa_index;
   p->writer_input = writer_input;
   p->mapping_batch = mapping_batch;
@@ -179,7 +170,7 @@ inline void sa_wf_input_free(sa_wf_input_t *p) {
 //--------------------------------------------------------------------
 
 typedef struct cigar {
-  uint32_t ops[400];
+  uint32_t ops[1000];
   int num_ops;
 } cigar_t;
 
@@ -500,7 +491,7 @@ void display_suffix_mappings(int strand, size_t r_start, size_t suffix_len,
 void print_seed(char *msg, seed_t *s);
 void display_sequence(uint j, sa_index3_t *index, uint len);
 char *get_subsequence(char *seq, size_t start, size_t len);
-void display_cmp_sequences(fastq_read_t *read, char *revcomp_seq, sa_index3_t *sa_index);
+void display_cmp_sequences(fastq_read_t *read, sa_index3_t *sa_index);
 
 //--------------------------------------------------------------------
 //--------------------------------------------------------------------

@@ -242,7 +242,7 @@ void cal_mng_select_best(int read_area, array_list_t *valid_list, array_list_t *
 // generate cal from an exact read
 //--------------------------------------------------------------------
 
-void generate_cals_from_exact_read(int strand, fastq_read_t *read, char *revcomp,
+void generate_cals_from_exact_read(int strand, fastq_read_t *read,
 				   size_t low, size_t high, sa_index3_t *sa_index, 
 				   array_list_t *cal_list) {  
   size_t g_start, g_end;
@@ -273,7 +273,7 @@ void generate_cals_from_exact_read(int strand, fastq_read_t *read, char *revcomp
 // bt using the mini-sw
 //--------------------------------------------------------------------
 
-int generate_cals_from_suffixes(int strand, fastq_read_t *read, char *revcomp,
+int generate_cals_from_suffixes(int strand, fastq_read_t *read,
 				int read_pos, int suffix_len, size_t low, size_t high, 
 				sa_index3_t *sa_index, cal_mng_t *cal_mng
                                 #ifdef _TIMING
@@ -300,7 +300,7 @@ int generate_cals_from_suffixes(int strand, fastq_read_t *read, char *revcomp,
   seed_t *seed;
 
   char *g_seq, *r_seq;
-  r_seq = (strand ? revcomp : read->sequence);
+  r_seq = (strand ? read->revcomp : read->sequence);
   
   #ifdef _TIMING
   gettimeofday(&stop, NULL);
@@ -511,8 +511,9 @@ int generate_cals_from_suffixes(int strand, fastq_read_t *read, char *revcomp,
   }
 
   //  return max_map_len + suffix_len + 1;
-  return (sa_index->k_value / 2);
+  //  return (sa_index->k_value * 2); // / 2);
   //  return (sa_index->k_value * 4);
+  return 0;
 }
 
 //--------------------------------------------------------------------
@@ -520,7 +521,7 @@ int generate_cals_from_suffixes(int strand, fastq_read_t *read, char *revcomp,
 //    search prefix + search suffix + extend using min-sw
 //--------------------------------------------------------------------
 
-array_list_t *step_one(fastq_read_t *read, char *revcomp_seq,
+array_list_t *step_one(int num_seeds, fastq_read_t *read,
 		       sa_mapping_batch_t *mapping_batch, 
 		       sa_index3_t *sa_index, cal_mng_t *cal_mng) {
 
@@ -543,7 +544,12 @@ array_list_t *step_one(fastq_read_t *read, char *revcomp_seq,
   cal_mng->read_length = read->length;
 
   int max_read_area;// = read->length * MISMATCH_PERC;
-  int read_pos, read_inc = sa_index->k_value / 2;
+  int read_pos, read_inc;
+  
+  read_inc = read->length / num_seeds;
+  if (read_inc < sa_index->k_value / 2) {
+    read_inc = sa_index->k_value / 2;
+  }
 
   // fill in the CAL manager structure
   int read_end_pos = read->length - sa_index->k_value;
@@ -551,7 +557,7 @@ array_list_t *step_one(fastq_read_t *read, char *revcomp_seq,
 
   #ifdef _VERBOSE	  
   printf("\n\n====>>>> STEP ONE <<<<====\n");
-  display_cmp_sequences(read, revcomp_seq, sa_index);
+  display_cmp_sequences(read, read->revcomp, sa_index);
   #endif
 
   //    memset(saved_pos, 0, sizeof(saved_pos));
@@ -608,7 +614,7 @@ array_list_t *step_one(fastq_read_t *read, char *revcomp_seq,
           #ifdef _TIMING
 	  gettimeofday(&start, NULL);
           #endif
-	  generate_cals_from_exact_read(strand, read, revcomp_seq,
+	  generate_cals_from_exact_read(strand, read,
 					low, high, sa_index, cal_list);
           #ifdef _TIMING
 	  gettimeofday(&stop, NULL);
@@ -620,21 +626,20 @@ array_list_t *step_one(fastq_read_t *read, char *revcomp_seq,
           #ifdef _TIMING
 	  gettimeofday(&start, NULL);
           #endif
-	  read_pos += generate_cals_from_suffixes(strand, read, revcomp_seq,
-						  read_pos, suffix_len, low, high, sa_index, cal_mng
-                                                  #ifdef _TIMING
-						  , mapping_batch
-                                                  #endif
-						  );
+	  generate_cals_from_suffixes(strand, read,
+				      read_pos, suffix_len, low, high, sa_index, cal_mng
+                                      #ifdef _TIMING
+				      , mapping_batch
+                                      #endif
+				      );
           #ifdef _TIMING
 	  gettimeofday(&stop, NULL);
 	  mapping_batch->func_times[FUNC_CALS_FROM_SUFFIXES] += 
 	    ((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);  
           #endif
 	}
-      } else {
-	read_pos += read_inc;
       }
+      read_pos += read_inc;
     } // end of for read_pos
     
     if (extra_seed) {
@@ -673,7 +678,7 @@ array_list_t *step_one(fastq_read_t *read, char *revcomp_seq,
         #ifdef _TIMING
 	gettimeofday(&start, NULL);
         #endif
-	read_pos += generate_cals_from_suffixes(strand, read, revcomp_seq,
+	read_pos += generate_cals_from_suffixes(strand, read,
 						read_pos, suffix_len, low, high, sa_index, cal_mng
                                                 #ifdef _TIMING
 						, mapping_batch
@@ -699,7 +704,7 @@ array_list_t *step_one(fastq_read_t *read, char *revcomp_seq,
     #endif
     
     // next, - strand
-    r_seq = revcomp_seq;
+    r_seq = read->revcomp;
   } // end of for strand
   
   //  printf("**************** filter min_read_area: = %i, num_cals = %i\n", 
@@ -851,7 +856,7 @@ void step_two(fastq_read_t *read, char *revcomp_seq,
 //    fill gaps using sw
 //--------------------------------------------------------------------
 
-void step_three(fastq_read_t *read, char *revcomp_seq, 
+void step_three(fastq_read_t *read, 
 		sa_mapping_batch_t *mapping_batch, sa_index3_t *sa_index, 
 		array_list_t *cal_list) {
   size_t seed_count, num_seeds, num_cals = array_list_size(cal_list);
@@ -906,7 +911,7 @@ void step_three(fastq_read_t *read, char *revcomp_seq,
       gap_genome_end = seed->genome_start - 1;
       ref = sa_genome_get_sequence(cal->chromosome_id, gap_genome_start, gap_genome_end, sa_index->genome);
       
-      seq = get_subsequence((cal->strand ? revcomp_seq : read->sequence), 
+      seq = get_subsequence((cal->strand ? read->revcomp : read->sequence), 
 			    0, seed->read_start + 1);
       
       sw_prepare = sw_prepare_new(seq, ref, 0, 0, FIRST_SW);
@@ -970,7 +975,7 @@ void step_three(fastq_read_t *read, char *revcomp_seq,
       #endif
 
       assert(gap_read_len > 0);
-      seq = get_subsequence((cal->strand ? revcomp_seq : read->sequence), 
+      seq = get_subsequence((cal->strand ? read->revcomp : read->sequence), 
 			    gap_read_start, gap_read_len);
 
       assert(gap_genome_len > 0);
@@ -995,7 +1000,7 @@ void step_three(fastq_read_t *read, char *revcomp_seq,
       gap_genome_end = gap_genome_start + (read->length - seed->read_end);// + 10;
       ref = sa_genome_get_sequence(cal->chromosome_id, gap_genome_start, gap_genome_end, sa_index->genome);
 
-      seq = get_subsequence((cal->strand ? revcomp_seq : read->sequence), 
+      seq = get_subsequence((cal->strand ? read->revcomp : read->sequence), 
 			    seed->read_end + 1, read->length - seed->read_end - 1);
 
       sw_prepare = sw_prepare_new(seq, ref, 0, 0, LAST_SW);
@@ -1025,6 +1030,11 @@ void step_three(fastq_read_t *read, char *revcomp_seq,
     #endif
   }
   
+  if (sw_count > 0) {
+    mapping_batch->num_sw_reads++;
+    mapping_batch->num_sws += sw_count;
+  }
+
   #ifdef _TIMING
   gettimeofday(&stop, NULL);
   mapping_batch->func_times[FUNC_PRE_SW] += 
@@ -1208,6 +1218,9 @@ int sa_mapper(void *data) {
   #endif
   
   sa_wf_batch_t *wf_batch = (sa_wf_batch_t *) data;
+
+  int num_seeds = wf_batch->options->num_seeds;
+  int min_cal_size = wf_batch->options->min_cal_size;
   
   sa_mapping_batch_t *mapping_batch = wf_batch->mapping_batch;
   sa_index3_t *sa_index = (sa_index3_t *) wf_batch->sa_index;
@@ -1224,9 +1237,6 @@ int sa_mapper(void *data) {
 
   fastq_read_t *read;
 
-  //  int saved_pos[2][1024];
-  // TODO !!! 20 = min. cal size
-  uint min_cal_size = 20;
   cal_mng = cal_mng_new(sa_index->genome);
   #ifdef _TIMING
   gettimeofday(&stop, NULL);
@@ -1241,7 +1251,7 @@ int sa_mapper(void *data) {
     //max_num_mismatches = read->length * MISMATCH_PERC;
 
     // step one:: extend using mini-sw from suffix
-    cal_list = step_one(read, mapping_batch->revcomp_seqs[i], mapping_batch, sa_index, cal_mng);
+    cal_list = step_one(num_seeds, read, mapping_batch, sa_index, cal_mng);
 
     if (array_list_size(cal_list) > 0) {
       min_num_mismatches = get_min_num_mismatches(cal_list);
@@ -1260,7 +1270,7 @@ int sa_mapper(void *data) {
       #endif
 
       // step three (Smith-Waterman to fill in the gaps)
-      step_three(read, mapping_batch->revcomp_seqs[i], mapping_batch, sa_index, cal_list);
+      step_three(read, mapping_batch, sa_index, cal_list);
 
       //      min_num_mismatches = get_min_num_mismatches(cal_list);
       max_score = get_max_score(cal_list);

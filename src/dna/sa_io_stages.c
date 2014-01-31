@@ -79,7 +79,8 @@ void *sa_fq_reader(void *input) {
   } else {
     sa_mapping_batch_t *sa_mapping_batch = sa_mapping_batch_new(reads);
 
-    new_wf_batch = sa_wf_batch_new(curr_wf_batch->sa_index,
+    new_wf_batch = sa_wf_batch_new(curr_wf_batch->options,
+				   curr_wf_batch->sa_index,
 				   curr_wf_batch->writer_input, 
 				   sa_mapping_batch);
   }
@@ -98,6 +99,10 @@ int num_dup_reads = 0;
 int num_total_dup_reads = 0;
 #endif
 
+int num_gap_reads = 0;
+int num_sw_reads = 0;
+int num_sws = 0;
+
 int sa_sam_writer(void *data) {
   sa_wf_batch_t *wf_batch = (sa_wf_batch_t *) data;
   
@@ -106,6 +111,10 @@ int sa_sam_writer(void *data) {
     printf("bam_writer1: error, NULL mapping batch\n");
     exit(-1);
   }
+
+  num_gap_reads += mapping_batch->num_gap_reads;
+  num_sw_reads += mapping_batch->num_sw_reads;
+  num_sws += mapping_batch->num_sws;
 
   #ifdef _TIMING
   for (int i = 0; i < NUM_TIMING; i++) {

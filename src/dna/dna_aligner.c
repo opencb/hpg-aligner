@@ -6,6 +6,10 @@ extern int num_dup_reads;
 extern int num_total_dup_reads;
 #endif
 
+extern int num_gap_reads;
+extern int num_sw_reads;
+extern int num_sws;
+
 //--------------------------------------------------------------------
 // main 
 //--------------------------------------------------------------------
@@ -138,7 +142,7 @@ void dna_aligner(options_t *options) {
     //--------------------------------------------------------------------------------------
     // workflow management
     //
-    sa_wf_batch_t *wf_batch = sa_wf_batch_new((void *)sa_index, &writer_input, NULL);
+    sa_wf_batch_t *wf_batch = sa_wf_batch_new(options, (void *)sa_index, &writer_input, NULL);
     sa_wf_input_t *wf_input = sa_wf_input_new(&reader_input, wf_batch);
     
     // create and initialize workflow
@@ -158,6 +162,9 @@ void dna_aligner(options_t *options) {
     workflow_display_timing(wf);
     printf("----------------------------------------------\n");
 
+    printf("***** num_sw_reads = %i\n", num_sw_reads);
+    printf("***** num_sws = %i\n", num_sws);
+    printf("***** num_gap_reads = %i\n", num_gap_reads);
 
   #ifdef _TIMING
     char func_name[1024];
