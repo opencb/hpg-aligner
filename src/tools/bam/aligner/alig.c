@@ -17,7 +17,7 @@ char aux_msg[512];
  */
 
 ERROR_CODE
-alig_init(alig_context_t *context, linked_list_t *in_list, genome_t *genome)
+alig_init(alig_context_t *context, linked_list_t *in_list, genome_t *genome, uint8_t flags)
 {
 	ERROR_CODE err;
 
@@ -60,9 +60,7 @@ alig_init(alig_context_t *context, linked_list_t *in_list, genome_t *genome)
 	memset(&context->scores, 0, sizeof(alig_scores_t));
 
 	//Set flags
-	context->flags = ALIG_LEFT_ALIGN;
-	context->flags |= ALIG_REFERENCE_PRIORITY;
-	//context->flags |= ALIG_ORIGINAL_PRIORITY;
+	context->flags = flags;
 
 	return NO_ERROR;
 }
@@ -802,7 +800,7 @@ alig_bam_file2(char *bam_path, char *ref_name, char *ref_path)
 	//Create context
 	//printf("Creating context...\n");
 	fflush(stdout);
-	alig_init(&context, in_list, ref);
+	alig_init(&context, in_list, ref, ALIG_LEFT_ALIGN | ALIG_REFERENCE_PRIORITY);
 
 	//Validate context
 	err = alig_validate(&context);

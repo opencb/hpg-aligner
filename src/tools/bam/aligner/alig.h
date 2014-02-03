@@ -127,7 +127,7 @@ typedef enum {
  * CONTEXT
  */
 
-EXTERNC ERROR_CODE alig_init(alig_context_t *context, linked_list_t *in_list, genome_t *genome);
+EXTERNC ERROR_CODE alig_init(alig_context_t *context, linked_list_t *in_list, genome_t *genome, uint8_t flags);
 EXTERNC ERROR_CODE alig_destroy(alig_context_t *context);
 EXTERNC ERROR_CODE alig_validate(alig_context_t *context);
 
