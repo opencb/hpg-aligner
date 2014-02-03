@@ -37,7 +37,7 @@
 //FLAGS
 #define ALIG_LEFT_ALIGN 0x01	//Left align cigars?
 #define ALIG_REFERENCE_PRIORITY 0x02	//Reference haplotype have priority over alternative? (if equals case)
-#define ALIG_ORIGINAL_PRIORITY 0x03	//Original cigar have preference over realigned one? (if equals case)
+#define ALIG_ORIGINAL_PRIORITY 0x04	//Original cigar have preference over realigned one? (if equals case)
 
 /**
  * Time measures

@@ -1269,9 +1269,15 @@ alig_get_alternative_haplotype(alig_context_t *context, int *out_haplo_index, ui
 		aux_score = 0;
 		for(i = 0; i < bam_l; i++)
 		{
-			if(m_scores[(i * haplo_l) + j] != UINT32_MAX)	//If valid score
+			if(m_scores[(i * haplo_l) + j] < m_scores[(i * haplo_l)])	//If haplotype score is better
 			{
+				//Haplotype is better so add its score
 				aux_score += m_scores[(i * haplo_l) + j];
+			}
+			else
+			{
+				//Reference is better so add its score
+				aux_score += m_scores[(i * haplo_l)];
 			}
 		}
 
@@ -1381,6 +1387,8 @@ alig_indel_realign_from_haplo(alig_context_t *context, size_t alt_haplo_index)
 	sprintf(log_msg, "Realign, alternative haplotype = %s:%d\n", aux_msg, haplo->ref_pos + 1);
 	LOG_INFO("************************************\n");
 	LOG_INFO(log_msg);
+	if(context->flags & ALIG_ORIGINAL_PRIORITY)
+		LOG_INFO("Original cigar have priority\n");
 	if(context->flags & ALIG_REFERENCE_PRIORITY)
 		LOG_INFO("Reference haplotype have priority\n");
 
@@ -1436,7 +1444,8 @@ alig_indel_realign_from_haplo(alig_context_t *context, size_t alt_haplo_index)
 					|| misses_sum < min_score )	//Realigned cigar have priority
 			{
 				//Logging
-				sprintf(log_msg, "NOT Realigned read: %s - %d (original is better)\n", bam1_qname(read), read->core.pos);
+				sprintf(log_msg, "NOT Realigned read: %s - %d (original is better, O:%d vs H0:%d vs HA:%d)\n",
+						bam1_qname(read), read->core.pos, min_score, ref_score, h_score);
 				LOG_INFO(log_msg);
 
 				//Original is better, dont change!
@@ -1466,7 +1475,8 @@ alig_indel_realign_from_haplo(alig_context_t *context, size_t alt_haplo_index)
 			best_pos = m_positions[(i * m_ldim)];
 
 			//Logging
-			sprintf(log_msg, "Realigned read: %s - %d (to reference %d vs %d)\n", bam1_qname(read), read->core.pos + 1, ref_score, h_score);
+			sprintf(log_msg, "Realigned read: %s - %d (to reference O:%d vs H0:%d vs HA:%d)\n",
+					bam1_qname(read), read->core.pos + 1, misses_sum, ref_score, h_score);
 			LOG_INFO(log_msg);
 		}
 		else //Haplotype is better
@@ -1488,7 +1498,8 @@ alig_indel_realign_from_haplo(alig_context_t *context, size_t alt_haplo_index)
 			}
 
 			//Logging
-			sprintf(log_msg, "Realigned read: %s - %d (to alternative haplotype %d vs %d)\n", bam1_qname(read), read->core.pos + 1, ref_score, h_score);
+			sprintf(log_msg, "Realigned read: %s - %d (to alternative haplotype O:%d vs H0:%d vs HA:%d)\n",
+					bam1_qname(read), read->core.pos + 1, misses_sum, ref_score, h_score);
 			LOG_INFO(log_msg);
 
 		}
