@@ -182,8 +182,6 @@ void create_alignments(array_list_t *cal_list, fastq_read_t *read,
   uint num_cals = array_list_size(cal_list);
 
   // alignments
-  char cigar[1000];
-  int num_cigar_ops;
   alignment_t *alignment;
 
   if (num_cals <= 0) {
@@ -191,13 +189,10 @@ void create_alignments(array_list_t *cal_list, fastq_read_t *read,
     return;
   }
 
-  int AS;
-  size_t i, pos;
+  size_t i;
   linked_list_item_t *list_item; 
-  seed_t *s_first, *s_last;
 
   for (i = 0; i < num_cals; i++) {
-    cigar[0] = 0;
     cal = array_list_get(i, cal_list);
 
     #ifdef _VERBOSE	  
@@ -205,64 +200,25 @@ void create_alignments(array_list_t *cal_list, fastq_read_t *read,
     seed_cal_print(cal);
     #endif
 
-    // computing aligments
-    AS = read->length * 5;
-    s_first = linked_list_get_first(cal->seed_list);
-    s_last = linked_list_get_last(cal->seed_list);
+    //    AS = ((read->length * 5) * 254) / (read->length * 5)
+    //      num_cigar_ops = 0;
+    //      pos = cal->start;
+    //      if (s_first->read_start > 0) {
+    //	pos -= s_first->read_start;
+    //      }
+    //      sprintf(cigar, "%s%iM", cigar, read->length);
+    //      num_cigar_ops++;
 
-    // sanity checking
-    //    assert(s_first != NULL && s_last != NULL);
-
-    if (s_first != NULL && s_last != NULL) {
-      //      printf("-----> cigar_code = %x\n", s_first->info);
-      //      printf("-----> cigar_code = %x\n", s_last->info);
-      /*
-      if (num_cals > 1) {
-	printf("\t\t%s\t%i of %i\t[%i|%i - %i|%i]\n", 
-	       read->id, i, num_cals, 
-	       s_first->genome_start, s_first->read_start, s_first->read_end, s_first->genome_end);
-	/*
-	cigar_code_t *cigar = (cigar_code_t *) cal->info;
-	printf("\t\t%s\t%i of %i\t[%i|%i - %i|%i] (cigar %s, distance = %i)\n", 
-	       read->id, i, num_cals, 
-	       s_first->genome_start, s_first->read_start, s_first->read_end, s_first->genome_end,
-	       (cigar != NULL ? new_cigar_code_string(cigar) : "none"), 
-	       (cigar != NULL ? cigar->distance : 0));
-	*/
-      //      }
-
-      num_cigar_ops = 0;
-      pos = cal->start;
-      if (s_first->read_start > 0) {
-	pos -= s_first->read_start;
-	//sprintf(cigar, "%s%iS", cigar, s_first->read_start);
-	//      num_cigar_ops++;
-      }
-      sprintf(cigar, "%s%iM", cigar, read->length);
-      num_cigar_ops++;
-      /*
-      s_first->read_start = 0; // be carefull !!! to remove...now !!!
-      sprintf(cigar, "%s%iM", cigar, s_last->read_end - s_first->read_start + 1);
-      num_cigar_ops++;
-      if (s_last->read_end < read->length - 1) {
-	sprintf(cigar, "%s%iS", cigar, read->length - s_last->read_end - 1);
-	num_cigar_ops++;
-      }
-      */
-      alignment = alignment_new();	       
-      alignment_init_single_end(strdup(read->id), strdup(read->sequence), strdup(read->quality), 
-				cal->strand, cal->chromosome_id, 
-				pos,
-				strdup(cigar), num_cigar_ops, (AS * 254) / (read->length * 5), 1, (num_cals > 1),
-				0, 0, alignment);  
-      
-      array_list_insert(alignment, mapping_list);
-      //      array_list_insert(convert_to_bam(alignment, 33), mapping_list);
-      
-      // free memory
-      //      alignment_free(alignment);
-    }
+    // create the aligments
+    alignment = alignment_new();	       
+    alignment_init_single_end(strdup(read->id), strdup(read->sequence), strdup(read->quality), 
+			      cal->strand, cal->chromosome_id, cal->start,
+			      cigar_to_string(&cal->cigar), cal->cigar.num_ops, cal->AS, 1, (num_cals > 1),
+			      0, 0, alignment);  
     
+    array_list_insert(alignment, mapping_list);
+
+    // free memory
     seed_cal_free(cal);
   }
 }

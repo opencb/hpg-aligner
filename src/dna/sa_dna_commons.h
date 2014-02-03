@@ -12,6 +12,12 @@
 
 //--------------------------------------------------------------------
 
+#define NUM_COUNTERS 10
+extern int counters[NUM_COUNTERS];
+
+//--------------------------------------------------------------------
+
+
 #ifdef _TIMING
 
 #define FUNC_SEARCH_SUFFIX             0
@@ -49,7 +55,7 @@ char func_names[NUM_TIMING][1024];
 
 #define MISMATCH_PERC 0.10f
 
-#define MAX_NUM_MISMATCHES   4
+#define MAX_NUM_MISMATCHES    4
 #define MAX_NUM_SUFFIXES   2000
 
 //--------------------------------------------------------------------
@@ -58,9 +64,7 @@ char func_names[NUM_TIMING][1024];
 
 typedef struct sa_mapping_batch {
 
-  size_t num_gap_reads;
-  size_t num_sw_reads;
-  size_t num_sws;
+  int counters[NUM_COUNTERS];
 
   size_t num_reads;
   #ifdef _TIMING
@@ -78,9 +82,9 @@ inline sa_mapping_batch_t *sa_mapping_batch_new(array_list_t *fq_reads) {
 
   sa_mapping_batch_t *p = (sa_mapping_batch_t *) malloc(sizeof(sa_mapping_batch_t));
 
-  p->num_gap_reads = 0;
-  p->num_sw_reads = 0;
-  p->num_sws = 0;
+  for (int i = 0; i < NUM_COUNTERS; i++) {
+    p->counters[i] = 0;
+  }
 
   p->num_reads = num_reads;
   p->fq_reads = fq_reads;
@@ -403,6 +407,7 @@ typedef struct seed_cal {
   size_t start;
   size_t end;
 
+  int AS; // SAM format flag
   int read_area;
 
   int num_mismatches;
@@ -431,6 +436,7 @@ inline seed_cal_t *seed_cal_new(const size_t chromosome_id,
   p->start = start;
   p->end = end;
 
+  p->AS = 0;
   p->read_area = 0;
 
   p->num_mismatches = 0;
@@ -452,7 +458,7 @@ void seed_cal_free(seed_cal_t *p);
 
 //--------------------------------------------------------------------
 
-inline seed_cal_print(seed_cal_t *cal) {
+inline void seed_cal_print(seed_cal_t *cal) {
   printf(" CAL (%c)[%lu:%lu-%lu]:\n", 
 	 (cal->strand == 0 ? '+' : '-'), 
 	 cal->chromosome_id, cal->start, cal->end);

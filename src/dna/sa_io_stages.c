@@ -99,10 +99,6 @@ int num_dup_reads = 0;
 int num_total_dup_reads = 0;
 #endif
 
-int num_gap_reads = 0;
-int num_sw_reads = 0;
-int num_sws = 0;
-
 int sa_sam_writer(void *data) {
   sa_wf_batch_t *wf_batch = (sa_wf_batch_t *) data;
   
@@ -112,9 +108,9 @@ int sa_sam_writer(void *data) {
     exit(-1);
   }
 
-  num_gap_reads += mapping_batch->num_gap_reads;
-  num_sw_reads += mapping_batch->num_sw_reads;
-  num_sws += mapping_batch->num_sws;
+  for (int i = 0; i < NUM_COUNTERS; i++) {
+    counters[i] += mapping_batch->counters[i];
+  }
 
   #ifdef _TIMING
   for (int i = 0; i < NUM_TIMING; i++) {
