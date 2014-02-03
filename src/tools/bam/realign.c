@@ -31,7 +31,7 @@ int alig_bam(int argc, char **argv)
     struct arg_end  *end     = arg_end(20);
 
     void* argtable[] = {refile,infile,outfile,help,version,end};
-    const char* progname = "hpg-bam a";
+    const char* progname = "hpg-bam realign v"ALIG_VER;
     int nerrors;
     int exitcode=0;
 

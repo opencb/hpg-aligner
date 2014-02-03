@@ -25,6 +25,12 @@
 #include "aux/timestats.h"
 #include "alig_region.h"
 
+//VERSION
+#define ALIG_VER_MAJOR		"0"
+#define ALIG_VER_MINOR		"1"
+#define ALIG_VER_REVISION	"0"
+#define ALIG_VER 			ALIG_VER_MAJOR"."ALIG_VER_MINOR"."ALIG_VER_REVISION
+
 //OPTIONS
 #define ALIG_LIST_IN_SIZE	10000
 #define ALIG_LIST_NEXT_SIZE 1000
