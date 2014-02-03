@@ -1003,7 +1003,9 @@ alig_get_scores(alig_context_t *context)
 
 	//Reads
 	bam1_t *read;
+	size_t read_l;
 	size_t indels;
+	size_t bases;
 	char *read_seq;
 	char *comp_seq;
 	char *read_quals;
@@ -1011,6 +1013,7 @@ alig_get_scores(alig_context_t *context)
 	uint32_t read_left_cigar[MAX_CIGAR_LENGTH];
 	size_t read_left_cigar_l;
 	size_t read_disp_ref = SIZE_MAX;
+	size_t read_disp_clip;
 
 	//Haplotypes
 	aux_indel_t *haplo;
@@ -1111,6 +1114,10 @@ alig_get_scores(alig_context_t *context)
 		read_quals = (char *) malloc((read->core.l_qseq + 1) * sizeof(char));
 		new_quality_from_bam_ref(read, 0, read_quals, read->core.l_qseq + 1);
 
+		//Get initial clip displacement
+		cigar32_count_clip_displacement(read_cigar, read->core.n_cigar, &read_disp_clip);
+		cigar32_count_nucleotides_not_clip(read_cigar, read->core.n_cigar, &read_l);
+
 		//Leftalign cigar
 		read_disp_ref = read->core.pos - context->reference.position;
 		cigar32_leftmost(context->reference.reference + read_disp_ref, context->reference.length - read_disp_ref,
@@ -1118,12 +1125,12 @@ alig_get_scores(alig_context_t *context)
 				read_left_cigar, &read_left_cigar_l);
 
 		//Get raw score with reference
-		nucleotide_miss_qual_sum(ref_seq + read_disp_ref, read_seq, read_quals, read->core.l_qseq, comp_seq, &misses, &misses_sum);
+		nucleotide_miss_qual_sum(ref_seq + read_disp_ref, read_seq + read_disp_clip, read_quals + read_disp_clip, read_l, comp_seq, &misses, &misses_sum);
 		m_scores[i * m_ldim] = misses_sum;
 		m_positions[i * m_ldim] = read->core.pos;
 
 		//Dont iterate haplotypes if perfect reference match
-		if(m_scores[i * m_ldim] != 0)
+		if(misses != 0)
 		{
 			//Iterate haplotypes
 			for(j = 0; j < haplo_list_l; j++)
@@ -1438,12 +1445,12 @@ alig_indel_realign_from_haplo(alig_context_t *context, size_t alt_haplo_index)
 
 			//Is original cigar better?
 			min_score = min(ref_score, h_score);
-			if( ((context->flags & ALIG_ORIGINAL_PRIORITY) && misses_sum <= min_score)	//Original cigar have priority
+			if(((context->flags & ALIG_ORIGINAL_PRIORITY) && misses_sum <= min_score)	//Original cigar have priority
 					|| misses_sum < min_score )	//Realigned cigar have priority
 			{
 				//Logging
 				sprintf(log_msg, "NOT Realigned read: %s - %d (original is better, O:%d vs H0:%d vs HA:%d)\n",
-						bam1_qname(read), read->core.pos, min_score, ref_score, h_score);
+						bam1_qname(read), read->core.pos, misses_sum, ref_score, h_score);
 				LOG_INFO(log_msg);
 
 				//Original is better, dont change!
