@@ -264,8 +264,8 @@ cigar32_reclip(uint32_t *clip_cigar, size_t clip_cigar_l, uint32_t *unclip_cigar
 	if(new_l + unclip_cigar_l < MAX_CIGAR_LENGTH)
 	{
 		//Copy unclipped cigar
-		memcpy(aux_cigar + i, unclip_cigar, unclip_cigar_l * sizeof(uint32_t));
-		i += unclip_cigar_l;
+		memcpy(aux_cigar + new_l, unclip_cigar, unclip_cigar_l * sizeof(uint32_t));
+		//i += unclip_cigar_l;
 		new_l += unclip_cigar_l;
 
 		//Search for last clips
@@ -304,7 +304,7 @@ cigar32_reclip(uint32_t *clip_cigar, size_t clip_cigar_l, uint32_t *unclip_cigar
 				break;
 			}
 		}
-	}
+	} //Overflow if
 
 	//Set output cigar
 	memcpy(out_cigar, aux_cigar, sizeof(uint32_t) * new_l);
@@ -822,13 +822,20 @@ cigar32_from_haplo(uint32_t *cigar, size_t cigar_l, aux_indel_t *haplo, size_t r
 {
 	int i, elem, type;
 	size_t current_pos;
-	int disp_ref;
-	int aux;
 	size_t current_cigar_elem;
 	size_t bases;
 
+	//Read
+	size_t aux_read_pos;
+	int bases_left;
+
+	//Indel
+	int indel_size;
+	int indel_type;
+	int disp_to_indel;
+
 	//Generated cigar
-	uint32_t *gen_cigar;
+	uint32_t gen_cigar[MAX_CIGAR_LENGTH];
 	size_t gen_cigar_l;
 
 	assert(cigar);
@@ -838,8 +845,12 @@ cigar32_from_haplo(uint32_t *cigar, size_t cigar_l, aux_indel_t *haplo, size_t r
 	assert(new_cigar);
 	assert(new_cigar_l);
 
+	//Indel params
+	indel_size = haplo->indel >> BAM_CIGAR_SHIFT;
+	indel_type = haplo->indel & BAM_CIGAR_MASK;
+
 	//Haplotype position must be posterior to read position
-	if(haplo->ref_pos < read_pos - (haplo->indel >> BAM_CIGAR_SHIFT))
+	if(haplo->ref_pos < read_pos - indel_size)
 	{
 		memcpy(new_cigar, cigar, cigar_l * sizeof(uint32_t));
 		*new_cigar_l = cigar_l;
@@ -847,87 +858,127 @@ cigar32_from_haplo(uint32_t *cigar, size_t cigar_l, aux_indel_t *haplo, size_t r
 	}
 
 	//Get read displacement from haplotype
-	disp_ref = haplo->ref_pos - read_pos;
+	cigar32_count_clip_displacement(cigar, cigar_l, &disp_to_indel);
+	aux_read_pos = read_pos; //+ disp_to_indel;
+	disp_to_indel = haplo->ref_pos - aux_read_pos;
 
 	//Count unclipped bases
 	cigar32_count_nucleotides_not_clip(cigar, cigar_l, &bases);
 
-	//Create new cigar from haplotype (ex: 20M1I14M)
-	gen_cigar = (uint32_t *)malloc(sizeof(uint32_t) * 3);
-
-	//Indel
-	if(disp_ref > 0)
+	//Indel type cases
+	switch(indel_type)
 	{
-		aux = haplo->indel >> BAM_CIGAR_SHIFT;
-
-		if((int)bases - disp_ref > 0)
+	//Indel is an insertion
+	case BAM_CINS:
+		//Where is the indel
+		if(disp_to_indel > 0)
 		{
-			//Indel inside read
-			gen_cigar[0] = (disp_ref << BAM_CIGAR_SHIFT) + BAM_CMATCH;
-			gen_cigar[1] = haplo->indel;
-			if((haplo->indel & BAM_CIGAR_MASK) == BAM_CINS)	//Insertion?
+			//Insertion is not in in read beginning
+			bases_left = (int)bases - disp_to_indel;
+
+			//Insertion inside read
+			if(bases_left - indel_size > 0)
 			{
-				disp_ref += aux;	//Is insertion
+				//Remaining bases including insertion
+				bases_left -= indel_size;
+
+				//Create cigar
+				gen_cigar[0] = (disp_to_indel << BAM_CIGAR_SHIFT) + BAM_CMATCH;
+				gen_cigar[1] = (indel_size << BAM_CIGAR_SHIFT) + indel_type;
+				gen_cigar[2] = (bases_left << BAM_CIGAR_SHIFT) + BAM_CMATCH;
+				gen_cigar_l = 3;
 			}
-			gen_cigar[2] = ((bases - disp_ref) << BAM_CIGAR_SHIFT) + BAM_CMATCH;
-			gen_cigar_l = 3;
+			//Insertion at read end
+			else
+			{
+				//Set indel size
+				indel_size = bases_left;
+
+				//If
+				if(indel_size > 0)
+				{
+					//Last element size != 0
+					gen_cigar[0] = ((bases - indel_size) << BAM_CIGAR_SHIFT) + BAM_CMATCH;
+					gen_cigar[1] = (indel_size << BAM_CIGAR_SHIFT) + (haplo->indel & BAM_CIGAR_MASK);
+					gen_cigar_l = 2;
+				}
+				else
+				{
+					//Last element size is 0
+					gen_cigar[0] = (bases << BAM_CIGAR_SHIFT) + BAM_CMATCH;
+					gen_cigar_l = 1;
+				}
+			}
 		}
 		else
 		{
-			//Indel at read end
-			aux -= disp_ref - bases;
-			if(aux != 0 && (haplo->indel & BAM_CIGAR_MASK) != BAM_CDEL)
+			//Insertion is in read beginning
+
+			//In this case, negative displacement (read_pos > indel_pos) mean a shorter insertion
+			indel_size += disp_to_indel;
+			if(indel_size > 0)
 			{
-				//Insertion
-				gen_cigar_l = 2;
-				gen_cigar[0] = ((bases - aux) << BAM_CIGAR_SHIFT) + BAM_CMATCH;
-				gen_cigar[1] = (aux << BAM_CIGAR_SHIFT) + (haplo->indel & BAM_CIGAR_MASK);
-			}
-			else
-			{
-				//Deletion dont count
-				gen_cigar[0] = (bases << BAM_CIGAR_SHIFT) + BAM_CMATCH;
-				gen_cigar_l = 1;
-			}
-		}
-	}
-	else
-	{
-		if((haplo->indel & BAM_CIGAR_MASK) == BAM_CINS)
-		{
-			//Insertion
-			//gen_cigar[0] = 0; //0M
-			aux = haplo->indel >> BAM_CIGAR_SHIFT;
-			aux += disp_ref;
-			if(aux != 0)
-			{
-				gen_cigar[0] = (aux << BAM_CIGAR_SHIFT) + (haplo->indel & BAM_CIGAR_MASK);
-				if((haplo->indel & BAM_CIGAR_MASK) == BAM_CINS)	//Insertion?
-					 bases -= aux;
-				//printf("Aux  %d\n", aux);
-				//printf("Disp %d\n", disp_ref);
+				//Set length of final cigar element
+				bases -= indel_size;
+
+				//Create cigar
+				gen_cigar[0] = (indel_size << BAM_CIGAR_SHIFT) + indel_type;
 				gen_cigar[1] = (bases << BAM_CIGAR_SHIFT) + BAM_CMATCH;
 				gen_cigar_l = 2;
 			}
 			else
 			{
+				//Read is too far from insertion
+				gen_cigar[0] = (bases << BAM_CIGAR_SHIFT) + BAM_CMATCH;
+				gen_cigar_l = 1;
+			}
+		}
+
+		break;
+
+	//Indel is a deletion
+	case BAM_CDEL:
+
+		//Where is the indel
+		if(disp_to_indel > 0)
+		{
+			//Deletion is not in in read beginning
+			bases_left = (int)bases - disp_to_indel;
+
+			//Deletion inside read
+			if(bases_left > 0)
+			{
+				//Create cigar
+				gen_cigar[0] = (disp_to_indel << BAM_CIGAR_SHIFT) + BAM_CMATCH;
+				gen_cigar[1] = (indel_size << BAM_CIGAR_SHIFT) + indel_type;
+				gen_cigar[2] = (bases_left << BAM_CIGAR_SHIFT) + BAM_CMATCH;
+				gen_cigar_l = 3;
+			}
+			//Deletion at read end
+			else
+			{
+				//Deletion is not useful at read end
 				gen_cigar[0] = (bases << BAM_CIGAR_SHIFT) + BAM_CMATCH;
 				gen_cigar_l = 1;
 			}
 		}
 		else
 		{
-			//Deletion
+			//Deletion is in read beginning
+			//Deletion is not useful at read beginning
 			gen_cigar[0] = (bases << BAM_CIGAR_SHIFT) + BAM_CMATCH;
 			gen_cigar_l = 1;
 		}
+
+		break;
+
+	default:
+		//Unrecognised indel????
+		return CIGAR_INVALID_INDEL;
 	}
 
 	//Set output
 	cigar32_reclip(cigar, cigar_l, gen_cigar, gen_cigar_l, new_cigar, new_cigar_l);
-
-	//Free memory
-	free(gen_cigar);
 
 	return NO_ERROR;
 }

@@ -31,7 +31,7 @@ int alig_bam(int argc, char **argv)
     struct arg_end  *end     = arg_end(20);
 
     void* argtable[] = {refile,infile,outfile,help,version,end};
-    const char* progname = "hpg-bam a";
+    const char* progname = "hpg-bam realign v"ALIG_VER;
     int nerrors;
     int exitcode=0;
 
@@ -173,6 +173,7 @@ align_launch(char *reference, char *bam, char *output, int threads)
 	assert(output);
 
 	init_log();
+	LOG_FILE("realign.log","w");
 
 	//Set schedule if not defined
 	setenv("OMP_SCHEDULE", "static", 0);
