@@ -1033,6 +1033,8 @@ alig_get_scores(alig_context_t *context)
 	uint32_t misses_sum;
 	size_t best_pos;
 	size_t curr_pos;
+	int64_t init_pos;
+	int64_t end_pos;
 
 	//Lists
 	array_list_t *read_list;
@@ -1139,9 +1141,21 @@ alig_get_scores(alig_context_t *context)
 				haplo = array_list_get(j, context->haplo_list);
 				assert(haplo);
 
-				//Iterate positions
+				//Get initial position to iterate
 				read_disp_ref = SIZE_MAX;
-				for(curr_pos = haplo->ref_pos - read->core.l_qseq; curr_pos < ref_pos_end - read->core.l_qseq; curr_pos++)
+				init_pos = haplo->ref_pos - read->core.l_qseq;
+
+				//Initial position must be inside reference range
+				if(init_pos < ref_pos_begin)
+					init_pos = ref_pos_begin;
+
+				//Get end pos
+				end_pos = ref_pos_end - read->core.l_qseq;
+				if(end_pos < init_pos)	//Check valid range
+					end_pos = init_pos;
+
+				//Iterate positions
+				for(curr_pos = init_pos; curr_pos < end_pos; curr_pos++)
 				{
 					//Create cigar for this haplotype
 					if(cigar32_from_haplo(read_cigar, read->core.n_cigar, haplo, curr_pos, aux_cigar, &aux_cigar_l))
