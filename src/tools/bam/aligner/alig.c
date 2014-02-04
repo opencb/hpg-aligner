@@ -579,6 +579,10 @@ alig_region_haplotype_process(alig_context_t *context)
 							//Add to haplotype list (not duplicated)
 							array_list_insert(haplo, context->haplo_list);
 						}
+						else
+						{
+							free(haplo);
+						}
 					} //Indel == 1 if
 
 				}//Match reference if
