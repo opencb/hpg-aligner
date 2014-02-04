@@ -845,8 +845,12 @@ cigar32_from_haplo(uint32_t *cigar, size_t cigar_l, aux_indel_t *haplo, size_t r
 	assert(new_cigar);
 	assert(new_cigar_l);
 
+	//Indel params
+	indel_size = haplo->indel >> BAM_CIGAR_SHIFT;
+	indel_type = haplo->indel & BAM_CIGAR_MASK;
+
 	//Haplotype position must be posterior to read position
-	if(haplo->ref_pos < read_pos - (haplo->indel >> BAM_CIGAR_SHIFT))
+	if(haplo->ref_pos < read_pos - indel_size)
 	{
 		memcpy(new_cigar, cigar, cigar_l * sizeof(uint32_t));
 		*new_cigar_l = cigar_l;
@@ -855,15 +859,11 @@ cigar32_from_haplo(uint32_t *cigar, size_t cigar_l, aux_indel_t *haplo, size_t r
 
 	//Get read displacement from haplotype
 	cigar32_count_clip_displacement(cigar, cigar_l, &disp_to_indel);
-	aux_read_pos = read_pos /*+ disp_to_indel*/;
+	aux_read_pos = read_pos; //+ disp_to_indel;
 	disp_to_indel = haplo->ref_pos - aux_read_pos;
 
 	//Count unclipped bases
 	cigar32_count_nucleotides_not_clip(cigar, cigar_l, &bases);
-
-	//Indel params
-	indel_size = haplo->indel >> BAM_CIGAR_SHIFT;
-	indel_type = haplo->indel & BAM_CIGAR_MASK;
 
 	//Indel type cases
 	switch(indel_type)
@@ -974,7 +974,7 @@ cigar32_from_haplo(uint32_t *cigar, size_t cigar_l, aux_indel_t *haplo, size_t r
 
 	default:
 		//Unrecognised indel????
-		return INVALID_INPUT_PARAMS;
+		return CIGAR_INVALID_INDEL;
 	}
 
 	//Set output

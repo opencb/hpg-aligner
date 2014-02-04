@@ -473,7 +473,7 @@ alig_region_haplotype_process(alig_context_t *context)
 		//Valid reference?
 		if(!context->reference.reference)
 		{
-			fprintf(stderr, "Warning: Trying to extract haplotypes with uninitialized reference\n");
+			LOG_ERROR("Warning: Trying to extract haplotypes with uninitialized reference\n");
 			return ALIG_INVALID_REFERENCE;
 		}
 
@@ -624,34 +624,52 @@ alig_region_indel_realignment(alig_context_t *context)
 	}
 
 	//Realign only if a region is present and there is haplotypes
-	if(context->region.valid && array_list_size(context->haplo_list) > 0)
+	if(context->region.valid != 1)
 	{
-		if(!context->reference.reference)
-		{
-			fprintf(stderr, "Warning: Trying to indel realign with uninitialized reference\n");
-			return ALIG_INVALID_REFERENCE;
-		}
+		LOG_ERROR("Warning: Trying to realign an invalid region\n");
+		//return ALIG_INVALID_REGION;
+		return NO_ERROR;
+	}
 
-		//Get scores tables
-		alig_get_scores(context);
-		alig_get_alternative_haplotype(context, &alt_haplo_index, &alt_haplo_score, &ref_haplo_score);
+	if(array_list_size(context->haplo_list) == 0)
+	{
+		LOG_ERROR("Warning: Trying to realign region with invalid haplotypes\n");
+		//return ALIG_INVALID_REGION;
+		return NO_ERROR;
+	}
 
-		//Improvement
-		if(alt_haplo_score != 0)
-		{
-			improvement = (double)((double)ref_haplo_score / (double)alt_haplo_score) / 10.0;
-		}
-		else
-		{
-			improvement = ALIG_IMPROVEMENT_THREHOLD + 1;
-		}
+	if(!context->reference.reference)
+	{
+		LOG_ERROR("Warning: Trying to indel realign with uninitialized reference\n");
+		return ALIG_INVALID_REFERENCE;
+	}
 
-		//Enought improvement?
-		if(improvement > ALIG_IMPROVEMENT_THREHOLD)
-		{
-			//Realign
-			alig_indel_realign_from_haplo(context, alt_haplo_index);
-		}
+	//Get scores tables
+	err = alig_get_scores(context);
+	if(err)
+	{
+		sprintf(log_msg, "Error getting scores from region, error: %d\n", err);
+		LOG_ERROR(log_msg);
+		return ALIG_INVALID_SCORES;
+	}
+
+	alig_get_alternative_haplotype(context, &alt_haplo_index, &alt_haplo_score, &ref_haplo_score);
+
+	//Improvement
+	if(alt_haplo_score != 0)
+	{
+		improvement = (double)((double)ref_haplo_score / (double)alt_haplo_score) / 10.0;
+	}
+	else
+	{
+		improvement = ALIG_IMPROVEMENT_THREHOLD + 1;
+	}
+
+	//Enought improvement?
+	if(improvement > ALIG_IMPROVEMENT_THREHOLD)
+	{
+		//Realign
+		alig_indel_realign_from_haplo(context, alt_haplo_index);
 	}
 
 	return NO_ERROR;
@@ -1162,10 +1180,21 @@ alig_get_scores(alig_context_t *context)
 				for(curr_pos = init_pos; curr_pos < end_pos; curr_pos++)
 				{
 					//Create cigar for this haplotype
-					if(cigar32_from_haplo(read_cigar, read->core.n_cigar, haplo, curr_pos, aux_cigar, &aux_cigar_l))
+					err = cigar32_from_haplo(read_cigar, read->core.n_cigar, haplo, curr_pos, aux_cigar, &aux_cigar_l);
+					if(err)
 					{
-						//Cant displace anymore
-						break;
+						if(err == CIGAR_INVALID_INDEL)
+						{
+							//Haplotype is invalid
+							sprintf(log_msg, "Invalid haplotype %d\n", j + 1);
+							LOG_ERROR(log_msg);
+							break;
+						}
+						else
+						{
+							//Cant displace anymore
+							break;
+						}
 					}
 
 					//Get relative displacement from reference
