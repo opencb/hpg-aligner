@@ -527,6 +527,10 @@ alig_region_haplotype_process(alig_context_t *context)
 
 					//Replace read cigar
 					cigar32_replace(read, aux_cigar, aux_cigar_l);
+
+					//Logging
+					sprintf(log_msg, "%s \t%d:%d match reference perfectly\n", bam1_qname(read), read->core.tid + 1, read->core.pos + 1);
+					LOG_INFO(log_msg);
 				}
 				else
 				{
@@ -624,16 +628,16 @@ alig_region_indel_realignment(alig_context_t *context)
 	}
 
 	//Realign only if a region is present and there is haplotypes
-	if(context->region.valid != 1)
+	if(!context->region.valid)
 	{
 		LOG_ERROR("Warning: Trying to realign an invalid region\n");
 		//return ALIG_INVALID_REGION;
 		return NO_ERROR;
 	}
 
-	if(array_list_size(context->haplo_list) == 0)
+	if(array_list_size(context->haplo_list) < 2)
 	{
-		LOG_ERROR("Warning: Trying to realign region with invalid haplotypes\n");
+		LOG_INFO("Not enough haplotypes to realign\n");
 		//return ALIG_INVALID_REGION;
 		return NO_ERROR;
 	}
@@ -802,7 +806,7 @@ alig_bam_file2(char *bam_path, char *ref_name, char *ref_path)
 		read = bam_init1();
 		bytes = bam_read1(bam_f->bam_fd, read);
 
-		if(bytes > 0)
+		if(bytes > 0 && read)
 		{
 			linked_list_insert_last(read, in_list);
 		}
@@ -946,12 +950,20 @@ alig_bam_file2(char *bam_path, char *ref_name, char *ref_path)
 		init_time = omp_get_wtime();
 #endif
 		list_l = linked_list_size(in_list);
+
+		//Especial case: List is empty
+		if(list_l == 0)
+		{
+			linked_list_clear(in_list, NULL);
+		}
+
+		//Fill list
 		for(i = list_l; i < ALIG_LIST_IN_SIZE && bytes > 0; i++)
 		{
 			read = bam_init1();
 			bytes = bam_read1(bam_f->bam_fd, read);
 
-			if(bytes > 0)
+			if(bytes > 0 && read)
 			{
 				linked_list_insert_last(read, in_list);
 			}
@@ -982,6 +994,7 @@ alig_bam_file2(char *bam_path, char *ref_name, char *ref_path)
 			fflush(stdout);
 			return err;
 		}
+
 #ifdef D_TIME_DEBUG
 		end_time = omp_get_wtime();
 		if(context.last_readed_count > 0)
@@ -1436,7 +1449,7 @@ alig_indel_realign_from_haplo(alig_context_t *context, size_t alt_haplo_index)
 
 	//Logging
 	cigar32_to_string(&haplo->indel, 1, aux_msg);
-	sprintf(log_msg, "Realign, alternative haplotype = %s:%d\n", aux_msg, haplo->ref_pos + 1);
+	sprintf(log_msg, "Realign, alternative haplotype = %s:%d, %d reads\n", aux_msg, haplo->ref_pos + 1, array_list_size(list));
 	LOG_INFO("************************************\n");
 	LOG_INFO(log_msg);
 	if(context->flags & ALIG_ORIGINAL_PRIORITY)
