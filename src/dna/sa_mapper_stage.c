@@ -517,13 +517,13 @@ int generate_cals_from_suffixes(int strand, fastq_read_t *read,
 }
 
 //--------------------------------------------------------------------
-// step one:
-//    search prefix + search suffix + extend using min-sw
+// create_cals function:
+//    search prefix -> search longer suffix -> extend suffix
 //--------------------------------------------------------------------
 
-array_list_t *step_one(int num_seeds, fastq_read_t *read,
-		       sa_mapping_batch_t *mapping_batch, 
-		       sa_index3_t *sa_index, cal_mng_t *cal_mng) {
+array_list_t *create_cals(int num_seeds, fastq_read_t *read,
+			  sa_mapping_batch_t *mapping_batch, 
+			  sa_index3_t *sa_index, cal_mng_t *cal_mng) {
 
   #ifdef _TIMING
   struct timeval stop, start;
@@ -851,6 +851,51 @@ void step_two(fastq_read_t *read, char *revcomp_seq,
 
 }
 */
+
+//--------------------------------------------------------------------
+//
+//--------------------------------------------------------------------
+
+void clean_cals(array_list_t *cal_list, fastq_read_t *read, sa_index3_t *sa_index) {
+
+  seed_t *prev_seed, *seed;
+  linked_list_item_t *prev_item, *item;
+
+  seed_cal_t *cal;
+  size_t num_cals = array_list_size(cal_list);
+
+  for (int i = 0; i < num_cals; i++) {
+    cal = array_list_get(i, cal_list);
+    prev_item = cal->seed_list->first;
+    while ((item = prev_item->next) != NULL) {
+      prev_seed = prev_item->item;
+      seed = item->item;
+
+      if (prev_seed->read_end >= seed->read_start &&
+      	  prev_seed->genome_end >= seed->genome_start) {
+
+      //      if (prev_seed->read_start == seed->read_start ||
+      //	  prev_seed->read_end == seed->read_end) {
+
+	printf("----> TO CLEAN (read %s):\n", read->id);
+	display_cmp_sequences(read, sa_index);
+	seed_cal_print(cal);
+
+	linked_list_remove_item(item, cal->seed_list);
+	seed_free(seed);
+
+	//	printf("----> after remove:\n");
+	//	seed_cal_print(cal);
+      } else {
+	prev_item = item;
+	//	printf("----> keep it\n");
+	//	display_cmp_sequences(read, sa_index);
+	//	seed_cal_print(cal);
+      }
+    }
+  }
+}
+
 //--------------------------------------------------------------------
 // step three:
 //    fill gaps using sw
@@ -908,7 +953,6 @@ void step_three0(fastq_read_t *read, sa_mapping_batch_t *mapping_batch,
     if (cal->num_open_gaps > 1) mapping_batch->counters[5]++;
 
 
-
     cal->AS = 254;
     cigar_append_op(read->length, 'M', &cal->cigar);
   }
@@ -916,13 +960,19 @@ void step_three0(fastq_read_t *read, sa_mapping_batch_t *mapping_batch,
 
 //--------------------------------------------------------------------
 
-void step_three(fastq_read_t *read, 
-		 sa_mapping_batch_t *mapping_batch, sa_index3_t *sa_index, 
-		 array_list_t *cal_list) {
+#define SW_LEFT_FLANK 5
+#define SW_RIGHT_FLANK 5
+
+#define SW_LEFT_FLANK_EX 20
+#define SW_RIGHT_FLANK_EX 20
+
+int prepare_sw(fastq_read_t *read,   array_list_t *sw_prepare_list,
+	       sa_mapping_batch_t *mapping_batch, sa_index3_t *sa_index, 
+	       array_list_t *cal_list) {
   size_t seed_count, num_seeds, num_cals = array_list_size(cal_list);
 
   #ifdef _VERBOSE	  
-  printf("\n\n====>>>> STEP THREE <<<<====\n");
+  printf("\n\n====>>>> STEP THREE : prepare_sw <<<<====\n");
   #endif
 
   #ifdef _TIMING
@@ -941,13 +991,15 @@ void step_three(fastq_read_t *read,
 
   linked_list_item_t *item;
   sw_prepare_t *sw_prepare;
-  array_list_t *sw_prepare_list = array_list_new(1000, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
 
   seed_cal_t *cal;
   cigar_t *cigar;
   cigarset_t *cigarset;
 
+  int num_sw, num_total_sw = 0;
+
   for (int i = 0; i < num_cals; i++) {
+    num_sw = 0;
     cal = array_list_get(i, cal_list);
     cal->num_mismatches = 0;
 
@@ -961,27 +1013,31 @@ void step_three(fastq_read_t *read,
 
     // first seed
     seed = linked_list_get_first(cal->seed_list);
-    if (seed->read_start > 0) {
-      cal->start -= seed->read_start;
-    }
+    //    if (seed->read_start > 0) {
+    //      cal->start -= seed->read_start;
+    //    }
 
     // cal cigar
     cigarset = cigarset_new(num_seeds * 2 + 1);
     cal->info = (void *) cigarset;
 
     if (seed->read_start > 0) {
-      gap_genome_start = seed->genome_start - seed->read_start - 1;// - 10;
-      gap_genome_end = seed->genome_start - 1;
+      gap_genome_start = seed->genome_start - seed->read_start - 1 - SW_LEFT_FLANK_EX;
+      gap_genome_end = seed->genome_start + SW_RIGHT_FLANK;
       ref = sa_genome_get_sequence(cal->chromosome_id, gap_genome_start, gap_genome_end, sa_index->genome);
       
       seq = get_subsequence((cal->strand ? read->revcomp : read->sequence), 
-			    0, seed->read_start + 1);
+			    0, seed->read_start + 1 + SW_RIGHT_FLANK);
       
-      sw_prepare = sw_prepare_new(seq, ref, 0, 0, FIRST_SW);
+      sw_prepare = sw_prepare_new(seq, ref, 0, SW_RIGHT_FLANK, FIRST_SW);
       sw_prepare->seed_region = 0;
       sw_prepare->cal = cal;
       sw_prepare->read = read;
       array_list_insert(sw_prepare, sw_prepare_list);
+      num_sw++;
+
+      //printf("case 4: %s\n", read->id);
+      //exit(-1);
 
       cigarset->active[0] = 1;
     }
@@ -1015,6 +1071,10 @@ void step_three(fastq_read_t *read,
 	cal->num_open_gaps += 1;
 	cal->num_extend_gaps += (gap_genome_len - 1);
 	prev_seed = seed;
+
+	//	printf("case 1: %s\n", read->id);
+	//	exit(-1);
+
 	continue;
       }
 
@@ -1025,6 +1085,10 @@ void step_three(fastq_read_t *read,
 	cal->num_open_gaps += 1;
 	cal->num_extend_gaps += (gap_genome_len - 1);
 	prev_seed = seed;
+
+	//	printf("case 2: %s\n", read->id);
+	//	exit(-1);
+
 	continue;
       }
 
@@ -1044,12 +1108,15 @@ void step_three(fastq_read_t *read,
       assert(gap_genome_len > 0);
       ref = sa_genome_get_sequence(cal->chromosome_id, gap_genome_start, gap_genome_end, sa_index->genome);
       
+      //      printf("case 3: %s\n", read->id);
+      //      exit(-1);
       
       sw_prepare = sw_prepare_new(seq, ref, 0, 0, MIDDLE_SW);
       sw_prepare->seed_region = seed_count * 2;
       sw_prepare->cal = cal;
       sw_prepare->read = read;
       array_list_insert(sw_prepare, sw_prepare_list);
+      num_sw++;
       cigarset->active[seed_count * 2] = 1;
 
       prev_seed = seed;
@@ -1071,10 +1138,37 @@ void step_three(fastq_read_t *read,
       sw_prepare->cal = cal;
       sw_prepare->read = read;
       array_list_insert(sw_prepare, sw_prepare_list);
+      num_sw++;
 
       cigarset->active[num_seeds * 2] = 1;
+
+      //printf("case 5: %s\n", read->id);
+      //exit(-1);
     }
+
+    if (num_sw == 0) {
+      seed_cal_set_cigar_by_seed(seed, cal);
+    }
+
+    num_total_sw += num_sw;
   }
+  
+  return num_total_sw;
+}
+
+//--------------------------------------------------------------------
+
+void execute_sw(array_list_t *sw_prepare_list, sa_mapping_batch_t *mapping_batch) {
+
+  #ifdef _TIMING
+  struct timeval stop, start;
+  #endif
+
+  sw_prepare_t *sw_prepare;
+
+  seed_cal_t *cal;
+  cigar_t *cigar;
+  cigarset_t *cigarset;
 
   // apply smith-waterman
   sw_optarg_t sw_optarg;
@@ -1120,6 +1214,7 @@ void step_three(fastq_read_t *read,
   #endif
 
   // process Smith-Waterman output
+  char *seq, *ref;
   int op_name, op_value, diff, len;
   for (int i = 0; i < sw_count; i++) {
     sw_prepare = array_list_get(i, sw_prepare_list);
@@ -1226,41 +1321,71 @@ void step_three(fastq_read_t *read,
     sw_prepare_free(sw_prepare);
   }
 
-  // re-construct CIGAR for each CAL (from seed and gap CIGARS)
-  for (int i = 0; i < num_cals; i++) {
-    cal = array_list_get(i, cal_list);
-    cal->score = ((-4.0f) * cal->num_mismatches) 
-      + ((-10.0f) * cal->num_open_gaps) 
-      + ((-0.5f) * cal->num_extend_gaps);
-
-    cal->AS = 254;
-    cigar_append_op(read->length, 'M', &cal->cigar);
-
-    #ifdef _VERBOSE
-    printf("\t\t\t\tcal score = %0.2f\n", cal->score);
-    #endif
-    cigarset = cal->info;
-    cigar = &cal->cigar;
-    for (int j = 0; j < cigarset->num_cigars; j++) {
-      if (cigarset->active[j] > 0) {
-	#ifdef _VERBOSE
-	printf("************** gap %i -> concat cigar %s into %s\n",
-	       j, cigar_to_string(cigarset->cigars[j]), cigar_to_string(cigar));
-	#endif
-	//	cigar_concat(cigarset->cigars[j], cigar);
-	if (cigarset->active[j] == 1) {
-	  cigar_free(cigarset->cigars[j]);
-	}
-      }
-    }
-    cigarset_free(cigarset);
-    cal->info = NULL;
-  }
-
   // free memory
   sw_multi_output_free(sw_output);
-  array_list_free(sw_prepare_list, (void *) NULL);
 
+  #ifdef _TIMING
+  gettimeofday(&stop, NULL);
+  mapping_batch->func_times[FUNC_POST_SW] += 
+    ((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);  
+  #endif
+}
+
+//--------------------------------------------------------------------
+
+void post_process_sw(int sw_post_read_counter, int *sw_post_read,   
+		     array_list_t **cal_lists) {
+
+  #ifdef _TIMING
+  struct timeval stop, start;
+  #endif
+
+  #ifdef _TIMING
+  gettimeofday(&start, NULL);
+  #endif
+
+  int num_cals;
+  array_list_t *cal_list;
+
+  seed_cal_t *cal;
+  cigar_t *cigar;
+  cigarset_t *cigarset;
+
+  for (int j = 0; j < sw_post_read_counter; j++) {
+
+    cal_list = cal_lists[sw_post_read[j]];
+    num_cals = array_list_size(cal_list);
+    
+    // re-construct CIGAR for each CAL (from seed and gap CIGARS)
+    for (int i = 0; i < num_cals; i++) {
+      cal = array_list_get(i, cal_list);
+      cal->score = ((-4.0f) * cal->num_mismatches) 
+	+ ((-10.0f) * cal->num_open_gaps) 
+	+ ((-0.5f) * cal->num_extend_gaps);
+      
+      cal->AS = 254;
+      
+      #ifdef _VERBOSE
+      printf("\t\t\t\tcal score = %0.2f\n", cal->score);
+      #endif
+      cigarset = cal->info;
+      cigar = &cal->cigar;
+      for (int j = 0; j < cigarset->num_cigars; j++) {
+	if (cigarset->active[j] > 0) {
+          #ifdef _VERBOSE
+	  printf("************** gap %i -> concat cigar %s into %s\n",
+		 j, cigar_to_string(cigarset->cigars[j]), cigar_to_string(cigar));
+          #endif
+	  //	cigar_concat(cigarset->cigars[j], cigar);
+	  if (cigarset->active[j] == 1) {
+	    cigar_free(cigarset->cigars[j]);
+	  }
+	}
+      }
+      cigarset_free(cigarset);
+      cal->info = NULL;
+    }
+  }
 
   #ifdef _TIMING
   gettimeofday(&stop, NULL);
@@ -1301,6 +1426,12 @@ int sa_mapper(void *data) {
   cal_mng_t *cal_mng;
   array_list_t *cal_list;
 
+  int sw_post_read_counter = 0;
+  int sw_post_read[num_reads];
+
+  array_list_t *cal_lists[num_reads];
+  array_list_t *sw_prepare_list = array_list_new(1000, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
+
   fastq_read_t *read;
 
   cal_mng = cal_mng_new(sa_index->genome);
@@ -1310,14 +1441,12 @@ int sa_mapper(void *data) {
     ((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);  
   #endif
 
-  // for each read
+  // for each read, create cals and prepare sw
   for (int i = 0; i < num_reads; i++) {
     read = array_list_get(i, mapping_batch->fq_reads);
-    //printf("read id = %s\n", read->id);
-    //max_num_mismatches = read->length * MISMATCH_PERC;
 
-    // step one:: extend using mini-sw from suffix
-    cal_list = step_one(num_seeds, read, mapping_batch, sa_index, cal_mng);
+    // 1) extend using mini-sw from suffix
+    cal_list = create_cals(num_seeds, read, mapping_batch, sa_index, cal_mng);
 
     if (array_list_size(cal_list) > 0) {
       min_num_mismatches = get_min_num_mismatches(cal_list);
@@ -1335,16 +1464,36 @@ int sa_mapper(void *data) {
 	((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);  
       #endif
 
-      // step three (Smith-Waterman to fill in the gaps)
-      step_three(read, mapping_batch, sa_index, cal_list);
+      clean_cals(cal_list, read, sa_index);
 
+      // 2) prepare Smith-Waterman to fill in the gaps
+      if (prepare_sw(read, sw_prepare_list, mapping_batch, sa_index, cal_list)) {
+	sw_post_read[sw_post_read_counter++] = i;
+      }
+    }
+    cal_lists[i] = cal_list;
+  }
+
+  // 3) run SW to fill
+  if (array_list_size(sw_prepare_list) > 0) {
+    execute_sw(sw_prepare_list, mapping_batch);
+    post_process_sw(sw_post_read_counter, sw_post_read, cal_lists);
+  }
+  array_list_free(sw_prepare_list, (void *) NULL);
+
+  // 4) for each read, create alignments
+  for (int i = 0; i < num_reads; i++) {
+    cal_list = cal_lists[i];
+    read = array_list_get(i, mapping_batch->fq_reads);
+
+    if (array_list_size(cal_list) > 0) {
       // filter by score
       #ifdef _TIMING
       gettimeofday(&start, NULL);
       #endif
       max_score = get_max_score(cal_list);
       #ifdef _VERBOSE
-      printf("\t*** after SW> max. score = %0.2f\n", max_score);
+      printf("\n******* after SW> max. score = %0.2f (read %s)\n", max_score, read->id);
       #endif
       filter_cals_by_max_score(max_score, &cal_list);
       #ifdef _TIMING
@@ -1354,7 +1503,7 @@ int sa_mapper(void *data) {
       #endif
     }
 
-    // fill in gaps on CALs and create alignments structures
+    // create alignments structures
     #ifdef _TIMING
     gettimeofday(&start, NULL);
     #endif

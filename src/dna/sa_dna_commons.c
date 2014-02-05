@@ -200,15 +200,6 @@ void create_alignments(array_list_t *cal_list, fastq_read_t *read,
     seed_cal_print(cal);
     #endif
 
-    //    AS = ((read->length * 5) * 254) / (read->length * 5)
-    //      num_cigar_ops = 0;
-    //      pos = cal->start;
-    //      if (s_first->read_start > 0) {
-    //	pos -= s_first->read_start;
-    //      }
-    //      sprintf(cigar, "%s%iM", cigar, read->length);
-    //      num_cigar_ops++;
-
     // create the aligments
     alignment = alignment_new();	       
     alignment_init_single_end(strdup(read->id), strdup(read->sequence), strdup(read->quality), 
@@ -296,7 +287,7 @@ void display_cmp_sequences(fastq_read_t *read, sa_index3_t *sa_index) {
   free(aux);
   free(chrom_str);
   
-  printf("\n\n======> %s\n", read->id);
+  printf("\n======> %s\n", read->id);
   for (int i = 0; i < read->length; i++) {
     if (i % 10 == 0) {
       printf("%i", i / 10);
