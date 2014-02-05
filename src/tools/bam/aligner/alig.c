@@ -529,8 +529,8 @@ alig_region_haplotype_process(alig_context_t *context)
 					cigar32_replace(read, aux_cigar, aux_cigar_l);
 
 					//Logging
-					sprintf(log_msg, "%s \t%d:%d match reference perfectly\n", bam1_qname(read), read->core.tid + 1, read->core.pos + 1);
-					LOG_INFO(log_msg);
+					//sprintf(log_msg, "%s \t%d:%d match reference perfectly\n", bam1_qname(read), read->core.tid + 1, read->core.pos + 1);
+					//LOG_INFO(log_msg);
 				}
 				else
 				{
