@@ -131,8 +131,8 @@ float doscadfun(char* st1, int ll1, char* st2, int ll2,
       if (num_errors == MAX_NUM_ERRORS){
 		
 #ifdef _VERBOSE
-	printf("\t\t\t---- abort at (%i, %i) first error at (%i, %i) -- %d consecutive errors --\n", 
-	       i, j, first_i, first_j, num_errors);
+	printf("\t\t\t---- abort at (%i, %i) first error at (%i, %i, %s) -- %d consecutive errors --\n", 
+	       i, j, first_i, first_j, cigar_to_string(&first_cigar), num_errors);
 #endif
 	alig_out_set(first_i, first_j, first_match, first_mism, first_gap1, first_gapmas, first_st_map_len, out);
 	cigar_copy(&out->cigar, &first_cigar);

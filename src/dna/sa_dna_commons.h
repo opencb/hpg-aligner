@@ -294,6 +294,8 @@ inline void cigar_copy(cigar_t *dst, cigar_t *src) {
   if (src->num_ops > 0) {
     dst->num_ops = src->num_ops;
     memcpy(dst->ops, src->ops, src->num_ops * sizeof(uint32_t));
+  } else {
+    cigar_init(dst);
   }
 }
 
@@ -321,32 +323,42 @@ inline void cigar_rev(cigar_t *p) {
 }
 
 //--------------------------------------------------------------------
-// cigarset_t
-//--------------------------------------------------------------------
 
-typedef struct cigarset {
-  int num_cigars;
-  int *active;
-  cigar_t **cigars;
-} cigarset_t;
-
-//--------------------------------------------------------------------
-
-inline cigarset_t *cigarset_new(int num_cigars) {
-  cigarset_t *p = (cigarset_t *) malloc(sizeof(cigarset_t));
-  p->num_cigars = num_cigars;
-  p->active = (int *) calloc(num_cigars, sizeof(int));
-  p->cigars = (cigar_t **) malloc(num_cigars * sizeof(cigar_t*));
-  return p;
+inline int cigar_get_length(cigar_t *p) {
+  int op_value, op_name, num_ops, len = 0;
+  if ((num_ops = p->num_ops) > 0) {
+    for (int i = 0; i < num_ops; i++) {
+      cigar_get_op(i, &op_value, &op_name, p);
+      if (op_name == 'M' || op_name == 'I' || op_name== 'S') {
+	len += op_value;
+      }
+    }
+  }
+  return len;
 }
 
 //--------------------------------------------------------------------
 
-inline void cigarset_free(cigarset_t *p) {
-  if (p) {
-    if (p->active) free(p->active);
-    if (p->cigars) free(p->cigars);
-    free(p);
+inline void cigar_ltrim_ops(int len, cigar_t *p) {
+  int num_ops;
+  if ((num_ops = p->num_ops) > 0) {
+    if (len >= num_ops) {
+      cigar_init(p);
+    } else {
+      p->num_ops -= len;
+      memcpy(p->ops, &p->ops[len], len * sizeof(uint32_t));
+    }
+  }
+}
+
+inline void cigar_rtrim_ops(int len, cigar_t *p) {
+  int num_ops;
+  if ((num_ops = p->num_ops) > 0) {
+    if (len >= num_ops) {
+      cigar_init(p);
+    } else {
+      p->num_ops -= len;
+    }
   }
 }
 
@@ -417,6 +429,7 @@ typedef struct seed_cal {
   float score;
   cigar_t cigar;
 
+  fastq_read_t *read;
   linked_list_t *seed_list;
   void *info;
 } seed_cal_t;
@@ -446,6 +459,7 @@ inline seed_cal_t *seed_cal_new(const size_t chromosome_id,
   p->score = 0.0f;
   cigar_init(&p->cigar);
 
+  p->read = NULL;
   p->seed_list = seed_list;
   p->info = 0;
 
@@ -484,6 +498,50 @@ inline void seed_cal_print(seed_cal_t *cal) {
 	     seed->num_open_gaps, seed->num_extend_gaps);
     }
     printf("\n");
+  }
+}
+
+//--------------------------------------------------------------------
+// cigarset_t
+//--------------------------------------------------------------------
+typedef struct cigarset_info {
+  int active;
+  int overlap;
+  cigar_t *cigar;
+  seed_t *seed;
+} cigarset_info_t;
+
+inline cigarset_info_t *cigarset_info_set(int active, int overlap,
+					  cigar_t *cigar, seed_t *seed,
+					  cigarset_info_t *p) {
+  p->active = active;
+  p->overlap = overlap;
+  p->cigar = cigar;
+  p->seed = seed;
+}
+
+//--------------------------------------------------------------------
+
+typedef struct cigarset {
+  int size;
+  cigarset_info_t *info;
+} cigarset_t;
+
+//--------------------------------------------------------------------
+
+inline cigarset_t *cigarset_new(int size) {
+  cigarset_t *p = (cigarset_t *) malloc(sizeof(cigarset_t));
+  p->size = size;
+  p->info = (cigarset_info_t *) malloc(size * sizeof(cigarset_info_t));
+  return p;
+}
+
+//--------------------------------------------------------------------
+
+inline void cigarset_free(cigarset_t *p) {
+  if (p) {
+    if (p->info) free(p->info);
+    free(p);
   }
 }
 

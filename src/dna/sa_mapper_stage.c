@@ -54,7 +54,7 @@ void cal_mng_clear(cal_mng_t *p) {
 
 //--------------------------------------------------------------------
 
-void cal_mng_update(seed_t *seed, int read_length, cal_mng_t *p) {
+void cal_mng_update(seed_t *seed, fastq_read_t *read, cal_mng_t *p) {
   int is_used = 0;
   if (p->cals_lists) {
     seed_cal_t *cal;
@@ -80,6 +80,7 @@ void cal_mng_update(seed_t *seed, int read_length, cal_mng_t *p) {
 			   seed->genome_start, seed->genome_end, seed_list);
 	cal->read_area = seed->read_end - seed->read_start + 1;
 	cal->num_mismatches = seed->num_mismatches + seed->num_open_gaps + seed->num_extend_gaps;
+	cal->read = read;
 	linked_list_insert(cal, cal_list);
       } else {
 	// insert (by order)
@@ -92,8 +93,8 @@ void cal_mng_update(seed_t *seed, int read_length, cal_mng_t *p) {
 	  #endif
 	  //	  assert(cal->end > item->start);
 	  s_last = linked_list_get_last(item->seed_list);
-	  if (seed->read_start - s_last->read_end < read_length && 
-	      seed->genome_start - s_last->genome_end < read_length) {
+	  if (seed->read_start - s_last->read_end < read->length && 
+	      seed->genome_start - s_last->genome_end < read->length) {
 	    is_used = 1;
 	    linked_list_insert_last(seed, item->seed_list);
 	    item->end = seed->genome_end;
@@ -116,6 +117,7 @@ void cal_mng_update(seed_t *seed, int read_length, cal_mng_t *p) {
 				 seed->genome_start, seed->genome_end, seed_list);
 	      cal->read_area = seed->read_end - seed->read_start + 1;
 	      cal->num_mismatches = seed->num_mismatches + seed->num_open_gaps + seed->num_extend_gaps;
+	      cal->read = read;
 	      linked_list_iterator_insert(cal, itr);
 	      linked_list_iterator_prev(itr);
 	      break;
@@ -134,6 +136,7 @@ void cal_mng_update(seed_t *seed, int read_length, cal_mng_t *p) {
 			     seed->genome_start, seed->genome_end, seed_list);
 	  cal->read_area = seed->read_end - seed->read_start + 1;
 	  cal->num_mismatches = seed->num_mismatches + seed->num_open_gaps + seed->num_extend_gaps;
+	  cal->read = read;
 	  linked_list_insert_last(cal, cal_list);
 	}
 	linked_list_iterator_free(itr);
@@ -264,6 +267,7 @@ void generate_cals_from_exact_read(int strand, fastq_read_t *read,
     cal = seed_cal_new(chrom, strand, g_start, g_end, seed_list);
     cal->read_area = read->length;
     cal->num_mismatches = 0;
+    cal->read = read;
     array_list_insert(cal, cal_list);
   }
 }
@@ -498,7 +502,7 @@ int generate_cals_from_suffixes(int strand, fastq_read_t *read,
       #ifdef _TIMING
       gettimeofday(&start, NULL);
       #endif
-      cal_mng_update(seed, read->length, cal_mng);
+      cal_mng_update(seed, read, cal_mng);
       #ifdef _TIMING
       gettimeofday(&stop, NULL);
       mapping_batch->func_times[FUNC_CAL_MNG_INSERT] += 
@@ -966,6 +970,67 @@ void step_three0(fastq_read_t *read, sa_mapping_batch_t *mapping_batch,
 #define SW_LEFT_FLANK_EX 20
 #define SW_RIGHT_FLANK_EX 20
 
+#define CIGAR_FROM_GAP  1
+#define CIGAR_FROM_SEED 2
+
+void update_left_side_seed(int min_flank, seed_t *seed) {
+  int q_flank = 0, r_flank = 0;
+  // look at left-side cigar
+  cigar_t *cigar = &seed->cigar;
+  int op_value, op_name, trim = 0, num_ops = cigar->num_ops;
+
+  for (int i = 0; i < num_ops; i++) {
+    cigar_get_op(i, &op_value, &op_name, cigar);
+    if (op_name == 'M' && op_value > min_flank) {
+      break;
+    } else {
+      trim++;
+      if (op_name == 'M') {
+	q_flank += op_value;
+	r_flank += op_value;
+      } else if (op_name == 'I') {
+	q_flank += op_value;
+      } else if (op_name == 'D') {
+	r_flank += op_value;
+      }
+    }
+  }  
+  if (trim) {
+    seed->read_start += q_flank;
+    seed->genome_start += r_flank;
+    cigar_ltrim_ops(trim, cigar);
+  }
+}
+
+void update_right_side_seed(int min_flank, seed_t *seed) {
+  int q_flank = 0, r_flank = 0;
+  // look at right-side cigar
+  cigar_t *cigar = &seed->cigar;
+  int op_value, op_name, trim = 0, num_ops = cigar->num_ops;
+
+  for (int i = num_ops - 1; i >= 0; i--) {
+    cigar_get_op(i, &op_value, &op_name, cigar);
+    if (op_name == 'M' && op_value > min_flank) {
+      break;
+    } else {
+      trim++;
+      if (op_name == 'M') {
+	q_flank += op_value;
+	r_flank += op_value;
+      } else if (op_name == 'I') {
+	q_flank += op_value;
+      } else if (op_name == 'D') {
+	r_flank += op_value;
+      }
+    }
+  }  
+  if (trim) {
+    seed->read_end -= q_flank;
+    seed->genome_end -= r_flank;
+    cigar_rtrim_ops(trim, cigar);
+  }
+}
+
 int prepare_sw(fastq_read_t *read,   array_list_t *sw_prepare_list,
 	       sa_mapping_batch_t *mapping_batch, sa_index3_t *sa_index, 
 	       array_list_t *cal_list) {
@@ -996,6 +1061,7 @@ int prepare_sw(fastq_read_t *read,   array_list_t *sw_prepare_list,
   cigar_t *cigar;
   cigarset_t *cigarset;
 
+  int query_flank, ref_flank;
   int num_sw, num_total_sw = 0;
 
   for (int i = 0; i < num_cals; i++) {
@@ -1022,15 +1088,23 @@ int prepare_sw(fastq_read_t *read,   array_list_t *sw_prepare_list,
     cal->info = (void *) cigarset;
 
     if (seed->read_start > 0) {
+      #ifdef _VERBOSE
+      print_seed("-----> before updating first left-side seed: ", seed);
+      #endif
+      update_left_side_seed(SW_RIGHT_FLANK, seed);
+      #ifdef _VERBOSE
+      print_seed("-----> after updating first left-side seed: ", seed);
+      #endif
+
       gap_genome_start = seed->genome_start - seed->read_start - 1 - SW_LEFT_FLANK_EX;
-      gap_genome_end = seed->genome_start + SW_RIGHT_FLANK;
+      gap_genome_end = seed->genome_start + SW_RIGHT_FLANK; //ref_flank; //SW_RIGHT_FLANK;
       ref = sa_genome_get_sequence(cal->chromosome_id, gap_genome_start, gap_genome_end, sa_index->genome);
       
       seq = get_subsequence((cal->strand ? read->revcomp : read->sequence), 
-			    0, seed->read_start + 1 + SW_RIGHT_FLANK);
+			    0, seed->read_start + SW_RIGHT_FLANK); //query_flank); //SW_RIGHT_FLANK);
       
       sw_prepare = sw_prepare_new(seq, ref, 0, SW_RIGHT_FLANK, FIRST_SW);
-      sw_prepare->seed_region = 0;
+      sw_prepare->seed_region = seed;
       sw_prepare->cal = cal;
       sw_prepare->read = read;
       array_list_insert(sw_prepare, sw_prepare_list);
@@ -1039,15 +1113,16 @@ int prepare_sw(fastq_read_t *read,   array_list_t *sw_prepare_list,
       //printf("case 4: %s\n", read->id);
       //exit(-1);
 
-      cigarset->active[0] = 1;
+      cigarset_info_set(CIGAR_FROM_GAP, 0, NULL, NULL, &cigarset->info[0]);
+    } else {
+      cigarset_info_set(0, 0, NULL, NULL, &cigarset->info[0]);
     }
     // seeds at the middle positions
     cal->num_mismatches += seed->num_mismatches;
     cal->num_open_gaps += seed->num_open_gaps;
     cal->num_extend_gaps += seed->num_extend_gaps;
     prev_seed = seed;
-    cigarset->active[1] = 2;
-    cigarset->cigars[1] = &seed->cigar;
+    cigarset_info_set(CIGAR_FROM_SEED, 0, &seed->cigar, seed, &cigarset->info[1]);
     seed_count = 0;
     for (item = cal->seed_list->first->next; item != NULL; item = item->next) {
       seed_count++;
@@ -1055,6 +1130,22 @@ int prepare_sw(fastq_read_t *read,   array_list_t *sw_prepare_list,
       cal->num_mismatches += seed->num_mismatches;
       cal->num_open_gaps += seed->num_open_gaps;
       cal->num_extend_gaps += seed->num_extend_gaps;
+
+      #ifdef _VERBOSE
+      print_seed("-----> before updating middle right-side seed: ", prev_seed);
+      #endif
+      update_right_side_seed(SW_LEFT_FLANK, prev_seed);
+      #ifdef _VERBOSE
+      print_seed("-----> before updating middle right-side seed: ", prev_seed);
+      #endif
+      #ifdef _VERBOSE
+      print_seed("-----> before updating middle lefth-side seed: ", seed);
+      #endif
+      update_left_side_seed(SW_RIGHT_FLANK, seed);
+      #ifdef _VERBOSE
+      print_seed("-----> before updating middle left-side seed: ", seed);
+      #endif
+
 
       gap_read_start = prev_seed->read_end + 1;
       gap_read_end = seed->read_start - 1;
@@ -1066,72 +1157,96 @@ int prepare_sw(fastq_read_t *read,   array_list_t *sw_prepare_list,
 
       if (gap_read_len <= 0) {
 	// deletion
-	cigarset->active[seed_count * 2] = 1;
-	cigarset->cigars[seed_count * 2] = cigar_new(gap_genome_len, 'D');	
-	cal->num_open_gaps += 1;
-	cal->num_extend_gaps += (gap_genome_len - 1);
-	prev_seed = seed;
+	//	printf("gap_read_len = %i\n", gap_read_len);
+	//	exit(-1);
+	//	cigarset->active[seed_count * 2] = CIGAR_FROM_GAP; //1;
+	//	cigarset->cigars[seed_count * 2] = cigar_new(gap_genome_len, 'D');	
+	//	cal->num_open_gaps += 1;
+	//	cal->num_extend_gaps += (gap_genome_len - 1);
+	//	prev_seed = seed;
+
+	seq = get_subsequence((cal->strand ? read->revcomp : read->sequence), 
+			      gap_read_start - SW_LEFT_FLANK - abs(gap_read_len), 
+			      gap_read_len + SW_LEFT_FLANK + SW_RIGHT_FLANK + (2*abs(gap_read_len)));
+
+	ref = sa_genome_get_sequence(cal->chromosome_id, gap_genome_start - SW_LEFT_FLANK - abs(gap_read_len), 
+				     gap_genome_end + SW_RIGHT_FLANK + abs(gap_read_len), sa_index->genome);
+
+	
+	cigarset_info_set(CIGAR_FROM_GAP, abs(gap_read_len), NULL, NULL, &cigarset->info[seed_count * 2]);
 
 	//	printf("case 1: %s\n", read->id);
 	//	exit(-1);
-
-	continue;
-      }
-
-      if (gap_genome_len <= 0) {
+      } else if (gap_genome_len <= 0) {
 	// insertion
-	cigarset->active[seed_count * 2] = 1;
-	cigarset->cigars[seed_count * 2] = cigar_new(gap_genome_len, 'I');	
-	cal->num_open_gaps += 1;
-	cal->num_extend_gaps += (gap_genome_len - 1);
-	prev_seed = seed;
+	//	cigarset->active[seed_count * 2] = CIGAR_FROM_GAP; //1;
+	//	cigarset->cigars[seed_count * 2] = cigar_new(gap_genome_len, 'I');	
+	//	cal->num_open_gaps += 1;
+	//	cal->num_extend_gaps += (gap_genome_len - 1);
+
+	seq = get_subsequence((cal->strand ? read->revcomp : read->sequence), 
+			      gap_read_start - SW_LEFT_FLANK, gap_read_len + SW_LEFT_FLANK + SW_RIGHT_FLANK);
+
+	ref = sa_genome_get_sequence(cal->chromosome_id, gap_genome_start - SW_LEFT_FLANK - abs(gap_genome_len), 
+				     gap_genome_end + SW_RIGHT_FLANK + abs(gap_genome_len), sa_index->genome);
+            
+	cigarset_info_set(CIGAR_FROM_GAP, 0, NULL, NULL, &cigarset->info[seed_count * 2]);
 
 	//	printf("case 2: %s\n", read->id);
 	//	exit(-1);
+      } else {
 
-	continue;
+        #ifdef _VERBOSE1
+	print_seed("", prev_seed);
+	print_seed("", seed);
+	printf("read id = %s\n", read->id);
+	printf("genome gap (start, end) = (%lu, %lu), len = %i\n", gap_genome_start, gap_genome_end, gap_genome_len);
+	printf("read gap (start, end) = (%lu, %lu), len = %i\n", gap_read_start, gap_read_end, gap_read_len);
+	exit(-1);
+        #endif
+
+	//assert(gap_read_len > 0);
+	seq = get_subsequence((cal->strand ? read->revcomp : read->sequence), 
+			      gap_read_start - SW_LEFT_FLANK, gap_read_len + SW_LEFT_FLANK + SW_RIGHT_FLANK);
+
+	//assert(gap_genome_len > 0);
+	ref = sa_genome_get_sequence(cal->chromosome_id, gap_genome_start - SW_LEFT_FLANK, 
+				     gap_genome_end + SW_RIGHT_FLANK, sa_index->genome);
+
+	cigarset_info_set(CIGAR_FROM_GAP, 0, NULL, NULL, &cigarset->info[seed_count * 2]);
+
+	//      printf("case 3: %s\n", read->id);
+	//      exit(-1);
       }
-
-      #ifdef _VERBOSE1
-      print_seed("", prev_seed);
-      print_seed("", seed);
-      printf("read id = %s\n", read->id);
-      printf("genome gap (start, end) = (%lu, %lu), len = %i\n", gap_genome_start, gap_genome_end, gap_genome_len);
-      printf("read gap (start, end) = (%lu, %lu), len = %i\n", gap_read_start, gap_read_end, gap_read_len);
-      exit(-1);
-      #endif
-
-      assert(gap_read_len > 0);
-      seq = get_subsequence((cal->strand ? read->revcomp : read->sequence), 
-			    gap_read_start, gap_read_len);
-
-      assert(gap_genome_len > 0);
-      ref = sa_genome_get_sequence(cal->chromosome_id, gap_genome_start, gap_genome_end, sa_index->genome);
-      
-      //      printf("case 3: %s\n", read->id);
-      //      exit(-1);
-      
+      // prepare MIDDLE_SW
       sw_prepare = sw_prepare_new(seq, ref, 0, 0, MIDDLE_SW);
       sw_prepare->seed_region = seed_count * 2;
       sw_prepare->cal = cal;
       sw_prepare->read = read;
       array_list_insert(sw_prepare, sw_prepare_list);
       num_sw++;
-      cigarset->active[seed_count * 2] = 1;
 
       prev_seed = seed;
-      cigarset->active[seed_count * 2 + 1] = 2;
-      cigarset->cigars[seed_count * 2 + 1] = &seed->cigar;
+      cigarset_info_set(CIGAR_FROM_SEED, 0, &seed->cigar, seed, &cigarset->info[seed_count * 2 + 1]);
     }
     // last seed
     seed = linked_list_get_last(cal->seed_list);
     if (seed->read_end < read->length - 1) {
-      gap_genome_start = seed->genome_end + 1;
-      gap_genome_end = gap_genome_start + (read->length - seed->read_end);// + 10;
+      #ifdef _VERBOSE
+      print_seed("-----> before updating last right-side seed: ", seed);
+      #endif
+      update_right_side_seed(SW_LEFT_FLANK, seed);
+      #ifdef _VERBOSE
+      print_seed("-----> after updating last right-side seed: ", seed);
+      #endif
+
+      gap_genome_start = seed->genome_end - SW_LEFT_FLANK + 1;
+      gap_genome_end = gap_genome_start + (read->length - seed->read_end) + SW_LEFT_FLANK_EX;
       ref = sa_genome_get_sequence(cal->chromosome_id, gap_genome_start, gap_genome_end, sa_index->genome);
 
       seq = get_subsequence((cal->strand ? read->revcomp : read->sequence), 
-			    seed->read_end + 1, read->length - seed->read_end - 1);
+			    seed->read_end - SW_LEFT_FLANK + 1, 
+			    read->length + SW_LEFT_FLANK - seed->read_end);
 
       sw_prepare = sw_prepare_new(seq, ref, 0, 0, LAST_SW);
       sw_prepare->seed_region = num_seeds * 2;
@@ -1140,10 +1255,12 @@ int prepare_sw(fastq_read_t *read,   array_list_t *sw_prepare_list,
       array_list_insert(sw_prepare, sw_prepare_list);
       num_sw++;
 
-      cigarset->active[num_seeds * 2] = 1;
+      cigarset_info_set(CIGAR_FROM_GAP, 0, NULL, NULL, &cigarset->info[num_seeds * 2]);
 
       //printf("case 5: %s\n", read->id);
       //exit(-1);
+    } else {
+      cigarset_info_set(0, 0, NULL, NULL, &cigarset->info[num_seeds * 2]);
     }
 
     if (num_sw == 0) {
@@ -1214,16 +1331,107 @@ void execute_sw(array_list_t *sw_prepare_list, sa_mapping_batch_t *mapping_batch
   #endif
 
   // process Smith-Waterman output
-  char *seq, *ref;
-  int op_name, op_value, diff, len;
+  seed_t *seed;
+  char *seq, *ref, *query_map, *ref_map;
+  int op_name, op_value, diff, len, r_nt_mapped;
+  int left_flank, right_flank, query_start, ref_start;
   for (int i = 0; i < sw_count; i++) {
     sw_prepare = array_list_get(i, sw_prepare_list);
     cal = sw_prepare->cal;
     
     cigarset = cal->info;
     cigar = cigar_new_empty();
+
+    query_map = sw_output->query_map_p[i];
+    ref_map = sw_output->ref_map_p[i];
+
+    // nt mapped in reference
+    r_nt_mapped = 0;
+    len = strlen(ref_map);
+
+    left_flank = sw_prepare->left_flank;
+    right_flank = sw_prepare->right_flank;
+    query_start = sw_output->query_start_p[i];
+    ref_start = sw_output->ref_start_p[i];
+    diff = query_start - ref_start;
+
+    // check initial positions
+    if (sw_prepare->ref_type == FIRST_SW) {
+      seed = sw_prepare->seed_region;
+      if (query_start > 0) {
+	cigar_append_op(query_start, 'S', cigar);
+      }
+      for(int j = 0; j < len; j++) {
+	if (ref_map[j] != '-') {
+	  r_nt_mapped++;
+	}
+      }
+      cal->start = seed->genome_start - (r_nt_mapped - right_flank) + query_start;
+    } else {
+      if (query_start > 0) {
+	printf("case query_start > 0: read %s\n", cal->read->id);
+	//	exit(-1);
+	if (ref_start > 0) {
+	  printf("case query_start and ref_start > 0: read %s\n", cal->read->id);
+	  //	  exit(-1);
+	  if (diff == 0) {
+	    cigar_append_op(query_start, 'M', cigar);      
+	    //assert(1 == 0);
+	  } else if (diff > 0) {
+	    cigar_append_op(ref_start, 'M', cigar);      
+	    cigar_append_op(diff, 'I', cigar);      
+	    //	  assert(1 == 0);
+	  } else {
+	    cigar_append_op(query_start, 'M', cigar);      
+	    cigar_append_op(abs(diff), 'D', cigar);      
+	  }
+	} else {
+	  cigar_append_op(query_start, 'I', cigar);      
+	}
+      } else if (ref_start > 0) {
+	//	printf("case ref_start > 0\n");
+	//	exit(-1);
+	//cigar_append_op(ref_start, 'D', cigar);      
+	//      assert(1 == 0);
+      }
+    }
+
+    // scan map to complete cigar
     op_value = 0;
     op_name = 'M';
+    for(int i = 0; i < len; i++) {
+      if (query_map[i] == '-') {
+	// deletion (in the query)
+	if (op_name != 'D' && op_value > 0) {
+	  cigar_append_op(op_value, op_name, cigar);
+	  op_value = 0;
+	}
+	op_value++;
+	op_name = 'D';
+      } else if (ref_map[i] == '-') {
+	// insertion (in the query)
+	if (op_name != 'I' && op_value > 0) {
+	  cigar_append_op(op_value, op_name, cigar);
+	  op_value = 0;
+	}
+	op_value++;
+	op_name = 'I';
+      } else {
+	if (op_name != 'M' && op_value > 0) {
+	  cigar_append_op(op_value, op_name, cigar);
+          #ifdef _VERBOSE
+	  printf("****************** (value, name) = (%i, %c) : op. change: current cigar: %s\n", 
+		 op_value, op_name, cigar_to_string(cigar));
+          #endif
+	  op_value = 0;
+	}
+	op_value++;
+	op_name = 'M';
+      }
+    }
+    cigar_append_op(op_value, op_name, cigar);
+
+    /*
     if (sw_output->query_start_p[i] > 0 && sw_output->ref_start_p[i] > 0) {
       diff = sw_output->query_start_p[i] - sw_output->ref_start_p[i];
       if (diff < 0) {
@@ -1310,11 +1518,20 @@ void execute_sw(array_list_t *sw_prepare_list, sa_mapping_batch_t *mapping_batch
       }
       cigar_append_op(op_value, op_name, cigar);
     }
-    cigarset->active[(int)sw_prepare->seed_region] = 1;
-    cigarset->cigars[(int)sw_prepare->seed_region] = cigar;
+*/
+
+    int gap_count = 0;
+    if (sw_prepare->ref_type == FIRST_SW) {
+      gap_count = 0;
+    } else {
+      gap_count = (int)sw_prepare->seed_region;
+    }
+    cigarset->info[gap_count].active = CIGAR_FROM_GAP;
+    cigarset->info[gap_count].cigar = cigar;
+    //    cigarset->info[gap_count].overlap = 0;
     #ifdef _VERBOSE
-    printf("************** sw_count: %i, cigar for gap %i: %s\n", 
-	   i, sw_prepare->seed_region, cigar_to_string(cigar));
+    printf("************** sw_count: %i, for gap %i cigar %s\n", 
+	   i, gap_count, cigar_to_string(cigar));
     #endif
 
     // free
@@ -1344,12 +1561,14 @@ void post_process_sw(int sw_post_read_counter, int *sw_post_read,
   gettimeofday(&start, NULL);
   #endif
 
-  int num_cals;
+  int num_cals, cigar_type;
   array_list_t *cal_list;
 
+  seed_t *seed;
   seed_cal_t *cal;
-  cigar_t *cigar;
+  cigar_t *cigar, *aux_cigar;
   cigarset_t *cigarset;
+  int cigar_len, op_value, op_name;
 
   for (int j = 0; j < sw_post_read_counter; j++) {
 
@@ -1370,16 +1589,65 @@ void post_process_sw(int sw_post_read_counter, int *sw_post_read,
       #endif
       cigarset = cal->info;
       cigar = &cal->cigar;
-      for (int j = 0; j < cigarset->num_cigars; j++) {
-	if (cigarset->active[j] > 0) {
-          #ifdef _VERBOSE
-	  printf("************** gap %i -> concat cigar %s into %s\n",
-		 j, cigar_to_string(cigarset->cigars[j]), cigar_to_string(cigar));
-          #endif
-	  //	cigar_concat(cigarset->cigars[j], cigar);
-	  if (cigarset->active[j] == 1) {
-	    cigar_free(cigarset->cigars[j]);
+      for (int j = 0; j < cigarset->size; j++) {
+	cigar_type = cigarset->info[j].active;
+	if (cigar_type > 0) {
+	  if (cigar_type == CIGAR_FROM_SEED) {
+	    seed = cigarset->info[j].seed;
+	    aux_cigar = cigarset->info[j].cigar;
+	    // CIGAR_FROM_SEED
+	    if (seed->read_start > 0) {
+	      cigar_get_op(0, &op_value, &op_name, aux_cigar);
+	      if (op_value < SW_LEFT_FLANK || op_name != 'M') {
+		printf("read = %s: attention: op (%i, %c) sw_left_flank!!!\n", cal->read->id, op_value, op_name);
+		//		exit(-1);
+	      }
+	      cigar_set_op(0, op_value - SW_LEFT_FLANK, op_name, aux_cigar);
+	    }
+	    if (seed->read_end < cal->read->length - 1) {
+	      cigar_get_op(aux_cigar->num_ops - 1, &op_value, &op_name, aux_cigar);
+	      if (op_value < SW_RIGHT_FLANK || op_name != 'M') {
+		printf("read = %s: attention: op (%i, %c) sw_right_flank!!!\n", cal->read->id, op_value, op_name);
+		//		exit(-1);
+	      }
+	      cigar_set_op(aux_cigar->num_ops - 1, op_value - SW_RIGHT_FLANK, op_name, aux_cigar);
+	    }
+            #ifdef _VERBOSE
+	    printf("************** gap %i -> concat SEED cigar %s into %s\n",
+		   j, cigar_to_string(aux_cigar), cigar_to_string(cigar));
+            #endif
+	    cigar_concat(aux_cigar, cigar);
+	  } else {
+	    // CIGAR_FROM_GAP
+            #ifdef _VERBOSE
+	    printf("************** gap %i -> concat GAP cigar %s into %s\n",
+		   j, cigar_to_string(cigarset->info[j].cigar), cigar_to_string(cigar));
+            #endif
+	    aux_cigar = cigarset->info[j].cigar;
+	    if (cigarset->info[j].overlap) {
+	      cigar_get_op(aux_cigar->num_ops - 1, &op_value, &op_name, aux_cigar);
+	      if (op_value < cigarset->info[j].overlap || op_name != 'M') {
+		printf("read = %s: attention OVERLAP: op (%i, %c) overlap (%i)!!!\n", cal->read->id, op_value, op_name, cigarset->info[j].overlap);
+		exit(-1);
+	      }
+	      cigar_set_op(aux_cigar->num_ops - 1, op_value - cigarset->info[j].overlap, op_name, aux_cigar);
+	    }
+	    cigar_concat(aux_cigar, cigar);
+	    cigar_free(aux_cigar);
 	  }
+	}
+      }
+      cigar_len = cigar_get_length(cigar);
+      if (cigar_len > cal->read->length) {
+	printf("cigar_len (%i : %s) > cal->read->length (%i): read %s\n", 
+	       cigar_len, cigar_to_string(cigar), cal->read->length, cal->read->id);
+	//	exit(-1);
+      }
+      if (cigar_len < cal->read->length) {
+	if (seed && seed->read_end == cal->read->length - 1) {
+	  cigar_append_op(cal->read->length - cigar_len, 'M', cigar);
+	} else {
+	  cigar_append_op(cal->read->length - cigar_len, 'S', cigar);
 	}
       }
       cigarset_free(cigarset);
