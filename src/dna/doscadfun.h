@@ -27,7 +27,7 @@ typedef struct alig_out {
 
 //--------------------------------------------------------------------
 
-inline void alig_out_init(alig_out_t *out) {
+static inline void alig_out_init(alig_out_t *out) {
   out->map_len1 = 0;
   out->map_len2 = 0;
   out->match = 0;
@@ -41,7 +41,7 @@ inline void alig_out_init(alig_out_t *out) {
 
 //--------------------------------------------------------------------
 
-inline void alig_out_set(int map_l1, int map_l2, int mm, int mism,
+static inline void alig_out_set(int map_l1, int map_l2, int mm, int mism,
                          int gap1, int gapmas, int st_mm_len, alig_out_t *out) {
   out->map_len1 = map_l1;
   out->map_len2 = map_l2;
@@ -55,7 +55,7 @@ inline void alig_out_set(int map_l1, int map_l2, int mm, int mism,
 
 //--------------------------------------------------------------------
 
-inline void alig_out_print(alig_out_t *out) {
+static inline void alig_out_print(alig_out_t *out) {
   printf("matches = %i, mismatches = %i, open-gaps = %i, extended-gaps = %i, (query map len, ref. map.len) = (%i, %i)\n",
 	 out->match, out->mismatch, out->gap_open, out->gap_extend,
 	 out->map_len1, out->map_len2);

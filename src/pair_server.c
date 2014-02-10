@@ -11,7 +11,7 @@ void prepare_paired_alignments(pair_server_input_t *input, mapping_batch_t *batc
 
 //------------------------------------------------------------------------------------
 
-inline void filter_alignments(char report_all, 
+static inline void filter_alignments(char report_all,
 			      size_t report_n_best, 
 			      size_t report_n_hits,
 			      int report_best,
@@ -58,7 +58,7 @@ void prepare_pair_server(pair_server_input_t* input) {
 
 //------------------------------------------------------------------------------------
 
-inline array_list_t *create_new_list(size_t *valid_items, size_t num_valids, array_list_t *list) {
+static inline array_list_t *create_new_list(size_t *valid_items, size_t num_valids, array_list_t *list) {
   void *item;
   int num = 0;
 
@@ -523,7 +523,7 @@ void update_mispaired_pair(int pair_num, size_t num_items, array_list_t *list) {
 
 //------------------------------------------------------------------------------------
 
-inline void update_mispaired_alignment(int pair_num, alignment_t *alig) {
+static inline void update_mispaired_alignment(int pair_num, alignment_t *alig) {
     // set pair fields
     alig->mate_position = 0;
     alig->mate_chromosome = 0;
@@ -540,7 +540,7 @@ inline void update_mispaired_alignment(int pair_num, alignment_t *alig) {
 
 //------------------------------------------------------------------------------------
 
-inline void update_mispaired_pairs(size_t num_items1, size_t num_items2,
+static inline void update_mispaired_pairs(size_t num_items1, size_t num_items2,
 				   array_list_t *list1, array_list_t *list2) {
   alignment_t *alig;
   alignment_t *first1 = array_list_get(0, list1);
@@ -921,7 +921,7 @@ void prepare_paired_alignments(pair_server_input_t *input, mapping_batch_t *batc
 
 //------------------------------------------------------------------------------------
 
-inline size_t select_n_hits(array_list_t *mapping_list, 
+static inline size_t select_n_hits(array_list_t *mapping_list,
 			    size_t report_n_hits) {
 
   array_list_t *mapping_list_filter;
@@ -946,7 +946,7 @@ inline size_t select_n_hits(array_list_t *mapping_list,
 //-----------------------------------------------------------------------------
 extern unsigned int alignmentcmp(alignment_t *alignment_1, alignment_t *alignment_2);
 
-inline size_t select_best_hits(array_list_t *mapping_list, 
+static inline size_t select_best_hits(array_list_t *mapping_list,
 			       size_t report_n_best) {
   int j, i, z;
   size_t best_pos, array_size;
@@ -1008,7 +1008,7 @@ inline size_t select_best_hits(array_list_t *mapping_list,
 
 //-----------------------------------------------------------------------------
 
-inline void select_best (array_list_t *mapping_list) {
+static inline void select_best (array_list_t *mapping_list) {
   size_t num_items = array_list_size(mapping_list);
   int max_quality = 0;
   alignment_t *alig;
@@ -1055,7 +1055,7 @@ inline void select_best (array_list_t *mapping_list) {
 
 //-----------------------------------------------------------------------------
 
-inline void filter_alignments(char report_all, 
+static inline void filter_alignments(char report_all,
 			      size_t report_n_best, 
 			      size_t report_n_hits,
 			      int report_best,

@@ -29,7 +29,7 @@ struct pair_server_input {
 
 //------------------------------------------------------------------------------------
 
-inline void generate_alignment_len(alignment_t *alig) {
+static inline void generate_alignment_len(alignment_t *alig) {
   alig->map_len = 0;
   char *cigar_str = alig->cigar;
   int cigar_len = strlen(cigar_str);	  
