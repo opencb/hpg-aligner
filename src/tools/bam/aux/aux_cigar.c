@@ -11,6 +11,9 @@
  * CIGAR GENERATION
  */
 
+/**
+ * Leftalign one read cigar.
+ */
 ERROR_CODE
 cigar32_leftmost(char *ref, size_t ref_l, char *read, size_t read_l, uint32_t *cigar, size_t cigar_l, uint32_t *out_cigar, size_t *out_cigar_l)
 {
@@ -179,6 +182,9 @@ cigar32_leftmost(char *ref, size_t ref_l, char *read, size_t read_l, uint32_t *c
 	return NO_ERROR;
 }
 
+/**
+ * Remove clips from cigar.
+ */
 ERROR_CODE
 cigar32_unclip(uint32_t *cigar, size_t cigar_l, uint32_t *out_cigar, size_t *out_cigar_l)
 {
@@ -220,6 +226,9 @@ cigar32_unclip(uint32_t *cigar, size_t cigar_l, uint32_t *out_cigar, size_t *out
 	return NO_ERROR;
 }
 
+/**
+ * Add clips to cigar32 from other cigar32 (ideally the original one).
+ */
 ERROR_CODE
 cigar32_reclip(uint32_t *clip_cigar, size_t clip_cigar_l, uint32_t *unclip_cigar, size_t unclip_cigar_l, uint32_t *out_cigar, size_t *out_cigar_l)
 {
@@ -313,6 +322,9 @@ cigar32_reclip(uint32_t *clip_cigar, size_t clip_cigar_l, uint32_t *unclip_cigar
 	return NO_ERROR;
 }
 
+/**
+ * Shift a cigar32 indel one position in left direction.
+ */
 ERROR_CODE
 cigar32_shift_left_indel(uint32_t *cigar, size_t cigar_l, size_t indel_index, uint32_t *out_cigar, size_t *out_cigar_l)
 {

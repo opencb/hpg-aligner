@@ -305,6 +305,9 @@ decompose_cigar(char *cigar, uint8_t cigar_l, char *n_elem, char *type, uint8_t 
 	return NO_ERROR;
 }
 
+/**
+ * Generates sequence with indels supressed. Insertions are deleted, Deletions are substituted by 'X'.
+ */
 ERROR_CODE
 supress_indels(char *seq, U_CYCLES seq_l, char *cigar_elem, char *cigar_type, uint8_t cigar_type_l, char *seq_res, U_CYCLES *seq_res_l)
 {
