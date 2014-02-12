@@ -23,7 +23,7 @@ nucleotide_compare(char *ref_seq, char *bam_seq, size_t bam_seq_l, char *comp_re
 	//Iterates nucleotides in this read
 	for(i = 0; i < bam_seq_l; i++)
 	{
-#ifdef __SSE2__	//SSE Block
+/*#ifdef __SSE2__	//SSE Block
 		if( (i + 16) < bam_seq_l)
 		{
 			//Use SSE
@@ -43,7 +43,7 @@ nucleotide_compare(char *ref_seq, char *bam_seq, size_t bam_seq_l, char *comp_re
 			i += 15;
 		}
 		else
-#endif //SSE Block
+#endif //SSE Block*/
 		{
 			if(ref_seq[i] != bam_seq[i])
 			{
