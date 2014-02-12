@@ -174,7 +174,11 @@ recal_get_data_from_bam(const bam_file_t *bam, const genome_t* ref, recal_info_t
 						fflush(stdout);
 
 						//Get last alignment
+#ifdef __SSE2__
+						_mm_free(last_seq);
+#else
 						free(last_seq);
+#endif
 						last_alig = collect_batch->alignments_p[collect_batch->num_alignments-1];
 						last_seq = new_sequence_from_bam(last_alig);
 						l_last_seq = last_alig->core.l_qseq;
@@ -484,9 +488,9 @@ recal_get_data_from_bam_alignment(const bam1_t* alig, const genome_t* ref, recal
 	#endif
 
 	//Allocations
-	ref_seq = (char *)_mm_malloc((bam_seq_l + 1) * sizeof(char), MEM_ALIG_SIZE);
-	comp_res = (char *)_mm_malloc(bam_seq_l * sizeof(char), MEM_ALIG_SIZE);
-	dinucs = (char *)_mm_malloc(bam_seq_l * sizeof(char), MEM_ALIG_SIZE);
+	ref_seq = (char *)_mm_malloc((bam_seq_l + 1) * sizeof(char), MEM_ALIG_SSE_SIZE);
+	comp_res = (char *)_mm_malloc(bam_seq_l * sizeof(char), MEM_ALIG_SSE_SIZE);
+	dinucs = (char *)_mm_malloc(bam_seq_l * sizeof(char), MEM_ALIG_SSE_SIZE);
 
 	//Obtain reference for this 100 nucleotides
 	flag = (uint32_t) alig->core.flag;

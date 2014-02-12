@@ -1,5 +1,8 @@
 #include "aux_nucleotide.h"
 
+/**
+ * Compare two sequences and obtain missmatches.
+ */
 ERROR_CODE
 nucleotide_compare(char *ref_seq, char *bam_seq, size_t bam_seq_l, char *comp_res, uint32_t *miss_count)
 {
@@ -20,7 +23,7 @@ nucleotide_compare(char *ref_seq, char *bam_seq, size_t bam_seq_l, char *comp_re
 	//Iterates nucleotides in this read
 	for(i = 0; i < bam_seq_l; i++)
 	{
-/*#ifdef __SSE2__	//SSE Block
+#ifdef __SSE2__	//SSE Block
 		if( (i + 16) < bam_seq_l)
 		{
 			//Use SSE
@@ -40,7 +43,7 @@ nucleotide_compare(char *ref_seq, char *bam_seq, size_t bam_seq_l, char *comp_re
 			i += 15;
 		}
 		else
-#endif //SSE Block*/
+#endif //SSE Block
 		{
 			if(ref_seq[i] != bam_seq[i])
 			{
@@ -69,7 +72,9 @@ nucleotide_compare(char *ref_seq, char *bam_seq, size_t bam_seq_l, char *comp_re
 	return NO_ERROR;
 }
 
-
+/**
+ * Compare two sequences and obtain missmatches and missmatches qualities summatory.
+ */
 ERROR_CODE
 nucleotide_miss_qual_sum(char *ref_seq, char *bam_seq, char *bam_qual, size_t bam_seq_l, char *comp_seq, uint32_t *out_miss_count, uint32_t *out_sum_quals)
 {

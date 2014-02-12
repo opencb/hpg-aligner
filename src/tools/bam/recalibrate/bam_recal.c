@@ -480,9 +480,11 @@ recal_recalibrate_alignment_priv(const bam1_t* alig, const recal_info_t *bam_inf
 	memcpy(bam1_qual(alig), res_quals, bam_seq_l);
 
 	//Memory free
+#ifdef __SSE2__
+	_mm_free(bam_seq);
+#else
 	free(bam_seq);
+#endif
 	free(res_quals);
-	//free(aux_alig1);
-	//alignment_free(aux_alig);
 }
 

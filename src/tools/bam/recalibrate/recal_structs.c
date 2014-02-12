@@ -173,8 +173,8 @@ recal_get_data_init_env(const U_CYCLES cycles, recal_data_collect_env_t *collect
 		return INVALID_INPUT_PARAMS_NULL;
 
 	//Sequence storage
-	collect_env->bam_seq = (char *) _mm_malloc (sizeof(char) * cycles, MEM_ALIG_SIZE);
-	collect_env->bam_quals = (char *) _mm_malloc (sizeof(char) * cycles, MEM_ALIG_SIZE);
+	collect_env->bam_seq = (char *) _mm_malloc (sizeof(char) * cycles, MEM_ALIG_SSE_SIZE);
+	collect_env->bam_quals = (char *) _mm_malloc (sizeof(char) * cycles, MEM_ALIG_SSE_SIZE);
 
 	//Auxiliar
 	collect_env->aux_res_seq = (char *) malloc(sizeof(char) * cycles);

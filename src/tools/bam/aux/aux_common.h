@@ -83,7 +83,7 @@ typedef uint8_t U_DINUC;
 /**
  * MEMORY ALIGNMENT
  */
-#define MEM_ALIG_SIZE 16
+#define MEM_ALIG_SSE_SIZE 16
 
 /**
  * HOT AND COLD ATTRIBUTES
