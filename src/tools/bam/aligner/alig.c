@@ -1,9 +1,19 @@
-/*
- * alig.c
- *
- *  Created on: Dec 12, 2013
- *      Author: rmoreno
- */
+/**
+* Copyright (C) 2013 Raúl Moreno Galdón
+*
+* This program is free software: you can redistribute it and/or modify
+* it under the terms of the GNU General Public License as published by
+* the Free Software Foundation, either version 3 of the License, or
+* (at your option) any later version.
+*
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+* GNU General Public License for more details.
+*
+* You should have received a copy of the GNU General Public License
+* along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
 
 #include "alig.h"
 
@@ -16,6 +26,9 @@ char aux_msg[512];
  * CONTEXT
  */
 
+/**
+ * Initialize empty realignment data structure.
+ */
 ERROR_CODE
 alig_init(alig_context_t *context, linked_list_t *in_list, genome_t *genome, uint8_t flags)
 {
@@ -65,6 +78,9 @@ alig_init(alig_context_t *context, linked_list_t *in_list, genome_t *genome, uin
 	return NO_ERROR;
 }
 
+/**
+ * Free resources from realigner.
+ */
 ERROR_CODE
 alig_destroy(alig_context_t *context)
 {
@@ -125,6 +141,9 @@ alig_destroy(alig_context_t *context)
 	return NO_ERROR;
 }
 
+/**
+ * Check if a realigner context is valid.
+ */
 ERROR_CODE
 alig_validate(alig_context_t *context)
 {
@@ -163,6 +182,9 @@ alig_validate(alig_context_t *context)
  * REGION OPERATIONS
  */
 
+/**
+ * Get next region of reads to process.
+ */
 ERROR_CODE
 alig_region_next(alig_context_t *context)
 {
@@ -350,6 +372,9 @@ alig_region_next(alig_context_t *context)
 	return NO_ERROR;
 }
 
+/**
+ * Load reference sequence for present region in context.
+ */
 ERROR_CODE
 alig_region_load_reference(alig_context_t *context)
 {
@@ -425,6 +450,9 @@ alig_region_load_reference(alig_context_t *context)
 	return NO_ERROR;
 }
 
+/**
+ * Get haplotypes from present region.
+ */
 ERROR_CODE
 alig_region_haplotype_process(alig_context_t *context)
 {
@@ -604,6 +632,9 @@ alig_region_haplotype_process(alig_context_t *context)
 	return NO_ERROR;
 }
 
+/**
+ * Realign readings around indels using current haplotypes.
+ */
 ERROR_CODE
 alig_region_indel_realignment(alig_context_t *context)
 {
@@ -679,6 +710,9 @@ alig_region_indel_realignment(alig_context_t *context)
 	return NO_ERROR;
 }
 
+/**
+ * Clear context to be ready for next region.
+ */
 ERROR_CODE
 alig_region_clear(alig_context_t *context)
 {
@@ -718,9 +752,11 @@ alig_region_clear(alig_context_t *context)
 	return NO_ERROR;
 }
 
-
+/**
+ * Indel realign one file.
+ */
 ERROR_CODE
-alig_bam_file2(char *bam_path, char *ref_name, char *ref_path)
+alig_bam_file(char *bam_path, char *ref_name, char *ref_path)
 {
 	ERROR_CODE err;
 	unsigned char outbam[30] = "output.bam";
@@ -1030,6 +1066,9 @@ alig_bam_file2(char *bam_path, char *ref_name, char *ref_path)
 //	ERRZZZZ
 //
 
+/**
+ * PRIVATE FUNCTION. Obtain score tables from present region.
+ */
 static ERROR_CODE
 alig_get_scores(alig_context_t *context)
 {
@@ -1264,6 +1303,9 @@ alig_get_scores(alig_context_t *context)
 	return NO_ERROR;
 }
 
+/**
+ * PRIVATE FUNCTION. Obtain alternative haplotype from generated score tables.
+ */
 static inline ERROR_CODE
 alig_get_alternative_haplotype(alig_context_t *context, int *out_haplo_index, uint32_t *out_haplo_score, uint32_t *out_ref_score)
 {
@@ -1373,6 +1415,9 @@ alig_get_alternative_haplotype(alig_context_t *context, int *out_haplo_index, ui
 	return NO_ERROR;
 }
 
+/**
+ * PRIVATE FUNCTION. Realign around indels using an alternative haplotype.
+ */
 static ERROR_CODE
 alig_indel_realign_from_haplo(alig_context_t *context, size_t alt_haplo_index)
 {

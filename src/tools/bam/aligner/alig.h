@@ -1,9 +1,19 @@
-/*
- * alig.h
- *
- *  Created on: Dec 12, 2013
- *      Author: rmoreno
- */
+/**
+* Copyright (C) 2013 Raúl Moreno Galdón
+*
+* This program is free software: you can redistribute it and/or modify
+* it under the terms of the GNU General Public License as published by
+* the Free Software Foundation, either version 3 of the License, or
+* (at your option) any later version.
+*
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+* GNU General Public License for more details.
+*
+* You should have received a copy of the GNU General Public License
+* along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
 
 #ifndef ALIG_H_
 #define ALIG_H_
@@ -71,22 +81,34 @@
 
 
 /**
- * REALIGNMENT CONTEXT
+ * REALIGNMENT REFERENCE SEQUENCE
  */
-
 typedef struct {
 	char *reference;
 	size_t position;
 	size_t length;
 } alig_reference_t;
 
+/**
+ * REALIGNMENT SCORE TABLE
+ */
 typedef struct {
 	uint32_t *m_scores;
 	size_t *m_positions;
 	size_t m_total;
 	size_t m_ldim;
 } alig_scores_t;
+/**
+ * 					H0			H1			H2			H3			H4
+ * 					sco	pos
+ * 		ERRXXXX		23	97		0	16		321	34
+ * 		ERRYYYY
+ * 		ERRZZZZ
+ */
 
+/**
+ * REALIGNER CONTEXT
+ */
 typedef struct {
 	//Input list
 	linked_list_t *in_list;
@@ -123,7 +145,6 @@ typedef struct {
 /**
  * INTERVAL STATUS
  */
-
 typedef enum {
 	NO_INTERVAL,
 	INTERVAL
@@ -133,34 +154,106 @@ typedef enum {
  * CONTEXT
  */
 
+/**
+ * \brief Initialize empty realignment data structure.
+ *
+ * \param[in] context Context to initialize.
+ * \param[in] in_list Input list from which realigner take readings.
+ * \param[in] genome Context containing reference genome.
+ * \param[in] flags Flags to configure realigner behavior. Can be ALIG_LEFT_ALIGN, ALIG_REFERENCE_PRIORITY and ALIG_ORIGINAL_PRIORITY.
+ */
 EXTERNC ERROR_CODE alig_init(alig_context_t *context, linked_list_t *in_list, genome_t *genome, uint8_t flags);
+
+/**
+ * \brief Free resources from realigner.
+ *
+ * \param[in] context Context to destroy.
+ */
 EXTERNC ERROR_CODE alig_destroy(alig_context_t *context);
+
+/**
+ * \brief Check if a realigner context is valid.
+ *
+ * \param[in] context Context to validate.
+ */
 EXTERNC ERROR_CODE alig_validate(alig_context_t *context);
 
 /**
  * REGION OPERATIONS
  */
 
+/**
+ * \brief Get next region of reads to process.
+ *
+ * \param[in] context Context to process.
+ */
 EXTERNC ERROR_CODE alig_region_next(alig_context_t *context);
-EXTERNC ERROR_CODE alig_region_load_reference(alig_context_t *context);
-EXTERNC ERROR_CODE alig_region_haplotype_process(alig_context_t *context);
-EXTERNC ERROR_CODE alig_region_indel_realignment(alig_context_t *context);
-EXTERNC ERROR_CODE alig_region_clear(alig_context_t *context);
-
-EXTERNC ERROR_CODE alig_bam_file2(char *bam_path, char *ref_name, char *ref_path);
 
 /**
- * BAM REALIGN
+ * \brief Load reference sequence for present region in context.
+ *
+ * \param[in] context Context to process.
  */
+EXTERNC ERROR_CODE alig_region_load_reference(alig_context_t *context);
 
-EXTERNC ERROR_CODE alig_bam_list_realign(array_list_t *bam_list, array_list_t *haplotype_list, genome_t* ref);
+/**
+ * \brief Get haplotypes from present region.
+ *
+ * \param[in] context Context to process.
+ */
+EXTERNC ERROR_CODE alig_region_haplotype_process(alig_context_t *context);
+
+/**
+ * \brief Realign readings around indels using current haplotypes.
+ *
+ * \param[in] context Context to process.
+ */
+EXTERNC ERROR_CODE alig_region_indel_realignment(alig_context_t *context);
+
+/**
+ * \brief Clear context to be ready for next region.
+ *
+ * \param[in] context Context to process.
+ */
+EXTERNC ERROR_CODE alig_region_clear(alig_context_t *context);
+
+/**
+ * \brief Indel realign one file.
+ *
+ * \param[in] bam_path Path to BAM file.
+ * \param[in] ref_name Reference file name (not including path).
+ * \param[in] ref_path Path to reference file (not including name).
+ */
+EXTERNC ERROR_CODE alig_bam_file(char *bam_path, char *ref_name, char *ref_path);
+
 
 /**
  * PRIVATE FUNCTIONS
  */
 
+/**
+ * \brief PRIVATE FUNCTION. Obtain score tables from present region.
+ *
+ * \param[in] context Context to process.
+ */
 static ERROR_CODE alig_get_scores(alig_context_t *context);
+
+/**
+ * \brief PRIVATE FUNCTION. Obtain alternative haplotype from generated score tables.
+ *
+ * \param[in] context Context to process.
+ * \param[out] out_haplo_index Index in haplotype list of alternative haplotype.
+ * \param[out] out_haplo_score Alternative haplotype score.
+ * \param[out] out_ref_score Reference haplotype (H0) score.
+ */
 static ERROR_CODE alig_get_alternative_haplotype(alig_context_t *context, int *out_haplo_index, uint32_t *out_haplo_score, uint32_t *out_ref_score);
+
+/**
+ * \brief PRIVATE FUNCTION. Realign around indels using an alternative haplotype.
+ *
+ * \param[in] context Context to process.
+ * \param[in] alt_haplo_index Index of alternative haplotype in haplotypes list.
+ */
 static ERROR_CODE alig_indel_realign_from_haplo(alig_context_t *context, size_t alt_haplo_index);
 
 

@@ -1,9 +1,19 @@
-/*
- * region.c
- *
- *  Created on: Dec 10, 2013
- *      Author: rmoreno
- */
+/**
+* Copyright (C) 2013 Raúl Moreno Galdón
+*
+* This program is free software: you can redistribute it and/or modify
+* it under the terms of the GNU General Public License as published by
+* the Free Software Foundation, either version 3 of the License, or
+* (at your option) any later version.
+*
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+* GNU General Public License for more details.
+*
+* You should have received a copy of the GNU General Public License
+* along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
 
 #include "alig_region.h"
 
@@ -192,9 +202,14 @@ region_table_insert(alig_region_table_t *table, alig_region_t *region)
  * REGION DISCOVER
  */
 
+/**
+ * Get a region from string cigar.
+ */
 int
 region_get_from_cigar(char *cigar, size_t cigar_len, size_t pos, size_t *r_pos, size_t *r_end_pos)
 {
+	int err;
+
 	//CIGAR
 	uint32_t *cigar32;
 	uint32_t cigar_l;
@@ -212,11 +227,16 @@ region_get_from_cigar(char *cigar, size_t cigar_len, size_t pos, size_t *r_pos, 
 	convert_to_cigar_uint32_t((uint8_t *)cigar32, cigar, cigar_len);
 
 	//Call region get
-	region_get(cigar32, cigar_l, pos, r_pos, r_end_pos);
+	err = region_get(cigar32, cigar_l, pos, r_pos, r_end_pos);
 
 	free(cigar32);
+
+	return err;
 }
 
+/**
+ * Get a region from bam1_t.
+ */
 int
 region_get_from_bam1(const bam1_t *alig, size_t *r_pos, size_t *r_end_pos)
 {
@@ -245,6 +265,9 @@ region_get_from_bam1(const bam1_t *alig, size_t *r_pos, size_t *r_end_pos)
 	return region_get(cigar, cigar_l, read_pos, r_pos, r_end_pos);
 }
 
+/**
+ * Get a region from cigar32.
+ */
 int
 region_get(uint32_t *cigar, uint32_t cigar_l, size_t pos, size_t *r_pos, size_t *r_end_pos)
 {
@@ -317,10 +340,10 @@ region_get(uint32_t *cigar, uint32_t cigar_l, size_t pos, size_t *r_pos, size_t 
 
 		case BAM_CHARD_CLIP:
 		case BAM_CSOFT_CLIP:
-		if(i == 0)
-		{
-			break;
-		}
+			/*if(i == 0)
+			{
+				break;
+			}*/
 
 		default:
 			//printf("X");
@@ -343,8 +366,12 @@ region_get(uint32_t *cigar, uint32_t cigar_l, size_t pos, size_t *r_pos, size_t 
 		return 0;
 	}
 
+	return 0;
 }
 
+/**
+ * Get region table from BAM batch.
+ */
 int
 region_get_from_batch(const bam_batch_t* batch, alig_region_table_t *region_table)
 {
@@ -390,6 +417,9 @@ region_get_from_batch(const bam_batch_t* batch, alig_region_table_t *region_tabl
 	}
 }
 
+/**
+ * Get region table from BAM file.
+ */
 int
 region_get_from_file(const char *bam_path)
 {
@@ -460,6 +490,9 @@ region_get_from_file(const char *bam_path)
 	printf("BAM closed.\n");
 }
 
+/**
+ * Get if BAM read overlaps a region.
+ */
 int
 region_bam_overlap(bam1_t *read, alig_region_t *region)
 {

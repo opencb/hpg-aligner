@@ -251,8 +251,7 @@ align_launch(char *reference, char *bam, char *output, int threads)
 #ifdef D_TIME_DEBUG
 	init_time = omp_get_wtime();
 #endif
-	//alig_bam_file(bamc, base, dir);
-	alig_bam_file2(bamc, base, dir);
+	alig_bam_file(bamc, base, dir);
 #ifdef D_TIME_DEBUG
 	end_time = omp_get_wtime();
 	time_add_time_slot(D_SLOT_TOTAL, TIME_GLOBAL_STATS, end_time - init_time);
