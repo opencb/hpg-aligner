@@ -53,15 +53,15 @@ env.Program('#bin/hpg-aligner',
                       ]
            )
 
-#env.Program('#bin/hpg-bam',
-#             source = [Glob('src/tools/bam/*.c'), 
-#	     	       Glob('src/tools/bam/aux/*.c'),
-#	     	       Glob('src/tools/bam/recalibrate/*.c'),
-#	     	       Glob('src/tools/bam/aligner/*.c'),
-#                       "%s/libbioinfo.a" % bioinfo_path,
-#                       "%s/libcommon.a" % commons_path
-#                      ]
-#           )
+env.Program('#bin/hpg-bam',
+             source = [Glob('src/tools/bam/*.c'), 
+	     	       Glob('src/tools/bam/aux/*.c'),
+	     	       Glob('src/tools/bam/recalibrate/*.c'),
+	     	       Glob('src/tools/bam/aligner/*.c'),
+                       "%s/libbioinfo.a" % bioinfo_path,
+                       "%s/libcommon.a" % commons_path
+                      ]
+           )
 
 '''
 if 'debian' in COMMAND_LINE_TARGETS:
