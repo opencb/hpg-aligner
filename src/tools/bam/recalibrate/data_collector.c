@@ -488,9 +488,15 @@ recal_get_data_from_bam_alignment(const bam1_t* alig, const genome_t* ref, recal
 	#endif
 
 	//Allocations
+#ifdef __SSE2__
 	ref_seq = (char *)_mm_malloc((bam_seq_l + 1) * sizeof(char), MEM_ALIG_SSE_SIZE);
 	comp_res = (char *)_mm_malloc(bam_seq_l * sizeof(char), MEM_ALIG_SSE_SIZE);
 	dinucs = (char *)_mm_malloc(bam_seq_l * sizeof(char), MEM_ALIG_SSE_SIZE);
+#else
+	ref_seq = (char *)malloc((bam_seq_l + 1) * sizeof(char));
+	comp_res = (char *)malloc(bam_seq_l * sizeof(char));
+	dinucs = (char *)malloc(bam_seq_l * sizeof(char));
+#endif
 
 	//Obtain reference for this 100 nucleotides
 	flag = (uint32_t) alig->core.flag;
@@ -561,9 +567,15 @@ recal_get_data_from_bam_alignment(const bam1_t* alig, const genome_t* ref, recal
 
 	//Free resources
 	{
+#ifdef __SSE2__
 		_mm_free(ref_seq);
 		_mm_free(comp_res);
 		_mm_free(dinucs);
+#else
+		free(ref_seq);
+		free(comp_res);
+		free(dinucs);
+#endif
 	}
 
 	return NO_ERROR;
