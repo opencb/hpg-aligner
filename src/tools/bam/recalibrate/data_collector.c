@@ -500,7 +500,7 @@ recal_get_data_from_bam_alignment(const bam1_t* alig, const genome_t* ref, recal
 	//Iterates nucleotides in this read
 	for(i = 0; i < bam_seq_l; i++)
 	{
-#ifdef USE_SSE
+#ifdef __SSE2__
 		//#ifdef __SSE2__ //SSE Block
 		if( (i + 16) < bam_seq_l)
 		{
