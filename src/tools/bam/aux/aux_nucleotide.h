@@ -32,7 +32,7 @@
  * \param[out] comp_seq Output sequence to store individual missmatch value. 0xFF means equal, 0x00 means differ. 
  * \param[out] miss_count Number of missmatches in comparation. Optional, set to NULL in case.
  */
-EXTERNC ERROR_CODE nucleotide_compare(char *ref_seq, char *bam_seq, size_t bam_seq_l, char *comp_seq, uint32_t *miss_count);
+EXTERNC ERROR_CODE nucleotide_compare(const char *ref_seq, const char *bam_seq, size_t bam_seq_l, char *comp_seq, uint32_t *miss_count);
 
 /**
  * Compare two sequences and obtain missmatches and missmatches qualities summatory. 
@@ -44,7 +44,7 @@ EXTERNC ERROR_CODE nucleotide_compare(char *ref_seq, char *bam_seq, size_t bam_s
  * \param[out] out_miss_count Number of missmatches in comparation. Optional, set to NULL in case.
  * \param[out] out_sum_quals Summatory of missmatch qualities. 
  */
-EXTERNC ERROR_CODE nucleotide_miss_qual_sum(char *ref_seq, char *bam_seq, char *bam_qual, size_t bam_seq_l, char *comp_seq, uint32_t *out_miss_count, uint32_t *out_sum_quals);
+EXTERNC ERROR_CODE nucleotide_miss_qual_sum(const char *ref_seq, const char *bam_seq, const char *bam_qual, size_t bam_seq_l, char *comp_seq, uint32_t *out_miss_count, uint32_t *out_sum_quals);
 
 
 #endif /* AUX_NUCLEOTIDE_H_ */

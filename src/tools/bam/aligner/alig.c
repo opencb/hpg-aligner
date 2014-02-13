@@ -427,7 +427,7 @@ alig_region_load_reference(alig_context_t *context)
 		//Auxiliar
 		aux_pos_begin = ref_pos_begin + 1;
 		aux_pos_end = ref_pos_end + 1;
-
+		//MANEJAR ALINEAMIENTOS CON MEMORIA!!!!!
 		//Get reference
 #ifdef __SSE2__
 		ref_seq = (char *) _mm_malloc(((ref_pos_end - ref_pos_begin) + 2) * sizeof(char), MEM_ALIG_SSE_SIZE);
@@ -553,7 +553,8 @@ alig_region_haplotype_process(alig_context_t *context)
 					read_disp_ref = 0;
 
 				//Get raw missmatch
-				nucleotide_compare(ref_seq + read_disp_ref, read_seq, read_seq_l, comp_seq, &ref_miss);
+				//nucleotide_compare(ref_seq + read_disp_ref, read_seq, read_seq_l, comp_seq, &ref_miss);
+				ref_miss = 1;
 
 				//If match reference perfectly, realign to reference and extract from process list
 				if(ref_miss == 0)

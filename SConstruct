@@ -14,7 +14,7 @@ compiler = ARGUMENTS.get('compiler', 'gcc')
 env = Environment(tools = ['default', 'packaging'],
       		  CC = compiler,
                   variables = vars,
-                  CFLAGS = '-std=c99 -D_XOPEN_SOURCE=600 -D_GNU_SOURCE -fopenmp',
+                  CFLAGS = '-std=c99 -D_XOPEN_SOURCE=600 -D_GNU_SOURCE -fopenmp -D_REENTRANT',
                   CPPPATH = ['#', '#src', '#src/tools/bam', bioinfo_path, commons_path, "%s/commons/argtable" % commons_path, "%s/commons/config" % commons_path, system_include, '%s/libxml2' % system_include ],
                   LIBPATH = [commons_path, bioinfo_path, system_libs],
                   LIBS = ['xml2', 'm', 'z', 'curl', 'bioinfo', 'common'],
@@ -53,7 +53,9 @@ env.Program('#bin/hpg-aligner',
                       ]
            )
 
-env.Program('#bin/hpg-bam',
+envprogram = env.Clone()
+envprogram['CFLAGS'] += ' -DNODEBUG'
+envprogram.Program('#bin/hpg-bam',
              source = [Glob('src/tools/bam/*.c'), 
 	     	       Glob('src/tools/bam/aux/*.c'),
 	     	       Glob('src/tools/bam/recalibrate/*.c'),
