@@ -1319,7 +1319,7 @@ void execute_sw(array_list_t *sw_prepare_list, sa_mapping_batch_t *mapping_batch
       cal->start = seed->genome_start - (r_nt_mapped - right_flank) + query_start;
     } else {
       if (query_start > 0) {
-	mapping_batch->counters[0]++;
+	//	mapping_batch->counters[0]++;
 	cal->invalid = 1;
 	//	printf("case query_start > 0: read %s\n", cal->read->id);
 	//	exit(-1);
@@ -1473,7 +1473,7 @@ void post_process_sw(int sw_post_read_counter, int *sw_post_read,
 	    if (seed->read_start > 0) {
 	      cigar_get_op(0, &op_value, &op_name, aux_cigar);
 	      if (op_value < SW_LEFT_FLANK || op_name != '=') {
-		mapping_batch->counters[1]++;
+		//		mapping_batch->counters[1]++;
 		//printf("read = %s: attention: op (%i, %c) sw_left_flank!!!\n", cal->read->id, op_value, op_name);
 		//exit(-1);
 	      }
@@ -1482,7 +1482,7 @@ void post_process_sw(int sw_post_read_counter, int *sw_post_read,
 	    if (seed->read_end < cal->read->length - 1) {
 	      cigar_get_op(aux_cigar->num_ops - 1, &op_value, &op_name, aux_cigar);
 	      if (op_value < SW_RIGHT_FLANK || op_name != '=') {
-		mapping_batch->counters[2]++;
+		//		mapping_batch->counters[2]++;
 		//printf("read = %s: attention: op (%i, %c) sw_right_flank!!!\n", cal->read->id, op_value, op_name);
 		//exit(-1);
 	      }
@@ -1503,7 +1503,7 @@ void post_process_sw(int sw_post_read_counter, int *sw_post_read,
 	    if (cigarset->info[j].overlap) {
 	      cigar_get_op(aux_cigar->num_ops - 1, &op_value, &op_name, aux_cigar);
 	      if (op_value < cigarset->info[j].overlap || op_name != '=') {
-		mapping_batch->counters[3]++;
+		//		mapping_batch->counters[3]++;
 		//printf("read = %s: attention OVERLAP: op (%i, %c) overlap (%i)!!!\n", 
 		//       cal->read->id, op_value, op_name, cigarset->info[j].overlap);
 		//exit(-1);

@@ -108,9 +108,9 @@ int sa_sam_writer(void *data) {
     exit(-1);
   }
 
-  for (int i = 0; i < NUM_COUNTERS; i++) {
-    counters[i] += mapping_batch->counters[i];
-  }
+  //  for (int i = 0; i < NUM_COUNTERS; i++) {
+  //    counters[i] += mapping_batch->counters[i];
+  //  }
 
   #ifdef _TIMING
   for (int i = 0; i < NUM_TIMING; i++) {

@@ -203,9 +203,9 @@ void create_alignments(array_list_t *cal_list, fastq_read_t *read,
     #endif
 
     if (cal->invalid) {
-      mapping_batch->counters[4]++;
+      //      mapping_batch->counters[4]++;
     } else if ((cigar_len = cigar_get_length(&cal->cigar)) > read->length) {
-      mapping_batch->counters[5]++;
+      //      mapping_batch->counters[5]++;
     } else {
       cal->AS = (cal->score * 253 / (read->length * 5));
 

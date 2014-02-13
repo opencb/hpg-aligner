@@ -74,7 +74,7 @@ void** argtable_index_options_new(int mode) {
   void **argtable = (void**)malloc((num_options + 1) * sizeof(void*));	
 
   int count = 0;
-  argtable[count++] = arg_file0("i", "index", NULL, "BWT directory name");
+  argtable[count++] = arg_file0("i", "index", NULL, "Index directory name");
   argtable[count++] = arg_file0("g", "ref-genome", NULL, "Reference genome");
   argtable[count++] = arg_lit0("h", "help", "Help option");
 
@@ -208,7 +208,7 @@ void run_index_builder(int argc, char **argv, char *mode_str) {
   if (mode == SA_INDEX) {
     printf("Generating SA Index...\n");
     const uint prefix_value = 18;
-    sa_index3_build(options->ref_genome, prefix_value, options->index_filename);
+    sa_index3_build_k18(options->ref_genome, prefix_value, options->index_filename);
     printf("SA Index generated!\n");
   } else {
     char binary_filename[strlen(options->index_filename) + 128];
