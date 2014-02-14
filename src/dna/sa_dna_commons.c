@@ -111,6 +111,7 @@ void filter_cals_by_max_read_area(int max_read_area, array_list_t **list) {
     if (cal->read_area - cal->num_mismatches >= max_read_area) {
       array_list_insert(cal, new_cal_list);
       array_list_set(j, NULL, cal_list);
+      //      break;
     }
   }
   array_list_free(cal_list, (void *) seed_cal_free);
@@ -172,6 +173,117 @@ void filter_cals_by_max_num_mismatches(int num_mismatches, array_list_t **list) 
   }
   array_list_free(cal_list, (void *) seed_cal_free);
   *list = new_cal_list;
+}
+
+//--------------------------------------------------------------------
+
+void filter_cals_by_pair_mode(int pair_mode, int pair_min_distance, int pair_max_distance, 
+			      int num_lists, array_list_t **cal_lists) {
+
+  int diff, pairs, size1, size2;
+  seed_cal_t *cal1, *cal2;
+  array_list_t *cal_list1, *cal_list2;
+  array_list_t *new_cal_list1 = NULL, *new_cal_list2 = NULL;
+  for (int i = 0; i < num_lists; i += 2) {
+    cal_list1 = cal_lists[i];
+    cal_list2 = cal_lists[i+1];
+
+    // prepare new_cal_list1
+    if ((size1 = array_list_size(cal_list1)) > 0) {
+      if (!new_cal_list1) {
+	new_cal_list1 = array_list_new(3 * size1, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
+      }
+    }
+
+    // prepare new_cal_list2
+    if ((size2 = array_list_size(cal_list2)) > 0) {
+      if (!new_cal_list2) {
+	new_cal_list2 = array_list_new(3 * size2, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
+      }
+    }
+
+    /*
+    printf("-----> PAIR 1:\n");
+    for (int i1 = 0; i1 < size1; i1++) {
+      cal1 = array_list_get(i1, cal_list1);
+      seed_cal_print(cal1);
+    }
+    printf("-----> PAIR 2:\n");
+    for (int i2 = 0; i2 < size2; i2++) {
+      cal2 = array_list_get(i2, cal_list2);
+      seed_cal_print(cal2);
+    }
+    */
+
+    if (size1 > 1 || size2 > 1) {
+      int pair1[size1], pair2[size2];
+      for (int j = 0; j < size1; j++) pair1[j] = 0;
+      for (int j = 0; j < size2; j++) pair2[j] = 0;
+
+      pairs = 0;
+      for (int i1 = 0; i1 < size1; i1++) {
+	cal1 = array_list_get(i1, cal_list1);
+	for (int i2 = 0; i2 < size2; i2++) {
+	  cal2 = array_list_get(i2, cal_list2);
+
+	  if ((cal1->chromosome_id == cal2->chromosome_id)) {
+	    //&&
+	    //	      ((cal1->strand != cal2->strand && pair_mode == PAIRED_END_MODE) ||
+	    //	       (cal1->strand == cal2->strand && pair_mode == MATE_PAIR_MODE))) {
+
+	    diff = abs(cal2->start - cal1->start) + 1;
+
+	    if (diff >= pair_min_distance && diff <= pair_max_distance) {
+	      pair1[i1] = 1;
+	      pair2[i2] = 1;
+	      pairs++;
+	    }
+	  }
+	}
+      }
+      // update lists
+      if (pairs) {
+	for (int i1 = 0; i1 < size1; i1++) {
+	  if (pair1[i1]) {
+	    cal1 = array_list_get(i1, cal_list1);
+	    array_list_insert(cal1, new_cal_list1);
+	    array_list_set(i1, NULL, cal_list1);
+	  }
+	}
+	array_list_free(cal_list1, (void *) seed_cal_free);
+	cal_lists[i] = new_cal_list1;
+	new_cal_list1 = NULL;
+
+	for (int i2 = 0; i2 < size2; i2++) {
+	  if (pair2[i2]) {
+	    cal2 = array_list_get(i2, cal_list2);
+	    array_list_insert(cal2, new_cal_list2);
+	    array_list_set(i2, NULL, cal_list2);
+	  }
+	}
+	array_list_free(cal_list2, (void *) seed_cal_free);
+	cal_lists[i+1] = new_cal_list2;
+	new_cal_list2 = NULL;
+      }
+      /*
+      printf("*******-----> PAIR 1:\n");
+      size1 = array_list_size(cal_lists[i]);
+      for (int i1 = 0; i1 < size1; i1++) {
+	cal1 = array_list_get(i1, cal_lists[i]);
+	seed_cal_print(cal1);
+      }
+      printf("*******-----> PAIR 2:\n");
+      size2 = array_list_size(cal_lists[i+1]);
+      for (int i2 = 0; i2 < size2; i2++) {
+	cal2 = array_list_get(i2, cal_lists[i+1]);
+	seed_cal_print(cal2);
+      }
+      */
+    }
+  }
+
+  if (new_cal_list1) array_list_free(new_cal_list1, (void *) NULL);
+  if (new_cal_list2) array_list_free(new_cal_list2, (void *) NULL);
 }
 
 //--------------------------------------------------------------------

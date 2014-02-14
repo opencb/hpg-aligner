@@ -247,7 +247,7 @@ void cal_mng_select_best(int read_area, array_list_t *valid_list, array_list_t *
 
 void generate_cals_from_exact_read(int strand, fastq_read_t *read,
 				   size_t low, size_t high, sa_index3_t *sa_index, 
-				   array_list_t *cal_list) {  
+				   cal_mng_t *cal_mng) { //, array_list_t *cal_list) {  
   size_t g_start, g_end;
   int chrom;
 
@@ -262,14 +262,19 @@ void generate_cals_from_exact_read(int strand, fastq_read_t *read,
     g_end = g_start + read->length - 1;
     seed_list = linked_list_new(COLLECTION_MODE_ASYNCHRONIZED);
     seed = seed_new(0, read->length - 1, g_start, g_end);
+    seed->chromosome_id = chrom;
+    seed->strand = strand;
     cigar_append_op(read->length, '=', &seed->cigar);
-    linked_list_insert(seed, seed_list);
-    cal = seed_cal_new(chrom, strand, g_start, g_end, seed_list);
-    cal->read_area = read->length;
-    cal->num_mismatches = 0;
-    cal->read = read;
-    cal->score = 5.0f * read->length;
-    array_list_insert(cal, cal_list);
+    //    linked_list_insert(seed, seed_list);
+    //    cal = seed_cal_new(chrom, strand, g_start, g_end, seed_list);
+    //    cal->read_area = read->length;
+    //    cal->num_mismatches = 0;
+    //    cal->read = read;
+    //    cal->score = 5.0f * read->length;
+    //    array_list_insert(cal, cal_list);
+
+    // the 
+    cal_mng_update(seed, read, cal_mng);
   }
 }
 
@@ -623,8 +628,8 @@ array_list_t *create_cals(int num_seeds, fastq_read_t *read,
           #ifdef _TIMING
 	  gettimeofday(&start, NULL);
           #endif
-	  generate_cals_from_exact_read(strand, read,
-					low, high, sa_index, cal_list);
+	  generate_cals_from_exact_read(strand, read, low, high, 
+					sa_index, cal_mng); //, cal_list);
           #ifdef _TIMING
 	  gettimeofday(&stop, NULL);
 	  mapping_batch->func_times[FUNC_CALS_FROM_EXACT_READ] += 
@@ -1556,6 +1561,10 @@ int sa_mapper(void *data) {
   
   sa_wf_batch_t *wf_batch = (sa_wf_batch_t *) data;
 
+  int pair_mode = wf_batch->options->pair_mode;
+  int pair_min_distance = wf_batch->options->pair_min_distance;
+  int pair_max_distance = wf_batch->options->pair_max_distance;
+
   int num_seeds = wf_batch->options->num_seeds;
   int min_cal_size = wf_batch->options->min_cal_size;
   
@@ -1618,6 +1627,11 @@ int sa_mapper(void *data) {
       }
     }
     cal_lists[i] = cal_list;
+  }
+
+  if (pair_mode != SINGLE_END_MODE) {
+    filter_cals_by_pair_mode(pair_mode, pair_min_distance, pair_max_distance, 
+			     num_reads, cal_lists);
   }
 
   // 3) run SW to fill
