@@ -29,7 +29,7 @@
  * \param[in] ref_seq First sequence.
  * \param[in] bam_seq Second sequence. 
  * \param[in] bam_seq_l Length of input sequences. 
- * \param[out] comp_seq Output sequence to store individual missmatch value. 0xFF means equal, 0x00 means differ. 
+ * \param[out] comp_seq Output sequence to store individual missmatch value. 0 means equal, 1 means differ.
  * \param[out] miss_count Number of missmatches in comparation. Optional, set to NULL in case.
  */
 EXTERNC ERROR_CODE nucleotide_compare(const char *ref_seq, const char *bam_seq, size_t bam_seq_l, char *comp_seq, uint32_t *miss_count);
@@ -40,7 +40,7 @@ EXTERNC ERROR_CODE nucleotide_compare(const char *ref_seq, const char *bam_seq, 
  * \param[in] bam_seq Second sequence. 
  * \param[in] bam_qual Sequence qualities. 
  * \param[in] bam_seq_l Length of input sequences. 
- * \param[out] comp_seq Output sequence to store individual missmatch value. 0xFF means equal, 0x00 means differ. 
+ * \param[out] comp_seq Output sequence to store individual missmatch value. 0 means equal, 1 means differ.
  * \param[out] out_miss_count Number of missmatches in comparation. Optional, set to NULL in case.
  * \param[out] out_sum_quals Summatory of missmatch qualities. 
  */
