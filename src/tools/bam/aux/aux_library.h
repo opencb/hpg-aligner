@@ -45,6 +45,7 @@
 #include "aux_nucleotide.h"
 #include "aux_quality.h"
 #include "aux_vector.h"
+#include "aux_simd.h"
 
 
 #endif /* AUX_LIBRARY_H_ */

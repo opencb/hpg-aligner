@@ -1,29 +1,5 @@
 #include "aux_nucleotide.h"
 
-static inline int
-sse2_epi8_compare_and_count_diffs(__m128i v_1, __m128i v_2, __m128i *v_out_comp)
-{
-	char aux[16];
-	__m128i v_comp, v_count;
-
-	//Compare sequences
-	v_comp = _mm_cmpeq_epi8(v_1, v_2);	//0xFF Equals, 0x00 Diff
-
-	//Change result
-	v_comp = _mm_add_epi8(v_comp, _mm_set1_epi8(1));	//Now equals = 0 and diff = 1
-
-	//Sum differences
-	v_count = _mm_add_epi8(v_comp, _mm_slli_si128(v_comp, 8));
-	v_count = _mm_add_epi8(v_count, _mm_slli_si128(v_count, 4));
-	v_count = _mm_add_epi8(v_count, _mm_slli_si128(v_count, 2));
-	v_count = _mm_add_epi8(v_count, _mm_slli_si128(v_count, 1));	//First element is differences count
-
-	//Output
-	*v_out_comp = v_comp;
-
-	return (int) ((char *)&v_count)[15];
-}
-
 #ifndef _REENTRANT
 static char *ref_aux;
 static char *bam_aux;
