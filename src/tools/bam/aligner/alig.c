@@ -311,7 +311,7 @@ alig_region_next(alig_context_t *context)
 					assert(context->region.start_pos <= context->region.end_pos);
 				}
 			}
-			else if (context->region.end_pos < read_pos)
+			else //if (context->region.end_pos < read_pos)
 			{
 				//ALIGNMENT PAST INTERVAL
 				//Interval end!
