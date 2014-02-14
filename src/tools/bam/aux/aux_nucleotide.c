@@ -10,7 +10,7 @@ static size_t aux_l = 0;
 /**
  * Compare two sequences and obtain missmatches.
  */
-ERROR_CODE
+inline ERROR_CODE
 nucleotide_compare(const char *ref_seq, const char *bam_seq, size_t bam_seq_l, char *comp_res, uint32_t *miss_count)
 {
 	int i;
@@ -115,7 +115,7 @@ nucleotide_compare(const char *ref_seq, const char *bam_seq, size_t bam_seq_l, c
 /**
  * Compare two sequences and obtain missmatches and missmatches qualities summatory.
  */
-ERROR_CODE
+inline ERROR_CODE
 nucleotide_miss_qual_sum(const char *ref_seq, const char *bam_seq, const char *bam_qual, size_t bam_seq_l, char *comp_seq, uint32_t *out_miss_count, uint32_t *out_sum_quals)
 {
 	uint32_t sum;
