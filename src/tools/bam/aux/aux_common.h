@@ -86,9 +86,11 @@ typedef uint8_t U_DINUC;
 #define MEM_ALIG_SSE_SIZE 16
 
 /**
- * HOT AND COLD ATTRIBUTES
+ * ATTRIBUTES
  */
 #define __ATTR_HOT __attribute__((hot))
+#define __ATTR_COLD __attribute__((cold))
+#define __ATTR_INLINE __attribute__((always_inline));
 
 /**
  * ASSERTIONS

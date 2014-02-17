@@ -38,6 +38,7 @@
 #include "recalibrate/recal_config.h"
 
 //Auxiliar headers
+#include "aux_simd.h"
 #include "aux_bam.h"
 #include "aux_cigar.h"
 #include "aux_math.h"
@@ -45,7 +46,6 @@
 #include "aux_nucleotide.h"
 #include "aux_quality.h"
 #include "aux_vector.h"
-#include "aux_simd.h"
 
 
 #endif /* AUX_LIBRARY_H_ */

@@ -40,7 +40,7 @@ sse2_epi8_compare_and_count_diffs(__m128i v_1, __m128i v_2, __m128i *v_out_comp)
 	v_count = _mm_add_epi8(v_count, _mm_slli_si128(v_count, 1));	//First element is differences count
 
 	//Output
-	*v_out_comp = v_comp;
+	memcpy(v_out_comp, &v_comp, sizeof(__m128i));
 
 	return (int) ((char *)&v_count)[15];
 }
