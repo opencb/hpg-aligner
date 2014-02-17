@@ -164,12 +164,13 @@ new_sequence_from_bam_ref(bam1_t *bam1, char *seq, uint32_t max_l)
 {
 	char *bam_seq = (char *)bam1_seq(bam1);
 	int seq_len = bam1->core.l_qseq;
+	int i;
 
 	if(seq_len > max_l)
 		seq_len = max_l;
 
 	// nucleotide content
-	for (int i = 0; i < seq_len; i++) {
+	for (i = 0; i < seq_len; i++) {
 		switch (bam1_seqi(bam_seq, i))
 		{
 		case 1:
@@ -193,6 +194,9 @@ new_sequence_from_bam_ref(bam1_t *bam1, char *seq, uint32_t max_l)
 			break;
 		}
 	}
+
+	if(max_l > seq_len)
+		seq[i] = '\0';
 
 	return NO_ERROR;
 }
@@ -301,6 +305,9 @@ decompose_cigar(char *cigar, uint8_t cigar_l, char *n_elem, char *type, uint8_t 
 	return NO_ERROR;
 }
 
+/**
+ * Generates sequence with indels supressed. Insertions are deleted, Deletions are substituted by 'X'.
+ */
 ERROR_CODE
 supress_indels(char *seq, U_CYCLES seq_l, char *cigar_elem, char *cigar_type, uint8_t cigar_type_l, char *seq_res, U_CYCLES *seq_res_l)
 {

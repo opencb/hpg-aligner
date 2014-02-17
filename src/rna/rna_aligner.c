@@ -783,7 +783,7 @@ void rna_aligner(options_t *options) {
   */
 
   
-  options_free(options);
+  //options_free(options);
   bam_fclose(writer_input.bam_file);
   
  

@@ -22,7 +22,7 @@
 #include <bioformats/bam/bam_file.h>
 #include <bioformats/bam/alignment.h>
 #include <aligners/bwt/genome.h>
-#include <recal_common.h>
+#include "aux/aux_common.h"
 
 /**
  * \brief Recalibration data storage.

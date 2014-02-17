@@ -93,7 +93,7 @@ typedef struct sw_prepare {
   fastq_read_t *read;
 } sw_prepare_t;
 
-inline sw_prepare_t *sw_prepare_new(char *query, char *ref, int left_flank, int right_flank, int ref_type) {
+static inline sw_prepare_t *sw_prepare_new(char *query, char *ref, int left_flank, int right_flank, int ref_type) {
   sw_prepare_t *p = (sw_prepare_t *) malloc(sizeof(sw_prepare_t));
   p->query = query;
   p->ref = ref;
@@ -107,7 +107,7 @@ inline sw_prepare_t *sw_prepare_new(char *query, char *ref, int left_flank, int 
   return p;
 }
 
-inline void sw_prepare_free(sw_prepare_t *p) {
+static inline void sw_prepare_free(sw_prepare_t *p) {
   if (p) free(p);
 }
 

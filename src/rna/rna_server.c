@@ -5894,7 +5894,6 @@ int apply_rna_last(sw_server_input_t* input_p, batch_t *batch) {
     if (array_list_size(meta_alignments_list[i]) <= 0) {	
       //Make Seeding and Caling
       array_list_clear(mapping_batch->mapping_lists[i], (void*)cal_free);
-
       //array_list_clear(cals_list, NULL);
       array_list_t *new_cals_list = mapping_batch->mapping_lists[i];
       //int seed_size = 16;
@@ -6215,7 +6214,7 @@ int apply_rna_last(sw_server_input_t* input_p, batch_t *batch) {
     }
   
     array_list_clear(mapping_batch->mapping_lists[i], (void*)NULL);
-	
+
     //printf("::::AFTER CALS %i\n", num_process);
     //stop_timer(t_start, t_end, time_s);
     //extern double seeding_time_2;

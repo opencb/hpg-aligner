@@ -22,10 +22,10 @@
 #include <libgen.h>
 #include <unistd.h>
 #include <sys/stat.h>
-#include "recal_config.h"
-#include "bam_recal_library.h"
-#include "aux_library.h"
-#include "timestats.h"
+#include "aux/aux_library.h"
+#include "aux/timestats.h"
+#include "recalibrate/recal_config.h"
+#include "recalibrate/bam_recal_library.h"
 
 int mymain(	int full,
 			int p1,
@@ -156,7 +156,7 @@ int mymain(	int full,
 			strcat(filename,sched);
 		else
 		{
-			printf("ERROR: Obtainig OMP_SCHEDULE environment value\n");
+			printf("ERROR: Obtaining OMP_SCHEDULE environment value\n");
 		}
 
 		//Create stats directory
@@ -405,23 +405,23 @@ int recalibrate_bam(int argc, char **argv)
     //struct arg_file *infiles = arg_filen(NULL,NULL,NULL,1,argc+2,       "input file(s)");
     //struct arg_end  *end     = arg_end(20);
     
-    struct arg_lit  *full = arg_lit0("F",NULL,                 			"execute full recalibration");
-    struct arg_lit  *phase1 = arg_lit0("1",NULL,                 		"execute only first part of recalibration");
-    struct arg_lit  *phase2 = arg_lit0("2",NULL,                 		"execute only second part of recalibration, need data file");
-    struct arg_int  *cycles  = arg_int0("C","scalar",NULL,              "define number of cycles of bams");
-    struct arg_int  *threads  = arg_int0("T","scalar",NULL,             "define number of threads to use");
-    struct arg_file *refile = arg_file0("R",NULL,"<reference>",         "reference genome FASTA file");
-    struct arg_file *infile = arg_file0("I",NULL,"<input>",           	"input BAM file");
-    struct arg_file *outfile = arg_file0("o",NULL,"<output>",          	"output recalibrated BAM file, default:\"output.bam\"");
-    struct arg_file *datafile = arg_file0("d",NULL,"<data>",         	"data file containing recalibration information");
-    struct arg_file *infofile = arg_file0("i",NULL,"<info>",         	"info file (human readable) containing recalibration information");
-    struct arg_file *compfile = arg_file0("c",NULL,"<compfile>",        "bam file to compare with recalibrated bam");
-    struct arg_lit  *help    = arg_lit0(NULL,"help",                    "print this help and exit");
-    struct arg_lit  *version = arg_lit0(NULL,"version",                 "print version information and exit");
+    struct arg_lit  *full = arg_lit0("f",NULL,"execute full recalibration");
+    struct arg_lit  *phase1 = arg_lit0("1",NULL,"execute only first part of recalibration");
+    struct arg_lit  *phase2 = arg_lit0("2",NULL,"execute only second part of recalibration, need data file");
+    struct arg_int  *cycles  = arg_int0(NULL,"cycles",NULL,"define number of cycles of bams");
+    struct arg_int  *threads  = arg_int0(NULL,"num-threads",NULL,"define number of threads to use");
+    struct arg_file *refile = arg_file0("r",NULL,"<reference>","reference genome compressed file (dna_compression.bin)");
+    struct arg_file *infile = arg_file0("b",NULL,"<input>","input BAM file");
+    struct arg_file *outfile = arg_file0("o",NULL,"<output>","output recalibrated BAM file, default:\"output.bam\"");
+    struct arg_file *datafile = arg_file0("d",NULL,"<data>","data file containing recalibration information");
+    struct arg_file *infofile = arg_file0("i",NULL,"<info>","info file (human readable) containing recalibration information");
+    struct arg_file *compfile = arg_file0("c",NULL,"<compfile>","bam file to compare with recalibrated bam");
+    struct arg_lit  *help    = arg_lit0("h","help","print this help and exit");
+    struct arg_lit  *version = arg_lit0(NULL,"version","print version information and exit");
     struct arg_end  *end     = arg_end(20);
     
     void* argtable[] = {full,phase1,phase2,cycles,threads,refile,infile,outfile,datafile,infofile,compfile,help,version,end};
-    const char* progname = "Recalibrate";
+    const char* progname = "hpg-bam recalibrate";
     int nerrors;
     int exitcode=0;
 
@@ -489,7 +489,7 @@ int recalibrate_bam(int argc, char **argv)
 	/* Incorrect case: No cycles*/
     if (cycles->count == 0)
     {
-		printf("Please, specify number of cycles with -C.\n");
+		printf("Please, specify number of cycles with -c.\n");
 		exitcode = 1;
 		goto exit;
 	}

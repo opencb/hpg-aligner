@@ -31,7 +31,7 @@ typedef struct sa_genome3 {
   char *S;
 } sa_genome3_t;
 
-inline sa_genome3_t *sa_genome3_new(uint length, size_t num_chroms, 
+static inline sa_genome3_t *sa_genome3_new(uint length, size_t num_chroms,
 				    size_t *chrom_lengths,
 				    char **chrom_names, char *S) {
   sa_genome3_t *p = (sa_genome3_t *) calloc(1, sizeof(sa_genome3_t));
@@ -55,7 +55,7 @@ inline sa_genome3_t *sa_genome3_new(uint length, size_t num_chroms,
 
 //--------------------------------------------------------------------------------------
 
-inline void sa_genome3_free(sa_genome3_t *p) {
+static inline void sa_genome3_free(sa_genome3_t *p) {
   if (p) {
     if (p->chrom_lengths) free(p->chrom_lengths);
     if (p->chrom_offsets) free(p->chrom_offsets);
@@ -72,7 +72,7 @@ inline void sa_genome3_free(sa_genome3_t *p) {
 
 //--------------------------------------------------------------------------------------
 
-inline char *sa_genome_get_sequence(int chrom, size_t start, size_t end, sa_genome3_t *p) {
+static inline char *sa_genome_get_sequence(int chrom, size_t start, size_t end, sa_genome3_t *p) {
   size_t pos, len = end - start + 1;
   char *seq = (char *) malloc((len + 1) * sizeof(char));
   for (size_t i = 0, pos = start + p->chrom_offsets[chrom]; i < len; i++, pos++) {
@@ -84,7 +84,7 @@ inline char *sa_genome_get_sequence(int chrom, size_t start, size_t end, sa_geno
 
 //--------------------------------------------------------------------------------------
 
-inline void sa_genome3_set_nt_counters(size_t num_A, size_t num_C, size_t num_G, 
+static inline void sa_genome3_set_nt_counters(size_t num_A, size_t num_C, size_t num_G,
 				      size_t num_N, size_t num_T, sa_genome3_t *p) {
   if (p) {
     p->num_A = num_A;
@@ -97,7 +97,7 @@ inline void sa_genome3_set_nt_counters(size_t num_A, size_t num_C, size_t num_G,
 
 //--------------------------------------------------------------------------------------
 
-inline void sa_genome3_display(sa_genome3_t *p) {
+static inline void sa_genome3_display(sa_genome3_t *p) {
   if (!p) return;
 
   printf("Genome length: %u\n", p->length);
@@ -216,7 +216,7 @@ void sa_index3_free(sa_index3_t *sa_index);
 
 //--------------------------------------------------------------------------------------
 
-inline void sa_index3_display(sa_index3_t *p) {
+static inline void sa_index3_display(sa_index3_t *p) {
   if (!p) return;
 
   printf("Num. suffixes          : %lu\n", p->num_suffixes);
@@ -231,7 +231,7 @@ inline void sa_index3_display(sa_index3_t *p) {
 
 //--------------------------------------------------------------------------------------
 
-inline void display_prefix(char *S, int len) {
+static inline void display_prefix(char *S, int len) {
   for (int i = 0; i < len; i++) {
     printf("%c", S[i]);
   }

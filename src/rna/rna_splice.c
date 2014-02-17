@@ -56,7 +56,7 @@ void avl_process(cp_avlnode *node) {
 }
 
 
-inline void insert_ends(unsigned char strand, start_data_t *start_data, size_t start, array_list_t *intron_list) {
+static inline void insert_ends(unsigned char strand, start_data_t *start_data, size_t start, array_list_t *intron_list) {
   //Node is in the range
   int num_ends = array_list_size(start_data->list_ends);
 
@@ -68,7 +68,7 @@ inline void insert_ends(unsigned char strand, start_data_t *start_data, size_t s
 
 }
 
-inline void insert_starts(unsigned char strand, end_data_t *end_data, size_t end, array_list_t *intron_list) {
+static inline void insert_starts(unsigned char strand, end_data_t *end_data, size_t end, array_list_t *intron_list) {
   //Node is in the range
   int num_starts = array_list_size(end_data->list_starts);
 

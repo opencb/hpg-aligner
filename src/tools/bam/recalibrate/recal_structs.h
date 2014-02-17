@@ -1,11 +1,11 @@
 #ifndef RECAL_STRUCTS_H_
 #define RECAL_STRUCTS_H_
 
-#include <recal_common.h>
-#include <recal_config.h>
-#include <aux_library.h>
-#include <bam_recal_library.h>
-#include <timestats.h>
+#include "aux/aux_common.h"
+#include "aux/aux_library.h"
+#include "aux/timestats.h"
+#include "recalibrate/recal_config.h"
+#include "bam_recal_library.h"
 
 /**
  * Recalibration data storage

@@ -3,7 +3,7 @@
 //--------------------------------------------------------------------
 //--------------------------------------------------------------------
 
-inline void set_map_trace(int *map_counter, char *st1_map, char st1_value, 
+static inline void set_map_trace(int *map_counter, char *st1_map, char st1_value,
 			  char *nt_map, char nt_value, char *st2_map, char st2_value) {
   int count = *map_counter;
   st1_map[count] = st1_value;
@@ -484,13 +484,13 @@ float doscadfun(char* st1, int ll1, char* st2, int ll2,
 	alig_out_set(map_len1, map_len2, match, mism, gap1, gapmas, st_m_len, out);
       
 	return (-1.0f);
-	// i=ll1; j=ll2; //--> salgo llevando los índices al final.
+	// i=ll1; j=ll2; //--> salgo llevando los ï¿½ndices al final.
       }  
     }//--> del else del primer IF  
     //getchar();
   }//----------> fin del bucle_for
   
-  //-------> Comprobamos los dos últimos nt.
+  //-------> Comprobamos los dos ï¿½ltimos nt.
 
   //==================== DOS ULTIMOS NUCLEOTIDOS  ========================
   if(i==(ll1-2)){ 
@@ -595,7 +595,7 @@ float doscadfun(char* st1, int ll1, char* st2, int ll2,
     }      
   }//--> del if() de los dos ultimos
 
-  if(i==(ll1-1)){ //--> esoy en el últimpo nt!!
+  if(i==(ll1-1)){ //--> esoy en el ï¿½ltimpo nt!!
     if (st1[i]==st2[j]){ //--> coincide 1
 #ifdef _VERBOSE
       set_map_trace(&map_counter, st1_map, st1[i], nt_map, '|', st2_map, st2[j]);
@@ -1127,13 +1127,13 @@ float doscadfun_inv(char* st1, int ll1, char* st2, int ll2,
 	cigar_rev(&out->cigar);
 	
 	return (-1.0f);
-	// i=ll1; j=ll2; //--> salgo llevando los índices al final.
+	// i=ll1; j=ll2; //--> salgo llevando los ï¿½ndices al final.
       }  
     }//--> del else del primer IF  
     //getchar();
   }//----------> fin del bucle_for
   
-  //-------> Comprobamos los dos últimos nt.
+  //-------> Comprobamos los dos ï¿½ltimos nt.
 
   //==========  DOS ULTIMOS NUCLEOTIDOS ========================
 
@@ -1237,7 +1237,7 @@ float doscadfun_inv(char* st1, int ll1, char* st2, int ll2,
     }      
   }//--> del if() de los dos ultimos
   
-  if(i==0){ //--> esoy en el últimpo nt!!
+  if(i==0){ //--> esoy en el ï¿½ltimpo nt!!
     if (st1[i]==st2[j]){ //--> coincide 1
 #ifdef _VERBOSE
       set_map_trace(&map_counter, st1_map, st1[i], nt_map, '|', st2_map, st2[j]);

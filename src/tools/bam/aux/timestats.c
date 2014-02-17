@@ -15,7 +15,7 @@
 * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <timestats.h>
+#include "timestats.h"
 #include <time.h>
 #include <sys/timeb.h>
 #include <stdint.h>
