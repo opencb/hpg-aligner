@@ -41,22 +41,24 @@ SConscript(['%s/SConscript' % bioinfo_path,
             '%s/SConscript' % commons_path
             ], exports = ['env', 'debug', 'compiler'])
 
-env.Program('#bin/hpg-aligner',
+envprogram = env.Clone()
+envprogram['CFLAGS'] += ' -DNODEBUG -mssse3'
+envprogram.Program('#bin/hpg-aligner',
              source = [Glob('src/*.c'),
 		       Glob('src/build-index/*.c'),
 		       Glob('src/dna/*.c'),
 	               Glob('src/rna/*.c'),
 	               Glob('src/bs/*.c'),
 	               Glob('src/sa/*.c'),
-#		       Glob('src/tools/bam/aux/*.c'),
-#	     	       Glob('src/tools/bam/aligner/*.c'),
+		       Glob('src/tools/bam/aux/*.c'),
+	     	       Glob('src/tools/bam/aligner/*.c'),
 		       "%s/libcommon.a" % commons_path,
 		       "%s/libbioinfo.a" % bioinfo_path
                       ]
            )
 
-envprogram = env.Clone()
-envprogram['CFLAGS'] += ' -DNODEBUG -mssse3'
+#envprogram = env.Clone()
+#envprogram['CFLAGS'] += ' -DNODEBUG -mssse3'
 envprogram.Program('#bin/hpg-bam',
              source = [Glob('src/tools/bam/*.c'), 
 	     	       Glob('src/tools/bam/aux/*.c'),
