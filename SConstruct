@@ -20,7 +20,7 @@ env = Environment(tools = ['default', 'packaging'],
                   LIBS = ['xml2', 'm', 'z', 'curl', 'bioinfo', 'common'],
                   LINKFLAGS = ['-fopenmp'])
 
-if int(ARGUMENTS.get('debug', '1')) == 1:
+if int(ARGUMENTS.get('debug', '0')) == 1:
     debug = 1
     env['CFLAGS'] += ' -O0 -g'
 else:
@@ -48,6 +48,8 @@ env.Program('#bin/hpg-aligner',
 	               Glob('src/rna/*.c'),
 	               Glob('src/bs/*.c'),
 	               Glob('src/sa/*.c'),
+#		       Glob('src/tools/bam/aux/*.c'),
+#	     	       Glob('src/tools/bam/aligner/*.c'),
 		       "%s/libcommon.a" % commons_path,
 		       "%s/libbioinfo.a" % bioinfo_path
                       ]

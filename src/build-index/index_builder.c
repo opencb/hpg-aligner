@@ -206,9 +206,12 @@ void run_index_builder(int argc, char **argv, char *mode_str) {
   validate_index_options(options, mode);
   
   if (mode == SA_INDEX) {
-    printf("Generating SA Index...\n");
     const uint prefix_value = 18;
+    char binary_filename[strlen(options->index_filename) + 128];
+    sprintf(binary_filename, "%s/dna_compression.bin", options->index_filename);
+    printf("Generating SA Index...\n");
     sa_index3_build_k18(options->ref_genome, prefix_value, options->index_filename);
+    generate_codes(binary_filename, options->ref_genome);
     printf("SA Index generated!\n");
   } else {
     char binary_filename[strlen(options->index_filename) + 128];

@@ -54,7 +54,7 @@
 //#define RNA_MODE 1
 //#define BS_MODE  2
 
-#define NUM_OPTIONS			26
+#define NUM_OPTIONS			29
 #define NUM_RNA_OPTIONS			 5
 #define NUM_DNA_OPTIONS			 1
 
@@ -62,6 +62,9 @@
 typedef struct options {
   int mode;
   int gzip;
+  int bam_format;
+  int realignment;
+  int recalibration;
   unsigned char bwt_set;
   unsigned char reg_set;
   unsigned char cal_set;

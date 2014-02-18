@@ -66,6 +66,7 @@ typedef struct sa_mapping_batch {
 
   int counters[NUM_COUNTERS];
 
+  int bam_format;
   size_t num_reads;
   #ifdef _TIMING
   double func_times[NUM_TIMING];
@@ -86,6 +87,7 @@ static inline sa_mapping_batch_t *sa_mapping_batch_new(array_list_t *fq_reads) {
     p->counters[i] = 0;
   }
 
+  p->bam_format = 0;
   p->num_reads = num_reads;
   p->fq_reads = fq_reads;
   p->mapping_lists = (array_list_t **) malloc(num_reads * sizeof(array_list_t *));
@@ -149,15 +151,18 @@ static inline void sa_wf_batch_free(sa_wf_batch_t *p) {
 //--------------------------------------------------------------------
 
 typedef struct sa_wf_input {
+  int bam_format;
   fastq_batch_reader_input_t *fq_reader_input;
   sa_wf_batch_t *wf_batch;
 } sa_wf_input_t;
 
 //--------------------------------------------------------------------
 
-static inline sa_wf_input_t *sa_wf_input_new(fastq_batch_reader_input_t *fq_reader_input,
-				      sa_wf_batch_t *wf_batch) {
+static inline sa_wf_input_t *sa_wf_input_new(int bam_format,
+					     fastq_batch_reader_input_t *fq_reader_input,
+					     sa_wf_batch_t *wf_batch) {
   sa_wf_input_t *p = (sa_wf_input_t *) malloc(sizeof(sa_wf_input_t));
+  p->bam_format = bam_format;
   p->fq_reader_input = fq_reader_input;
   p->wf_batch = wf_batch;
   return p;

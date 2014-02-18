@@ -16,6 +16,9 @@ options_t *options_new(void) {
   options->log_level = LOG_INFO_LEVEL;
   options->output_name = strdup(DEFAULT_OUTPUT_NAME);
   options->num_gpu_threads = DEFAULT_GPU_THREADS;
+  options->bam_format = 0;
+  options->realignment = 0;
+  options->recalibration = 0;
   //GET Number System Cores
   //----------------------------------------------
   if (num_cores = get_optimal_cpu_num_threads()) {
@@ -264,6 +267,8 @@ void options_display(options_t *options) {
      printf("\tFastQ gzip mode: %s\n", options->gzip == 1 ? "Enable" : "Disable");
      printf("\tIndex directory name: %s\n", bwt_dirname);
      printf("\tOutput directory name: %s\n", output_name);
+     printf("\tOutput file format: %s\n", 
+	    (options->bam_format || options->realignment || options->recalibration) ? "SAM" : "BAM");
      printf("\n");
 
      printf("Architecture parameters\n");
@@ -312,6 +317,16 @@ void options_display(options_t *options) {
        printf("\tMin intron length: %d\n", min_intron_length);
        printf("\tMin score        : %d\n", min_score);
      }
+
+     if (options->realignment || options->recalibration) {
+       printf("Post-processing\n");
+       if (options->realignment) {
+	 printf("\tRealignment\n");
+       }
+       if (options->recalibration) {
+	 printf("\tRecalibration\n");
+       }
+     }
      printf("+--------------------------------------------------------------------------------------+\n");
      
      free(in_filename);
@@ -359,6 +374,9 @@ void** argtable_options_new(int mode) {
   argtable[count++] = arg_str0(NULL, "prefix", NULL, "File prefix name");
   argtable[count++] = arg_int0("l", "log-level", NULL, "Log debug level");
   argtable[count++] = arg_lit0("h", "help", "Help option");
+  argtable[count++] = arg_lit0(NULL, "bam-format", "BAM output format (otherwise, SAM format)");
+  argtable[count++] = arg_lit0(NULL, "realignment", "Indel-based realignment");
+  argtable[count++] = arg_lit0(NULL, "recalibration", "Base quality score recalibration");
 
   if (mode == DNA_MODE) {
     argtable[count++] = arg_int0(NULL, "num-seeds", NULL, "Number of seeds");
@@ -446,6 +464,9 @@ options_t *read_CLI_options(void **argtable, options_t *options) {
   if (((struct arg_str*)argtable[++count])->count) { options->prefix_name = strdup(*(((struct arg_str*)argtable[count])->sval)); }
   if (((struct arg_file*)argtable[++count])->count) { options->log_level = *(((struct arg_int*)argtable[count])->ival); }
   if (((struct arg_int*)argtable[++count])->count) { options->help = ((struct arg_int*)argtable[count])->count; }
+  if (((struct arg_int*)argtable[++count])->count) { options->bam_format = ((struct arg_int*)argtable[count])->count; }
+  if (((struct arg_int*)argtable[++count])->count) { options->realignment = ((struct arg_int*)argtable[count])->count; }
+  if (((struct arg_int*)argtable[++count])->count) { options->recalibration = ((struct arg_int*)argtable[count])->count; }
 
   if (options->mode == DNA_MODE) {
     if (((struct arg_int*)argtable[++count])->count) { options->num_seeds = *(((struct arg_int*)argtable[count])->ival); }

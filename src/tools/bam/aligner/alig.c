@@ -756,10 +756,10 @@ alig_region_clear(alig_context_t *context)
  * Indel realign one file.
  */
 ERROR_CODE
-alig_bam_file(char *bam_path, char *ref_name, char *ref_path)
+alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 {
 	ERROR_CODE err;
-	unsigned char outbam[30] = "output.bam";
+	//	unsigned char outbam[30] = "output.bam";
 	int i;
 
 	//Files

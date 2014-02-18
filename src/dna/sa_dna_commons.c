@@ -291,6 +291,9 @@ void filter_cals_by_pair_mode(int pair_mode, int pair_min_distance, int pair_max
 void create_alignments(array_list_t *cal_list, fastq_read_t *read, 
 		       array_list_t *mapping_list, sa_mapping_batch_t *mapping_batch) {
 
+  // bam or sam format ?
+  int bam_format = mapping_batch->bam_format;
+
   // CAL
   seed_cal_t *cal;
   uint num_cals = array_list_size(cal_list);
@@ -327,8 +330,13 @@ void create_alignments(array_list_t *cal_list, fastq_read_t *read,
 				cal->strand, cal->chromosome_id, cal->start,
 				cigar_to_string(&cal->cigar), cal->cigar.num_ops, cal->AS, 1, (num_cals > 1),
 				0, 0, alignment);  
-      
-      array_list_insert(alignment, mapping_list);
+
+      if (bam_format) {
+	array_list_insert(convert_to_bam(alignment, 33), mapping_list);
+	alignment_free(alignment);	 
+      } else {
+	array_list_insert(alignment, mapping_list);
+      }
     }
 
     // free memory
