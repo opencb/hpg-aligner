@@ -226,7 +226,7 @@ EXTERNC ERROR_CODE alig_region_clear(alig_context_t *context);
  * \param[in] ref_path Path to reference file (not including name).
  * \param[in] outbam Path to output BAM file.
  */
-EXTERNC ERROR_CODE alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
+EXTERNC ERROR_CODE alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam);
 
 
 /**
