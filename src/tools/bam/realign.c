@@ -246,6 +246,9 @@ align_launch(char *reference, char *bam, char *output, int threads)
 #ifdef __SSE2__	//SSE Block
 	printf("SSE2 Activated\n");
 #endif
+#ifdef __SSSE3__
+	printf("Extended SSE3 Activated\n");
+#endif
 	printf("------------\n");
 
 	//Obtain reference filename and dirpath from full path

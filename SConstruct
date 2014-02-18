@@ -54,7 +54,7 @@ env.Program('#bin/hpg-aligner',
            )
 
 envprogram = env.Clone()
-envprogram['CFLAGS'] += ' -DNODEBUG'
+envprogram['CFLAGS'] += ' -DNODEBUG -mssse3'
 envprogram.Program('#bin/hpg-bam',
              source = [Glob('src/tools/bam/*.c'), 
 	     	       Glob('src/tools/bam/aux/*.c'),

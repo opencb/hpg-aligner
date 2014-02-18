@@ -19,6 +19,7 @@
 #define AUX_NUCLEOTIDE_H_
 
 #include "aux_library.h"
+#include "x86intrin.h"
 
 /***************************
  * NUCLEOTIDE OPERATIONS
@@ -72,7 +73,7 @@ nucleotide_compare(const char *ref_seq, const char *bam_seq, size_t bam_seq_l, c
 	__m128i v_ref, v_seq, v_count;
 
 	//Comparation
-	__m128i v_comp, vl_comp, vh_comp;
+	__m128i v_comp;
 
 	//Constants
 	const __m128i v_zero = _mm_set1_epi8(0);
@@ -96,13 +97,16 @@ nucleotide_compare(const char *ref_seq, const char *bam_seq, size_t bam_seq_l, c
 	memset(ref_aux + bam_seq_l, 0, aux_l - bam_seq_l);	//Set last elements to match
 	memset(bam_aux + bam_seq_l, 0, aux_l - bam_seq_l);
 
+	//Init count
+	v_count = _mm_set1_epi16(0);
+
 	//Iterates nucleotides in this read
 	misses = 0;
 	for(i = 0; i < bam_seq_l; i += 16)
 	{
 		//Pack sequences
-		v_ref = _mm_load_si128(ref_aux + i);
-		v_seq = _mm_load_si128(bam_aux + i);
+		v_ref = _mm_load_si128((__m128i const *)(ref_aux + i));
+		v_seq = _mm_load_si128((__m128i const *)(bam_aux + i));
 
 		//Compare sequences
 		v_comp = _mm_cmpeq_epi8(v_ref, v_seq);	//0xFF Equals, 0x00 Diff
@@ -111,24 +115,15 @@ nucleotide_compare(const char *ref_seq, const char *bam_seq, size_t bam_seq_l, c
 		v_comp = _mm_add_epi8(v_comp, v_one);	//Now equals = 0 and diff = 1
 
 		//Sum number of differences
-		{
-			//Convert diffs to 16 bits integer
-			vl_comp = _mm_unpacklo_epi8(v_comp, v_zero);
-			vh_comp = _mm_unpackhi_epi8(v_comp, v_zero);
-
-			//Accumulate 16 bit values to 32 bit partial sum
-			v_count = _mm_add_epi32(v_count, _mm_madd_epi16(v_one16, vl_comp));
-			v_count = _mm_add_epi32(v_count, _mm_madd_epi16(v_one16, vh_comp));
-		}
+		//Accumulate 8 bit values to two 64 bit partial sum
+		v_count = _mm_add_epi64(v_count, _mm_sad_epu8(v_comp, v_zero));
 
 		//Store comparation values
-		_mm_store_si128(comp_aux + i, v_comp);
+		_mm_store_si128((__m128i*)(comp_aux + i), v_comp);
 	}
 
-	//Horizontal add of four 32 bit partial sums
-	v_count = _mm_add_epi32(v_count, _mm_srli_si128(v_count, 8));
-	v_count = _mm_add_epi32(v_count, _mm_srli_si128(v_count, 4));
-	misses = _mm_cvtsi128_si32(v_count);
+	//Horizontal add of two 64 bit partial sums
+	misses = _mm_cvtsi128_si32(v_count) + _mm_cvtsi128_si32(_mm_srli_si128(v_count, 8));
 
 	//Set result
 	memcpy(comp_res, comp_aux, bam_seq_l);
@@ -236,9 +231,9 @@ nucleotide_miss_qual_sum(const char *ref_seq, const char *bam_seq, const char *b
 	for(i = 0; i < bam_seq_l; i += 16)
 	{
 		//Pack sequences
-		v_ref = _mm_load_si128(ref_aux + i);
-		v_seq = _mm_load_si128(bam_aux + i);
-		v_qual = _mm_load_si128(qual_aux + i);
+		v_ref = _mm_load_si128((__m128i const *)(ref_aux + i));
+		v_seq = _mm_load_si128((__m128i const *)(bam_aux + i));
+		v_qual = _mm_load_si128((__m128i const *)(qual_aux + i));
 
 		//Compare sequences
 		v_comp = _mm_cmpeq_epi8(v_ref, v_seq);	//0xFF Equals, 0x00 Diff
@@ -247,18 +242,14 @@ nucleotide_miss_qual_sum(const char *ref_seq, const char *bam_seq, const char *b
 		v_comp = _mm_add_epi8(v_comp, v_one);	//Now equals = 0 and diff = 1
 
 		//Sum number of differences
+		v_count = _mm_add_epi64(v_count, _mm_sad_epu8(v_comp, v_zero));
+
+		//Sum different qualities
 		{
 			//Convert diffs to 16 bits integer
 			vl_comp = _mm_unpacklo_epi8(v_comp, v_zero);
 			vh_comp = _mm_unpackhi_epi8(v_comp, v_zero);
 
-			//Accumulate 16 bit values to 32 bit partial sum
-			v_count = _mm_add_epi32(v_count, _mm_madd_epi16(v_one16, vl_comp));
-			v_count = _mm_add_epi32(v_count, _mm_madd_epi16(v_one16, vh_comp));
-		}
-
-		//Sum different qualities
-		{
 			//Convert qualities to 16 bits integer
 			vl_qual = _mm_unpacklo_epi8(v_qual, v_zero);
 			vh_qual = _mm_unpackhi_epi8(v_qual, v_zero);
@@ -269,15 +260,19 @@ nucleotide_miss_qual_sum(const char *ref_seq, const char *bam_seq, const char *b
 		}
 
 		//Store comparation values
-		_mm_store_si128(comp_aux + i, v_comp);
+		_mm_store_si128((__m128i*)(comp_aux + i), v_comp);
 	}
 
 	//Horizontal add of four 32 bit partial sums
+#ifdef __SSSE3__
+	v_sum = _mm_hadd_epi32(_mm_hadd_epi32(v_sum, v_zero), v_zero);
+#else
 	v_sum = _mm_add_epi32(v_sum, _mm_srli_si128(v_sum, 8));
 	v_sum = _mm_add_epi32(v_sum, _mm_srli_si128(v_sum, 4));
+#endif
 	sum = _mm_cvtsi128_si32(v_sum);
+
 	v_count = _mm_add_epi32(v_count, _mm_srli_si128(v_count, 8));
-	v_count = _mm_add_epi32(v_count, _mm_srli_si128(v_count, 4));
 	misses = _mm_cvtsi128_si32(v_count);
 
 	//Set result
