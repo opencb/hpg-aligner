@@ -151,7 +151,7 @@ int alig_bam(int argc, char **argv)
 
     /* normal case: realignment */
 	{
-		exitcode = align_launch(refile->filename[0], infile->filename[0], outfile->filename[0], 1);
+		exitcode = align_launch((char *)refile->filename[0], (char *)infile->filename[0], (char *)outfile->filename[0], 1);
 	}
 
     exit:
