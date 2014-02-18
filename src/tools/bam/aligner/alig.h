@@ -221,11 +221,12 @@ EXTERNC ERROR_CODE alig_region_clear(alig_context_t *context);
 /**
  * \brief Indel realign one file.
  *
- * \param[in] bam_path Path to BAM file.
+ * \param[in] bam_path Path to the input BAM file.
  * \param[in] ref_name Reference file name (not including path).
  * \param[in] ref_path Path to reference file (not including name).
+ * \param[in] outbam Path to output BAM file.
  */
-EXTERNC ERROR_CODE alig_bam_file(char *bam_path, char *ref_name, char *ref_path);
+EXTERNC ERROR_CODE alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 
 
 /**

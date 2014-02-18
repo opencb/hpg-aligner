@@ -52,13 +52,13 @@ float doscadfun(char* st1, int ll1, char* st2, int ll2,
     if (ll1 < 10) max_num_mismatches *= 2;
     for (i = 0; i < ll1; i++) {
       if (st1[i] == st2[i]) {
-	//(*match)++;
+	cigar_append_op(1, '=', &out->cigar);
 #ifdef _VERBOSE
 	set_map_trace(&map_counter, st1_map, st1[i], nt_map, '|', st2_map, st2[i]);
 #endif
 	match++;
       } else {
-	//(*mism)++;
+	cigar_append_op(1, 'X', &out->cigar);
 #ifdef _VERBOSE
 	set_map_trace(&map_counter, st1_map, st1[i], nt_map, 'x', st2_map, st2[i]);
 #endif
@@ -78,7 +78,7 @@ float doscadfun(char* st1, int ll1, char* st2, int ll2,
       //out_alig_set(int map_l1, int map_l2, int mm, int mism,
       //                     int gap1, int gapmas, st_m_len, out_alig_t *out) 		  
       alig_out_set(map_len1, map_len2, match, mism, gap1, gapmas, st_m_len, out);
-      cigar_append_op(map_len1, 'M', &out->cigar);
+      //      cigar_append_op(map_len1, 'M', &out->cigar);
       
       //score = (float) (((*match) * 5.0f)-((*mism) * 4.0f));
       score = (float) ((match * 5.0f)-(mism * 4.0f));
@@ -103,6 +103,8 @@ float doscadfun(char* st1, int ll1, char* st2, int ll2,
     //---> initialize again.
     //*match=0; *mism=0; score = 0.0f;
     match=0; mism=0; score = 0.0f;
+    cigar_init(&out->cigar);
+
     
 #ifdef _VERBOSE
     map_counter=0;//===>> fundamental para resetear los strings
@@ -124,15 +126,15 @@ float doscadfun(char* st1, int ll1, char* st2, int ll2,
 #endif
       //(*match)++;
       match++;
-      cigar_append_op(1, 'M', &out->cigar);
+      cigar_append_op(1, '=', &out->cigar);
       num_errors = 0; //--> reset a la cuenta de num_errors!!!!
     } 
     else {//---> que cerrare antes del for
       if (num_errors == MAX_NUM_ERRORS){
 		
 #ifdef _VERBOSE
-	printf("\t\t\t---- abort at (%i, %i) first error at (%i, %i) -- %d consecutive errors --\n", 
-	       i, j, first_i, first_j, num_errors);
+	printf("\t\t\t---- abort at (%i, %i) first error at (%i, %i, %s) -- %d consecutive errors --\n", 
+	       i, j, first_i, first_j, cigar_to_string(&first_cigar), num_errors);
 #endif
 	alig_out_set(first_i, first_j, first_match, first_mism, first_gap1, first_gapmas, first_st_map_len, out);
 	cigar_copy(&out->cigar, &first_cigar);
@@ -168,7 +170,8 @@ float doscadfun(char* st1, int ll1, char* st2, int ll2,
 	//(*match)++;    
 	//(*match)++;    i++; j++;
 	mism++; match+=2;
-	cigar_append_op(3, 'M', &out->cigar);	
+	cigar_append_op(1, 'X', &out->cigar);	
+	cigar_append_op(2, '=', &out->cigar);	
 	i+=2; j+=2;
       }
       //--> busco "x | x | | "
@@ -187,7 +190,10 @@ float doscadfun(char* st1, int ll1, char* st2, int ll2,
 	//(*match)++; i++; j++;
 	//(*match)++; i++; j++;
 	mism+=2; match+=3; 
-	cigar_append_op(5, 'M', &out->cigar);	
+	cigar_append_op(1, 'X', &out->cigar);	
+	cigar_append_op(1, '=', &out->cigar);	
+	cigar_append_op(1, 'X', &out->cigar);	
+	cigar_append_op(2, '=', &out->cigar);	
 	i+=4; j+=4;
       }
       //--> busco gaps de 1nt
@@ -202,7 +208,7 @@ float doscadfun(char* st1, int ll1, char* st2, int ll2,
 	//(*gap1)++; j++;
 	match+=2; gap1++; 
 	cigar_append_op(1, 'D', &out->cigar);	
-	cigar_append_op(2, 'M', &out->cigar);	
+	cigar_append_op(2, '=', &out->cigar);	
 	i++; j+=2;
       }
       else if((st1[i+1]==st2[j]) && (st1[i+2]==st2[j+1])) { 
@@ -216,7 +222,7 @@ float doscadfun(char* st1, int ll1, char* st2, int ll2,
 	//(*gap1)++;   i++;
 	match+=2; gap1++; 
 	cigar_append_op(1, 'I', &out->cigar);	
-	cigar_append_op(2, 'M', &out->cigar);	
+	cigar_append_op(2, '=', &out->cigar);	
 	i+=2; j++;
       }
       else if ((st1[i+2]==st2[j+2])  && (st1[i+3]==st2[j+3])) { //--> mismatch de 2nt 
@@ -239,7 +245,8 @@ float doscadfun(char* st1, int ll1, char* st2, int ll2,
 	//(*match)++;    
 	//(*match)++;    i++; j++;
 	mism+=2; match+=2; 
-	cigar_append_op(4, 'M', &out->cigar);	
+	cigar_append_op(2, 'X', &out->cigar);	
+	cigar_append_op(2, '=', &out->cigar);	
 	i+=3; j+=3;  
       }
       //--> busco gaps de 2nt
@@ -256,7 +263,7 @@ float doscadfun(char* st1, int ll1, char* st2, int ll2,
 	//(*match)++;    i++; j++; 
 	match+=2; gap1++; gapmas++; 
 	cigar_append_op(2, 'D', &out->cigar);	
-	cigar_append_op(2, 'M', &out->cigar);	
+	cigar_append_op(2, '=', &out->cigar);	
 	i++; j+=3;
       }
       else if((st1[i+2]==st2[j]) && (st1[i+3]==st2[j+1])) { 
@@ -279,7 +286,7 @@ float doscadfun(char* st1, int ll1, char* st2, int ll2,
 	//(*match)++;    i++; j++;
 	match+=2; gap1++; gapmas++; 
 	cigar_append_op(2, 'I', &out->cigar);	
-	cigar_append_op(2, 'M', &out->cigar);	
+	cigar_append_op(2, '=', &out->cigar);	
 	i+=3; j++;
       }
       //--> NUEVO: busco mut+gaps de 1nt
@@ -302,7 +309,8 @@ float doscadfun(char* st1, int ll1, char* st2, int ll2,
 	//(*match)++;    i++; j++; 
 	mism++; match+=2; gap1++; 
 	cigar_append_op(1, 'D', &out->cigar);	
-	cigar_append_op(3, 'M', &out->cigar);	
+	cigar_append_op(1, 'X', &out->cigar);	
+	cigar_append_op(2, '=', &out->cigar);	
 	i+=2; j+=3;
       }
       else if((st1[i+2]==st2[j+1]) && (st1[i+3]==st2[j+2])) { 
@@ -331,7 +339,8 @@ float doscadfun(char* st1, int ll1, char* st2, int ll2,
 	//(*match)++;    i++; j++;
 	mism++; match+=2; gap1++;
 	cigar_append_op(1, 'I', &out->cigar);	
-	cigar_append_op(3, 'M', &out->cigar);	
+	cigar_append_op(1, 'X', &out->cigar);	
+	cigar_append_op(2, '=', &out->cigar);	
 	i+=3; j+=2;	  
       }                                  
       //--> busco gaps de 3nt
@@ -348,7 +357,7 @@ float doscadfun(char* st1, int ll1, char* st2, int ll2,
 	//(*match)++;    i++; j++; 
 	match+=2; gap1++; gapmas+=2; 
 	cigar_append_op(3, 'D', &out->cigar);	
-	cigar_append_op(2, 'M', &out->cigar);	
+	cigar_append_op(2, '=', &out->cigar);	
 	i++; j+=4;
       }
       else if((st1[i+3]==st2[j]) && (st1[i+4]==st2[j+1])) { 
@@ -371,7 +380,7 @@ float doscadfun(char* st1, int ll1, char* st2, int ll2,
 	//(*match)++;    i++; j++;
 	match+=2; gap1++; gapmas+=2; 
 	cigar_append_op(3, 'I', &out->cigar);	
-	cigar_append_op(2, 'M', &out->cigar);	
+	cigar_append_op(2, '=', &out->cigar);	
 	i+=4; j++;	  
       }    
       else if ((st1[i+3]==st2[j+3]) && (st1[i+4]==st2[j+4])) { //--> mismatch de 3nt 
@@ -396,7 +405,8 @@ float doscadfun(char* st1, int ll1, char* st2, int ll2,
 	//(*match)++; 
 	//(*match)++; i++; j++;
 	mism+=3; match+=2; 
-	cigar_append_op(5, 'M', &out->cigar);	
+	cigar_append_op(3, 'X', &out->cigar);	
+	cigar_append_op(2, '=', &out->cigar);	
 	i+=4; j+=4;
 	  
       }
@@ -428,7 +438,12 @@ float doscadfun(char* st1, int ll1, char* st2, int ll2,
 	//(*match)++; i++; j++;
 	//(*match)++; i++; j++;
 	mism+=3; match+=4; 
-	cigar_append_op(7, 'M', &out->cigar);	
+	cigar_append_op(1, 'X', &out->cigar);	
+	cigar_append_op(1, '=', &out->cigar);	
+	cigar_append_op(1, 'X', &out->cigar);	
+	cigar_append_op(1, '=', &out->cigar);	
+	cigar_append_op(1, 'X', &out->cigar);	
+	cigar_append_op(2, '=', &out->cigar);	
 	i+=6; j+=6;
 		
       }
@@ -485,7 +500,7 @@ float doscadfun(char* st1, int ll1, char* st2, int ll2,
 #endif
       //(*match)++;
       match++;
-      cigar_append_op(1, 'M', &out->cigar);	
+      cigar_append_op(1, '=', &out->cigar);	
       i++; j++;
       if (st1[i]==st2[j]){ //--> coincide 2
 #ifdef _VERBOSE
@@ -493,7 +508,7 @@ float doscadfun(char* st1, int ll1, char* st2, int ll2,
 #endif
 	//(*match)++;
 	match++;
-	cigar_append_op(1, 'M', &out->cigar);	
+	cigar_append_op(1, '=', &out->cigar);	
 	i++; j++;
       }
       else{ //--> NO coincide 2: meto Mismatch
@@ -502,7 +517,7 @@ float doscadfun(char* st1, int ll1, char* st2, int ll2,
 #endif
 	//(*mism)++;
 	mism++;
-	cigar_append_op(1, 'M', &out->cigar);	
+	cigar_append_op(1, 'X', &out->cigar);	
 	i++; j++;
       }
     } 
@@ -516,7 +531,8 @@ float doscadfun(char* st1, int ll1, char* st2, int ll2,
 	//(*match)++;
 	//i++; j++; i++; j++;
 	mism++; match++;
-	cigar_append_op(2, 'M', &out->cigar);	
+	cigar_append_op(1, 'X', &out->cigar);	
+	cigar_append_op(1, '=', &out->cigar);	
 	i+=2; j+=2;			   
 			   
       }
@@ -531,7 +547,7 @@ float doscadfun(char* st1, int ll1, char* st2, int ll2,
 	//i++; j++; i++; j++;
 	gap1++; match+=2;
 	cigar_append_op(1, 'D', &out->cigar);	
-	cigar_append_op(2, 'M', &out->cigar);	
+	cigar_append_op(2, '=', &out->cigar);	
 	i+=2; j+=3;	
       }
       else  if ((st1[i]==st2[j+2]) && (st1[i+1]==st2[j+3])) { //--> 2*GAP y 2*match
@@ -546,7 +562,7 @@ float doscadfun(char* st1, int ll1, char* st2, int ll2,
 	//i++; j++; i++; j++;
 	gap1++; gapmas++; match+=2;
 	cigar_append_op(2, 'D', &out->cigar);	
-	cigar_append_op(2, 'M', &out->cigar);	
+	cigar_append_op(2, '=', &out->cigar);	
 	i+=2; j+=4;	
       }
       else if ((st1[i]==st2[j+3]) && (st1[i+1]==st2[j+4])) { //--> 3*GAP y 2*match
@@ -562,7 +578,7 @@ float doscadfun(char* st1, int ll1, char* st2, int ll2,
 	//i++; j++; i++; j++;
 	gap1++; gapmas++; match+=2;
 	cigar_append_op(3, 'D', &out->cigar);	
-	cigar_append_op(2, 'M', &out->cigar);	
+	cigar_append_op(2, '=', &out->cigar);	
 	i+=2; j+=5;	
       }
       else {
@@ -573,7 +589,7 @@ float doscadfun(char* st1, int ll1, char* st2, int ll2,
 	//(*mism)++; (*mism)++; 
 	//i++; j++; i++; j++;
 	mism+=2;
-	cigar_append_op(2, 'M', &out->cigar);	
+	cigar_append_op(2, 'X', &out->cigar);	
 	i+=2; j+=2;	
       }
     }      
@@ -586,7 +602,7 @@ float doscadfun(char* st1, int ll1, char* st2, int ll2,
 #endif
       //(*match)++;
       match++;
-      cigar_append_op(1, 'M', &out->cigar);	
+      cigar_append_op(1, '=', &out->cigar);	
       i++; j++;
     }
     else{ //--> NO coincide 2: meto Mismatch
@@ -595,7 +611,7 @@ float doscadfun(char* st1, int ll1, char* st2, int ll2,
 #endif
       //(*mism)++;
       mism++;
-      cigar_append_op(1, 'M', &out->cigar);	
+      cigar_append_op(1, 'X', &out->cigar);	
       i++; j++;
     }
   }   
@@ -681,13 +697,13 @@ float doscadfun_inv(char* st1, int ll1, char* st2, int ll2,
     char *st22 = &st2[ll2 - ll1];
     for (i = ll1 - 1; i >= 0; i--) {
       if (st1[i] == st22[i]) {
-	//(*match)++;
+	cigar_append_op(1, '=', &out->cigar);
 #ifdef _VERBOSE
 	set_map_trace(&map_counter, st1_map, st1[i], nt_map, '|', st2_map, st22[i]);
 #endif
 	match++;
       } else {
-	//(*mism)++;
+	cigar_append_op(1, 'X', &out->cigar);
 #ifdef _VERBOSE
 	set_map_trace(&map_counter, st1_map, st1[i], nt_map, 'x', st2_map, st22[i]);
 #endif
@@ -702,7 +718,7 @@ float doscadfun_inv(char* st1, int ll1, char* st2, int ll2,
       st_m_len = ll1;
       
       alig_out_set(map_len1, map_len2, match, mism, gap1, gapmas, st_m_len, out);
-      cigar_append_op(map_len1, 'M', &out->cigar);
+      //      cigar_append_op(map_len1, 'M', &out->cigar);
       
       //score = (float) (((*match) * 5.0f)-((*mism) * 4.0f));
       score = (float) ((match * 5.0f)-(mism * 4.0f));
@@ -721,6 +737,8 @@ float doscadfun_inv(char* st1, int ll1, char* st2, int ll2,
     }
     //*match=0; *mism=0; score = 0.0f;
     match=0; mism=0; score = 0.0f;
+    cigar_init(&out->cigar);
+
 #ifdef _VERBOSE
     map_counter=0; //===>> fundamental para resetear los strings
 #endif
@@ -743,7 +761,7 @@ float doscadfun_inv(char* st1, int ll1, char* st2, int ll2,
 #endif
       //(*match)++;
       match++;
-      cigar_append_op(1, 'M', &out->cigar);
+      cigar_append_op(1, '=', &out->cigar);
       num_errors = 0; //--> reset a la cuenta de num_errors!!!!
     } 
     else {//---> que cerrare antes del for
@@ -788,7 +806,8 @@ float doscadfun_inv(char* st1, int ll1, char* st2, int ll2,
 	//(*match)++;    
 	//(*match)++; i--; j--;
 	mism++; match+=2;
-	cigar_append_op(3, 'M', &out->cigar);
+	cigar_append_op(1, 'X', &out->cigar);
+	cigar_append_op(2, '=', &out->cigar);
 	i-=2; j-=2;
       }
       
@@ -817,7 +836,10 @@ float doscadfun_inv(char* st1, int ll1, char* st2, int ll2,
 	//(*match)++; i--; j--;
 	//(*match)++; i--; j--;
 	mism+=2; match+=3; 
-	cigar_append_op(5, 'M', &out->cigar);	
+	cigar_append_op(1, 'X', &out->cigar);	
+	cigar_append_op(1, '=', &out->cigar);	
+	cigar_append_op(1, 'X', &out->cigar);	
+	cigar_append_op(2, '=', &out->cigar);	
 	i-=4; j-=4;
       }
       
@@ -833,7 +855,7 @@ float doscadfun_inv(char* st1, int ll1, char* st2, int ll2,
 	//(*gap1)++; j--;
 	match+=2; gap1++; 
 	cigar_append_op(1, 'D', &out->cigar);	
-	cigar_append_op(2, 'M', &out->cigar);	
+	cigar_append_op(2, '=', &out->cigar);	
 	i--; j-=2;
       }
       else if((st1[i-1]==st2[j]) && (st1[i-2]==st2[j-1])) { 
@@ -847,7 +869,7 @@ float doscadfun_inv(char* st1, int ll1, char* st2, int ll2,
 	//(*gap1)++;   i--; 
 	match+=2; gap1++; 
 	cigar_append_op(1, 'I', &out->cigar);	
-	cigar_append_op(2, 'M', &out->cigar);	
+	cigar_append_op(2, '=', &out->cigar);	
 	i-=2; j--;
       }
       
@@ -872,7 +894,8 @@ float doscadfun_inv(char* st1, int ll1, char* st2, int ll2,
 	//(*match)++;    
 	//(*match)++;    i--; j--;
 	mism+=2; match+=2; 
-	cigar_append_op(4, 'M', &out->cigar);	
+	cigar_append_op(2, 'X', &out->cigar);	
+	cigar_append_op(2, '=', &out->cigar);	
 	i-=3; j-=3;
       }
       
@@ -890,7 +913,7 @@ float doscadfun_inv(char* st1, int ll1, char* st2, int ll2,
 	//(*match)++;    i--; j--; 
 	match+=2; gap1++; gapmas++; 
 	cigar_append_op(2, 'D', &out->cigar);	
-	cigar_append_op(2, 'M', &out->cigar);	
+	cigar_append_op(2, '=', &out->cigar);	
 	i--; j-=3;
       }
       else if((st1[i-2]==st2[j]) && (st1[i-3]==st2[j-1])) { 
@@ -914,7 +937,7 @@ float doscadfun_inv(char* st1, int ll1, char* st2, int ll2,
 	//(*match)++; i--; j--;
 	match+=2; gap1++; gapmas++; 
 	cigar_append_op(2, 'I', &out->cigar);	
-	cigar_append_op(2, 'M', &out->cigar);	
+	cigar_append_op(2, '=', &out->cigar);	
 	i-=3; j--;
       }
       
@@ -932,9 +955,9 @@ float doscadfun_inv(char* st1, int ll1, char* st2, int ll2,
 	//(*match)++;
 	//(*match)++;    i--; j--; 
 	mism++; match+=2; gap1++; 
-	cigar_append_op(1, 'M', &out->cigar);	
+	cigar_append_op(1, 'X', &out->cigar);	
 	cigar_append_op(1, 'D', &out->cigar);	
-	cigar_append_op(2, 'M', &out->cigar);	
+	cigar_append_op(2, '=', &out->cigar);	
 	i-=2; j-=3;
       }
       else if((st1[i-2]==st2[j-1]) && (st1[i-3]==st2[j-2])) { 
@@ -958,9 +981,9 @@ float doscadfun_inv(char* st1, int ll1, char* st2, int ll2,
 	//(*match)++;
 	//(*match)++;    i--; j--;
 	mism++; match+=2; gap1++;
-	cigar_append_op(1, 'M', &out->cigar);	
+	cigar_append_op(1, 'X', &out->cigar);	
 	cigar_append_op(1, 'I', &out->cigar);	
-	cigar_append_op(2, 'M', &out->cigar);	
+	cigar_append_op(2, '=', &out->cigar);	
 	i-=3; j-=2;
       }                                  
       //--> busco gaps de 3nt
@@ -977,7 +1000,7 @@ float doscadfun_inv(char* st1, int ll1, char* st2, int ll2,
 	//(*match)++;    i--; j--; 
 	match+=2; gap1++; gapmas+=2; 
 	cigar_append_op(3, 'D', &out->cigar);	
-	cigar_append_op(2, 'M', &out->cigar);	
+	cigar_append_op(2, '=', &out->cigar);	
 	i--; j-=4;
       }
       else if((st1[i-3]==st2[j]) && (st1[i-4]==st2[j-1])) { 
@@ -1002,7 +1025,7 @@ float doscadfun_inv(char* st1, int ll1, char* st2, int ll2,
 	//(*match)++;    i--; j--;
 	match+=2; gap1++; gapmas+=2; 
 	cigar_append_op(3, 'I', &out->cigar);	
-	cigar_append_op(2, 'M', &out->cigar);	
+	cigar_append_op(2, '=', &out->cigar);	
 	i-=4; j--;
       }    
       else if ((st1[i-3]==st2[j-3]) && (st1[i-4]==st2[j-4])) { //--> mismatch de 3nt 
@@ -1027,7 +1050,8 @@ float doscadfun_inv(char* st1, int ll1, char* st2, int ll2,
 	//(*match)++; 
 	//(*match)++; i--; j--;
 	mism+=3; match+=2; 
-	cigar_append_op(5, 'M', &out->cigar);	
+	cigar_append_op(3, 'X', &out->cigar);	
+	cigar_append_op(2, '=', &out->cigar);	
 	i-=4; j-=4;
       }
       //--> busco "x | x | x | |"
@@ -1059,7 +1083,12 @@ float doscadfun_inv(char* st1, int ll1, char* st2, int ll2,
 	//(*match)++; i--; j--;
 	//(*match)++; i--; j--;
 	mism+=3; match+=4; 
-	cigar_append_op(7, 'M', &out->cigar);	
+	cigar_append_op(1, 'X', &out->cigar);	
+	cigar_append_op(1, '=', &out->cigar);	
+	cigar_append_op(1, 'X', &out->cigar);	
+	cigar_append_op(1, '=', &out->cigar);	
+	cigar_append_op(1, 'X', &out->cigar);	
+	cigar_append_op(2, '=', &out->cigar);	
 	i-=6; j-=6;
       }
       
@@ -1115,7 +1144,7 @@ float doscadfun_inv(char* st1, int ll1, char* st2, int ll2,
 #endif
       //(*match)++;
       match++;
-      cigar_append_op(1, 'M', &out->cigar);	
+      cigar_append_op(1, '=', &out->cigar);	
       i--; j--;
       if (st1[i]==st2[j]){ //--> coincide 2
 #ifdef _VERBOSE
@@ -1123,7 +1152,7 @@ float doscadfun_inv(char* st1, int ll1, char* st2, int ll2,
 #endif
 	//(*match)++;
 	match++;
-	cigar_append_op(1, 'M', &out->cigar);	
+	cigar_append_op(1, '=', &out->cigar);	
 	i--; j--;
       }
       else{ //--> NO coincide 2: meto Mismatch
@@ -1132,7 +1161,7 @@ float doscadfun_inv(char* st1, int ll1, char* st2, int ll2,
 #endif
 	//(*mism)++;
 	mism++;
-	cigar_append_op(1, 'M', &out->cigar);	
+	cigar_append_op(1, 'X', &out->cigar);	
 	i--; j--;
       }
     } 
@@ -1145,7 +1174,8 @@ float doscadfun_inv(char* st1, int ll1, char* st2, int ll2,
 	//(*mism)++;
 	//(*match)++;
 	mism++; match++;
-	cigar_append_op(2, 'M', &out->cigar);	
+	cigar_append_op(1, 'X', &out->cigar);	
+	cigar_append_op(1, '=', &out->cigar);	
 	i-=2; j-=2;	
       }
       else if ((st1[i]==st2[j-1]) && (st1[i-1]==st2[j-2])) { //--> GAP en 1nt y 2*match
@@ -1159,7 +1189,7 @@ float doscadfun_inv(char* st1, int ll1, char* st2, int ll2,
 	//i--; j--; i--; j--;
 	gap1++; match+=2;
 	cigar_append_op(1, 'D', &out->cigar);	
-	cigar_append_op(2, 'M', &out->cigar);	
+	cigar_append_op(2, '=', &out->cigar);	
 	i-=2; j-=2;
       }
       else  if ((st1[i]==st2[j-2]) && (st1[i-1]==st2[j-3])) { //--> 2*GAP y 2*match
@@ -1174,7 +1204,7 @@ float doscadfun_inv(char* st1, int ll1, char* st2, int ll2,
 	//i--; j--; i--; j--;
 	gap1++; gapmas++; match+=2;
 	cigar_append_op(2, 'D', &out->cigar);	
-	cigar_append_op(2, 'M', &out->cigar);	
+	cigar_append_op(2, '=', &out->cigar);	
 	i-=2; j-=4;
       }
       else if ((st1[i]==st2[j-3]) && (st1[i-1]==st2[j-4])) { //--> 3*GAP y 2*match
@@ -1190,7 +1220,7 @@ float doscadfun_inv(char* st1, int ll1, char* st2, int ll2,
 	//i--; j--; i--; j--;
 	gap1++; gapmas+=2; match+=2;
 	cigar_append_op(3, 'D', &out->cigar);	
-	cigar_append_op(2, 'M', &out->cigar);	
+	cigar_append_op(2, '=', &out->cigar);	
 	i-=2; j-=5;
       }
       else {
@@ -1201,7 +1231,7 @@ float doscadfun_inv(char* st1, int ll1, char* st2, int ll2,
 	//(*mism)++; (*mism)++; 
 	//i--; j--; i--; j--;
 	mism+=2;
-	cigar_append_op(2, 'M', &out->cigar);	
+	cigar_append_op(2, 'X', &out->cigar);	
 	i-=2; j-=2;
       }
     }      
@@ -1214,7 +1244,7 @@ float doscadfun_inv(char* st1, int ll1, char* st2, int ll2,
 #endif
       //(*match)++;
       match++;
-      cigar_append_op(1, 'M', &out->cigar);	
+      cigar_append_op(1, '=', &out->cigar);	
       i--; j--;
     }
     else{ //--> NO coincide 2: meto Mismatch
@@ -1223,7 +1253,7 @@ float doscadfun_inv(char* st1, int ll1, char* st2, int ll2,
 #endif
       //(*mism)++;
       mism++;
-      cigar_append_op(1, 'M', &out->cigar);	
+      cigar_append_op(1, 'X', &out->cigar);	
       i--; j--;
     }
   }   

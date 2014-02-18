@@ -499,10 +499,6 @@ void write_unmapped_read(fastq_read_t *fq_read, bam_file_t *bam_file);
 
 //--------------------------------------------------------------------
 
-int num_sws = 0;
-int num_ext_sws = 0;
-int num_gaps = 0;
-
 int bam_writer(void *data) {
      struct timeval start, end;
      double time;
@@ -518,10 +514,6 @@ int bam_writer(void *data) {
      //alignment_t *alig;
 
      mapping_batch_t *mapping_batch = (mapping_batch_t *) batch->mapping_batch;
-
-     num_sws += mapping_batch->num_sws;
-     num_ext_sws += mapping_batch->num_ext_sws;
-     num_gaps += mapping_batch->num_gaps;
 
      batch_writer_input_t *writer_input = batch->writer_input;
      bam_file_t *bam_file = writer_input->bam_file;     

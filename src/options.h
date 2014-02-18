@@ -28,7 +28,6 @@
 #define DEFAULT_NUM_CAL_SEEKERS		1
 #define DEFAULT_REGION_THREADS		1
 #define DEFAULT_NUM_SW_THREADS		1
-#define DEFAULT_NUM_SEEDS		10
 #define DEFAULT_MIN_NUM_SEEDS_IN_CAL	-1
 #define DEFAULT_MAX_INTRON_LENGTH	500000
 #define DEFAULT_MIN_INTRON_LENGTH	40
@@ -55,13 +54,17 @@
 //#define RNA_MODE 1
 //#define BS_MODE  2
 
-#define NUM_OPTIONS			26
+#define NUM_OPTIONS			29
 #define NUM_RNA_OPTIONS			 5
+#define NUM_DNA_OPTIONS			 1
 
 
 typedef struct options {
   int mode;
   int gzip;
+  int bam_format;
+  int realignment;
+  int recalibration;
   unsigned char bwt_set;
   unsigned char reg_set;
   unsigned char cal_set;
@@ -118,7 +121,6 @@ typedef struct options {
   char* intron_filename;
   // new variables for bisulphite case
 } options_t;
-
 
 options_t *options_new(void);
 

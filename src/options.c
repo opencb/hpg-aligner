@@ -16,6 +16,9 @@ options_t *options_new(void) {
   options->log_level = LOG_INFO_LEVEL;
   options->output_name = strdup(DEFAULT_OUTPUT_NAME);
   options->num_gpu_threads = DEFAULT_GPU_THREADS;
+  options->bam_format = 0;
+  options->realignment = 0;
+  options->recalibration = 0;
   //GET Number System Cores
   //----------------------------------------------
   if (num_cores = get_optimal_cpu_num_threads()) {
@@ -25,7 +28,7 @@ options_t *options_new(void) {
   }
   //----------------------------------------------
   options->max_intron_length = DEFAULT_MAX_INTRON_LENGTH;
-  options->num_seeds = DEFAULT_NUM_SEEDS;
+  options->num_seeds = 0;
   options->min_num_seeds_in_cal = DEFAULT_MIN_NUM_SEEDS_IN_CAL;
   options->cal_seeker_errors = DEFAULT_CAL_SEEKER_ERRORS;
   options->write_size = DEFAULT_WRITE_BATCH_SIZE;
@@ -74,6 +77,7 @@ void validate_options(options_t *options) {
   int DEFAULT_READ_BATCH_SIZE;
   int DEFAULT_SEED_SIZE;
   int DEFAULT_FLANK_LENGTH;
+  int DEFAULT_NUM_SEEDS;
   int DEFAULT_MIN_SEED_SIZE;
   int DEFAULT_MIN_CAL_SIZE;
   int DEFAULT_SEEDS_MAX_DISTANCE;
@@ -85,14 +89,16 @@ void validate_options(options_t *options) {
   if (mode == DNA_MODE) {
     strcpy(options->str_mode, "DNA");
     DEFAULT_READ_BATCH_SIZE = 200000;
-    DEFAULT_SEED_SIZE	= 20;
+    DEFAULT_NUM_SEEDS	= 20;
+    DEFAULT_SEED_SIZE	= 18;
     DEFAULT_FLANK_LENGTH = 5;
     DEFAULT_MIN_SEED_SIZE = 16;
-    DEFAULT_MIN_CAL_SIZE = 30;
+    DEFAULT_MIN_CAL_SIZE = 20;
     DEFAULT_SEEDS_MAX_DISTANCE = 100;
-  }else if (mode == BS_MODE) {
+  } else if (mode == BS_MODE) {
     strcpy(options->str_mode, "BS");
     DEFAULT_READ_BATCH_SIZE = 20000;
+    DEFAULT_NUM_SEEDS	= 20;
     DEFAULT_SEED_SIZE	= 20;
     DEFAULT_FLANK_LENGTH = 5;
     DEFAULT_MIN_SEED_SIZE = 16;
@@ -101,6 +107,7 @@ void validate_options(options_t *options) {
   }else if (mode == RNA_MODE) {
     strcpy(options->str_mode, "RNA");
     DEFAULT_READ_BATCH_SIZE = 200000;
+    DEFAULT_NUM_SEEDS	= 20;
     DEFAULT_SEED_SIZE = 16;
     DEFAULT_FLANK_LENGTH = 30;
     DEFAULT_MIN_SEED_SIZE = 16;
@@ -127,6 +134,10 @@ void validate_options(options_t *options) {
       usage_cli(mode);
     }
   }
+
+  if (!options->num_seeds) {
+    options->num_seeds = DEFAULT_NUM_SEEDS;
+  }    
 
   if (!options->min_cal_size) {
     options->min_cal_size = DEFAULT_MIN_CAL_SIZE;
@@ -256,6 +267,8 @@ void options_display(options_t *options) {
      printf("\tFastQ gzip mode: %s\n", options->gzip == 1 ? "Enable" : "Disable");
      printf("\tIndex directory name: %s\n", bwt_dirname);
      printf("\tOutput directory name: %s\n", output_name);
+     printf("\tOutput file format: %s\n", 
+	    (options->bam_format || options->realignment || options->recalibration) ? "SAM" : "BAM");
      printf("\n");
 
      printf("Architecture parameters\n");
@@ -273,6 +286,9 @@ void options_display(options_t *options) {
      printf("\n");
 
      printf("Seeding and CAL parameters\n");
+     if (options->mode == DNA_MODE) {
+       printf("\tNum. seeds: %d\n",  num_seeds);
+     }
      printf("\tMin CAL size: %d\n",  min_cal_size);
      printf("\n");
 
@@ -301,6 +317,16 @@ void options_display(options_t *options) {
        printf("\tMin intron length: %d\n", min_intron_length);
        printf("\tMin score        : %d\n", min_score);
      }
+
+     if (options->realignment || options->recalibration) {
+       printf("Post-processing\n");
+       if (options->realignment) {
+	 printf("\tRealignment\n");
+       }
+       if (options->recalibration) {
+	 printf("\tRecalibration\n");
+       }
+     }
      printf("+--------------------------------------------------------------------------------------+\n");
      
      free(in_filename);
@@ -314,8 +340,8 @@ void options_display(options_t *options) {
 
 void** argtable_options_new(int mode) {
   int num_options = NUM_OPTIONS;
-  if (mode == RNA_MODE) num_options += NUM_RNA_OPTIONS;
-
+  if      (mode == DNA_MODE) num_options += NUM_DNA_OPTIONS;
+  else if (mode == RNA_MODE) num_options += NUM_RNA_OPTIONS;
 
   // NUM_OPTIONS +1 to allocate end structure
   void **argtable = (void**)malloc((num_options + 1) * sizeof(void*));	
@@ -348,8 +374,13 @@ void** argtable_options_new(int mode) {
   argtable[count++] = arg_str0(NULL, "prefix", NULL, "File prefix name");
   argtable[count++] = arg_int0("l", "log-level", NULL, "Log debug level");
   argtable[count++] = arg_lit0("h", "help", "Help option");
+  argtable[count++] = arg_lit0(NULL, "bam-format", "BAM output format (otherwise, SAM format)");
+  argtable[count++] = arg_lit0(NULL, "realignment", "Indel-based realignment");
+  argtable[count++] = arg_lit0(NULL, "recalibration", "Base quality score recalibration");
 
-  if (mode == RNA_MODE) {
+  if (mode == DNA_MODE) {
+    argtable[count++] = arg_int0(NULL, "num-seeds", NULL, "Number of seeds");
+  } else if (mode == RNA_MODE) {
     argtable[count++] = arg_int0(NULL, "max-distance-seeds", NULL, "Maximum distance between seeds");
     argtable[count++] = arg_file0(NULL, "transcriptome-file", NULL, "Transcriptome file to help search splice junctions");
     argtable[count++] = arg_int0(NULL, "seed-size", NULL, "Number of nucleotides in a seed");
@@ -433,8 +464,13 @@ options_t *read_CLI_options(void **argtable, options_t *options) {
   if (((struct arg_str*)argtable[++count])->count) { options->prefix_name = strdup(*(((struct arg_str*)argtable[count])->sval)); }
   if (((struct arg_file*)argtable[++count])->count) { options->log_level = *(((struct arg_int*)argtable[count])->ival); }
   if (((struct arg_int*)argtable[++count])->count) { options->help = ((struct arg_int*)argtable[count])->count; }
+  if (((struct arg_int*)argtable[++count])->count) { options->bam_format = ((struct arg_int*)argtable[count])->count; }
+  if (((struct arg_int*)argtable[++count])->count) { options->realignment = ((struct arg_int*)argtable[count])->count; }
+  if (((struct arg_int*)argtable[++count])->count) { options->recalibration = ((struct arg_int*)argtable[count])->count; }
 
-  if (options->mode == RNA_MODE) {
+  if (options->mode == DNA_MODE) {
+    if (((struct arg_int*)argtable[++count])->count) { options->num_seeds = *(((struct arg_int*)argtable[count])->ival); }
+  } else if (options->mode == RNA_MODE) {
     if (((struct arg_int*)argtable[++count])->count) { options->seeds_max_distance = *(((struct arg_int*)argtable[count])->ival); }
     if (((struct arg_file*)argtable[++count])->count) { options->transcriptome_filename = strdup(*(((struct arg_file*)argtable[count])->filename)); }
     if (((struct arg_int*)argtable[++count])->count) { options->seed_size = *(((struct arg_int*)argtable[count])->ival); }
@@ -453,6 +489,7 @@ options_t *parse_options(int argc, char **argv) {
   int mode, num_options = NUM_OPTIONS;
   if (strcmp(argv[0], "dna") == 0) {
     mode = DNA_MODE;
+    num_options += NUM_DNA_OPTIONS;
   } else if (strcmp(argv[0], "rna") == 0) {
     mode = RNA_MODE;
     num_options += NUM_RNA_OPTIONS;

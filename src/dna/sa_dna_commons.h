@@ -4,12 +4,19 @@
 #include "bioformats/fastq/fastq_batch_reader.h"
 #include "aligners/bwt/bwt.h"
 
+#include "options.h"
 #include "buffers.h"
 #include "cal_seeker.h"
 
 #include "sa/sa_index3.h"
 
 //--------------------------------------------------------------------
+
+#define NUM_COUNTERS 10
+extern int counters[NUM_COUNTERS];
+
+//--------------------------------------------------------------------
+
 
 #ifdef _TIMING
 
@@ -48,7 +55,7 @@ char func_names[NUM_TIMING][1024];
 
 #define MISMATCH_PERC 0.10f
 
-#define MAX_NUM_MISMATCHES   4
+#define MAX_NUM_MISMATCHES    4
 #define MAX_NUM_SUFFIXES   2000
 
 //--------------------------------------------------------------------
@@ -56,43 +63,36 @@ char func_names[NUM_TIMING][1024];
 //--------------------------------------------------------------------
 
 typedef struct sa_mapping_batch {
+
+  int counters[NUM_COUNTERS];
+
+  int bam_format;
   size_t num_reads;
   #ifdef _TIMING
   double func_times[NUM_TIMING];
   #endif
   array_list_t *fq_reads;
-  char **revcomp_seqs;
   array_list_t **mapping_lists;
 } sa_mapping_batch_t;
 
 //--------------------------------------------------------------------
 
 static inline sa_mapping_batch_t *sa_mapping_batch_new(array_list_t *fq_reads) {
-  char *revcomp, c;
   fastq_read_t *read;
   size_t read_length, num_reads = array_list_size(fq_reads);
 
   sa_mapping_batch_t *p = (sa_mapping_batch_t *) malloc(sizeof(sa_mapping_batch_t));
+
+  for (int i = 0; i < NUM_COUNTERS; i++) {
+    p->counters[i] = 0;
+  }
+
+  p->bam_format = 0;
   p->num_reads = num_reads;
   p->fq_reads = fq_reads;
-  p->revcomp_seqs = (char **) malloc(num_reads * sizeof(char *));
   p->mapping_lists = (array_list_t **) malloc(num_reads * sizeof(array_list_t *));
   for (size_t i = 0; i < num_reads; i++) {
-    read = array_list_get(i, fq_reads);
-    read_length = read->length;
     p->mapping_lists[i] = array_list_new(10, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
-    // prepare reverse complementary sequence
-    revcomp = (char *) malloc(read_length + 1);
-    for (int src = 0, dest = read_length - 1; src < read_length; src++, dest--) {
-      c = read->sequence[src];
-      if      (c == 'A') { revcomp[dest] = 'T'; }
-      else if (c == 'T') { revcomp[dest] = 'A'; }
-      else if (c == 'G') { revcomp[dest] = 'C'; }
-      else if (c == 'C') { revcomp[dest] = 'G'; }
-      else               { revcomp[dest] = c; }
-    }
-    revcomp[read_length] = 0;
-    p->revcomp_seqs[i] = revcomp;
   }
 
   #ifdef _TIMING
@@ -110,12 +110,6 @@ static inline void sa_mapping_batch_free(sa_mapping_batch_t *p) {
   if (p) {
     if (p->fq_reads) { array_list_free(p->fq_reads, (void *) fastq_read_free); }
     if (p->mapping_lists) { free(p->mapping_lists); }
-    if (p->revcomp_seqs) {
-      for (size_t i = 0; i < p->num_reads; i++) {
-	free(p->revcomp_seqs[i]);
-      }
-      free(p->revcomp_seqs);
-    }
     free(p);
   }
 }  
@@ -125,6 +119,7 @@ static inline void sa_mapping_batch_free(sa_mapping_batch_t *p) {
 //--------------------------------------------------------------------
 
 typedef struct sa_wf_batch {
+  options_t *options;
   sa_index3_t *sa_index;
   batch_writer_input_t *writer_input;
   sa_mapping_batch_t *mapping_batch;  
@@ -132,11 +127,13 @@ typedef struct sa_wf_batch {
 
 //--------------------------------------------------------------------
 
-static inline sa_wf_batch_t *sa_wf_batch_new(sa_index3_t *sa_index,
+static inline sa_wf_batch_t *sa_wf_batch_new(options_t *options,
+				      sa_index3_t *sa_index,
 				      batch_writer_input_t *writer_input,
 				      sa_mapping_batch_t *mapping_batch) {
   
   sa_wf_batch_t *p = (sa_wf_batch_t *) malloc(sizeof(sa_wf_batch_t));
+  p->options = options;
   p->sa_index = sa_index;
   p->writer_input = writer_input;
   p->mapping_batch = mapping_batch;
@@ -154,15 +151,18 @@ static inline void sa_wf_batch_free(sa_wf_batch_t *p) {
 //--------------------------------------------------------------------
 
 typedef struct sa_wf_input {
+  int bam_format;
   fastq_batch_reader_input_t *fq_reader_input;
   sa_wf_batch_t *wf_batch;
 } sa_wf_input_t;
 
 //--------------------------------------------------------------------
 
-static inline sa_wf_input_t *sa_wf_input_new(fastq_batch_reader_input_t *fq_reader_input,
-				      sa_wf_batch_t *wf_batch) {
+static inline sa_wf_input_t *sa_wf_input_new(int bam_format,
+					     fastq_batch_reader_input_t *fq_reader_input,
+					     sa_wf_batch_t *wf_batch) {
   sa_wf_input_t *p = (sa_wf_input_t *) malloc(sizeof(sa_wf_input_t));
+  p->bam_format = bam_format;
   p->fq_reader_input = fq_reader_input;
   p->wf_batch = wf_batch;
   return p;
@@ -179,7 +179,7 @@ static inline void sa_wf_input_free(sa_wf_input_t *p) {
 //--------------------------------------------------------------------
 
 typedef struct cigar {
-  uint32_t ops[100];
+  uint32_t ops[2000];
   int num_ops;
 } cigar_t;
 
@@ -299,6 +299,8 @@ static inline void cigar_copy(cigar_t *dst, cigar_t *src) {
   if (src->num_ops > 0) {
     dst->num_ops = src->num_ops;
     memcpy(dst->ops, src->ops, src->num_ops * sizeof(uint32_t));
+  } else {
+    cigar_init(dst);
   }
 }
 
@@ -326,34 +328,77 @@ static inline void cigar_rev(cigar_t *p) {
 }
 
 //--------------------------------------------------------------------
-// cigarset_t
-//--------------------------------------------------------------------
 
-typedef struct cigarset {
-  int num_cigars;
-  int *active;
-  cigar_t **cigars;
-} cigarset_t;
-
-//--------------------------------------------------------------------
-
-static inline cigarset_t *cigarset_new(int num_cigars) {
-  cigarset_t *p = (cigarset_t *) malloc(sizeof(cigarset_t));
-  p->num_cigars = num_cigars;
-  p->active = (int *) calloc(num_cigars, sizeof(int));
-  p->cigars = (cigar_t **) malloc(num_cigars * sizeof(cigar_t*));
-  return p;
+static inline int cigar_get_length(cigar_t *p) {
+  int op_value, op_name, num_ops, len = 0;
+  if ((num_ops = p->num_ops) > 0) {
+    for (int i = 0; i < num_ops; i++) {
+      cigar_get_op(i, &op_value, &op_name, p);
+      if (op_name == 'X' || op_name == '=' || op_name == 'I' || op_name == 'S' || op_name== 'M') {
+	len += op_value;
+      }
+    }
+  }
+  return len;
 }
 
 //--------------------------------------------------------------------
 
-static inline void cigarset_free(cigarset_t *p) {
-  if (p) {
-    if (p->active) free(p->active);
-    if (p->cigars) free(p->cigars);
-    free(p);
+static inline void cigar_ltrim_ops(int len, cigar_t *p) {
+  int num_ops;
+  if ((num_ops = p->num_ops) > 0) {
+    if (len >= num_ops) {
+      cigar_init(p);
+    } else {
+      num_ops -= len;
+      for (int i = 0, j = len; i < num_ops; i++, j++) {
+	p->ops[i] = p->ops[j];
+      }
+      p->num_ops = num_ops;
+      //	memcpy(p->ops, &p->ops[len], p->num_ops * sizeof(uint32_t));
+    }
   }
 }
+
+//--------------------------------------------------------------------
+
+static inline void cigar_rtrim_ops(int len, cigar_t *p) {
+  int num_ops;
+  if ((num_ops = p->num_ops) > 0) {
+    if (len >= num_ops) {
+      cigar_init(p);
+    } else {
+      p->num_ops -= len;
+    }
+  }
+}
+
+//--------------------------------------------------------------------
+
+static inline float cigar_compute_score(float match_score, float mismatch_penalty,
+				 float open_gap_penalty, float extend_gap_penalty,
+				 cigar_t *p) {
+  int num_matches = 0, num_mismatches = 0;
+  int num_open_gaps = 0, num_extend_gaps = 0;
+  int op_value, op_name, num_ops = p->num_ops;
+
+  for (int i = 0; i < num_ops; i++) {
+    cigar_get_op(i, &op_value, &op_name, p);
+    if (op_name == '=') {
+      num_matches += op_value;
+    } else if (op_name == 'X') {
+      num_mismatches += op_value;
+    } else if (op_name == 'I' || op_name == 'D') {
+      num_open_gaps++;
+      num_extend_gaps += (op_value - 1);
+    }
+  }
+
+  return (num_matches * match_score) + (num_mismatches * mismatch_penalty) +
+    (num_open_gaps * open_gap_penalty) + (num_extend_gaps * extend_gap_penalty);
+}
+
+				 
 
 //--------------------------------------------------------------------
 // seed_t
@@ -403,6 +448,50 @@ static inline seed_t *seed_new(size_t read_start, size_t read_end,
 void seed_free(seed_t *p);
 
 //--------------------------------------------------------------------
+// cigarset_t
+//--------------------------------------------------------------------
+typedef struct cigarset_info {
+  int active;
+  int overlap;
+  cigar_t *cigar;
+  seed_t *seed;
+} cigarset_info_t;
+
+static inline cigarset_info_t *cigarset_info_set(int active, int overlap,
+					  cigar_t *cigar, seed_t *seed,
+					  cigarset_info_t *p) {
+  p->active = active;
+  p->overlap = overlap;
+  p->cigar = cigar;
+  p->seed = seed;
+}
+
+//--------------------------------------------------------------------
+
+typedef struct cigarset {
+  int size;
+  cigarset_info_t *info;
+} cigarset_t;
+
+//--------------------------------------------------------------------
+
+static inline cigarset_t *cigarset_new(int size) {
+  cigarset_t *p = (cigarset_t *) malloc(sizeof(cigarset_t));
+  p->size = size;
+  p->info = (cigarset_info_t *) malloc(size * sizeof(cigarset_info_t));
+  return p;
+}
+
+//--------------------------------------------------------------------
+
+static inline void cigarset_free(cigarset_t *p) {
+  if (p) {
+    if (p->info) free(p->info);
+    free(p);
+  }
+}
+
+//--------------------------------------------------------------------
 // seed_cal_t
 //--------------------------------------------------------------------
 
@@ -412,7 +501,10 @@ typedef struct seed_cal {
   size_t start;
   size_t end;
 
+  int AS; // SAM format flag
   int read_area;
+  int invalid;
+
 
   int num_mismatches;
   int num_open_gaps;
@@ -421,8 +513,9 @@ typedef struct seed_cal {
   float score;
   cigar_t cigar;
 
+  fastq_read_t *read;
   linked_list_t *seed_list;
-  void *info;
+  cigarset_t *cigarset;
 } seed_cal_t;
 
 //--------------------------------------------------------------------
@@ -440,7 +533,9 @@ static inline seed_cal_t *seed_cal_new(const size_t chromosome_id,
   p->start = start;
   p->end = end;
 
+  p->AS = 0;
   p->read_area = 0;
+  p->invalid = 0;
 
   p->num_mismatches = 0;
   p->num_open_gaps = 0;
@@ -449,8 +544,9 @@ static inline seed_cal_t *seed_cal_new(const size_t chromosome_id,
   p->score = 0.0f;
   cigar_init(&p->cigar);
 
+  p->read = NULL;
   p->seed_list = seed_list;
-  p->info = 0;
+  p->cigarset = NULL;
 
   return p;
 }
@@ -461,10 +557,20 @@ void seed_cal_free(seed_cal_t *p);
 
 //--------------------------------------------------------------------
 
-static inline seed_cal_print(seed_cal_t *cal) {
-  printf(" CAL (%c)[%lu:%lu-%lu]:\n", 
+static inline void seed_cal_set_cigar_by_seed(seed_t *seed, seed_cal_t *cal) {
+  cal->num_mismatches = seed->num_mismatches;
+  cal->num_open_gaps = seed->num_open_gaps;
+  cal->num_extend_gaps = seed->num_extend_gaps;
+  cigar_concat(&seed->cigar, &cal->cigar);
+}
+
+//--------------------------------------------------------------------
+
+static inline void seed_cal_print(seed_cal_t *cal) {
+  printf(" CAL (%c)[%lu:%lu-%lu] (%s, x:%i, og:%i, eg:%i):\n", 
 	 (cal->strand == 0 ? '+' : '-'), 
-	 cal->chromosome_id, cal->start, cal->end);
+	 cal->chromosome_id, cal->start, cal->end, cigar_to_string(&cal->cigar), cal->num_mismatches,
+	     cal->num_open_gaps, cal->num_extend_gaps);
   printf("\t SEEDS LIST: ");
   if (cal->seed_list == NULL || cal->seed_list->size == 0) {
     printf(" NULL\n");
@@ -472,8 +578,9 @@ static inline seed_cal_print(seed_cal_t *cal) {
     for (linked_list_item_t *item = cal->seed_list->first; 
 	 item != NULL; item = item->next) {
       seed_t *seed = item->item;
-      printf(" [%lu|%lu - %lu|%lu] ", seed->genome_start, seed->read_start, 
-	     seed->read_end, seed->genome_end);
+      printf(" [%lu|%lu - %lu|%lu] (%s, x:%i, og:%i, eg:%i)", seed->genome_start, seed->read_start, 
+	     seed->read_end, seed->genome_end, cigar_to_string(&seed->cigar), seed->num_mismatches,
+	     seed->num_open_gaps, seed->num_extend_gaps);
     }
     printf("\n");
   }
@@ -493,14 +600,14 @@ void filter_cals_by_max_score(float score, array_list_t **list);
 void filter_cals_by_max_num_mismatches(int num_mismatches, array_list_t **list);
 
 void create_alignments(array_list_t *cal_list, fastq_read_t *read, 
-		       array_list_t *mapping_list);
+		       array_list_t *mapping_list, sa_mapping_batch_t *mapping_batch);
 
 void display_suffix_mappings(int strand, size_t r_start, size_t suffix_len, 
 			     size_t low, size_t high, sa_index3_t *sa_index);
 void print_seed(char *msg, seed_t *s);
 void display_sequence(uint j, sa_index3_t *index, uint len);
 char *get_subsequence(char *seq, size_t start, size_t len);
-void display_cmp_sequences(fastq_read_t *read, char *revcomp_seq, sa_index3_t *sa_index);
+void display_cmp_sequences(fastq_read_t *read, sa_index3_t *sa_index);
 
 //--------------------------------------------------------------------
 //--------------------------------------------------------------------
