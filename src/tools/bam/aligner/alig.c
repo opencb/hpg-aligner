@@ -311,7 +311,7 @@ alig_region_next(alig_context_t *context)
 					assert(context->region.start_pos <= context->region.end_pos);
 				}
 			}
-			else if (context->region.end_pos < read_pos)
+			else //if (context->region.end_pos < read_pos)
 			{
 				//ALIGNMENT PAST INTERVAL
 				//Interval end!
@@ -427,9 +427,13 @@ alig_region_load_reference(alig_context_t *context)
 		//Auxiliar
 		aux_pos_begin = ref_pos_begin + 1;
 		aux_pos_end = ref_pos_end + 1;
-
+		//MANEJAR ALINEAMIENTOS CON MEMORIA!!!!!
 		//Get reference
+#ifdef __SSE2__
+		ref_seq = (char *) _mm_malloc(((ref_pos_end - ref_pos_begin) + 2) * sizeof(char), MEM_ALIG_SSE_SIZE);
+#else
 		ref_seq = (char *) malloc(((ref_pos_end - ref_pos_begin) + 2) * sizeof(char));
+#endif
 		assert(ref_seq);
 		flag = (uint32_t) read->core.flag;
 		genome_read_sequence_by_chr_index(ref_seq, (flag & BAM_FREVERSE) ? 1 : 0, (unsigned int)read->core.tid, &aux_pos_begin, &aux_pos_end, context->genome);
@@ -440,7 +444,11 @@ alig_region_load_reference(alig_context_t *context)
 		if(context->reference.reference)
 		{
 			//Free previous reference
+#ifdef __SSE2__
 			free(context->reference.reference);
+#else
+			_mm_free(context->reference.reference);
+#endif
 		}
 		context->reference.position = ref_pos_begin;
 		context->reference.length = ref_length;
@@ -524,8 +532,15 @@ alig_region_haplotype_process(alig_context_t *context)
 			{
 				//Convert read sequence and qualities to string
 				read_seq_l = read->core.l_qseq;
+
+#ifdef __SSE2__
+				read_seq = (char *) _mm_malloc((read_seq_l + 1) * sizeof(char), MEM_ALIG_SSE_SIZE);
+				comp_seq = (char *) _mm_malloc((read_seq_l + 1) * sizeof(char), MEM_ALIG_SSE_SIZE);
+#else
 				read_seq = (char *) malloc((read_seq_l + 1) * sizeof(char));
 				comp_seq = (char *) malloc((read_seq_l + 1) * sizeof(char));
+#endif
+
 				assert(read);
 				new_sequence_from_bam_ref(read, read_seq, read_seq_l + 1);
 
@@ -538,7 +553,8 @@ alig_region_haplotype_process(alig_context_t *context)
 					read_disp_ref = 0;
 
 				//Get raw missmatch
-				nucleotide_compare(ref_seq + read_disp_ref, read_seq, read_seq_l, comp_seq, &ref_miss);
+				//nucleotide_compare(ref_seq + read_disp_ref, read_seq, read_seq_l, comp_seq, &ref_miss);
+				ref_miss = 1;
 
 				//If match reference perfectly, realign to reference and extract from process list
 				if(ref_miss == 0)
@@ -620,8 +636,13 @@ alig_region_haplotype_process(alig_context_t *context)
 				}//Match reference if
 
 				//Free
+#ifdef __SSE2__
+				_mm_free(read_seq);
+				_mm_free(comp_seq);
+#else
 				free(read_seq);
 				free(comp_seq);
+#endif
 
 			} //Valid cigar end if
 
@@ -661,7 +682,7 @@ alig_region_indel_realignment(alig_context_t *context)
 	//Realign only if a region is present and there is haplotypes
 	if(!context->region.valid)
 	{
-		LOG_ERROR("Warning: Trying to realign an invalid region\n");
+		//LOG_ERROR("Warning: Trying to realign an invalid region\n");
 		//return ALIG_INVALID_REGION;
 		return NO_ERROR;
 	}
@@ -736,7 +757,13 @@ alig_region_clear(alig_context_t *context)
 
 	//Clear reference
 	if(context->reference.reference)
+	{
+#ifdef __SSE2__
+		_mm_free(context->reference.reference);
+#else
 		free(context->reference.reference);
+#endif
+	}
 	memset(&context->reference, 0, sizeof(alig_reference_t));
 
 	//Clear scores
@@ -1055,6 +1082,8 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 	bam_fclose(out_bam_f);
 	printf("BAM closed.\n");
 
+	printf("Realignment around indels DONE.\n");
+
 	return NO_ERROR;
 }
 
@@ -1181,13 +1210,20 @@ alig_get_scores(alig_context_t *context)
 		assert(read_cigar);
 
 		//Convert read sequence to string
+#ifdef __SSE2__
+		read_seq = (char *) _mm_malloc((read->core.l_qseq + 1) * sizeof(char), MEM_ALIG_SSE_SIZE);
+		comp_seq = (char *) _mm_malloc((read->core.l_qseq + 1) * sizeof(char), MEM_ALIG_SSE_SIZE);
+		read_seq_ref = (char *) _mm_malloc((read->core.l_qseq + 1) * sizeof(char), MEM_ALIG_SSE_SIZE);
+		read_quals = (char *) _mm_malloc((read->core.l_qseq + 1) * sizeof(char), MEM_ALIG_SSE_SIZE);
+#else
 		read_seq = (char *) malloc((read->core.l_qseq + 1) * sizeof(char));
 		comp_seq = (char *) malloc((read->core.l_qseq + 1) * sizeof(char));
 		read_seq_ref = (char *) malloc((read->core.l_qseq + 1) * sizeof(char));
+		read_quals = (char *) malloc((read->core.l_qseq + 1) * sizeof(char));
+#endif
 		new_sequence_from_bam_ref(read, read_seq, read->core.l_qseq + 1);
 
 		//Get qualities
-		read_quals = (char *) malloc((read->core.l_qseq + 1) * sizeof(char));
 		new_quality_from_bam_ref(read, 0, read_quals, read->core.l_qseq + 1);
 
 		//Get initial clip displacement
@@ -1293,10 +1329,17 @@ alig_get_scores(alig_context_t *context)
 		} //Scores != 0 if
 
 		//Free
+#ifdef __SSE2__
+		_mm_free(read_seq);
+		_mm_free(comp_seq);
+		_mm_free(read_seq_ref);
+		_mm_free(read_quals);
+#else
 		free(read_seq);
 		free(comp_seq);
 		free(read_seq_ref);
 		free(read_quals);
+#endif
 
 	}
 

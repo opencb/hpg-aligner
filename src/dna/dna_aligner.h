@@ -10,7 +10,8 @@
 #include "options.h"
 #include "batch_writer.h"
 
-//#include "tools/bam/aligner/alig.h"
+#include "tools/bam/aligner/alig.h"
+#include "tools/bam/recalibrate/bam_recal_library.h"
 
 #include "sa/sa_index3.h"
 #include "sa/sa_search.h"

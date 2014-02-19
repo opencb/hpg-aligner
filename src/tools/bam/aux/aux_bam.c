@@ -122,10 +122,15 @@ init_empty_bam_header(const unsigned int num_chroms, bam_header_t *header)
 char *
 new_sequence_from_bam(bam1_t *bam1)
 {
+	char *seq;
 	char *bam_seq = (char *)bam1_seq(bam1);
 	int seq_len = bam1->core.l_qseq;
 
-	char *seq = (char *) _mm_malloc(seq_len * sizeof(char), MEM_ALIG_SIZE);
+#ifdef __SSE2__
+	seq = (char *) _mm_malloc(seq_len * sizeof(char), MEM_ALIG_SSE_SIZE);
+#else
+	seq = (char *) malloc(seq_len * sizeof(char));
+#endif
 
 	// nucleotide content
 	for (int i = 0; i < seq_len; i++) {
@@ -207,10 +212,15 @@ new_sequence_from_bam_ref(bam1_t *bam1, char *seq, uint32_t max_l)
 char *
 new_quality_from_bam(bam1_t *bam1, int base_quality)
 {
+	char *qual;
 	char *bam_qual = (char *)bam1_qual(bam1);
 	int qual_len = bam1->core.l_qseq;
 
-	char *qual = (char *) malloc(qual_len * sizeof(char));
+#ifdef __SSE2__
+	qual = (char *) _mm_malloc(qual_len * sizeof(char), MEM_ALIG_SSE_SIZE);
+#else
+	qual = (char *) malloc(qual_len * sizeof(char));
+#endif
 	for (int i = 0; i < qual_len; i++) {
 		qual[i] = base_quality + bam_qual[i];
 	}
@@ -409,9 +419,10 @@ supress_indels_from_32_cigar(char *seq, char *qual, int32_t seq_l, uint32_t *cig
 			}
 			break;
 		case BAM_CMATCH:
+		case BAM_CEQUAL:
+		case BAM_CDIFF:
 		case BAM_CHARD_CLIP:
 		case BAM_CPAD:
-		case BAM_CEQUAL:
 			if(count + seq_i > seq_l)
 				count = seq_l - seq_i;
 
@@ -430,7 +441,7 @@ supress_indels_from_32_cigar(char *seq, char *qual, int32_t seq_l, uint32_t *cig
 		default:
 			fprintf(stderr, "WARNING: Unrecognised cigar N:%d T:%d\n", count, type);
 			fflush(stderr);
-			abort();
+			//abort();
 		}
 	}
 

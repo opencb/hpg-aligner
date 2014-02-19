@@ -36,10 +36,10 @@
 #include "alig_region.h"
 
 //VERSION
-#define ALIG_VER_MAJOR		"0"
-#define ALIG_VER_MINOR		"2"
-#define ALIG_VER_REVISION	"0"
-#define ALIG_VER 			ALIG_VER_MAJOR"."ALIG_VER_MINOR"."ALIG_VER_REVISION
+#define ALIG_VER_CURRENT		"0"
+#define ALIG_VER_REVISION		"4"
+#define ALIG_VER_AGE			"0"
+#define ALIG_VER 			ALIG_VER_CURRENT"."ALIG_VER_REVISION"."ALIG_VER_AGE
 
 //OPTIONS
 #define ALIG_LIST_IN_SIZE	10000
@@ -58,7 +58,7 @@
 /**
  * Time measures
  */
-#define D_TIME_DEBUG
+//#define D_TIME_DEBUG
 #ifdef D_TIME_DEBUG
 	enum alig_slots {
 		//GENERAL
@@ -74,7 +74,8 @@
 		D_SLOT_NEXT,
 		D_SLOT_REFERENCE_LOAD,
 		D_SLOT_HAPLO_GET,
-		D_SLOT_REALIG_PER_HAPLO
+		D_SLOT_REALIG_PER_HAPLO,
+		D_SLOT_NUCLEO_CMP
 	};
 
 #endif
@@ -225,7 +226,7 @@ EXTERNC ERROR_CODE alig_region_clear(alig_context_t *context);
  * \param[in] ref_path Path to reference file (not including name).
  * \param[in] outbam Path to output BAM file.
  */
-EXTERNC ERROR_CODE alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
+EXTERNC ERROR_CODE alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam);
 
 
 /**

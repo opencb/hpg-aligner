@@ -174,7 +174,11 @@ recal_get_data_from_bam(const bam_file_t *bam, const genome_t* ref, recal_info_t
 						fflush(stdout);
 
 						//Get last alignment
+#ifdef __SSE2__
+						_mm_free(last_seq);
+#else
 						free(last_seq);
+#endif
 						last_alig = collect_batch->alignments_p[collect_batch->num_alignments-1];
 						last_seq = new_sequence_from_bam(last_alig);
 						l_last_seq = last_alig->core.l_qseq;
@@ -348,7 +352,7 @@ recal_get_data_from_bam_batch(const bam_batch_t* batch, const genome_t* ref, rec
 			err = recal_reduce_info(output_data, data);
 
 			if(err)
-				printf("ERROR: Failed to reduce collection data!\n");
+				printf("ERROR: Failed to reduce collection data!, error code: %d\n", err);
 
 			#ifdef D_TIME_DEBUG
 				end_time = omp_get_wtime();
@@ -484,9 +488,15 @@ recal_get_data_from_bam_alignment(const bam1_t* alig, const genome_t* ref, recal
 	#endif
 
 	//Allocations
-	ref_seq = (char *)_mm_malloc((bam_seq_l + 1) * sizeof(char), MEM_ALIG_SIZE);
-	comp_res = (char *)_mm_malloc(bam_seq_l * sizeof(char), MEM_ALIG_SIZE);
-	dinucs = (char *)_mm_malloc(bam_seq_l * sizeof(char), MEM_ALIG_SIZE);
+#ifdef __SSE2__
+	ref_seq = (char *)_mm_malloc((bam_seq_l + 1) * sizeof(char), MEM_ALIG_SSE_SIZE);
+	comp_res = (char *)_mm_malloc(bam_seq_l * sizeof(char), MEM_ALIG_SSE_SIZE);
+	dinucs = (char *)_mm_malloc(bam_seq_l * sizeof(char), MEM_ALIG_SSE_SIZE);
+#else
+	ref_seq = (char *)malloc((bam_seq_l + 1) * sizeof(char));
+	comp_res = (char *)malloc(bam_seq_l * sizeof(char));
+	dinucs = (char *)malloc(bam_seq_l * sizeof(char));
+#endif
 
 	//Obtain reference for this 100 nucleotides
 	flag = (uint32_t) alig->core.flag;
@@ -496,7 +506,7 @@ recal_get_data_from_bam_alignment(const bam1_t* alig, const genome_t* ref, recal
 	//Iterates nucleotides in this read
 	for(i = 0; i < bam_seq_l; i++)
 	{
-#ifdef USE_SSE
+#ifdef __SSE2__
 		//#ifdef __SSE2__ //SSE Block
 		if( (i + 16) < bam_seq_l)
 		{
@@ -557,9 +567,15 @@ recal_get_data_from_bam_alignment(const bam1_t* alig, const genome_t* ref, recal
 
 	//Free resources
 	{
+#ifdef __SSE2__
 		_mm_free(ref_seq);
 		_mm_free(comp_res);
 		_mm_free(dinucs);
+#else
+		free(ref_seq);
+		free(comp_res);
+		free(dinucs);
+#endif
 	}
 
 	return NO_ERROR;

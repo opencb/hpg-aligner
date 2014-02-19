@@ -38,6 +38,7 @@
 #include "recalibrate/recal_config.h"
 
 //Auxiliar headers
+#include "aux_simd.h"
 #include "aux_bam.h"
 #include "aux_cigar.h"
 #include "aux_math.h"

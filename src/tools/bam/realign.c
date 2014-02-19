@@ -151,7 +151,7 @@ int alig_bam(int argc, char **argv)
 
     /* normal case: realignment */
 	{
-		exitcode = align_launch(refile->filename[0], infile->filename[0], outfile->filename[0], 1);
+		exitcode = align_launch((char *)refile->filename[0], (char *)infile->filename[0], (char *)outfile->filename[0], 1);
 	}
 
     exit:
@@ -174,70 +174,82 @@ align_launch(char *reference, char *bam, char *output, int threads)
 
 	init_log();
 	LOG_FILE("realign.log","w");
+	LOG_LEVEL(LOG_ERROR_LEVEL);
 
 	//Set schedule if not defined
 	setenv("OMP_SCHEDULE", "static", 0);
 	sched = getenv("OMP_SCHEDULE");
 
 	//Time measures
-	#ifdef D_TIME_DEBUG
+#ifdef D_TIME_DEBUG
 
-		char filename[100];
-		char intaux[20];
-		char cwd[1024];
+	char filename[100];
+	char intaux[20];
+	char cwd[1024];
 
-		//Initialize stats
-		if(time_new_stats(20, &TIME_GLOBAL_STATS))
+	//Initialize stats
+	if(time_new_stats(20, &TIME_GLOBAL_STATS))
+	{
+		printf("ERROR: FAILED TO INITIALIZE TIME STATS\n");
+	}
+
+
+	if (getcwd(cwd, sizeof(cwd)) != NULL)
+	{
+		printf("Current working dir: %s\n", cwd);
+	}
+	else
+	{
+		perror("WARNING: getcwd() dont work");
+	}
+
+	strcpy(filename, cwd);
+	strcat(filename,"/stats/");
+	/*if(sched)
+		strcat(filename,sched);
+	else
+	{
+		printf("ERROR: Obtaining OMP_SCHEDULE environment value\n");
+	}*/
+
+	//Create stats directory
+	printf("Creating stats directory: %s\n", filename);
+	err = mkdir(filename, S_IRWXU);
+	if(err != 0 && errno != EEXIST)
+	{
+		perror("WARNING: failed to create stats directory");
+	}
+	else
+	{
+		//strcat(filename,"_");
+		//sprintf(intaux, "%d", MAX_BATCH_SIZE);
+		//strcat(filename, intaux);
+		strcat(filename, "_");
+		sprintf(intaux, "%d", threads);
+		strcat(filename, intaux);
+		strcat(filename, "_.stats");
+
+		//Initialize stats file output
+		if(time_set_output_file(filename, TIME_GLOBAL_STATS))
 		{
-			printf("ERROR: FAILED TO INITIALIZE TIME STATS\n");
+			printf("ERROR: FAILED TO INITIALIZE TIME STATS FILE OUTPUT\n");
 		}
 
+		printf("STATISTICS ACTIVATED, output file: %s\n\n", filename);
+	}
 
-		if (getcwd(cwd, sizeof(cwd)) != NULL)
-		{
-			printf("Current working dir: %s\n", cwd);
-		}
-		else
-		{
-			perror("WARNING: getcwd() dont work");
-		}
+#endif
 
-		strcpy(filename, cwd);
-		strcat(filename,"/stats/");
-		/*if(sched)
-			strcat(filename,sched);
-		else
-		{
-			printf("ERROR: Obtaining OMP_SCHEDULE environment value\n");
-		}*/
-
-		//Create stats directory
-		printf("Creating stats directory: %s\n", filename);
-		err = mkdir(filename, S_IRWXU);
-		if(err != 0 && errno != EEXIST)
-		{
-			perror("WARNING: failed to create stats directory");
-		}
-		else
-		{
-			//strcat(filename,"_");
-			//sprintf(intaux, "%d", MAX_BATCH_SIZE);
-			//strcat(filename, intaux);
-			strcat(filename, "_");
-			sprintf(intaux, "%d", threads);
-			strcat(filename, intaux);
-			strcat(filename, "_.stats");
-
-			//Initialize stats file output
-			if(time_set_output_file(filename, TIME_GLOBAL_STATS))
-			{
-				printf("ERROR: FAILED TO INITIALIZE TIME STATS FILE OUTPUT\n");
-			}
-
-			printf("STATISTICS ACTIVATED, output file: %s\n\n", filename);
-		}
-
-	#endif
+	//System info
+	printf("------------\n");
+	printf("System info:\n");
+#ifdef __SSE2__	//SSE Block
+	printf("SSE2 Activated\n");
+#endif
+#ifdef __SSSE3__
+	printf("Extended SSE3 Activated\n");
+#endif
+	printf("------------\n");
 
 	//Obtain reference filename and dirpath from full path
 	dir = strdup(reference);
@@ -251,7 +263,7 @@ align_launch(char *reference, char *bam, char *output, int threads)
 #ifdef D_TIME_DEBUG
 	init_time = omp_get_wtime();
 #endif
-	alig_bam_file(bamc, base, dir);
+	alig_bam_file(bamc, base, dir, output);
 #ifdef D_TIME_DEBUG
 	end_time = omp_get_wtime();
 	time_add_time_slot(D_SLOT_TOTAL, TIME_GLOBAL_STATS, end_time - init_time);

@@ -63,7 +63,7 @@
 /**
  * Time measures
  */
-#define D_TIME_DEBUG
+//#define D_TIME_DEBUG
 #ifdef D_TIME_DEBUG
 	//DELTAS
 	#define D_SLOT_PROCCESS_DELTAS 0
