@@ -682,7 +682,7 @@ alig_region_indel_realignment(alig_context_t *context)
 	//Realign only if a region is present and there is haplotypes
 	if(!context->region.valid)
 	{
-		LOG_ERROR("Warning: Trying to realign an invalid region\n");
+		//LOG_ERROR("Warning: Trying to realign an invalid region\n");
 		//return ALIG_INVALID_REGION;
 		return NO_ERROR;
 	}
@@ -1081,6 +1081,8 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 	printf("Closing \"%s\" BAM file...\n", outbam);
 	bam_fclose(out_bam_f);
 	printf("BAM closed.\n");
+
+	printf("Realignment around indels DONE.\n");
 
 	return NO_ERROR;
 }

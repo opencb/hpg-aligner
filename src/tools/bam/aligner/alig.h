@@ -37,8 +37,8 @@
 
 //VERSION
 #define ALIG_VER_MAJOR		"0"
-#define ALIG_VER_MINOR		"3"
-#define ALIG_VER_REVISION	"0"
+#define ALIG_VER_MINOR		"4"
+#define ALIG_VER_REVISION	"1"
 #define ALIG_VER 			ALIG_VER_MAJOR"."ALIG_VER_MINOR"."ALIG_VER_REVISION
 
 //OPTIONS
@@ -58,7 +58,7 @@
 /**
  * Time measures
  */
-#define D_TIME_DEBUG
+//#define D_TIME_DEBUG
 #ifdef D_TIME_DEBUG
 	enum alig_slots {
 		//GENERAL

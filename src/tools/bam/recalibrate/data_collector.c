@@ -352,7 +352,7 @@ recal_get_data_from_bam_batch(const bam_batch_t* batch, const genome_t* ref, rec
 			err = recal_reduce_info(output_data, data);
 
 			if(err)
-				printf("ERROR: Failed to reduce collection data!\n");
+				printf("ERROR: Failed to reduce collection data!, error code: %d\n", err);
 
 			#ifdef D_TIME_DEBUG
 				end_time = omp_get_wtime();
