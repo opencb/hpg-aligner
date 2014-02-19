@@ -241,11 +241,23 @@ void dna_aligner(options_t *options) {
     fclose((FILE *) writer_input.bam_file);
   }
 
-  // post-processing: realignment and recalibration ?
-  /*
+  // post-processing: realignment and recalibration
+  printf("-----------------------------------\n");
+#ifdef D_TIME_DEBUG
+  //Initialize stats
+  if(time_new_stats(20, &TIME_GLOBAL_STATS))
+  {
+	printf("ERROR: FAILED TO INITIALIZE TIME STATS\n");
+  }
+  else
+  {
+	printf("STATISTICS ACTIVATED\n");
+  }
+#endif
   char *aux = out_filename;
   char realig_filename[len], recal_filename[len];
   if (options->realignment) {
+	printf("-----------------------------------\nRealigning...\n");
     realig_filename[0] = 0;
     strcat(realig_filename, (options->output_name ? options->output_name : "."));
     strcat(realig_filename, "/");
@@ -258,8 +270,8 @@ void dna_aligner(options_t *options) {
     alig_bam_file(aux, "dna_compression.bin", sa_dirname, realig_filename);
     aux = realig_filename;
   }
-  */
-  /*
+
+
   if (options->recalibration) {
     recal_filename[0] = 0;
     strcat(recal_filename, (options->output_name ? options->output_name : "."));
@@ -275,10 +287,17 @@ void dna_aligner(options_t *options) {
     }
 
     recal_info_t *recal_info;
+    recal_init_info(500, &recal_info);
+    printf("-----------------------------------\nCollecting data for recalibration...\n");
     recal_get_data_from_file(aux, "dna_compression.bin", sa_dirname, recal_info);
+    printf("-----------------------------------\n");
+    recal_calc_deltas(recal_info);
+    printf("-----------------------------------\nRecalibrating...\n");
     recal_recalibrate_bam_file(aux, recal_info, recal_filename);
+    recal_destroy_info(&recal_info);
+
   }
-  */
+
 
   #ifdef _VERBOSE
   printf("*********> num_dup_reads = %i, num_total_dup_reads = %i\n", 

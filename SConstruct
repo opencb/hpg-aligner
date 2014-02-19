@@ -42,24 +42,9 @@ SConscript(['%s/SConscript' % bioinfo_path,
             ], exports = ['env', 'debug', 'compiler'])
 
 envprogram = env.Clone()
-envprogram['CFLAGS'] += ' -DNODEBUG -mssse3'
-envprogram.Program('#bin/hpg-aligner',
-             source = [Glob('src/*.c'),
-		       Glob('src/build-index/*.c'),
-		       Glob('src/dna/*.c'),
-	               Glob('src/rna/*.c'),
-	               Glob('src/bs/*.c'),
-	               Glob('src/sa/*.c'),
-		       Glob('src/tools/bam/aux/*.c'),
-	     	       Glob('src/tools/bam/aligner/*.c'),
-		       "%s/libcommon.a" % commons_path,
-		       "%s/libbioinfo.a" % bioinfo_path
-                      ]
-           )
+envprogram['CFLAGS'] += ' -DNODEBUG -mssse3 -DD_TIME_DEBUG'
 
-#envprogram = env.Clone()
-#envprogram['CFLAGS'] += ' -DNODEBUG -mssse3'
-envprogram.Program('#bin/hpg-bam',
+bams = envprogram.Program('#bin/hpg-bam',
              source = [Glob('src/tools/bam/*.c'), 
 	     	       Glob('src/tools/bam/aux/*.c'),
 	     	       Glob('src/tools/bam/recalibrate/*.c'),
@@ -68,6 +53,22 @@ envprogram.Program('#bin/hpg-bam',
                        "%s/libcommon.a" % commons_path
                       ]
            )
+
+aligner = envprogram.Program('#bin/hpg-aligner',
+             source = [Glob('src/*.c'),
+		       Glob('src/tools/bam/aux/*.c'),
+		       Glob('src/tools/bam/recalibrate/*.c'),
+	     	       Glob('src/tools/bam/aligner/*.c'),
+		       Glob('src/build-index/*.c'),
+		       Glob('src/dna/*.c'),
+	               Glob('src/rna/*.c'),
+	               Glob('src/bs/*.c'),
+	               Glob('src/sa/*.c'),
+		       "%s/libcommon.a" % commons_path,
+		       "%s/libbioinfo.a" % bioinfo_path
+                      ]
+           )
+Depends(aligner, bams)
 
 '''
 if 'debian' in COMMAND_LINE_TARGETS:
