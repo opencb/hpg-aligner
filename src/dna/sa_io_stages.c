@@ -131,13 +131,13 @@ int sa_sam_writer(void *data) {
   }
   #endif
 
-  int flag, pnext = 0, tlen = 0;
+  size_t flag, cigar_len, pnext = 0, tlen = 0;
   char *rnext = "*", *optional_flags = "NM:i:3";
 
   fastq_read_t *read;
   array_list_t *read_list = mapping_batch->fq_reads;
 
-  alignment_t *alig;
+  seed_cal_t *cal;
   array_list_t *mapping_list;
   FILE *out_file = (FILE *) wf_batch->writer_input->bam_file;
 
@@ -158,24 +158,33 @@ int sa_sam_writer(void *data) {
 
     if (num_mappings > 0) {
       for (size_t j = 0; j < num_mappings; j++) {
-	alig = (alignment_t *) array_list_get(j, mapping_list);
-	flag = (alig->seq_strand ? 16 : 0);
+	cal = (seed_cal_t *) array_list_get(j, mapping_list);
+
+	if (!cal->invalid && ((cigar_len = cigar_get_length(&cal->cigar) <= read->length))) {
+	  flag = (cal->strand ? 16 : 0);
+	  fprintf(out_file, "%s\t%i\t%s\t%lu\t%i\t%s\t%s\t%lu\t%lu\t%s\t%s\tNM:i:%i\n", 
+		  read->id,
+		  flag,
+		  genome->chrom_names[cal->chromosome_id],
+		  cal->start + 1,
+		  cal->AS,
+		  cigar_to_string(&cal->cigar),
+		  rnext,
+		  pnext,
+		  tlen,
+		  read->sequence,
+		  read->quality,
+		  cal->num_mismatches
+		  );
+	} else {
+	  fprintf(out_file, "%s\t4\t*\t0\t0\t*\t*\t0\t0\t%s\t%s\n", 
+		  read->id,
+		  read->sequence,
+		  read->quality
+		  );
+	}
 	  
-	fprintf(out_file, "%s\t%i\t%s\t%lu\t%i\t%s\t%s\t%lu\t%i\t%s\t%s\t%s\n", 
-		alig->query_name,
-		flag,
-		genome->chrom_names[alig->chromosome],
-		alig->position + 1,
-		alig->map_quality,
-		alig->cigar,
-		rnext,
-		pnext,
-		tlen,
-		alig->sequence,
-		alig->quality,
-		optional_flags
-		);
-	alignment_free(alig);	 
+	seed_cal_free(cal);	 
       }
     } else {
       fprintf(out_file, "%s\t4\t*\t0\t0\t*\t*\t0\t0\t%s\t%s\n", 

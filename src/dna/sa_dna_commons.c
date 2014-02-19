@@ -288,11 +288,8 @@ void filter_cals_by_pair_mode(int pair_mode, int pair_min_distance, int pair_max
 
 //--------------------------------------------------------------------
 
-void create_alignments(array_list_t *cal_list, fastq_read_t *read, 
-		       array_list_t *mapping_list, sa_mapping_batch_t *mapping_batch) {
-
-  // bam or sam format ?
-  int bam_format = mapping_batch->bam_format;
+void create_bam_alignments(array_list_t *cal_list, fastq_read_t *read, 
+			   array_list_t *mapping_list) {
 
   // CAL
   seed_cal_t *cal;
@@ -309,36 +306,29 @@ void create_alignments(array_list_t *cal_list, fastq_read_t *read,
   int i, cigar_len;
   linked_list_item_t *list_item; 
 
+
   for (i = 0; i < num_cals; i++) {
     cal = array_list_get(i, cal_list);
-
+    
     #ifdef _VERBOSE	  
     printf("--> CAL #%i (cigar %s):\n", i, cigar_to_string(&cal->cigar));
     seed_cal_print(cal);
     #endif
-
-    if (cal->invalid) {
-      //      mapping_batch->counters[4]++;
-    } else if ((cigar_len = cigar_get_length(&cal->cigar)) > read->length) {
-      //      mapping_batch->counters[5]++;
-    } else {
+    
+    if (!cal->invalid && ((cigar_len = cigar_get_length(&cal->cigar) <= read->length))) {
       cal->AS = (cal->score * 253 / (read->length * 5));
-
+      
       // create the aligments
       alignment = alignment_new();	       
       alignment_init_single_end(strdup(read->id), strdup(read->sequence), strdup(read->quality), 
 				cal->strand, cal->chromosome_id, cal->start,
 				cigar_to_string(&cal->cigar), cal->cigar.num_ops, cal->AS, 1, (num_cals > 1),
 				0, 0, alignment);  
-
-      if (bam_format) {
-	array_list_insert(convert_to_bam(alignment, 33), mapping_list);
-	alignment_free(alignment);	 
-      } else {
-	array_list_insert(alignment, mapping_list);
-      }
+      
+      array_list_insert(convert_to_bam(alignment, 33), mapping_list);
+      alignment_free(alignment);	 
     }
-
+    
     // free memory
     seed_cal_free(cal);
   }

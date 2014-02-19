@@ -811,6 +811,17 @@ p      display_prefix(&genome->S[tmp[0][i].value], k_value);
   fprintf(f_tab, "8. Number of chromosomes\n");
   fprintf(f_tab, "9. One line per chromsomome: name and length\n");
   fclose(f_tab);
+
+  sprintf(filename_tab, "%s/index", sa_index_dirname);
+  f_tab = fopen(filename_tab, "w");
+  for (size_t i = 0; i < genome->num_chroms; i++) {
+    fprintf(f_tab, ">%s %lu %lu\n", 
+	   (genome->chrom_names ? genome->chrom_names[i] : "no-name"), 
+	    0,
+	    genome->chrom_lengths[i] - 1);
+  }
+  fclose(f_tab);
+
 }
 
 //--------------------------------------------------------------------------------------

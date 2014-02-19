@@ -12,8 +12,8 @@
 
 //--------------------------------------------------------------------
 
-#define NUM_COUNTERS 10
-extern int counters[NUM_COUNTERS];
+//#define NUM_COUNTERS 10
+//extern int counters[NUM_COUNTERS];
 
 //--------------------------------------------------------------------
 
@@ -64,7 +64,7 @@ char func_names[NUM_TIMING][1024];
 
 typedef struct sa_mapping_batch {
 
-  int counters[NUM_COUNTERS];
+  //  int counters[NUM_COUNTERS];
 
   int bam_format;
   size_t num_reads;
@@ -83,9 +83,9 @@ static inline sa_mapping_batch_t *sa_mapping_batch_new(array_list_t *fq_reads) {
 
   sa_mapping_batch_t *p = (sa_mapping_batch_t *) malloc(sizeof(sa_mapping_batch_t));
 
-  for (int i = 0; i < NUM_COUNTERS; i++) {
-    p->counters[i] = 0;
-  }
+  //  for (int i = 0; i < NUM_COUNTERS; i++) {
+  //    p->counters[i] = 0;
+  //  }
 
   p->bam_format = 0;
   p->num_reads = num_reads;

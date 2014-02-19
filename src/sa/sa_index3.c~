@@ -640,7 +640,6 @@ p      display_prefix(&genome->S[tmp[0][i].value], k_value);
   
   size_t matrix, matrix_items, value, min_value, max_value;
   // set matrix to 0
-  const uint max_uint = 4294967295;
   matrix = 0;
   matrix_items = 0;
   memset(M, 255, M_bytes);
@@ -694,7 +693,8 @@ p      display_prefix(&genome->S[tmp[0][i].value], k_value);
 	  }
 	}
 	if (first_in_row == 1) {
-	  fwrite(&max_uint, sizeof(uint), 1, f_IA);
+	  uint max = max_uint;
+	  fwrite(&max, sizeof(uint), 1, f_IA);
 	  //fprintf(f_IA, "%lu\n", max_uint);
 	  IA_counter++;
 	  
@@ -745,7 +745,8 @@ p      display_prefix(&genome->S[tmp[0][i].value], k_value);
       }
     }
     if (first_in_row == 1) {
-      fwrite(&max_uint, sizeof(uint), 1, f_IA);
+      uint max = max_uint;
+      fwrite(&max, sizeof(uint), 1, f_IA);
       //fprintf(f_IA, "%lu\n", max_uint);
       IA_counter++;
       //printf("**** matrix %u, row %u without elements !!!\n", matrix, row);

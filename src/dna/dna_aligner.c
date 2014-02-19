@@ -10,7 +10,7 @@ extern int num_total_dup_reads;
 // main 
 //--------------------------------------------------------------------
 
-int counters[NUM_COUNTERS];
+//int counters[NUM_COUNTERS];
 
 void dna_aligner(options_t *options) {
   #ifdef _TIMING
@@ -176,9 +176,9 @@ void dna_aligner(options_t *options) {
     printf("----------------------------------------------\n");
     
 
-    for (int i = 0; i < NUM_COUNTERS; i++) {
-      printf("***** counter[%i] = %i\n", i, counters[i]);
-    }
+    //    for (int i = 0; i < NUM_COUNTERS; i++) {
+    //      printf("***** counter[%i] = %i\n", i, counters[i]);
+    //    }
 
   #ifdef _TIMING
     char func_name[1024];

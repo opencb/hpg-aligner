@@ -1477,20 +1477,20 @@ void post_process_sw(int sw_post_read_counter, int *sw_post_read,
 	    // CIGAR_FROM_SEED
 	    if (seed->read_start > 0) {
 	      cigar_get_op(0, &op_value, &op_name, aux_cigar);
-	      if (op_value < SW_LEFT_FLANK || op_name != '=') {
+	      //	      if (op_value < SW_LEFT_FLANK || op_name != '=') {
 		//		mapping_batch->counters[1]++;
 		//printf("read = %s: attention: op (%i, %c) sw_left_flank!!!\n", cal->read->id, op_value, op_name);
 		//exit(-1);
-	      }
+	      //	      }
 	      cigar_set_op(0, op_value - SW_LEFT_FLANK, op_name, aux_cigar);
 	    }
 	    if (seed->read_end < cal->read->length - 1) {
 	      cigar_get_op(aux_cigar->num_ops - 1, &op_value, &op_name, aux_cigar);
-	      if (op_value < SW_RIGHT_FLANK || op_name != '=') {
+	      //	      if (op_value < SW_RIGHT_FLANK || op_name != '=') {
 		//		mapping_batch->counters[2]++;
 		//printf("read = %s: attention: op (%i, %c) sw_right_flank!!!\n", cal->read->id, op_value, op_name);
 		//exit(-1);
-	      }
+	      //	      }
 	      cigar_set_op(aux_cigar->num_ops - 1, op_value - SW_RIGHT_FLANK, op_name, aux_cigar);
 	    }
             #ifdef _VERBOSE
@@ -1507,12 +1507,12 @@ void post_process_sw(int sw_post_read_counter, int *sw_post_read,
 	    aux_cigar = cigarset->info[j].cigar;
 	    if (cigarset->info[j].overlap) {
 	      cigar_get_op(aux_cigar->num_ops - 1, &op_value, &op_name, aux_cigar);
-	      if (op_value < cigarset->info[j].overlap || op_name != '=') {
+	      //	      if (op_value < cigarset->info[j].overlap || op_name != '=') {
 		//		mapping_batch->counters[3]++;
 		//printf("read = %s: attention OVERLAP: op (%i, %c) overlap (%i)!!!\n", 
 		//       cal->read->id, op_value, op_name, cigarset->info[j].overlap);
 		//exit(-1);
-	      }
+	      //	      }
 	      cigar_set_op(aux_cigar->num_ops - 1, op_value - cigarset->info[j].overlap, op_name, aux_cigar);
 	    }
 	    cigar_concat(aux_cigar, cigar);
@@ -1570,7 +1570,9 @@ int sa_mapper(void *data) {
   
   sa_mapping_batch_t *mapping_batch = wf_batch->mapping_batch;
   sa_index3_t *sa_index = (sa_index3_t *) wf_batch->sa_index;
- 
+  
+  int bam_format = mapping_batch->bam_format;
+
   size_t num_reads = mapping_batch->num_reads;
   int max_read_area, min_num_mismatches;
   float max_score;
@@ -1664,18 +1666,26 @@ int sa_mapper(void *data) {
     }
 
     // create alignments structures
-    #ifdef _TIMING
-    gettimeofday(&start, NULL);
-    #endif
-    create_alignments(cal_list, read, mapping_batch->mapping_lists[i], mapping_batch);
-    #ifdef _TIMING
-    gettimeofday(&stop, NULL);
-    mapping_batch->func_times[FUNC_CREATE_ALIGNMENTS] += 
-      ((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);  
-    #endif
+    if (bam_format) {
+      #ifdef _TIMING
+      gettimeofday(&start, NULL);
+      #endif
+      create_bam_alignments(cal_list, read, mapping_batch->mapping_lists[i]);
+      #ifdef _TIMING
+      gettimeofday(&stop, NULL);
+      mapping_batch->func_times[FUNC_CREATE_ALIGNMENTS] += 
+	((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);  
+      #endif
     
-    // free cal list and clear seed manager for next read
-    array_list_free(cal_list, (void *) NULL);
+      // free cal list and clear seed manager for next read
+      array_list_free(cal_list, (void *) NULL);
+    } else {
+      if (mapping_batch->mapping_lists[i]) {
+	array_list_free(mapping_batch->mapping_lists[i], (void *) NULL);
+	mapping_batch->mapping_lists[i] = cal_list;
+      }
+
+    }
   } // end of for reads
 
   // free memory
