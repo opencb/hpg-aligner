@@ -91,7 +91,7 @@ void dna_aligner(options_t *options) {
   array_list_t *files_fq2 = array_list_new(50,
 					   1.25f,
 					   COLLECTION_MODE_ASYNCHRONIZED);
-  int num_files1, num_files2;
+  int num_files1 = 0, num_files2 = 0;
   
   if (fq_list1) {
     ptr = strtok(fq_list1, token);    // Primera llamada => Primer token
