@@ -75,7 +75,8 @@
 		D_SLOT_REFERENCE_LOAD,
 		D_SLOT_HAPLO_GET,
 		D_SLOT_REALIG_PER_HAPLO,
-		D_SLOT_NUCLEO_CMP
+		D_SLOT_NUCLEO_CMP,
+		D_SLOT_SORT
 	};
 
 #endif
@@ -130,6 +131,9 @@ typedef struct {
 
 	//Current region
 	alig_region_t region;
+
+	//Last region
+	alig_region_t last_region;
 
 	//Current reference
 	alig_reference_t reference;

@@ -745,6 +745,9 @@ alig_region_clear(alig_context_t *context)
 
 	assert(context);
 
+	//Set last region
+	context->last_region = context->region;
+
 	//Clear region
 	memset(&context->region, 0, sizeof(alig_region_t));
 
@@ -779,6 +782,14 @@ alig_region_clear(alig_context_t *context)
 	return NO_ERROR;
 }
 
+//Private function
+static int compare_pos(const void *item1, const void *item2) {
+	const bam1_t *read1 = *(const bam1_t **)item1;
+	const bam1_t *read2 = *(const bam1_t **)item2;
+
+	return (int) (read1->core.pos - read2->core.pos);
+}
+
 /**
  * Indel realign one file.
  */
@@ -801,9 +812,13 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 
 	//Read
 	bam1_t *read;
+	size_t bam_readed = 0;
+	size_t bam_written = 0;
+	size_t bam_discarded = 0;
 
 	//Lists
 	linked_list_t *in_list;
+	array_list_t *write_buffer;
 	size_t list_l;
 
 	//Alignment context
@@ -858,6 +873,10 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 	in_list = linked_list_new(0);
 	assert(in_list);
 
+	//Create buffer for write to disk
+	write_buffer = array_list_new(ALIG_LIST_IN_SIZE, 1.2, 0);
+	assert(write_buffer);
+
 	//Fill input list
 #ifdef D_TIME_DEBUG
     init_time = omp_get_wtime();
@@ -869,6 +888,7 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 		read = bam_init1();
 		bytes = bam_read1(bam_f->bam_fd, read);
 
+		bam_readed++;
 		if(bytes > 0 && read)
 		{
 			linked_list_insert_last(read, in_list);
@@ -876,6 +896,7 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 		else
 		{
 			//Destroy empty last read
+			bam_discarded++;
 			bam_destroy1(read);
 		}
 	}
@@ -983,10 +1004,10 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 			fflush(stdout);
 		}
 
-		//Write processed to disk
 #ifdef D_TIME_DEBUG
 		init_time = omp_get_wtime();
 #endif
+		//Fill write buffer
 		list_l = context.last_readed_count;
 		for(i = 0; i < list_l; i++)
 		{
@@ -994,15 +1015,42 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 			read = linked_list_get_first(in_list);
 			assert(read);
 
-			//Write to disk
-			bam_write1(out_bam_f->bam_fd, read);
-
-			//Free read
-			bam_destroy1(read);
+			//Add to write list
+			array_list_insert(read, write_buffer);
 
 			//Update input list
 			linked_list_remove_first(in_list);
 		}
+
+		//Sort buffer
+		array_list_qsort(write_buffer, compare_pos);
+
+#ifdef D_TIME_DEBUG
+		end_time = omp_get_wtime();
+		time_add_time_slot(D_SLOT_SORT, TIME_GLOBAL_STATS, (double)(end_time - init_time)/(double)list_l);
+#endif
+
+#ifdef D_TIME_DEBUG
+		init_time = omp_get_wtime();
+#endif
+		//Write processed to disk
+		for(i = 0; i < list_l; i++)
+		{
+			//Get read
+			read = array_list_get(i, write_buffer);
+			assert(read);
+
+			//Write to disk
+			bam_written++;
+			bam_write1(out_bam_f->bam_fd, read);
+
+			//Free read
+			bam_destroy1(read);
+		}
+
+		//Clear buffer
+		array_list_clear(write_buffer, NULL);
+
 #ifdef D_TIME_DEBUG
 		end_time = omp_get_wtime();
 		time_add_time_slot(D_SLOT_WRITE, TIME_GLOBAL_STATS, (double)(end_time - init_time)/(double)list_l);
@@ -1026,6 +1074,7 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 			read = bam_init1();
 			bytes = bam_read1(bam_f->bam_fd, read);
 
+			bam_readed++;
 			if(bytes > 0 && read)
 			{
 				linked_list_insert_last(read, in_list);
@@ -1033,6 +1082,7 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 			else
 			{
 				//Destroy empty last read
+				bam_discarded++;
 				bam_destroy1(read);
 			}
 		}
@@ -1064,6 +1114,11 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 			time_add_time_slot(D_SLOT_NEXT, TIME_GLOBAL_STATS, (double)(end_time - init_time)/(double)context.last_readed_count);
 #endif
 	}
+
+	//Info
+	printf("\nReads readed from original BAM: %d\n", bam_readed);
+	printf("Reads written to new BAM: %d\n", bam_written);
+	printf("Reads corrupted on read from original BAM: %d\n", bam_discarded);
 
 	//Free context
 	printf("\nDestroying context...\n");
@@ -1258,6 +1313,10 @@ alig_get_scores(alig_context_t *context)
 				//Initial position must be inside reference range
 				if(init_pos < ref_pos_begin)
 					init_pos = ref_pos_begin;
+
+				//Initial position must not overlap last region
+				if(init_pos < context->last_region.end_pos)
+					init_pos = context->last_region.end_pos;
 
 				//Get end pos
 				end_pos = ref_pos_end - read->core.l_qseq;
