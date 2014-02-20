@@ -63,6 +63,7 @@ options_t *options_new(void) {
   options->min_seed_size = 0;
   options->seed_size = 0;
   options->flank_length = 0;
+  options->fast_mode = 0;
 
   //new variables for bisulphite case in index generation
   options->bs_index = 0;
@@ -79,8 +80,6 @@ void validate_options(options_t *options) {
   int DEFAULT_SEEDS_MAX_DISTANCE;
 
   int mode = options->mode;
-  
-  printf("%i == %i\n", mode, RNA_MODE);
 
   if (mode == DNA_MODE) {
     strcpy(options->str_mode, "DNA");
@@ -231,6 +230,8 @@ void options_display(options_t *options) {
      unsigned int pair_min_distance =  (unsigned int)options->pair_min_distance;
      unsigned int pair_max_distance =  (unsigned int)options->pair_max_distance;
      unsigned int min_intron_length =  (unsigned int)options->min_intron_length;
+     unsigned int fast_mode =   (unsigned int)options->fast_mode;
+
      //unsigned int gpu_process = (unsigned int)options->gpu_process;
 
      int min_score    =  (int)options->min_score;
@@ -296,6 +297,7 @@ void options_display(options_t *options) {
 
      if (options->mode == RNA_MODE) {
        printf("RNA parameters\n");
+       printf("\tMode: %s\n", fast_mode ? "Fast":"Slow");
        printf("\tSeed size: %d\n",  seed_size);
        printf("\tMax intron length: %d\n", max_intron_length);
        printf("\tMin intron length: %d\n", min_intron_length);
@@ -355,6 +357,7 @@ void** argtable_options_new(int mode) {
     argtable[count++] = arg_int0(NULL, "seed-size", NULL, "Number of nucleotides in a seed");
     argtable[count++] = arg_int0(NULL, "max-intron-size", NULL, "Maximum intron size");
     argtable[count++] = arg_int0(NULL, "min-intron-size", NULL, "Minimum intron size");
+    argtable[count++] = arg_lit0(NULL, "fast-mode", "Fast mode for SA index");
   }
 
   argtable[num_options] = arg_end(count);
@@ -440,6 +443,7 @@ options_t *read_CLI_options(void **argtable, options_t *options) {
     if (((struct arg_int*)argtable[++count])->count) { options->seed_size = *(((struct arg_int*)argtable[count])->ival); }
     if (((struct arg_int*)argtable[++count])->count) { options->max_intron_length = *(((struct arg_int*)argtable[count])->ival); }
     if (((struct arg_int*)argtable[++count])->count) { options->min_intron_length = *(((struct arg_int*)argtable[count])->ival); }
+    if (((struct arg_file*)argtable[++count])->count) { options->fast_mode = (((struct arg_int *)argtable[count])->count); }
   }
 
   return options;
@@ -462,6 +466,8 @@ options_t *parse_options(int argc, char **argv) {
 
   void **argtable = argtable_options_new(mode);
   options_t *options = options_new();
+  options->mode = mode;
+
   if (argc < 2) {
     usage(argtable);
     exit(-1);

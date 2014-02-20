@@ -35,6 +35,16 @@
 #include "workflow_functions.h"
 #include "rna_server.h"
 
+//For SA Mapping
+#include "sa/sa_index3.h"
+#include "sa/sa_search.h"
+#include "rna/sa_rna_mapper.h"
+
+#include "dna/sa_dna_commons.h"
+#include "dna/doscadfun.h"
+#include "dna/sa_io_stages.h"
+#include "dna/sa_mapper_stage.h"
+
 typedef struct buffer_reader_input {
   fastq_batch_reader_input_t *reader_input;
   linked_list_t *buffer;

@@ -138,7 +138,7 @@ void dna_aligner(options_t *options) {
     //--------------------------------------------------------------------------------------
     // workflow management
     //
-    sa_wf_batch_t *wf_batch = sa_wf_batch_new((void *)sa_index, &writer_input, NULL);
+    sa_wf_batch_t *wf_batch = sa_wf_batch_new((void *)sa_index, &writer_input, NULL, NULL);
     sa_wf_input_t *wf_input = sa_wf_input_new(&reader_input, wf_batch);
     
     // create and initialize workflow

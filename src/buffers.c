@@ -591,7 +591,7 @@ int file_read_meta_alignments(size_t num_items, array_list_t *list,
                                               simple_a->gap_start + map_len - 1,
                                               simple_a->map_start, 
                                               simple_a->map_start + map_len - 1,
-                                              0);
+                                              0, 0, 0);
     
     //printf("Exit with seed [%i:%i]\n", s_region->read_start, s_region->read_end);
     

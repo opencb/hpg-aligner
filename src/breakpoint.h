@@ -172,7 +172,8 @@ typedef struct metaexons {
   //linked_list_t      ***metaexons_x;  
 } metaexons_t;
 
-metaexons_t *metaexons_new(genome_t *genome);
+metaexons_t *metaexons_new(unsigned int num_chromosomes, 
+			   size_t *chr_size);
 
 void metaexons_free(metaexons_t *metaexons);
 

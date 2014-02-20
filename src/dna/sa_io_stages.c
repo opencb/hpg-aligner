@@ -81,7 +81,8 @@ void *sa_fq_reader(void *input) {
 
     new_wf_batch = sa_wf_batch_new(curr_wf_batch->sa_index,
 				   curr_wf_batch->writer_input, 
-				   sa_mapping_batch);
+				   sa_mapping_batch,
+				   NULL);
   }
 
   return new_wf_batch;
@@ -141,23 +142,22 @@ int sa_sam_writer(void *data) {
     if (num_mappings > 0) {
       for (size_t j = 0; j < num_mappings; j++) {
 	alig = (alignment_t *) array_list_get(j, mapping_list);
-	//if (j == 0) {
-	  flag = (alig->seq_strand ? 16 : 0);
-	  
-	  fprintf(out_file, "%s\t%i\t%s\t%lu\t%i\t%s\t%s\t%lu\t%i\t%s\t%s\t%s\n", 
-		  alig->query_name,
-		  flag,
-		  genome->chrom_names[alig->chromosome],
-		  alig->position + 1,
-		  alig->map_quality,
-		  alig->cigar,
-		  rnext,
-		  pnext,
-		  tlen,
-		  alig->sequence,
-		  alig->quality,
-		  optional_flags
-		  );
+	flag = (alig->seq_strand ? 16 : 0);
+	
+	fprintf(out_file, "%s\t%i\t%s\t%lu\t%i\t%s\t%s\t%lu\t%i\t%s\t%s\t%s\n", 
+		alig->query_name,
+		flag,
+		genome->chrom_names[alig->chromosome],
+		alig->position + 1,
+		alig->map_quality,
+		alig->cigar,
+		rnext,
+		pnext,
+		tlen,
+		alig->sequence,
+		alig->quality,
+		optional_flags
+		);
 	  //}
 	alignment_free(alig);	 
       }

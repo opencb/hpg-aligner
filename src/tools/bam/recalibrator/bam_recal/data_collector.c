@@ -39,7 +39,7 @@ recal_get_data_from_file(const char *bam_path, const char *ref_name, const char 
 
 	//Open reference genome
 	printf("Opening reference genome from \"%s%s\" ...\n", ref_path, ref_name);
-	ref = genome_new(ref_name, ref_path);
+	ref = genome_new(ref_name, ref_path, BWT_MODE);
 	printf("Reference opened!...\n");
 
 	//Fill data

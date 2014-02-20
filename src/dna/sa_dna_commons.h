@@ -127,19 +127,23 @@ inline void sa_mapping_batch_free(sa_mapping_batch_t *p) {
 typedef struct sa_wf_batch {
   sa_index3_t *sa_index;
   batch_writer_input_t *writer_input;
-  sa_mapping_batch_t *mapping_batch;  
+  void *mapping_batch;  
+  void *data;
 } sa_wf_batch_t;
 
 //--------------------------------------------------------------------
 
 inline sa_wf_batch_t *sa_wf_batch_new(sa_index3_t *sa_index,
 				      batch_writer_input_t *writer_input,
-				      sa_mapping_batch_t *mapping_batch) {
-  
+				      void *mapping_batch,
+				      void *data) {  
   sa_wf_batch_t *p = (sa_wf_batch_t *) malloc(sizeof(sa_wf_batch_t));
-  p->sa_index = sa_index;
-  p->writer_input = writer_input;
+
+  p->sa_index      = sa_index;
+  p->writer_input  = writer_input;
   p->mapping_batch = mapping_batch;
+  p->data          = data;
+
   return p;
 }
 

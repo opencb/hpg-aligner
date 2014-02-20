@@ -50,10 +50,10 @@ void run_bs_aligner(options_t *options) {
     //descomentar la siguiente linea para probar con el alfabeto de 4 letras
     ////////////////////////
     //printf("dir %s\n", options->bwt_dirname);
-    genome  = genome_new("dna_compression.bin", options->bwt_dirname);
+    genome  = genome_new("dna_compression.bin", options->bwt_dirname, BWT_MODE);
     //genome = genome_new("dna_compression.bin", bs_dir1);
-    genome1 = genome_new("dna_compression.bin", bs_dir1);
-    genome2 = genome_new("dna_compression.bin", bs_dir2);
+    genome1 = genome_new("dna_compression.bin", bs_dir1, BWT_MODE);
+    genome2 = genome_new("dna_compression.bin", bs_dir2, BWT_MODE);
 
     LOG_DEBUG("Done !!");
     

@@ -57,6 +57,9 @@ pthread_mutex_t mutex_sp;
 FILE *fd_log;
 size_t junction_id;
 
+size_t total_reads = 0, unmapped_reads = 0, correct_reads = 0;
+size_t seeds_1err = 0;
+
 // timing
 //double main_time;
 //size_t TOTAL_SW, 
@@ -153,7 +156,20 @@ int main(int argc, char* argv[]) {
 
   options_free(options);
 
+  /*
+  size_t mapped_reads = total_reads - unmapped_reads;
+  printf("TOTAL READS    : %lu\n", total_reads);
+  printf("    UNMAPPED READS : %lu (%f%%)\n", unmapped_reads, ((float)unmapped_reads * 100)/((float)total_reads));
+  printf("    MAPPED READS   : %lu (%f%%)\n", mapped_reads, ((float)mapped_reads * 100)/((float)total_reads));
+  printf("-------------------------------\n");
+  printf("    CORRECT READS    : %lu (%f%%)\n", correct_reads,  ((float)correct_reads * 100)/((float)total_reads));
+  printf("    INCORRECT READS  : %lu (%f%%)\n", mapped_reads - correct_reads,  ((float)(mapped_reads - correct_reads) * 100)/((float)total_reads));
+  */
+
+  printf("Seeds with one Error %i (%0.2f)\n", seeds_1err, seeds_1err*100/total_reads);
+
   return 0;
+
 }
 
 

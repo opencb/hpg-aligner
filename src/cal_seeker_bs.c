@@ -362,7 +362,7 @@ void fill_gaps_bs(mapping_batch_t *mapping_batch, sw_optarg_t *sw_optarg,
 	  }
 	  
 	  // insert gap in the list
-	  new_s = seed_region_new(gap_read_start, gap_read_end, gap_genome_start, gap_genome_end, 0);
+	  new_s = seed_region_new(gap_read_start, gap_read_end, gap_genome_start, gap_genome_end, 0, 0, 0);
 	  new_s->info = (void *) cigar_code;
 	  linked_list_iterator_insert(new_s, itr);
 
@@ -500,7 +500,7 @@ void fill_gaps_bs(mapping_batch_t *mapping_batch, sw_optarg_t *sw_optarg,
 	}
 	
 	// insert gap in the list
-	new_s = seed_region_new(gap_read_start, gap_read_end, gap_genome_start, gap_genome_end, 0);
+	new_s = seed_region_new(gap_read_start, gap_read_end, gap_genome_start, gap_genome_end, 0, 0, 0);
 	new_s->info = (void *) cigar_code;
 	linked_list_insert_last(new_s, cal->sr_list);
 

@@ -362,9 +362,12 @@ void allocate_start_node(unsigned int chromosome, unsigned char strand,
   //printf("Insert %lu - %lu\n", start, end);
 
   if (start > end) { 
-    fprintf(stderr, "ERROR [%i:%i]!!! START END AVL %lu vs %lu", 
-	    strand, chromosome, start, end); 
-    exit(-1); 
+    //fprintf(stderr, "ERROR [%i:%i]!!! START END AVL %lu vs %lu", 
+    //	    strand, chromosome, start, end); 
+    //exit(-1); 
+    pthread_mutex_unlock(&(avls_list->avls[strand][chromosome].mutex));
+
+    return;
   }
 
   cp_avltree *avl = avls_list->avls[strand][chromosome].avl;
@@ -545,10 +548,10 @@ void write_chromosome_avls( char *extend_sp, char *exact_sp,
   //}
 
   allocate_batches->fd_exact = fd_exact;
-  allocate_batches->fd_extend = fd_extend;
+  //allocate_batches->fd_extend = fd_extend;
 
   allocate_batches->write_exact_sp  = write_batch_new(write_size, SPLICE_EXACT_FLAG);
-  allocate_batches->write_extend_sp  = write_batch_new(write_size, SPLICE_EXTEND_FLAG);
+  //allocate_batches->write_extend_sp  = write_batch_new(write_size, SPLICE_EXTEND_FLAG);
 
   for(st = 0; st < NUM_STRANDS; st++) {      
     for(c = 0; c < num_chromosomes; c++) {

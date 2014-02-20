@@ -29,7 +29,7 @@ void cal_mng_free(cal_mng_t *p) {
     if (p->cals_lists) {
       for (unsigned int i = 0; i < p->num_chroms; i++) {
 	if (p->cals_lists[i]) {
-	  linked_list_free(p->cals_lists[i], seed_cal_free);
+	  linked_list_free(p->cals_lists[i], (void *)seed_cal_free);
 	}
       }
       free(p->cals_lists);
@@ -40,12 +40,40 @@ void cal_mng_free(cal_mng_t *p) {
 
 //--------------------------------------------------------------------
 
-void cal_mng_clear(cal_mng_t *p) {
+void cal_mng_simple_free(cal_mng_t *p) {
   if (p) {
     if (p->cals_lists) {
       for (unsigned int i = 0; i < p->num_chroms; i++) {
 	if (p->cals_lists[i]) {
-	  linked_list_clear(p->cals_lists[i], seed_cal_free);
+	  linked_list_free(p->cals_lists[i], (void *)NULL);
+	}
+      }
+      free(p->cals_lists);
+    }
+    free(p);
+  }
+}
+
+//--------------------------------------------------------------------
+
+void cal_mng_simple_clear(cal_mng_t *p) {
+  int list_size;
+  linked_list_item_t *item;
+  linked_list_t *list;
+  cal_t *cal;
+  if (p) {
+    if (p->cals_lists) {
+      for (unsigned int i = 0; i < p->num_chroms; i++) {
+	list = p->cals_lists[i];
+	if (list) {
+	  item = list->first;
+	  while (item) {
+	    cal = item->item;
+	    linked_list_clear(cal->sr_list, seed_region_simple_free);
+	    cal_simple_free(cal);
+	    item = item->next;
+	  }
+	  linked_list_clear(p->cals_lists[i], (void *)NULL);
 	}
       }
     }
@@ -54,7 +82,21 @@ void cal_mng_clear(cal_mng_t *p) {
 
 //--------------------------------------------------------------------
 
-void cal_mng_update(seed_t *seed, cal_mng_t *p) {
+void cal_mng_clear(cal_mng_t *p) {
+  if (p) {
+    if (p->cals_lists) {
+      for (unsigned int i = 0; i < p->num_chroms; i++) {
+	if (p->cals_lists[i]) {
+	  linked_list_clear(p->cals_lists[i], (void *)seed_cal_free);
+	}
+      }
+    }
+  }
+}
+
+//--------------------------------------------------------------------
+
+void cal_mng_update(seed_t *seed, int read_length, cal_mng_t *p) {
   int is_used = 0;
   if (p->cals_lists) {
     seed_cal_t *cal;
@@ -66,7 +108,6 @@ void cal_mng_update(seed_t *seed, cal_mng_t *p) {
       printf("\t\t\tinsert this seed to the CAL manager:\n");
       print_seed("\t\t\t", seed);
       #endif
-
       //      if (cal->read_area < p->min_read_area) {
 	//	printf("****************** set read min. area from %i to %i\n", p->min_read_area, cal->read_area);
       //	p->min_read_area = cal->read_area;
@@ -90,16 +131,19 @@ void cal_mng_update(seed_t *seed, cal_mng_t *p) {
 	  printf("---> merging with this CAL?\n");
 	  cal_print(item);
 	  #endif
-	  //	  assert(cal->end > item->start);
+	  //assert(cal->end > item->start);
 	  s_last = linked_list_get_last(item->seed_list);
-	  if (seed->read_start - s_last->read_end < 100 && 
-	      seed->genome_start - s_last->genome_end < 100) {
+	  printf("%i - %i(%i) < %i && %i - %i(%i) < %i\n", seed->read_start, s_last->read_end, seed->read_start - s_last->read_end,
+		 read_length, seed->genome_start, s_last->genome_end, seed->genome_start - s_last->genome_end, read_length);
+
+	  if (abs((int)seed->read_start - (int)s_last->read_end) < read_length && 
+	      abs((int)seed->genome_start - (int)s_last->genome_end) < read_length) {
+	    printf("Yes!\n");
 	    is_used = 1;
 	    linked_list_insert_last(seed, item->seed_list);
 	    item->end = seed->genome_end;
 	    item->read_area += (seed->read_end - seed->read_start + 1);
 	    item->num_mismatches += seed->num_mismatches + seed->num_open_gaps + seed->num_extend_gaps;
-
 	    //	    cal_free(cal);
             #ifdef _VERBOSE
 	    printf("---> yes, merging CAL, result:\n");
@@ -230,6 +274,7 @@ void cal_mng_select_best(int read_area, array_list_t *valid_list, array_list_t *
     }
   }
 }
+
 
 //--------------------------------------------------------------------
 // generate cal from an exact read
@@ -491,7 +536,7 @@ int generate_cals_from_suffixes(int strand, fastq_read_t *read, char *revcomp,
       #ifdef _TIMING
       gettimeofday(&start, NULL);
       #endif
-      cal_mng_update(seed, cal_mng);
+      cal_mng_update(seed, read->length, cal_mng);
       #ifdef _TIMING
       gettimeofday(&stop, NULL);
       mapping_batch->func_times[FUNC_CAL_MNG_INSERT] += 
