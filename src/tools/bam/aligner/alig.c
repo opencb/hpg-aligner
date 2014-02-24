@@ -227,6 +227,7 @@ alig_region_next(alig_context_t *context)
 	{
 		//No more input reads
 		linked_list_iterator_free(it);
+		array_list_free(aux_list, NULL);
 		return NO_ERROR;
 	}
 
@@ -271,6 +272,8 @@ alig_region_next(alig_context_t *context)
 				{
 					sprintf(log_msg, "Trying to get region from invalid read: %s\n", bam1_qname(read));
 					LOG_ERROR(log_msg);
+					linked_list_iterator_free(it);
+					array_list_free(aux_list, NULL);
 					return INVALID_INPUT_BAM;
 				}
 
@@ -814,7 +817,6 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 	bam1_t *read;
 	size_t bam_readed = 0;
 	size_t bam_written = 0;
-	size_t bam_discarded = 0;
 
 	//Lists
 	linked_list_t *in_list;
@@ -824,9 +826,7 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 	size_t write_buffer_l;
 
 	//Alignment context
-	alig_context_t readcontext;
 	alig_context_t context;
-	alig_context_t writecontext;
 
 	//aux
 	int aux_count = 0;
@@ -934,14 +934,14 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 	//Init multithreading
 	omp_set_dynamic(1);
 	omp_set_nested(1);
-	#pragma omp parallel private(init_time, end_time, list_l, read, bytes)
+	#pragma omp parallel private(init_time, end_time, list_l, read, bytes, i)
 	{
 		//Iterate
 		do
 		{
 
-			#pragma omp single
-			printf("=====Iteration=====\n");
+			//#pragma omp single
+			//printf("=====Iteration=====\n");
 
 
 			#pragma omp sections
@@ -962,20 +962,20 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 						read = bam_init1();
 						bytes = bam_read1(bam_f->bam_fd, read);
 
-						bam_readed++;
 						if(bytes > 0 && read)
 						{
 							linked_list_insert_last(read, in_list);
+							bam_readed++;
 							filled++;
 						}
 						else
 						{
 							//Destroy empty last read
-							bam_discarded++;
 							bam_destroy1(read);
 						}
 					}
-					printf("FILLED: %d\n", filled);
+					//printf("READED: %d\n", bam_readed);
+					//printf("FILLED: %d\n", filled);
 #ifdef D_TIME_DEBUG
 					end_time = omp_get_wtime();
 					if(filled > 0)
@@ -1048,7 +1048,7 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 							fflush(stdout);
 						}
 
-						printf("PROCESSED: %d\n", context.last_readed_count);
+						//printf("PROCESSED: %d\n", context.last_readed_count);
 
 					}//last_readed != 0 if
 				}
@@ -1068,13 +1068,13 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 							assert(read);
 
 							//Write to disk
-							bam_written++;
 							bam_write1(out_bam_f->bam_fd, read);
 
 							//Free read
 							bam_destroy1(read);
 						}
-						printf("WRITTEN: %d\n", write_buffer_l);
+						bam_written += write_buffer_l;
+						//printf("WRITTEN: %d\n", write_buffer_l);
 
 #ifdef D_TIME_DEBUG
 						end_time = omp_get_wtime();
@@ -1085,7 +1085,8 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 					//Clear buffer
 					array_list_clear(write_buffer, NULL);
 				}
-			}//Sections pragma
+
+			}//OMP SECTIONS
 
 			#pragma omp single
 			{
@@ -1109,7 +1110,7 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 						//Update input list
 						linked_list_remove_first(in_list);
 					}
-					printf("TO WRITE: %d\n", list_l);
+					//printf("TO WRITE: %d\n", list_l);
 
 					//Sort buffer
 					array_list_qsort(write_buffer, compare_pos);
@@ -1133,7 +1134,7 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 				//Clear context
 				alig_region_clear(&context);
 
-				//Get next reads
+				//Load next reads
 #ifdef D_TIME_DEBUG
 				init_time = omp_get_wtime();
 #endif
@@ -1144,9 +1145,9 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 					fflush(stdout);
 				}
 #ifdef D_TIME_DEBUG
-					end_time = omp_get_wtime();
-					if(context.last_readed_count > 0)
-						time_add_time_slot(D_SLOT_NEXT, TIME_GLOBAL_STATS, (double)(end_time - init_time)/(double)context.last_readed_count);
+				end_time = omp_get_wtime();
+				if(context.last_readed_count > 0)
+					time_add_time_slot(D_SLOT_NEXT, TIME_GLOBAL_STATS, (double)(end_time - init_time)/(double)context.last_readed_count);
 #endif
 
 				//Print progress
@@ -1157,21 +1158,22 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 					fflush(stdout);
 				}
 
-				printf("-----\n");
-				printf("IN LIST: %d\n", in_list_l);
-				printf("WRITE LIST: %d\n", write_buffer_l);
+				//printf("-----\n");
+				//printf("IN LIST: %d\n", in_list_l);
+				//printf("WRITE LIST: %d\n", write_buffer_l);
+
 			} //OMP single
 
 		} while(context.last_readed_count > 0
 				|| in_list_l > 0
 				|| write_buffer_l > 0
 				);
+
 	} //OMP PARALLEL
 
 	//Info
 	printf("\nReads readed from original BAM: %d\n", bam_readed);
 	printf("Reads written to new BAM: %d\n", bam_written);
-	printf("Reads corrupted on read from original BAM: %d\n", bam_discarded);
 
 	//Free context
 	printf("\nDestroying context...\n");
