@@ -28,6 +28,7 @@ float doscadfun(char* st1, int ll1, char* st2, int ll2,
   // variables to recover mapped data when errors > MAX_NUM_ERRORS
   int first_i, first_j, first_match, first_mism, first_gap1, first_gapmas, first_st_map_len;
   cigar_t first_cigar;
+  cigar_init(&first_cigar);
 
   // init output
   alig_out_init(out);
@@ -42,7 +43,7 @@ float doscadfun(char* st1, int ll1, char* st2, int ll2,
   first_match=0; first_mism=0;
   first_gap1=0; first_gapmas=0;
   first_st_map_len=0;
-  cigar_init(&first_cigar);
+  cigar_set_zero(&first_cigar);
   
   // init variables
   match=0; mism=0; gap1=0; gapmas=0; st_m_len=0;
@@ -97,13 +98,14 @@ float doscadfun(char* st1, int ll1, char* st2, int ll2,
 #endif
       
       
+      cigar_clean(&first_cigar);
       
       return score;
     }
     //---> initialize again.
     //*match=0; *mism=0; score = 0.0f;
     match=0; mism=0; score = 0.0f;
-    cigar_init(&out->cigar);
+    cigar_set_zero(&out->cigar);
 
     
 #ifdef _VERBOSE
@@ -139,6 +141,8 @@ float doscadfun(char* st1, int ll1, char* st2, int ll2,
 	alig_out_set(first_i, first_j, first_match, first_mism, first_gap1, first_gapmas, first_st_map_len, out);
 	cigar_copy(&out->cigar, &first_cigar);
 	   
+	cigar_clean(&first_cigar);
+
 	return (-1.0f);
       } // to avoid concatenating more than MAX_NUM_ERRORS consecutive. (27-XI-2013)
       else {
@@ -482,6 +486,7 @@ float doscadfun(char* st1, int ll1, char* st2, int ll2,
 #endif
       
 	alig_out_set(map_len1, map_len2, match, mism, gap1, gapmas, st_m_len, out);
+	cigar_clean(&first_cigar);
       
 	return (-1.0f);
 	// i=ll1; j=ll2; //--> salgo llevando los �ndices al final.
@@ -649,8 +654,8 @@ float doscadfun(char* st1, int ll1, char* st2, int ll2,
   //getchar();
 
   alig_out_set(map_len1, map_len2, match, mism, gap1, gapmas, st_m_len, out);
+  cigar_clean(&first_cigar);
 
-  
   // getchar();
   return (score);
 }
@@ -671,6 +676,7 @@ float doscadfun_inv(char* st1, int ll1, char* st2, int ll2,
 	
   int first_i, first_j, first_match, first_mism, first_gap1, first_gapmas, first_st_map_len;
   cigar_t first_cigar;
+  cigar_init(&first_cigar);
 
   // init output
   alig_out_init(out);
@@ -686,7 +692,7 @@ float doscadfun_inv(char* st1, int ll1, char* st2, int ll2,
   first_match=0; first_mism=0;
   first_gap1=0; first_gapmas=0;
   first_st_map_len=0;
-  cigar_init(&first_cigar);
+  cigar_set_zero(&first_cigar);
   
   // init variables
   match=0; mism=0; gap1=0; gapmas=0;;
@@ -733,11 +739,13 @@ float doscadfun_inv(char* st1, int ll1, char* st2, int ll2,
 	     score, map_len1, ll1, match, mism, gap1, gapmas, cigar_to_string(&out->cigar));
 #endif
       
+      cigar_clean(&first_cigar);
+
       return score;
     }
     //*match=0; *mism=0; score = 0.0f;
     match=0; mism=0; score = 0.0f;
-    cigar_init(&out->cigar);
+    cigar_set_zero(&out->cigar);
 
 #ifdef _VERBOSE
     map_counter=0; //===>> fundamental para resetear los strings
@@ -775,6 +783,7 @@ float doscadfun_inv(char* st1, int ll1, char* st2, int ll2,
 	alig_out_set((ll1 - 1) - first_i, (ll2 - 1) - first_j, first_match, first_mism, 
 		     first_gap1, first_gapmas, first_st_map_len, out);
 	cigar_revcopy(&out->cigar, &first_cigar);
+	cigar_clean(&first_cigar);
 	
 	return (-1.0f);
       }//---> para no concatenar mas de MAX_NUM_ERRORS consecutivos. (27-XI-2013)
@@ -1125,6 +1134,7 @@ float doscadfun_inv(char* st1, int ll1, char* st2, int ll2,
     
 	alig_out_set(map_len1, map_len2, match, mism, gap1, gapmas, st_m_len, out);
 	cigar_rev(&out->cigar);
+	cigar_clean(&first_cigar);
 	
 	return (-1.0f);
 	// i=ll1; j=ll2; //--> salgo llevando los �ndices al final.
@@ -1305,6 +1315,7 @@ float doscadfun_inv(char* st1, int ll1, char* st2, int ll2,
   
   alig_out_set(map_len1, map_len2, match, mism, gap1, gapmas, st_m_len, out);
   cigar_rev(&out->cigar);
+  cigar_clean(&first_cigar);
   
   // getchar();
   return (score);

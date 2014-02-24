@@ -305,6 +305,7 @@ int generate_cals_from_suffixes(int strand, fastq_read_t *read,
 
   float score;
   alig_out_t alig_out;
+  cigar_init(&alig_out.cigar);
 
   cigar_t cigar;
   seed_t *seed;
@@ -523,6 +524,8 @@ int generate_cals_from_suffixes(int strand, fastq_read_t *read,
       seed_free(seed);
     }
   }
+
+  cigar_clean(&alig_out.cigar);
 
   //  return max_map_len + suffix_len + 1;
   //  return (sa_index->k_value * 2); // / 2);
@@ -1326,8 +1329,10 @@ void execute_sw(array_list_t *sw_prepare_list, sa_mapping_batch_t *mapping_batch
       if (query_start > 0) {
 	//	mapping_batch->counters[0]++;
 	cal->invalid = 1;
-	//	printf("case query_start > 0: read %s\n", cal->read->id);
+	#ifdef _VERBOSE
+	printf("****** INVALID CAL because case query_start > 0: read %s\n", cal->read->id);
 	//	exit(-1);
+        #endif // _VERBOSE
 	if (ref_start > 0) {
 	  // printf("case query_start and ref_start > 0: read %s\n", cal->read->id);
 	  //	  exit(-1);

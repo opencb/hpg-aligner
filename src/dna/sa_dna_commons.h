@@ -68,6 +68,7 @@ typedef struct sa_mapping_batch {
 
   int bam_format;
   size_t num_reads;
+
   #ifdef _TIMING
   double func_times[NUM_TIMING];
   #endif
@@ -89,6 +90,7 @@ static inline sa_mapping_batch_t *sa_mapping_batch_new(array_list_t *fq_reads) {
 
   p->bam_format = 0;
   p->num_reads = num_reads;
+
   p->fq_reads = fq_reads;
   p->mapping_lists = (array_list_t **) malloc(num_reads * sizeof(array_list_t *));
   for (size_t i = 0; i < num_reads; i++) {
@@ -177,16 +179,38 @@ static inline void sa_wf_input_free(sa_wf_input_t *p) {
 //--------------------------------------------------------------------
 // cigar_t
 //--------------------------------------------------------------------
+#define NUM_INITIAL_CIGAR_OPS 200
 
 typedef struct cigar {
-  uint32_t ops[2000];
   int num_ops;
+  int num_allocated_ops;
+  uint32_t ops_array[NUM_INITIAL_CIGAR_OPS];
+  uint32_t *ops_pointer;
+  uint32_t *ops;
 } cigar_t;
+
+//--------------------------------------------------------------------
+
+static inline void cigar_init(cigar_t *p) {
+  p->num_ops = 0;
+  p->num_allocated_ops = NUM_INITIAL_CIGAR_OPS;
+  p->ops = p->ops_array;
+  p->ops_pointer = NULL;
+}
+
+//--------------------------------------------------------------------
+
+static inline void cigar_clean(cigar_t *p) {
+  if (p->ops_pointer) {
+    free(p->ops_pointer);
+  }
+}
 
 //--------------------------------------------------------------------
 
 static inline cigar_t *cigar_new(int value, int name) {
   cigar_t *p = (cigar_t *) malloc(sizeof(cigar_t));
+  cigar_init(p);
   p->ops[0] = ((value << 8) | (name & 255));
   p->num_ops = 1;
   //  printf("+++++ cigar_new: p = %x\n", p);
@@ -197,6 +221,7 @@ static inline cigar_t *cigar_new(int value, int name) {
 
 static inline cigar_t *cigar_new_empty() {
   cigar_t *p = (cigar_t *) malloc(sizeof(cigar_t));
+  cigar_init(p);
   p->num_ops = 0;
   //  printf("+++++ cigar_new_empty: p = %x\n", p);
   return p;
@@ -204,7 +229,18 @@ static inline cigar_t *cigar_new_empty() {
 
 //--------------------------------------------------------------------
 
-static inline void cigar_init(cigar_t *p) {
+static inline void cigar_free(cigar_t *p) {
+  //  printf("---------- cigar_free: p = %x (%s)\n", p, cigar_to_string(p));
+  //  printf("---------- cigar_free: p = %x\n", p);
+  if (p) {
+    cigar_clean(p);
+    free(p);
+  }
+}
+
+//--------------------------------------------------------------------
+
+static inline void cigar_set_zero(cigar_t *p) {
   if (p) {
     p->num_ops = 0;
   }
@@ -233,25 +269,22 @@ static inline char *cigar_to_string(cigar_t *p) {
 
 //--------------------------------------------------------------------
 
-static inline void cigar_free(cigar_t *p) {
-  //  printf("---------- cigar_free: p = %x (%s)\n", p, cigar_to_string(p));
-  //  printf("---------- cigar_free: p = %x\n", p);
-  if (p) free(p);
-}
-
-//--------------------------------------------------------------------
-
 static inline void cigar_set_op(int index, int value, int name, cigar_t *p) {
   p->ops[index] = ((value << 8) | (name & 255));
 }
 
 //--------------------------------------------------------------------
-
+/*
 static inline void _cigar_append_op(int value, int name, cigar_t *p) {
+  if ((p->num_ops + 1) == p->num_allocated_ops) {
+    printf("_cigar_append_op: (num_ops, num_allocated_ops) = (%i, %i)", 
+	   p->num_ops, p->num_allocated_ops);
+    exit(-1);
+  }
   cigar_set_op(p->num_ops, value, name, p);
   p->num_ops++;
 }
-
+*/
 //--------------------------------------------------------------------
 
 static inline void cigar_append_op(int value, int name, cigar_t *p) {
@@ -264,6 +297,21 @@ static inline void cigar_append_op(int value, int name, cigar_t *p) {
     if (last_op_name == name) {
       cigar_set_op(p->num_ops - 1, last_op_value + value, name, p);      
     } else {
+      
+      if (p->num_allocated_ops <= p->num_ops) {
+	p->num_allocated_ops += (2 * NUM_INITIAL_CIGAR_OPS);
+	uint32_t *aux = malloc(p->num_allocated_ops * sizeof(uint32_t));
+	memcpy(aux, p->ops, p->num_ops * sizeof(uint32_t));
+	if (p->ops_pointer) {
+	  free(p->ops_pointer);
+	}
+	p->ops_pointer = aux;
+	p->ops = p->ops_pointer;
+	//	printf("cigar_append_op: (num_ops, num_allocated_ops) = (%i, %i)\n", 
+	//	       p->num_ops, p->num_allocated_ops);
+	//	exit(-1);
+      }
+
       cigar_set_op(p->num_ops, value, name, p);
       p->num_ops++;      
     }
@@ -273,6 +321,21 @@ static inline void cigar_append_op(int value, int name, cigar_t *p) {
 //--------------------------------------------------------------------
 
 static inline void cigar_concat(cigar_t *src, cigar_t *dst) {
+  //check if there is space in dst to copy src
+  if (dst->num_allocated_ops < (dst->num_ops + src->num_ops)) {
+    dst->num_allocated_ops += (src->num_ops + (2 * NUM_INITIAL_CIGAR_OPS));
+    uint32_t *aux = malloc(dst->num_allocated_ops * sizeof(uint32_t));
+    memcpy(aux, dst->ops, dst->num_ops * sizeof(uint32_t));
+    if (dst->ops_pointer) {
+      free(dst->ops_pointer);
+    }
+    dst->ops_pointer = aux;
+    dst->ops = dst->ops_pointer;
+   //    printf("cigar_concat: dst->num_allocated_ops = %i < (dst->num_ops = %i + src->num_ops = %i)\n", 
+    //	   dst->num_allocated_ops, dst->num_ops, src->num_ops);
+    //    exit(-1);
+  }
+  
   if (dst->num_ops == 0) {
     memcpy(dst->ops, src->ops, src->num_ops * sizeof(uint32_t));
     dst->num_ops = src->num_ops;
@@ -297,10 +360,25 @@ static inline void cigar_concat(cigar_t *src, cigar_t *dst) {
 
 static inline void cigar_copy(cigar_t *dst, cigar_t *src) {
   if (src->num_ops > 0) {
+    //check if there is space in dst to copy src
+    if (dst->num_allocated_ops < src->num_ops) {
+      dst->num_allocated_ops = (src->num_ops + (2 * NUM_INITIAL_CIGAR_OPS));
+      uint32_t *aux = malloc(dst->num_allocated_ops * sizeof(uint32_t));
+      memcpy(aux, dst->ops, dst->num_ops * sizeof(uint32_t));
+      if (dst->ops_pointer) {
+	free(dst->ops_pointer);
+      }
+      dst->ops_pointer = aux;
+      dst->ops = dst->ops_pointer;
+      //      printf("cigar_copy: dst->num_allocated_ops = %i < src->num_ops = %i)\n", 
+      //	   dst->num_allocated_ops, src->num_ops);
+      //      exit(-1);
+    }
+
     dst->num_ops = src->num_ops;
     memcpy(dst->ops, src->ops, src->num_ops * sizeof(uint32_t));
   } else {
-    cigar_init(dst);
+    cigar_set_zero(dst);
   }
 }
 
@@ -308,6 +386,21 @@ static inline void cigar_copy(cigar_t *dst, cigar_t *src) {
 
 static inline void cigar_revcopy(cigar_t *dst, cigar_t *src) {
   if (src->num_ops > 0) {
+    //check if there is space in dst to copy src
+    if (dst->num_allocated_ops < src->num_ops) {
+      dst->num_allocated_ops = (src->num_ops + (2 * NUM_INITIAL_CIGAR_OPS));
+      uint32_t *aux = malloc(dst->num_allocated_ops * sizeof(uint32_t));
+      memcpy(aux, dst->ops, dst->num_ops * sizeof(uint32_t));
+      if (dst->ops_pointer) {
+	free(dst->ops_pointer);
+      }
+      dst->ops_pointer = aux;
+      dst->ops = dst->ops_pointer;
+      //      printf("cigar_revcopy: dst->num_allocated_ops = %i < src->num_ops = %i)\n", 
+      //	   dst->num_allocated_ops, src->num_ops);
+      //      exit(-1);
+    }
+
     dst->num_ops = src->num_ops;
     for (int i = 0, j = src->num_ops - 1; i < src->num_ops; i++, j--) {
       dst->ops[i] = src->ops[j];
@@ -320,10 +413,12 @@ static inline void cigar_revcopy(cigar_t *dst, cigar_t *src) {
 static inline void cigar_rev(cigar_t *p) {
   if (p->num_ops > 0) {
     cigar_t aux;
+    cigar_init(&aux);
     cigar_copy(&aux, p);
     for (int i = 0, j = p->num_ops - 1; i < p->num_ops; i++, j--) {
       p->ops[i] = aux.ops[j];
     }
+    cigar_clean(&aux);
   }
 }
 
@@ -348,7 +443,7 @@ static inline void cigar_ltrim_ops(int len, cigar_t *p) {
   int num_ops;
   if ((num_ops = p->num_ops) > 0) {
     if (len >= num_ops) {
-      cigar_init(p);
+      cigar_set_zero(p);
     } else {
       num_ops -= len;
       for (int i = 0, j = len; i < num_ops; i++, j++) {
@@ -366,7 +461,7 @@ static inline void cigar_rtrim_ops(int len, cigar_t *p) {
   int num_ops;
   if ((num_ops = p->num_ops) > 0) {
     if (len >= num_ops) {
-      cigar_init(p);
+      cigar_set_zero(p);
     } else {
       p->num_ops -= len;
     }

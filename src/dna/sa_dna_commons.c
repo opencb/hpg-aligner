@@ -6,13 +6,17 @@
 //--------------------------------------------------------------------
 
 void seed_free(seed_t *p) {
-  if (p) free(p);
+  if (p) {
+    cigar_clean(&p->cigar);
+    free(p);
+  }
 }
 
 //--------------------------------------------------------------------
 
 void seed_cal_free(seed_cal_t *p) {
   if (p) {
+    cigar_clean(&p->cigar);
     if (p->seed_list) linked_list_free(p->seed_list, (void *) seed_free);
     if (p->cigarset) cigarset_free(p->cigarset);
     free(p);

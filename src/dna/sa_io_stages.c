@@ -99,6 +99,9 @@ int num_dup_reads = 0;
 int num_total_dup_reads = 0;
 #endif
 
+size_t num_mapped_reads = 0;
+size_t num_unmapped_reads = 0;
+
 //--------------------------------------------------------------------
 // SAM writer
 //--------------------------------------------------------------------
@@ -131,7 +134,7 @@ int sa_sam_writer(void *data) {
   }
   #endif
 
-  size_t flag, cigar_len, pnext = 0, tlen = 0;
+  size_t flag, cigar_len, mapped, pnext = 0, tlen = 0;
   char *cigar_string, *rnext = "*";
 
   fastq_read_t *read;
@@ -156,11 +159,13 @@ int sa_sam_writer(void *data) {
     }
     #endif
 
+    mapped = 0;
     if (num_mappings > 0) {
       for (size_t j = 0; j < num_mappings; j++) {
 	cal = (seed_cal_t *) array_list_get(j, mapping_list);
 
 	if (!cal->invalid && ((cigar_len = cigar_get_length(&cal->cigar) <= read->length))) {
+	  mapped = 1;
 	  flag = (cal->strand ? 16 : 0);
 	  cigar_string = cigar_to_string(&cal->cigar);
 	  fprintf(out_file, "%s\t%i\t%s\t%lu\t%i\t%s\t%s\t%lu\t%lu\t%s\t%s\tNM:i:%i\n", 
@@ -178,24 +183,24 @@ int sa_sam_writer(void *data) {
 		  cal->num_mismatches
 		  );
 	  free(cigar_string);
-	} else {
-	  fprintf(out_file, "%s\t4\t*\t0\t0\t*\t*\t0\t0\t%s\t%s\n", 
-		  read->id,
-		  read->sequence,
-		  read->quality
-		  );
 	}
-	  
 	seed_cal_free(cal);	 
       }
+    }
+
+    array_list_free(mapping_list, (void *) NULL);
+
+    if (mapped) {
+      num_mapped_reads++;
     } else {
+      num_unmapped_reads++;
       fprintf(out_file, "%s\t4\t*\t0\t0\t*\t*\t0\t0\t%s\t%s\n", 
 	      read->id,
 	      read->sequence,
 	      read->quality
 	      );
     }
-    array_list_free(mapping_list, (void *) NULL);
+
   }
 
   // free memory
@@ -278,12 +283,14 @@ int sa_bam_writer(void *data) {
     #endif
 
     if (num_mappings > 0) {
+      num_mapped_reads++;
       for (size_t j = 0; j < num_mappings; j++) {
 	bam1 = (bam1_t *) array_list_get(j, mapping_list);
 	bam_fwrite(bam1, out_file);
 	bam_destroy1(bam1);
       }
     } else {
+      num_unmapped_reads++;
       alig = alignment_new();       
       alignment_init_single_end(strdup(read->id), read->sequence, read->quality,
 				0, -1, -1, /*strdup(aux)*/"", 0, 0, 0, 0, 0, NULL, alig);
