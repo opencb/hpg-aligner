@@ -1051,7 +1051,7 @@ int prepare_sw(fastq_read_t *read,   array_list_t *sw_prepare_list,
       #endif
       update_left_side_seed(SW_RIGHT_FLANK, seed);
       #ifdef _VERBOSE
-      print_seed("-----> after updating first left-side seed: ", seed);
+      print_seed("-------> after updating first left-side seed: ", seed);
       #endif
 
       gap_genome_start = seed->genome_start - seed->read_start - 1 - SW_LEFT_FLANK_EX;
@@ -1094,14 +1094,14 @@ int prepare_sw(fastq_read_t *read,   array_list_t *sw_prepare_list,
       #endif
       update_right_side_seed(SW_LEFT_FLANK, prev_seed);
       #ifdef _VERBOSE
-      print_seed("-----> before updating middle right-side seed: ", prev_seed);
+      print_seed("-------> after updating middle right-side seed: ", prev_seed);
       #endif
       #ifdef _VERBOSE
-      print_seed("-----> before updating middle lefth-side seed: ", seed);
+      print_seed("-----> before updating middle left-side seed: ", seed);
       #endif
       update_left_side_seed(SW_RIGHT_FLANK, seed);
       #ifdef _VERBOSE
-      print_seed("-----> before updating middle left-side seed: ", seed);
+      print_seed("-------> after updating middle left-side seed: ", seed);
       #endif
 
 
@@ -1195,7 +1195,7 @@ int prepare_sw(fastq_read_t *read,   array_list_t *sw_prepare_list,
       #endif
       update_right_side_seed(SW_LEFT_FLANK, seed);
       #ifdef _VERBOSE
-      print_seed("-----> after updating last right-side seed: ", seed);
+      print_seed("-------> after updating last right-side seed: ", seed);
       #endif
 
       gap_genome_start = seed->genome_end - SW_LEFT_FLANK + 1;
