@@ -809,9 +809,12 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 	genome_t* ref;
 	int bytes;
 
-#ifdef D_TIME_DEBUG
+	//Times
 	double init_time, end_time;
-#endif
+	double init_time_r, end_time_r;
+	double init_time_w, end_time_w;
+	double init_time_p, end_time_p;
+	double init_time_it, end_time_it;
 
 	//Read
 	bam1_t *read;
@@ -830,6 +833,7 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 
 	//aux
 	int aux_count = 0;
+	int filled = 0;
 
 	assert(bam_path);
 	assert(ref_name);
@@ -884,36 +888,6 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 	write_buffer = array_list_new(ALIG_LIST_IN_SIZE, 1.2, 0);
 	assert(write_buffer);
 
-	//Fill input list
-/*#ifdef D_TIME_DEBUG
-	init_time = omp_get_wtime();
-#endif
-	bytes = 1;
-	for(i = 0; i < ALIG_LIST_IN_SIZE && bytes > 0; i++)
-	{
-		//Get next read from disk
-		read = bam_init1();
-		bytes = bam_read1(bam_f->bam_fd, read);
-
-		bam_readed++;
-		if(bytes > 0 && read)
-		{
-			linked_list_insert_last(read, in_list);
-		}
-		else
-		{
-			//Destroy empty last read
-			bam_discarded++;
-			bam_destroy1(read);
-		}
-	}
-#ifdef D_TIME_DEBUG
-	end_time = omp_get_wtime();
-	list_l = linked_list_size(in_list);
-	if(list_l > 0)
-		time_add_time_slot(D_SLOT_READ, TIME_GLOBAL_STATS, (double)(end_time - init_time)/(double)list_l);
-#endif*/
-
 	//Create context
 	//printf("Creating context...\n");
 	fflush(stdout);
@@ -932,244 +906,236 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 	write_buffer_l = 0;
 
 	//Init multithreading
-	omp_set_dynamic(1);
-	omp_set_nested(1);
-	#pragma omp parallel private(init_time, end_time, list_l, read, bytes, i)
+	//omp_set_dynamic(1);
+	//omp_set_nested(1);
+	#pragma omp parallel
 	{
-		//Iterate
-		do
+
+	}
+
+	//Iterate
+	do
+	{
+#ifdef D_TIME_DEBUG
+		init_time_it = omp_get_wtime();
+#endif
+		#pragma omp parallel sections private(i, bytes, read, list_l, filled, err)
 		{
-
-			//#pragma omp single
-			//printf("=====Iteration=====\n");
-
-
-			#pragma omp sections
+			//Write section
+			#pragma omp section
 			{
-
-				#pragma omp section
+				if(write_buffer_l > 0)
 				{
-					int filled = 0;
-
-					//Fill input list
 #ifdef D_TIME_DEBUG
-					init_time = omp_get_wtime();
+					init_time_w = omp_get_wtime();
 #endif
-					//Fill list
-					bytes = 1;
-					for(i = in_list_l; i < ALIG_LIST_IN_SIZE && bytes > 0; i++)
+					//Write processed to disk
+					for(i = 0; i < write_buffer_l; i++)
 					{
-						read = bam_init1();
-						bytes = bam_read1(bam_f->bam_fd, read);
+						//Get read
+						read = array_list_get(i, write_buffer);
+						assert(read);
 
-						if(bytes > 0 && read)
-						{
-							linked_list_insert_last(read, in_list);
-							bam_readed++;
-							filled++;
-						}
-						else
-						{
-							//Destroy empty last read
-							bam_destroy1(read);
-						}
+						//Write to disk
+						bam_write1(out_bam_f->bam_fd, read);
+
+						//Free read
+						bam_destroy1(read);
 					}
-					//printf("READED: %d\n", bam_readed);
-					//printf("FILLED: %d\n", filled);
-#ifdef D_TIME_DEBUG
-					end_time = omp_get_wtime();
-					if(filled > 0)
-						time_add_time_slot(D_SLOT_READ, TIME_GLOBAL_STATS, (double)(end_time - init_time)/(double)filled);
-#endif
-				}
+					bam_written += write_buffer_l;
 
-				#pragma omp section
-				{
-					if(context.last_readed_count != 0)
-					{
-						//Load reference
 #ifdef D_TIME_DEBUG
-						init_time = omp_get_wtime();
+					end_time_w = omp_get_wtime();
+					time_add_time_slot(D_SLOT_WRITE, TIME_GLOBAL_STATS, (double)(end_time_w - init_time_w)/(double)write_buffer_l);
 #endif
-						err = alig_region_load_reference(&context);
+				} //If write_buffer_l > 0
+
+				//Clear buffer
+				array_list_clear(write_buffer, NULL);
+			}
+
+			//Read section
+			#pragma omp section
+			{
+				//Fill input list
+#ifdef D_TIME_DEBUG
+				init_time_r = omp_get_wtime();
+#endif
+				//Fill list
+				bytes = 1;
+				filled = 0;
+				for(i = in_list_l; i < ALIG_LIST_IN_SIZE && bytes > 0; i++)
+				{
+					read = bam_init1();
+					bytes = bam_read1(bam_f->bam_fd, read);
+
+					if(bytes > 0 && read)
+					{
+						linked_list_insert_last(read, in_list);
+						bam_readed++;
+						filled++;
+					}
+					else
+					{
+						//Destroy empty last read
+						bam_destroy1(read);
+					}
+				}
+#ifdef D_TIME_DEBUG
+				end_time_r = omp_get_wtime();
+				if(filled > 0)
+					time_add_time_slot(D_SLOT_READ, TIME_GLOBAL_STATS, (double)(end_time_r - init_time_r)/(double)filled);
+#endif
+			}
+
+			//Process section
+			#pragma omp section
+			{
+				if(context.last_readed_count != 0)
+				{
+					//Load reference
+#ifdef D_TIME_DEBUG
+					init_time_p = omp_get_wtime();
+#endif
+					err = alig_region_load_reference(&context);
+					if(!err)
+					{
+#ifdef D_TIME_DEBUG
+						end_time_p = omp_get_wtime();
+						time_add_time_slot(D_SLOT_REFERENCE_LOAD, TIME_GLOBAL_STATS, (double)(end_time_p - init_time_p)/(double)context.last_readed_count);
+#endif
+
+						//Generate haplotype list
+#ifdef D_TIME_DEBUG
+						init_time_p = omp_get_wtime();
+#endif
+						err = alig_region_haplotype_process(&context);
 						if(!err)
 						{
 #ifdef D_TIME_DEBUG
-							end_time = omp_get_wtime();
-							time_add_time_slot(D_SLOT_REFERENCE_LOAD, TIME_GLOBAL_STATS, (double)(end_time - init_time)/(double)context.last_readed_count);
+							end_time_p = omp_get_wtime();
+							list_l = array_list_size(context.filtered_list);
+							time_add_time_slot(D_SLOT_HAPLO_GET, TIME_GLOBAL_STATS, (double)(end_time_p - init_time_p)/(double)list_l);
 #endif
-
-							//Generate haplotype list
+							//Realign
 #ifdef D_TIME_DEBUG
-							init_time = omp_get_wtime();
+							init_time_p = omp_get_wtime();
 #endif
-							err = alig_region_haplotype_process(&context);
+							err = alig_region_indel_realignment(&context);
 							if(!err)
 							{
 #ifdef D_TIME_DEBUG
-								end_time = omp_get_wtime();
-								list_l = array_list_size(context.filtered_list);
-								time_add_time_slot(D_SLOT_HAPLO_GET, TIME_GLOBAL_STATS, (double)(end_time - init_time)/(double)list_l);
-#endif
-								//Realign
-#ifdef D_TIME_DEBUG
-								init_time = omp_get_wtime();
-#endif
-								err = alig_region_indel_realignment(&context);
-								if(!err)
+								end_time_p = omp_get_wtime();
+								list_l = array_list_size(context.realign_list);
+								if(list_l > 0)
 								{
-#ifdef D_TIME_DEBUG
-									end_time = omp_get_wtime();
-									list_l = array_list_size(context.realign_list);
+									end_time_p = (double)(end_time_p - init_time_p)/(double)list_l;
+									list_l = array_list_size(context.haplo_list);
 									if(list_l > 0)
-									{
-										end_time = (double)(end_time - init_time)/(double)list_l;
-										list_l = array_list_size(context.haplo_list);
-										if(list_l > 0)
-											time_add_time_slot(D_SLOT_REALIG_PER_HAPLO, TIME_GLOBAL_STATS, end_time/(double)list_l);
-									}
+										time_add_time_slot(D_SLOT_REALIG_PER_HAPLO, TIME_GLOBAL_STATS, end_time_p/(double)list_l);
+								}
 #endif
-								}
-								else
-								{
-									fprintf(stderr, "ERROR: Cannot align region, error code = %d\n", err);
-									fflush(stdout);
-								}
 							}
 							else
 							{
-								fprintf(stderr, "ERROR: Failed to get haplotype list, error code = %d\n", err);
+								fprintf(stderr, "ERROR: Cannot align region, error code = %d\n", err);
 								fflush(stdout);
 							}
 						}
 						else
 						{
-							fprintf(stderr, "ERROR: Failed to load reference for a region, error code = %d\n", err);
+							fprintf(stderr, "ERROR: Failed to get haplotype list, error code = %d\n", err);
 							fflush(stdout);
 						}
-
-						//printf("PROCESSED: %d\n", context.last_readed_count);
-
-					}//last_readed != 0 if
-				}
-
-				#pragma omp section
-				{
-					if(write_buffer_l > 0)
-					{
-#ifdef D_TIME_DEBUG
-						init_time = omp_get_wtime();
-#endif
-						//Write processed to disk
-						for(i = 0; i < write_buffer_l; i++)
-						{
-							//Get read
-							read = array_list_get(i, write_buffer);
-							assert(read);
-
-							//Write to disk
-							bam_write1(out_bam_f->bam_fd, read);
-
-							//Free read
-							bam_destroy1(read);
-						}
-						bam_written += write_buffer_l;
-						//printf("WRITTEN: %d\n", write_buffer_l);
-
-#ifdef D_TIME_DEBUG
-						end_time = omp_get_wtime();
-						time_add_time_slot(D_SLOT_WRITE, TIME_GLOBAL_STATS, (double)(end_time - init_time)/(double)write_buffer_l);
-#endif
-					} //If write_buffer_l > 0
-
-					//Clear buffer
-					array_list_clear(write_buffer, NULL);
-				}
-
-			}//OMP SECTIONS
-
-			#pragma omp single
-			{
-				//Get processed bams
-				list_l = context.last_readed_count;
-				if(list_l > 0)
-				{
-#ifdef D_TIME_DEBUG
-					init_time = omp_get_wtime();
-#endif
-					//Fill write buffer
-					for(i = 0; i < list_l; i++)
-					{
-						//Get read
-						read = linked_list_get_first(in_list);
-						assert(read);
-
-						//Add to write list
-						array_list_insert(read, write_buffer);
-
-						//Update input list
-						linked_list_remove_first(in_list);
 					}
-					//printf("TO WRITE: %d\n", list_l);
+					else
+					{
+						fprintf(stderr, "ERROR: Failed to load reference for a region, error code = %d\n", err);
+						fflush(stdout);
+					}
 
-					//Sort buffer
-					array_list_qsort(write_buffer, compare_pos);
+				}//last_readed != 0 if
+			}
+		}//OMP SECTIONS
+
+		//Get processed bams
+		list_l = context.last_readed_count;
+		if(list_l > 0)
+		{
+#ifdef D_TIME_DEBUG
+			init_time = omp_get_wtime();
+#endif
+			//Fill write buffer
+			for(i = 0; i < list_l; i++)
+			{
+				//Get read
+				read = linked_list_get_first(in_list);
+				assert(read);
+
+				//Add to write list
+				array_list_insert(read, write_buffer);
+
+				//Update input list
+				linked_list_remove_first(in_list);
+			}
+			//printf("TO WRITE: %d\n", list_l);
+
+			//Sort buffer
+			array_list_qsort(write_buffer, compare_pos);
 
 #ifdef D_TIME_DEBUG
-					end_time = omp_get_wtime();
-					time_add_time_slot(D_SLOT_SORT, TIME_GLOBAL_STATS, (double)(end_time - init_time)/(double)list_l);
+			end_time = omp_get_wtime();
+			time_add_time_slot(D_SLOT_SORT, TIME_GLOBAL_STATS, (double)(end_time - init_time)/(double)list_l);
 #endif
-				}
+		}
 
-				//Update vars
-				in_list_l = linked_list_size(in_list);
-				write_buffer_l = array_list_size(write_buffer);
+		//Update vars
+		in_list_l = linked_list_size(in_list);
+		write_buffer_l = array_list_size(write_buffer);
 
-				//Especial case: List is empty
-				if(in_list_l == 0)
-				{
-					linked_list_clear(in_list, NULL);
-				}
+		//Especial case: List is empty
+		if(in_list_l == 0)
+		{
+			linked_list_clear(in_list, NULL);
+		}
 
-				//Clear context
-				alig_region_clear(&context);
+		//Clear context
+		alig_region_clear(&context);
 
-				//Load next reads
+		//Load next reads
 #ifdef D_TIME_DEBUG
-				init_time = omp_get_wtime();
+		init_time = omp_get_wtime();
 #endif
-				err = alig_region_next(&context);
-				if(err)
-				{
-					fprintf(stderr, "ERROR: Cannot obtain next region, error code = %d\n", err);
-					fflush(stdout);
-				}
+		err = alig_region_next(&context);
+		if(err)
+		{
+			fprintf(stderr, "ERROR: Cannot obtain next region, error code = %d\n", err);
+			fflush(stdout);
+		}
 #ifdef D_TIME_DEBUG
-				end_time = omp_get_wtime();
-				if(context.last_readed_count > 0)
-					time_add_time_slot(D_SLOT_NEXT, TIME_GLOBAL_STATS, (double)(end_time - init_time)/(double)context.last_readed_count);
+		end_time = omp_get_wtime();
+		if(context.last_readed_count > 0)
+			time_add_time_slot(D_SLOT_NEXT, TIME_GLOBAL_STATS, (double)(end_time - init_time)/(double)context.last_readed_count);
 #endif
 
-				//Print progress
-				if(context.read_count / 10000 > aux_count)
-				{
-					aux_count = context.read_count / 10000;
-					printf("Total alignments readed: %d\r", (int)context.read_count);
-					fflush(stdout);
-				}
+		//Print progress
+		if(context.read_count / 10000 > aux_count)
+		{
+			aux_count = context.read_count / 10000;
+			printf("Total alignments readed: %d\r", (int)context.read_count);
+			fflush(stdout);
+		}
 
-				//printf("-----\n");
-				//printf("IN LIST: %d\n", in_list_l);
-				//printf("WRITE LIST: %d\n", write_buffer_l);
+#ifdef D_TIME_DEBUG
+		end_time_it = omp_get_wtime();
+		time_add_time_slot(D_SLOT_ITERATION, TIME_GLOBAL_STATS, (double)(end_time_it - init_time_it));
+#endif
 
-			} //OMP single
 
-		} while(context.last_readed_count > 0
-				|| in_list_l > 0
-				|| write_buffer_l > 0
-				);
-
-	} //OMP PARALLEL
+	} while(context.last_readed_count > 0
+			|| in_list_l > 0
+			|| write_buffer_l > 0
+			);
 
 	//Info
 	printf("\nReads readed from original BAM: %d\n", bam_readed);
@@ -1221,50 +1187,21 @@ alig_get_scores(alig_context_t *context)
 	ERROR_CODE err;
 	int i, j;
 
-	//Reads
-	bam1_t *read;
-	size_t read_l;
-	size_t indels;
-	size_t bases;
-	char *read_seq;
-	char *comp_seq;
-	char *read_quals;
-	uint32_t *read_cigar;
-	uint32_t read_left_cigar[MAX_CIGAR_LENGTH];
-	size_t read_left_cigar_l;
-	size_t read_disp_ref = SIZE_MAX;
-	size_t read_disp_clip;
-
-	//Haplotypes
-	aux_indel_t *haplo;
-	size_t haplo_list_l;
-
 	//Reference
 	char *ref_seq;
 	size_t ref_pos_begin;
 	size_t ref_pos_end;
-
-	//Compare
-	char *read_seq_ref;
-	size_t read_seq_ref_l;
-	uint32_t aux_cigar[MAX_CIGAR_LENGTH];
-	size_t aux_cigar_l;
-	uint32_t misses;
-	uint32_t misses_sum;
-	size_t best_pos;
-	size_t curr_pos;
-	int64_t init_pos;
-	int64_t end_pos;
-
-	//Lists
-	array_list_t *read_list;
-	size_t read_list_l;
 
 	//Matrix
 	uint32_t *m_scores;
 	size_t *m_positions;
 	size_t m_total;
 	size_t m_ldim;
+
+	//Lists
+	array_list_t *read_list;
+	size_t read_list_l;
+	size_t haplo_list_l;
 
 	assert(context);
 
@@ -1292,8 +1229,8 @@ alig_get_scores(alig_context_t *context)
 	{
 		if(context->scores.m_positions)
 			free(context->scores.m_positions);
-		if(context->scores.m_positions)
-			free(context->scores.m_positions);
+		if(context->scores.m_scores)
+			free(context->scores.m_scores);
 	}
 	memset(&context->scores, 0, sizeof(alig_scores_t));
 
@@ -1317,152 +1254,200 @@ alig_get_scores(alig_context_t *context)
 		*((uint32_t*)m_scores + i) = UINT32_MAX;
 	}
 
-	//Iterate reads
-	for(i = 0; i < read_list_l; i++)
+	/*#pragma omp parallel default(none) \
+		private(err, i, j) \
+		firstprivate(context, ref_seq, ref_pos_begin, ref_pos_end, read_list, read_list_l, haplo_list_l, \
+				m_scores, m_positions, m_total, m_ldim) \
+		shared(log_msg, log_level)*/
 	{
-		//Get read
-		read = array_list_get(i, read_list);
-		assert(read);
-		read_cigar = bam1_cigar(read);
-		assert(read_cigar);
+		//Reads
+		bam1_t *read;
+		size_t read_l;
+		size_t indels;
+		size_t bases;
+		char *read_seq;
+		char *comp_seq;
+		char *read_quals;
+		size_t read_disp_ref = SIZE_MAX;
+		size_t read_disp_clip;
 
-		//Convert read sequence to string
-#ifdef __SSE2__
-		read_seq = (char *) _mm_malloc((read->core.l_qseq + 1) * sizeof(char), MEM_ALIG_SSE_SIZE);
-		comp_seq = (char *) _mm_malloc((read->core.l_qseq + 1) * sizeof(char), MEM_ALIG_SSE_SIZE);
-		read_seq_ref = (char *) _mm_malloc((read->core.l_qseq + 1) * sizeof(char), MEM_ALIG_SSE_SIZE);
-		read_quals = (char *) _mm_malloc((read->core.l_qseq + 1) * sizeof(char), MEM_ALIG_SSE_SIZE);
-#else
-		read_seq = (char *) malloc((read->core.l_qseq + 1) * sizeof(char));
-		comp_seq = (char *) malloc((read->core.l_qseq + 1) * sizeof(char));
-		read_seq_ref = (char *) malloc((read->core.l_qseq + 1) * sizeof(char));
-		read_quals = (char *) malloc((read->core.l_qseq + 1) * sizeof(char));
-#endif
-		new_sequence_from_bam_ref(read, read_seq, read->core.l_qseq + 1);
+		//Haplotypes
+		aux_indel_t *haplo;
 
-		//Get qualities
-		new_quality_from_bam_ref(read, 0, read_quals, read->core.l_qseq + 1);
+		//Compare
+		char *read_seq_ref;
+		size_t read_seq_ref_l;
+		uint32_t misses;
+		uint32_t misses_sum;
+		size_t best_pos;
+		size_t curr_pos;
+		int64_t init_pos;
+		int64_t end_pos;
 
-		//Get initial clip displacement
-		cigar32_count_clip_displacement(read_cigar, read->core.n_cigar, &read_disp_clip);
-		cigar32_count_nucleotides_not_clip(read_cigar, read->core.n_cigar, &read_l);
+		//Cigars
+		uint32_t *read_cigar;
+		uint32_t *read_left_cigar;
+		size_t read_left_cigar_l;
+		uint32_t *aux_cigar;
+		size_t aux_cigar_l;
 
-		//Leftalign cigar
-		read_disp_ref = read->core.pos - context->reference.position;
-		cigar32_leftmost(context->reference.reference + read_disp_ref, context->reference.length - read_disp_ref,
-				read_seq, read->core.l_qseq, bam1_cigar(read), read->core.n_cigar,
-				read_left_cigar, &read_left_cigar_l);
+		//Allocate cigar
+		read_left_cigar = (uint32_t *)malloc(MAX_CIGAR_LENGTH * sizeof(uint32_t));
+		aux_cigar = (uint32_t *)malloc(MAX_CIGAR_LENGTH * sizeof(uint32_t));
 
-		//Get raw score with reference
-		nucleotide_miss_qual_sum(ref_seq + read_disp_ref, read_seq + read_disp_clip, read_quals + read_disp_clip, read_l, comp_seq, &misses, &misses_sum);
-		m_scores[i * m_ldim] = misses_sum;
-		m_positions[i * m_ldim] = read->core.pos;
-
-		//Dont iterate haplotypes if perfect reference match
-		if(misses != 0)
+		//Iterate reads
+		//#pragma omp for
+		for(i = 0; i < read_list_l; i++)
 		{
-			//Iterate haplotypes
-			for(j = 0; j < haplo_list_l; j++)
+			//Get read
+			#pragma omp critical
+			read = array_list_get(i, read_list);
+			assert(read);
+			read_cigar = bam1_cigar(read);
+			assert(read_cigar);
+
+			//Allocate new read
+			read_l = read->core.l_qseq;
+			read_seq = (char *) malloc((read_l + 1) * sizeof(char));
+			comp_seq = (char *) malloc((read_l + 1) * sizeof(char));
+			read_seq_ref = (char *) malloc((read_l + 1) * sizeof(char));
+			read_quals = (char *) malloc((read_l + 1) * sizeof(char));
+
+			//Convert read sequence to string
+			new_sequence_from_bam_ref(read, read_seq, read_l + 1);
+
+			//Get qualities
+			new_quality_from_bam_ref(read, 0, read_quals, read->core.l_qseq + 1);
+
+			//Get initial clip displacement
+			cigar32_count_clip_displacement(read_cigar, read->core.n_cigar, &read_disp_clip);
+			cigar32_count_nucleotides_not_clip(read_cigar, read->core.n_cigar, &read_l);
+
+			//Leftalign cigar
+			read_disp_ref = read->core.pos - context->reference.position;
+			cigar32_leftmost(context->reference.reference + read_disp_ref, context->reference.length - read_disp_ref,
+					read_seq, read->core.l_qseq, bam1_cigar(read), read->core.n_cigar,
+					read_left_cigar, &read_left_cigar_l);
+
+			//Get raw score with reference
+			nucleotide_miss_qual_sum(ref_seq + read_disp_ref, read_seq + read_disp_clip, read_quals + read_disp_clip, read_l, comp_seq, &misses, &misses_sum);
+			m_scores[i * m_ldim] = misses_sum;
+			m_positions[i * m_ldim] = read->core.pos;
+
+			//Dont iterate haplotypes if perfect reference match
+			if(misses != 0)
 			{
-				//Get haplotype
-				haplo = array_list_get(j, context->haplo_list);
-				assert(haplo);
-
-				//Get initial position to iterate
-				read_disp_ref = SIZE_MAX;
-				init_pos = haplo->ref_pos - read->core.l_qseq;
-
-				//Initial position must be inside reference range
-				if(init_pos < ref_pos_begin)
-					init_pos = ref_pos_begin;
-
-				//Initial position must not overlap last region
-				if(init_pos < context->last_region.end_pos)
-					init_pos = context->last_region.end_pos;
-
-				//Get end pos
-				end_pos = ref_pos_end - read->core.l_qseq;
-				if(end_pos < init_pos)	//Check valid range
-					end_pos = init_pos;
-
-				//Iterate positions
-				for(curr_pos = init_pos; curr_pos < end_pos; curr_pos++)
+				//Iterate haplotypes
+				for(j = 0; j < haplo_list_l; j++)
 				{
-					//Create cigar for this haplotype
-					err = cigar32_from_haplo(read_cigar, read->core.n_cigar, haplo, curr_pos, aux_cigar, &aux_cigar_l);
-					if(err)
+					//Get haplotype
+					haplo = array_list_get(j, context->haplo_list);
+					assert(haplo);
+
+					//Get initial position to iterate
+					read_disp_ref = SIZE_MAX;
+					init_pos = haplo->ref_pos - read->core.l_qseq;
+
+					//Initial position must be inside reference range
+					if(init_pos < ref_pos_begin)
+						init_pos = ref_pos_begin;
+
+					//Initial position must not overlap last region
+					if(init_pos < context->last_region.end_pos)
+						init_pos = context->last_region.end_pos;
+
+					//Get end pos
+					end_pos = ref_pos_end - read->core.l_qseq;
+					if(end_pos < init_pos)	//Check valid range
+						end_pos = init_pos;
+
+					//Iterate positions
+					for(curr_pos = init_pos; curr_pos < end_pos; curr_pos++)
 					{
-						if(err == CIGAR_INVALID_INDEL)
+						//Create cigar for this haplotype
+						err = cigar32_from_haplo(read_cigar, read->core.n_cigar, haplo, curr_pos, aux_cigar, &aux_cigar_l);
+						if(err)
 						{
-							//Haplotype is invalid
-							sprintf(log_msg, "Invalid haplotype %d\n", j + 1);
-							LOG_ERROR(log_msg);
-							break;
+							if(err == CIGAR_INVALID_INDEL)
+							{
+								//Haplotype is invalid
+								#pragma omp critical
+								{
+									sprintf(log_msg, "Invalid haplotype %d\n", j + 1);
+									LOG_ERROR(log_msg);
+								}
+								//break;
+								curr_pos = end_pos;
+							}
+							else
+							{
+								//Cant displace anymore
+								//break;
+								curr_pos = end_pos;
+							}
 						}
 						else
 						{
-							//Cant displace anymore
-							break;
+							//Get relative displacement from reference
+							if(curr_pos < haplo->ref_pos)
+							{
+								read_disp_ref = curr_pos - ref_pos_begin;
+							}
+							else
+							{
+								read_disp_ref = haplo->ref_pos - ref_pos_begin;
+							}
+
+							//Get haplotype reference transform
+							cigar32_create_ref(aux_cigar, aux_cigar_l,
+									ref_seq + read_disp_ref, context->reference.length - read_disp_ref,
+									read_seq, read->core.l_qseq,
+									read_seq_ref, &read_seq_ref_l);
+
+							if(read_seq_ref_l != read->core.l_qseq)
+							{
+								#pragma omp critical
+								{
+									sprintf(log_msg, "Read-Ref: %d, Read: %d\n", read_seq_ref_l, read->core.l_qseq);
+									LOG_ERROR(log_msg);
+								}
+							}
+							//assert(read_seq_ref_l == read->core.l_qseq);
+
+							//Compare and miss with haplotype
+							nucleotide_miss_qual_sum(read_seq, read_seq_ref, read_quals, read_seq_ref_l, comp_seq, &misses, &misses_sum);
+
+							//Better?
+							if(m_scores[(i * m_ldim) + (j+1)] > misses_sum)
+							{
+								//Update scores
+								m_scores[(i * m_ldim) + (j+1)] = misses_sum;
+								m_positions[(i * m_ldim) + (j+1)] = curr_pos;
+							}
+
+							//Perfect match?
+							if(misses == 0)
+							{
+								curr_pos = end_pos;
+								//break;
+							}
 						}
-					}
+					} //Iterate positions
+				} //Iterate haplotypes
+			} //Scores != 0 if
 
-					//Get relative displacement from reference
-					if(curr_pos < haplo->ref_pos)
-					{
-						read_disp_ref = curr_pos - ref_pos_begin;
-					}
-					else
-					{
-						read_disp_ref = haplo->ref_pos - ref_pos_begin;
-					}
+			//Free
+			free(read_seq);
+			free(comp_seq);
+			free(read_seq_ref);
+			free(read_quals);
 
-					//Get haplotype reference transform
-					cigar32_create_ref(aux_cigar, aux_cigar_l,
-							ref_seq + read_disp_ref, context->reference.length - read_disp_ref,
-							read_seq, read->core.l_qseq,
-							read_seq_ref, &read_seq_ref_l);
+		} //FOR reads
 
-					if(read_seq_ref_l != read->core.l_qseq)
-					{
-						sprintf(log_msg, "Read-Ref: %d, Read: %d\n", read_seq_ref_l, read->core.l_qseq);
-						LOG_ERROR(log_msg);
-					}
-					//assert(read_seq_ref_l == read->core.l_qseq);
+		free(read_left_cigar);
+		free(aux_cigar);
 
-					//Compare and miss with haplotype
-					nucleotide_miss_qual_sum(read_seq, read_seq_ref, read_quals, read_seq_ref_l, comp_seq, &misses, &misses_sum);
-
-					//Better?
-					if(m_scores[(i * m_ldim) + (j+1)] > misses_sum)
-					{
-						//Update scores
-						m_scores[(i * m_ldim) + (j+1)] = misses_sum;
-						m_positions[(i * m_ldim) + (j+1)] = curr_pos;
-					}
-
-					//Perfect match?
-					if(misses == 0)
-					{
-						break;
-					}
-				} //Iterate positions
-			} //Iterate haplotypes
-		} //Scores != 0 if
-
-		//Free
-#ifdef __SSE2__
-		_mm_free(read_seq);
-		_mm_free(comp_seq);
-		_mm_free(read_seq_ref);
-		_mm_free(read_quals);
-#else
-		free(read_seq);
-		free(comp_seq);
-		free(read_seq_ref);
-		free(read_quals);
-#endif
-
-	}
+	} //OMP PARALLEL
 
 	return NO_ERROR;
 }

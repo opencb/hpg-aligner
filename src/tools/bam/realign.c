@@ -291,11 +291,11 @@ align_launch(char *reference, char *bam, char *output, int threads)
 	printf("Time used to initialize aligner -> %.2f s - min/max = %.2f/%.2f\n",
 			mean, min, max);
 
-	/*time_get_mean_slot(D_SLOT_PROCCESS, TIME_GLOBAL_STATS, &mean);
-	time_get_min_slot(D_SLOT_PROCCESS, TIME_GLOBAL_STATS, &min);
-	time_get_max_slot(D_SLOT_PROCCESS, TIME_GLOBAL_STATS, &max);
-	printf("Time used to proccess every read -> %.2f us - min/max = %.2f/%.2f\n",
-			mean*1000000.0, min*1000000.0, max*1000000.0);*/
+	time_get_mean_slot(D_SLOT_ITERATION, TIME_GLOBAL_STATS, &mean);
+	time_get_min_slot(D_SLOT_ITERATION, TIME_GLOBAL_STATS, &min);
+	time_get_max_slot(D_SLOT_ITERATION, TIME_GLOBAL_STATS, &max);
+	printf("Time per iteration -> %.2f us - min/max = %.2f/%.2f\n",
+			mean*1000000.0, min*1000000.0, max*1000000.0);
 
 	printf("\n====== Haplotype ======\n");
 	time_get_mean_slot(D_SLOT_NEXT, TIME_GLOBAL_STATS, &mean);
