@@ -1027,9 +1027,9 @@ int prepare_sw(fastq_read_t *read,   array_list_t *sw_prepare_list,
     cal = array_list_get(i, cal_list);
     cal->num_mismatches = 0;
 
-    #ifdef _VERBOSE
-    seed_cal_print(cal);
-    #endif
+    //#ifdef _VERBOSE
+    //seed_cal_print(cal);
+    //#endif
 
     // if not seeds, then next cal
     num_seeds = cal->seed_list->size;

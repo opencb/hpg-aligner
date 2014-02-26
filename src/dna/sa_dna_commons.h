@@ -662,20 +662,22 @@ static inline void seed_cal_set_cigar_by_seed(seed_t *seed, seed_cal_t *cal) {
 //--------------------------------------------------------------------
 
 static inline void seed_cal_print(seed_cal_t *cal) {
-  printf(" CAL (%c)[%lu:%lu-%lu] (%s, x:%i, og:%i, eg:%i):\n", 
+  printf(" CAL (%c)[%lu:%lu-%lu] (%s, x:%i, og:%i, eg:%i): (read id %s)\n", 
 	 (cal->strand == 0 ? '+' : '-'), 
 	 cal->chromosome_id, cal->start, cal->end, cigar_to_string(&cal->cigar), cal->num_mismatches,
-	     cal->num_open_gaps, cal->num_extend_gaps);
-  printf("\t SEEDS LIST: ");
+	 cal->num_open_gaps, cal->num_extend_gaps,
+	 cal->read->id);
+  printf("\tSEEDS LIST:\n");
   if (cal->seed_list == NULL || cal->seed_list->size == 0) {
-    printf(" NULL\n");
+    printf("\t\tno seeds\n");
   } else {
     for (linked_list_item_t *item = cal->seed_list->first; 
 	 item != NULL; item = item->next) {
       seed_t *seed = item->item;
-      printf(" [%lu|%lu - %lu|%lu] (%s, x:%i, og:%i, eg:%i)", seed->genome_start, seed->read_start, 
-	     seed->read_end, seed->genome_end, cigar_to_string(&seed->cigar), seed->num_mismatches,
-	     seed->num_open_gaps, seed->num_extend_gaps);
+      print_seed("\t\t", seed);
+      //      printf(" [%lu|%lu - %lu|%lu] (%s, x:%i, og:%i, eg:%i)", seed->genome_start, seed->read_start, 
+      //	     seed->read_end, seed->genome_end, cigar_to_string(&seed->cigar), seed->num_mismatches,
+      //	     seed->num_open_gaps, seed->num_extend_gaps);
     }
     printf("\n");
   }
