@@ -883,6 +883,7 @@ void clean_cals(array_list_t *cal_list, fastq_read_t *read, sa_index3_t *sa_inde
 
   for (int i = 0; i < num_cals; i++) {
     cal = array_list_get(i, cal_list);
+    //    seed_cal_print(cal);
     prev_item = cal->seed_list->first;
     while ((item = prev_item->next) != NULL) {
       prev_seed = prev_item->item;
@@ -894,9 +895,9 @@ void clean_cals(array_list_t *cal_list, fastq_read_t *read, sa_index3_t *sa_inde
       //      if (prev_seed->read_start == seed->read_start ||
       //	  prev_seed->read_end == seed->read_end) {
 
-	printf("----> TO CLEAN (read %s):\n", read->id);
-	display_cmp_sequences(read, sa_index);
-	seed_cal_print(cal);
+	//printf("----> TO CLEAN (read %s):\n", read->id);
+	//display_cmp_sequences(read, sa_index);
+	//seed_cal_print(cal);
 
 	linked_list_remove_item(item, cal->seed_list);
 	seed_free(seed);
