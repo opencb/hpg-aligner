@@ -1045,6 +1045,10 @@ int prepare_sw(fastq_read_t *read,   array_list_t *sw_prepare_list,
     cigarset = cigarset_new(num_seeds * 2 + 1);
     cal->cigarset = cigarset;
 
+    //    seed_cal_set_cigar_by_seed(seed, cal);
+    //    continue;
+
+
     if (seed->read_start > 0) {
       #ifdef _VERBOSE
       print_seed("-----> before updating first left-side seed: ", seed);
@@ -1255,6 +1259,9 @@ void execute_sw(array_list_t *sw_prepare_list, sa_mapping_batch_t *mapping_batch
     sw_prepare = array_list_get(i, sw_prepare_list);
     q[i] = sw_prepare->query;
     r[i] = sw_prepare->ref;
+
+    //    printf ("(query_len, ref_len) = (%lu, %lu) read id = %s\n", strlen(q[i]), strlen(r[i]), ((seed_cal_t *) sw_prepare->cal)->read->id);
+
     #ifdef _VERBOSE
     printf("\t\t%i: query: %s\n", i, q[i]);
     printf("\t\t%i: ref. : %s\n", i, r[i]);
