@@ -134,6 +134,7 @@ int main(int argc, char* argv[]) {
     //run_bs_aligner(genome1, genome2, genome, bwt_index1, bwt_index2,
     //                   bwt_optarg, cal_optarg, pair_mng, report_optarg, options);
   } 
+
   /*else if (!strcmp(command, "build-bwt-index")) {
     // BWT-INDEX command
     if (options->bs_index == 0) {
@@ -156,17 +157,18 @@ int main(int argc, char* argv[]) {
 
   options_free(options);
 
-  /*
-  size_t mapped_reads = total_reads - unmapped_reads;
-  printf("TOTAL READS    : %lu\n", total_reads);
-  printf("    UNMAPPED READS : %lu (%f%%)\n", unmapped_reads, ((float)unmapped_reads * 100)/((float)total_reads));
-  printf("    MAPPED READS   : %lu (%f%%)\n", mapped_reads, ((float)mapped_reads * 100)/((float)total_reads));
-  printf("-------------------------------\n");
-  printf("    CORRECT READS    : %lu (%f%%)\n", correct_reads,  ((float)correct_reads * 100)/((float)total_reads));
-  printf("    INCORRECT READS  : %lu (%f%%)\n", mapped_reads - correct_reads,  ((float)(mapped_reads - correct_reads) * 100)/((float)total_reads));
-  */
+  if (options->fast_mode) {  
+    size_t mapped_reads = total_reads - unmapped_reads;
+    printf("TOTAL READS    : %lu\n", total_reads);
+    printf("    UNMAPPED READS : %lu (%f%%)\n", unmapped_reads, ((float)unmapped_reads * 100)/((float)total_reads));
+    printf("    MAPPED READS   : %lu (%f%%)\n", mapped_reads, ((float)mapped_reads * 100)/((float)total_reads));
+    printf("-------------------------------\n");
+    printf("    CORRECT READS    : %lu (%f%%)\n", correct_reads,  ((float)correct_reads * 100)/((float)total_reads));
+    printf("    INCORRECT READS  : %lu (%f%%)\n", mapped_reads - correct_reads,  ((float)(mapped_reads - correct_reads) * 100)/((float)total_reads));
+    
 
-  printf("Seeds with one Error %i (%0.2f)\n", seeds_1err, seeds_1err*100/total_reads);
+    printf("Seeds with one Error %i (%0.2f)\n", seeds_1err, seeds_1err*100/total_reads);
+  }
 
   return 0;
 

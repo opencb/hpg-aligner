@@ -510,11 +510,16 @@ void rna_aligner(options_t *options) {
       //--------------------------------------------------------------------------------------
       // workflow management
       //
+      sw_optarg_t sw_optarg;
+      sw_optarg_init(options->gap_open, options->gap_extend, 
+		     options->match, options->mismatch, &sw_optarg);
+
       sa_rna_input_t sa_rna;
       sa_rna.genome    = genome;
       sa_rna.avls_list = avls_list;
       sa_rna.metaexons = metaexons;
-      
+      sa_rna.sw_optarg = &sw_optarg;
+
       sa_wf_batch_t *wf_batch = sa_wf_batch_new((void *)sa_index, &writer_input, NULL, &sa_rna);
       sa_wf_input_t *wf_input = sa_wf_input_new(&reader_input, wf_batch);
       

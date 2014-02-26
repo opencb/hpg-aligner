@@ -2075,9 +2075,10 @@ void meta_alignment_fill_gaps(int meta_type,
 
 	    if (nt) {
 	      cigar_code->distance = distance_aux;
+	      int sp_strand = (sp_type == CT_AC_SPLICE ? 1 : 0);
 
 	      allocate_start_node(cal->chromosome_id - 1,
-				  cal->strand,
+				  sp_strand,
 				  sp_start,
 				  sp_end,
 				  sp_start,
@@ -3600,7 +3601,7 @@ cigar_code_t *search_left_single_anchor(int gap_close,
 	  type = UNKNOWN_SPLICE;
 	  sprintf(str_sp_type, "%c%c-%c%c\0", nt_start[0], nt_start[1], nt_end[0], nt_end[1]);
 	}
-
+	
 	allocate_start_node(cal->chromosome_id - 1,
 			    splice_strand,
 			    start_sp,
@@ -5011,8 +5012,7 @@ int apply_sw_rna(sw_server_input_t* input_p, batch_t *batch) {
   sw_depth_t sw_depth;
   sw_depth.depth = 0;
   sw_multi_output_t *output = sw_multi_output_new(MAX_DEPTH);
-  //array_list_t **sw_items_list = (array_list_t **)malloc(sizeof(array_list_t *)*num_reads);
-  //array_list_t **alignments_list = (array_list_t **)malloc(sizeof(array_list_t *)*num_reads);
+
   array_list_t **meta_alignments_list = (array_list_t **)malloc(sizeof(array_list_t *)*num_reads);
   array_list_t *seeds_list = array_list_new(1000, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
   array_list_t *final_positions = array_list_new(10, 1.25f, COLLECTION_MODE_ASYNCHRONIZED); 
@@ -5281,9 +5281,10 @@ int apply_sw_rna(sw_server_input_t* input_p, batch_t *batch) {
 
 		  //assert(s_prev_aux->genome_start < sp_start);
 		  //assert(node_avl_end->position + 1 < s_next_aux->genome_end);
-		  
+		  int sp_strand = (sp_type == CT_AC_SPLICE ? 1 : 0);
+
 		  allocate_start_node(first_cal->chromosome_id - 1,
-				      first_cal->strand,
+				      sp_strand,
 				      sp_start,
 				      sp_end,
 				      sp_start,
@@ -5638,9 +5639,11 @@ int apply_sw_rna(sw_server_input_t* input_p, batch_t *batch) {
 		seed_region_t *s_next_aux = linked_list_get_first(last_cal->sr_list);
 		
 		int err_l, err_r;
-		
+
+		int sp_strand = (sp_type == CT_AC_SPLICE ? 1 : 0);
+
 		allocate_start_node(first_cal->chromosome_id - 1,
-				    first_cal->strand,
+				    sp_strand,
 				    sp_start,
 				    sp_end,
 				    sp_start,
@@ -6671,8 +6674,10 @@ int apply_rna_last(sw_server_input_t* input_p, batch_t *batch) {
 		  seed_region_t *s_prev_aux = linked_list_get_last(first_cal->sr_list);    
 		  seed_region_t *s_next_aux = linked_list_get_first(last_cal->sr_list);
 
+		  int sp_strand = (sp_type == CT_AC_SPLICE ? 1 : 0);
+
 		  allocate_start_node(first_cal->chromosome_id - 1,
-				      first_cal->strand,
+				      sp_strand,
 				      sp_start,
 				      sp_end,
 				      sp_start,
