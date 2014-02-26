@@ -3667,6 +3667,8 @@ cigar_code_t *search_right_single_anchor(int gap_close,
   int cal_strand = cal->strand;
   int cal_chromosome_id = cal->chromosome_id;
 
+  cigar_code_t *cigar_code = NULL;
+
   //printf("IN PARAMETERS: read_pos->%i, first_cal_end->%lu, gap_close->%i\n", read_pos, last_cal_start - 1, gap_close );
 
   genome_end = last_cal_start -  1;
@@ -3767,7 +3769,7 @@ cigar_code_t *search_right_single_anchor(int gap_close,
 	reference_len = strlen(reference) - 1;
 	for (c  = 0; c < lim_ref; c++) { 
 	  //printf("\t\t[%c vs %c]\n", query_map[read_pos - c], reference[reference_len - c]);
-	  if ((read_pos - c) < 0 || (reference_len - c) < 0) { printf("Ref error\n"); exit(-1); }
+	  if ((read_pos - c) < 0 || (reference_len - c) < 0) { goto sp_free; }
 	  if (query_map[read_pos - c] != reference[reference_len - c]) { 
 	    dist++;
 	  }
@@ -3850,7 +3852,7 @@ cigar_code_t *search_right_single_anchor(int gap_close,
       //printf("anchor nt = %i, array_list_size(final_ends) = %i\n", anchor_nt, array_list_size(final_ends));
       for (int c = 0; c < anchor_nt; c++) {
 	for (int s = 0; s < array_list_size(final_ends); s++) {	  
-	  if (read_pos - c < 0 || references_len[s] - c < 0) { printf("Error pos 2\n"); exit(-1); }
+	  if (read_pos - c < 0 || references_len[s] - c < 0) { goto sp_free; }
 	  //printf("\t[%c vs %c]\n", query_map[read_pos - c], s_reference[s][references_len[s] - c]);
 	  if (query_map[read_pos - c] != s_reference[s][references_len[s] - c]) {
 	    ref_mismatches[s]++;
@@ -3925,7 +3927,7 @@ cigar_code_t *search_right_single_anchor(int gap_close,
 		for (int c  = 0; c < gap_close; c++) { 
 		  //printf("\t[%c vs %c]\n", query_map[read_pos - c], reference[reference_len - c]);
 		  if ((read_pos - c < 0) &&
-		      (reference_len - c < 0)) { printf("read pos \n"); exit(-1); }
+		      (reference_len - c < 0)) { goto sp_free; }
 
 		  if (query_map[read_pos - c] != reference[reference_len - c]) { 
 		    dist++;
@@ -3952,8 +3954,6 @@ cigar_code_t *search_right_single_anchor(int gap_close,
       break;
     }
   }
-
-  cigar_code_t *cigar_code = NULL;
 
   if (map) {
     size_t pos_prev = cal->end, pos_next;
@@ -4034,6 +4034,7 @@ cigar_code_t *search_right_single_anchor(int gap_close,
 	      
   }
 
+ sp_free:
   array_list_free(final_positions, NULL);
   array_list_free(ends_targets, NULL);
   array_list_free(final_ends, NULL);
