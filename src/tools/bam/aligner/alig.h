@@ -63,9 +63,13 @@
 	enum alig_slots {
 		//GENERAL
 		D_SLOT_TOTAL,
-		D_SLOT_PROCCESS,
 		D_SLOT_INIT,
+
+		//ITERATION
 		D_SLOT_ITERATION,
+		D_SLOT_IT_PROCESS,
+		D_SLOT_IT_READ,
+		D_SLOT_IT_WRITE,
 
 		//BAM I/0
 		D_SLOT_READ,
@@ -243,7 +247,8 @@ EXTERNC ERROR_CODE alig_bam_file(char *bam_path, char *ref_name, char *ref_path,
  *
  * \param[in] context Context to process.
  */
-static ERROR_CODE alig_get_scores(alig_context_t *context);
+/*static*/ ERROR_CODE alig_get_scores(alig_context_t *context);
+/*static*/ ERROR_CODE alig_get_scores_from_read(bam1_t *read, alig_context_t *context, uint32_t *v_scores, size_t *v_positions);
 
 /**
  * \brief PRIVATE FUNCTION. Obtain alternative haplotype from generated score tables.
