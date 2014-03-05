@@ -94,9 +94,13 @@ int get_max_read_area(array_list_t *cal_list) {
   int max_read_area = 0;
   for (size_t j = 0; j < num_cals; j++) {
     cal = array_list_get(j, cal_list);
-    if (cal->read_area - cal->num_mismatches > max_read_area) {
-      max_read_area = cal->read_area - cal->num_mismatches;
+    seed_cal_update_info(cal);
+    if (cal->read_area > max_read_area) {
+      max_read_area = cal->read_area;
     }
+    //    if (cal->read_area - cal->num_mismatches > max_read_area) {
+    //      max_read_area = cal->read_area - cal->num_mismatches;
+    //    }
   }
 
   return max_read_area;
@@ -112,7 +116,9 @@ void filter_cals_by_max_read_area(int max_read_area, array_list_t **list) {
 
   for (size_t j = 0; j < num_cals; j++) {
     cal = array_list_get(j, cal_list);
-    if (cal->read_area - cal->num_mismatches >= max_read_area) {
+    //    seed_cal_print(cal);
+    if (cal->read_area >= max_read_area) {
+      //    if (cal->read_area - cal->num_mismatches >= max_read_area) {
       array_list_insert(cal, new_cal_list);
       array_list_set(j, NULL, cal_list);
       //      break;
@@ -358,9 +364,10 @@ void display_suffix_mappings(int strand, size_t r_start, size_t suffix_len,
 //--------------------------------------------------------------------
 
 void print_seed(char *msg, seed_t *s) {
-  printf("%s%c:%i[%lu|%lu - %lu|%lu] (cigar: %s, num. mismatches = %i)\n",  msg, (s->strand == 0 ? '+' : '-'),
+  printf("%s%c:%i[%lu|%lu - %lu|%lu] suf[%lu|%lu - %lu|%lu] (cigar (len = %i): %s, num. mismatches = %i)\n",  msg, (s->strand == 0 ? '+' : '-'),
 	 s->chromosome_id, s->genome_start, s->read_start, s->read_end, s->genome_end,
-	 cigar_to_string(&s->cigar), s->num_mismatches);
+	 s->suf_genome_start, s->suf_read_start, s->suf_read_end, s->suf_genome_end,
+	 cigar_get_length(&s->cigar), /*""*/cigar_to_string(&s->cigar), s->num_mismatches);
 }
 
 //--------------------------------------------------------------------

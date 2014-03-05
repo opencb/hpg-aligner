@@ -249,12 +249,18 @@ static inline void cigar_set_zero(cigar_t *p) {
 //--------------------------------------------------------------------
 
 static inline void cigar_get_op(int index, int *value, int *name, cigar_t *p) {
-  assert(index < p->num_ops);
+  //  printf("cigar_get_op: (index, num_ops) = (%i, %i) %s\n", 
+  //	 index, p->num_ops, cigar_to_string(p));
+  if (index >= p->num_ops) {
+    printf("cigar_get_op: (index, num_ops) = (%i, %i)\n", index, p->num_ops);
+    assert(index < p->num_ops);
+  }
   *name = (p->ops[index] & 255);
   *value = (p->ops[index] >> 8);
 }
 
 //--------------------------------------------------------------------
+
 
 static inline char *cigar_to_string(cigar_t *p) {
   char *str = (char *) malloc(p->num_ops * 10);
@@ -505,6 +511,11 @@ typedef struct seed {
   size_t genome_start;
   size_t genome_end;
 
+  size_t suf_read_start;
+  size_t suf_read_end;
+  size_t suf_genome_start;
+  size_t suf_genome_end;
+
   int strand;
   int chromosome_id;
   int num_mismatches;
@@ -526,6 +537,11 @@ static inline seed_t *seed_new(size_t read_start, size_t read_end,
   p->genome_start = genome_start;
   p->genome_end = genome_end;
 
+  p->suf_read_start = read_start;
+  p->suf_read_end = read_end;
+  p->suf_genome_start = genome_start;
+  p->suf_genome_end = genome_end;
+
   p->strand = 0;
   p->chromosome_id = 0;
   p->num_mismatches = 0;
@@ -541,6 +557,210 @@ static inline seed_t *seed_new(size_t read_start, size_t read_end,
 //--------------------------------------------------------------------
 
 void seed_free(seed_t *p);
+
+//--------------------------------------------------------------------
+
+static inline void seed_ltrim_read(int len, seed_t *p) {
+  // look at left-side cigar
+  cigar_t *cigar = &p->cigar;
+  int op_value, op_name;
+  int remain = len, q_trim = 0, r_trim = 0, trim_ops = 0, num_ops = cigar->num_ops;
+
+  for (int i = 0; i < num_ops; i++) {
+    cigar_get_op(i, &op_value, &op_name, cigar);
+
+    if (op_name == '=' || op_name == 'X') {
+
+      if (op_value >= remain) {
+	q_trim += remain;
+	r_trim += remain;
+	cigar_set_op(i, op_value - remain, op_name, cigar);
+	break;
+      } else {
+	q_trim += op_value;
+	r_trim += op_value;
+	remain -= op_value;
+	trim_ops++;
+      }
+
+    } if (op_name == 'I') {
+
+      if (op_value >= remain) {
+	q_trim += remain;
+	cigar_set_op(i, op_value - remain, op_name, cigar);
+	break;
+      } else {
+	q_trim += op_value;
+	remain -= op_value;
+	trim_ops++;
+      }
+
+    } else if (op_name == 'D') {
+
+      r_trim += op_value;
+      trim_ops++;
+
+    }
+  }
+  p->read_start += q_trim;
+  p->genome_start += r_trim;
+  if (trim_ops) {
+    cigar_ltrim_ops(trim_ops, cigar);
+  }
+}
+
+//--------------------------------------------------------------------
+
+static inline void seed_rtrim_read(int len, seed_t *p) {
+  // look at right-side cigar
+  cigar_t *cigar = &p->cigar;
+  int op_value, op_name;
+  int remain = len, q_trim = 0, r_trim = 0, trim_ops = 0, num_ops = cigar->num_ops;
+
+  for (int i = num_ops - 1; i >= 0; i--) {
+    cigar_get_op(i, &op_value, &op_name, cigar);
+
+    if (op_name == '=' || op_name == 'X') {
+
+      if (op_value >= remain) {
+	q_trim += remain;
+	r_trim += remain;
+	cigar_set_op(i, op_value - remain, op_name, cigar);
+	break;
+      } else {
+	q_trim += op_value;
+	r_trim += op_value;
+	remain -= op_value;
+	trim_ops++;
+      }
+
+    } if (op_name == 'I') {
+
+      if (op_value >= remain) {
+	q_trim += remain;
+	cigar_set_op(i, op_value - remain, op_name, cigar);
+	break;
+      } else {
+	q_trim += op_value;
+	remain -= op_value;
+	trim_ops++;
+      }
+
+    } else if (op_name == 'D') {
+
+      r_trim += op_value;
+      trim_ops++;
+
+    }
+  }
+  p->read_end -= q_trim;
+  p->genome_end -= r_trim;
+  if (trim_ops) {
+    cigar_rtrim_ops(trim_ops, cigar);
+  }
+}
+
+//--------------------------------------------------------------------
+
+static inline void seed_ltrim_genome(int len, seed_t *p) {
+  // look at left-side cigar
+  cigar_t *cigar = &p->cigar;
+  int op_value, op_name;
+  int remain = len, q_trim = 0, r_trim = 0, trim_ops = 0, num_ops = cigar->num_ops;
+
+  for (int i = 0; i < num_ops; i++) {
+    cigar_get_op(i, &op_value, &op_name, cigar);
+
+    if (op_name == '=' || op_name == 'X') {
+
+      if (op_value >= remain) {
+	q_trim += remain;
+	r_trim += remain;
+	cigar_set_op(i, op_value - remain, op_name, cigar);
+	break;
+      } else {
+	q_trim += op_value;
+	r_trim += op_value;
+	remain -= op_value;
+	trim_ops++;
+      }
+
+    } if (op_name == 'D') {
+
+      if (op_value >= remain) {
+	q_trim += remain;
+	cigar_set_op(i, op_value - remain, op_name, cigar);
+	break;
+      } else {
+	q_trim += op_value;
+	remain -= op_value;
+	trim_ops++;
+      }
+
+    } else if (op_name == 'I') {
+
+      r_trim += op_value;
+      trim_ops++;
+
+    }
+  }
+  p->read_start += q_trim;
+  p->genome_start += r_trim;
+  if (trim_ops) {
+    cigar_ltrim_ops(trim_ops, cigar);
+  }
+}
+
+//--------------------------------------------------------------------
+
+static inline void seed_rtrim_genome(int len, seed_t *p) {
+  // look at right-side cigar
+  cigar_t *cigar = &p->cigar;
+  int op_value, op_name;
+  int remain = len, q_trim = 0, r_trim = 0, trim_ops = 0, num_ops = cigar->num_ops;
+
+  for (int i = num_ops - 1; i >= 0; i--) {
+    cigar_get_op(i, &op_value, &op_name, cigar);
+
+    if (op_name == '=' || op_name == 'X') {
+
+      if (op_value >= remain) {
+	q_trim += remain;
+	r_trim += remain;
+	cigar_set_op(i, op_value - remain, op_name, cigar);
+	break;
+      } else {
+	q_trim += op_value;
+	r_trim += op_value;
+	remain -= op_value;
+	trim_ops++;
+      }
+
+    } if (op_name == 'D') {
+
+      if (op_value >= remain) {
+	q_trim += remain;
+	cigar_set_op(i, op_value - remain, op_name, cigar);
+	break;
+      } else {
+	q_trim += op_value;
+	remain -= op_value;
+	trim_ops++;
+      }
+
+    } else if (op_name == 'I') {
+
+      r_trim += op_value;
+      trim_ops++;
+
+    }
+  }
+  p->read_end -= q_trim;
+  p->genome_end -= r_trim;
+  if (trim_ops) {
+    cigar_rtrim_ops(trim_ops, cigar);
+  }
+}
 
 //--------------------------------------------------------------------
 // cigarset_t
@@ -649,6 +869,28 @@ static inline seed_cal_t *seed_cal_new(const size_t chromosome_id,
 //--------------------------------------------------------------------
 
 void seed_cal_free(seed_cal_t *p);
+
+//--------------------------------------------------------------------
+
+static inline void seed_cal_update_info(seed_cal_t *cal) {
+  int read_area = 0, num_mismatches = 0, num_open_gaps = 0, num_extend_gaps = 0;
+  seed_t *seed;
+
+  for (linked_list_item_t *item = cal->seed_list->first; 
+       item != NULL; item = item->next) {
+    seed = item->item;
+    num_mismatches += seed->num_mismatches;
+    num_open_gaps += seed->num_open_gaps;
+    num_extend_gaps += seed->num_extend_gaps;
+    read_area += (seed->read_end - seed->read_start - num_mismatches - num_open_gaps - num_extend_gaps);
+    
+  }
+  cal->num_mismatches = num_mismatches;
+  cal->num_open_gaps = num_open_gaps;
+  cal->num_extend_gaps = num_extend_gaps;
+  cal->num_mismatches = num_mismatches;
+  cal->read_area = read_area;
+}
 
 //--------------------------------------------------------------------
 
