@@ -844,7 +844,8 @@ cigar32_from_haplo(uint32_t *cigar, size_t cigar_l, aux_indel_t *haplo, size_t r
 	//Indel
 	int indel_size;
 	int indel_type;
-	int disp_to_indel;
+	int disp_to_indel_i;
+	size_t disp_to_indel_u;
 
 	//Generated cigar
 	uint32_t gen_cigar[MAX_CIGAR_LENGTH];
@@ -870,9 +871,9 @@ cigar32_from_haplo(uint32_t *cigar, size_t cigar_l, aux_indel_t *haplo, size_t r
 	}
 
 	//Get read displacement from haplotype
-	cigar32_count_clip_displacement(cigar, cigar_l, &disp_to_indel);
+	cigar32_count_clip_displacement(cigar, cigar_l, &disp_to_indel_u);
 	aux_read_pos = read_pos; //+ disp_to_indel;
-	disp_to_indel = haplo->ref_pos - aux_read_pos;
+	disp_to_indel_i = haplo->ref_pos - aux_read_pos;
 
 	//Count unclipped bases
 	cigar32_count_nucleotides_not_clip(cigar, cigar_l, &bases);
@@ -883,10 +884,10 @@ cigar32_from_haplo(uint32_t *cigar, size_t cigar_l, aux_indel_t *haplo, size_t r
 	//Indel is an insertion
 	case BAM_CINS:
 		//Where is the indel
-		if(disp_to_indel > 0)
+		if(disp_to_indel_i > 0)
 		{
 			//Insertion is not in in read beginning
-			bases_left = (int)bases - disp_to_indel;
+			bases_left = (int)bases - disp_to_indel_i;
 
 			//Insertion inside read
 			if(bases_left - indel_size > 0)
@@ -895,7 +896,7 @@ cigar32_from_haplo(uint32_t *cigar, size_t cigar_l, aux_indel_t *haplo, size_t r
 				bases_left -= indel_size;
 
 				//Create cigar
-				gen_cigar[0] = (disp_to_indel << BAM_CIGAR_SHIFT) + BAM_CMATCH;
+				gen_cigar[0] = (disp_to_indel_i << BAM_CIGAR_SHIFT) + BAM_CMATCH;
 				gen_cigar[1] = (indel_size << BAM_CIGAR_SHIFT) + indel_type;
 				gen_cigar[2] = (bases_left << BAM_CIGAR_SHIFT) + BAM_CMATCH;
 				gen_cigar_l = 3;
@@ -927,7 +928,7 @@ cigar32_from_haplo(uint32_t *cigar, size_t cigar_l, aux_indel_t *haplo, size_t r
 			//Insertion is in read beginning
 
 			//In this case, negative displacement (read_pos > indel_pos) mean a shorter insertion
-			indel_size += disp_to_indel;
+			indel_size += disp_to_indel_i;
 			if(indel_size > 0)
 			{
 				//Set length of final cigar element
@@ -952,16 +953,16 @@ cigar32_from_haplo(uint32_t *cigar, size_t cigar_l, aux_indel_t *haplo, size_t r
 	case BAM_CDEL:
 
 		//Where is the indel
-		if(disp_to_indel > 0)
+		if(disp_to_indel_i > 0)
 		{
 			//Deletion is not in in read beginning
-			bases_left = (int)bases - disp_to_indel;
+			bases_left = (int)bases - disp_to_indel_i;
 
 			//Deletion inside read
 			if(bases_left > 0)
 			{
 				//Create cigar
-				gen_cigar[0] = (disp_to_indel << BAM_CIGAR_SHIFT) + BAM_CMATCH;
+				gen_cigar[0] = (disp_to_indel_i << BAM_CIGAR_SHIFT) + BAM_CMATCH;
 				gen_cigar[1] = (indel_size << BAM_CIGAR_SHIFT) + indel_type;
 				gen_cigar[2] = (bases_left << BAM_CIGAR_SHIFT) + BAM_CMATCH;
 				gen_cigar_l = 3;

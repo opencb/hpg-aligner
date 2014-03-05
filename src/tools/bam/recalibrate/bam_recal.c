@@ -28,7 +28,7 @@ recal_recalibrate_bam_file(const char *orig_bam_path, const recal_info_t *bam_in
 
 	//Open bam
 	printf("Opening BAM from \"%s\" to being recalibrated ...\n", orig_bam_path);
-	orig_bam_f = bam_fopen(orig_bam_path);
+	orig_bam_f = bam_fopen((char *)orig_bam_path);
 	printf("BAM opened!...\n");
 
 	//Allocate
@@ -37,7 +37,7 @@ recal_recalibrate_bam_file(const char *orig_bam_path, const recal_info_t *bam_in
 	//Create new bam
 	printf("Creating new bam file in \"%s\"...\n", recal_bam_path);
 	//init_empty_bam_header(orig_bam_f->bam_header_p->n_targets, recal_bam_header);
-	recal_bam_f = bam_fopen_mode(recal_bam_path, orig_bam_f->bam_header_p, "w");
+	recal_bam_f = bam_fopen_mode((char *)recal_bam_path, orig_bam_f->bam_header_p, "w");
 	bam_fwrite_header(recal_bam_f->bam_header_p, recal_bam_f);
 	recal_bam_f->bam_header_p = NULL;
 	printf("New BAM initialized!...\n");
@@ -133,7 +133,7 @@ recal_recalibrate_bam(const bam_file_t *orig_bam_f, const recal_info_t *bam_info
 					read_batch = bam_batch_new(MAX_BATCH_SIZE, MULTIPLE_CHROM_BATCH);
 
 					//Read batch
-					bam_fread_max_size(read_batch, MAX_BATCH_SIZE, 0, orig_bam_f);
+					bam_fread_max_size(read_batch, MAX_BATCH_SIZE, 0, (bam_file_t *)orig_bam_f);
 
 					#ifdef D_TIME_DEBUG
 					end_read = omp_get_wtime();
@@ -410,10 +410,10 @@ recal_recalibrate_alignment_priv(const bam1_t* alig, const recal_info_t *bam_inf
 	ASSERT(bam_seq_l != 0);
 
 	//Get sequence
-	bam_seq = new_sequence_from_bam(alig);
+	bam_seq = new_sequence_from_bam((bam1_t *)alig);
 
 	//Get quals
-	new_quality_from_bam_ref(alig, 0, bam_quals, bam_seq_max_l);
+	new_quality_from_bam_ref((bam1_t *)alig, 0, bam_quals, bam_seq_max_l);
 
 	//Allocate for result
 	res_quals = (char *)malloc(bam_seq_l * sizeof(char));

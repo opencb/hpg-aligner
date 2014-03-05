@@ -34,12 +34,12 @@ recal_get_data_from_file(const char *bam_path, const char *ref_name, const char 
 
 	//Open bam
 	printf("Opening BAM from \"%s\" ...\n", bam_path);
-	bam_f = bam_fopen(bam_path);
+	bam_f = bam_fopen((char *)bam_path);
 	printf("BAM opened!...\n");
 
 	//Open reference genome
 	printf("Opening reference genome from \"%s%s\" ...\n", ref_path, ref_name);
-	ref = genome_new(ref_name, ref_path);
+	ref = genome_new((char *)ref_name, (char *)ref_path);
 	printf("Reference opened!...\n");
 
 	//Fill data
@@ -143,7 +143,7 @@ recal_get_data_from_bam(const bam_file_t *bam, const genome_t* ref, recal_info_t
 						init_read = omp_get_wtime();
 					#endif
 					//bam_fread_max_size(batch, MAX_BATCH_SIZE, 1, bam);
-					bam_fread_max_size_no_duplicates(read_batch, MAX_BATCH_SIZE, 0, bam, last_seq, &l_last_seq, &pos_last_seq);
+					bam_fread_max_size_no_duplicates(read_batch, MAX_BATCH_SIZE, 0, (bam_file_t *)bam, last_seq, &l_last_seq, &pos_last_seq);
 					#ifdef D_TIME_DEBUG
 						end_read = omp_get_wtime();
 					#endif
@@ -297,7 +297,7 @@ recal_get_data_from_bam_batch(const bam_batch_t* batch, const genome_t* ref, rec
 		recal_init_info(output_data->num_cycles, &data);
 
 		//Current is general batch
-		current_batch = batch;
+		current_batch = (bam_batch_t *)batch;
 
 		#ifdef SPLIT_BATCHS_BY_CHROM
 			//printf("Number alignments in original batch: %d\n", batch->num_alignments);
@@ -447,10 +447,10 @@ recal_get_data_from_bam_alignment(const bam1_t* alig, const genome_t* ref, recal
 	}
 
 	//Get sequence
-	new_sequence_from_bam_ref(alig, bam_seq, bam_seq_max_l);
+	new_sequence_from_bam_ref((bam1_t *)alig, bam_seq, bam_seq_max_l);
 
 	//Get quals
-	new_quality_from_bam_ref(alig, 0, bam_quals, bam_seq_max_l);
+	new_quality_from_bam_ref((bam1_t *)alig, 0, bam_quals, bam_seq_max_l);
 
 	//Indel suppression
  	supress_indels_from_32_cigar(bam_seq, bam_quals, alig->core.l_qseq, bam1_cigar(alig), alig->core.n_cigar,
@@ -501,7 +501,7 @@ recal_get_data_from_bam_alignment(const bam1_t* alig, const genome_t* ref, recal
 	//Obtain reference for this 100 nucleotides
 	flag = (uint32_t) alig->core.flag;
 
-	genome_read_sequence_by_chr_index(ref_seq, (flag & BAM_FREVERSE) ? 1 : 0, (unsigned int)alig->core.tid, &init_pos, &end_pos, ref);
+	genome_read_sequence_by_chr_index(ref_seq, (flag & BAM_FREVERSE) ? 1 : 0, (unsigned int)alig->core.tid, &init_pos, &end_pos, (genome_t *)ref);
 
 	//Iterates nucleotides in this read
 	for(i = 0; i < bam_seq_l; i++)

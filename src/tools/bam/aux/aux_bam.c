@@ -32,8 +32,8 @@ compare_bams_qual(const char* bamPath0, const char* bamPath1, const int cycles)
 
 	printf("Opening BAM 1 form \"%s\" ...\n", bamPath0);
 	printf("Opening BAM 2 form \"%s\" ...\n", bamPath1);
-	bamFile0 = bam_fopen(bamPath0);
-	bamFile1 = bam_fopen(bamPath1);
+	bamFile0 = bam_fopen((char *)bamPath0);
+	bamFile1 = bam_fopen((char *)bamPath1);
 	printf("BAM opened!...\n");
 
 
@@ -126,11 +126,7 @@ new_sequence_from_bam(bam1_t *bam1)
 	char *bam_seq = (char *)bam1_seq(bam1);
 	int seq_len = bam1->core.l_qseq;
 
-#ifdef __SSE2__
-	seq = (char *) _mm_malloc(seq_len * sizeof(char), MEM_ALIG_SSE_SIZE);
-#else
 	seq = (char *) malloc(seq_len * sizeof(char));
-#endif
 
 	// nucleotide content
 	for (int i = 0; i < seq_len; i++) {
@@ -216,11 +212,8 @@ new_quality_from_bam(bam1_t *bam1, int base_quality)
 	char *bam_qual = (char *)bam1_qual(bam1);
 	int qual_len = bam1->core.l_qseq;
 
-#ifdef __SSE2__
-	qual = (char *) _mm_malloc(qual_len * sizeof(char), MEM_ALIG_SSE_SIZE);
-#else
 	qual = (char *) malloc(qual_len * sizeof(char));
-#endif
+
 	for (int i = 0; i < qual_len; i++) {
 		qual[i] = base_quality + bam_qual[i];
 	}
@@ -328,7 +321,6 @@ supress_indels(char *seq, U_CYCLES seq_l, char *cigar_elem, char *cigar_type, ui
 	if(seq == NULL
 		|| cigar_elem == NULL
 		|| cigar_type == NULL
-		|| cigar_type_l == NULL
 		|| seq_res == NULL
 		|| seq_res_l == NULL)
 	{

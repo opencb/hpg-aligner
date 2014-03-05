@@ -428,15 +428,12 @@ alig_region_load_reference(alig_context_t *context)
 		ref_pos_end = (read->core.pos + read->core.l_qseq) + ALIG_REFERENCE_ADDITIONAL_OFFSET;
 
 		//Auxiliar
-		aux_pos_begin = ref_pos_begin + 1;
-		aux_pos_end = ref_pos_end + 1;
-		//MANEJAR ALINEAMIENTOS CON MEMORIA!!!!!
+		aux_pos_begin = ref_pos_begin + ALIG_REFERENCE_CORRECTION_OFFSET;
+		aux_pos_end = ref_pos_end + ALIG_REFERENCE_CORRECTION_OFFSET;
+
 		//Get reference
-#ifdef __SSE2__
-		ref_seq = (char *) _mm_malloc(((ref_pos_end - ref_pos_begin) + 2) * sizeof(char), MEM_ALIG_SSE_SIZE);
-#else
 		ref_seq = (char *) malloc(((ref_pos_end - ref_pos_begin) + 2) * sizeof(char));
-#endif
+
 		assert(ref_seq);
 		flag = (uint32_t) read->core.flag;
 		genome_read_sequence_by_chr_index(ref_seq, (flag & BAM_FREVERSE) ? 1 : 0, (unsigned int)read->core.tid, &aux_pos_begin, &aux_pos_end, context->genome);
@@ -447,11 +444,7 @@ alig_region_load_reference(alig_context_t *context)
 		if(context->reference.reference)
 		{
 			//Free previous reference
-#ifdef __SSE2__
 			free(context->reference.reference);
-#else
-			_mm_free(context->reference.reference);
-#endif
 		}
 		context->reference.position = ref_pos_begin;
 		context->reference.length = ref_length;
@@ -536,13 +529,8 @@ alig_region_haplotype_process(alig_context_t *context)
 				//Convert read sequence and qualities to string
 				read_seq_l = read->core.l_qseq;
 
-#ifdef __SSE2__
-				read_seq = (char *) _mm_malloc((read_seq_l + 1) * sizeof(char), MEM_ALIG_SSE_SIZE);
-				comp_seq = (char *) _mm_malloc((read_seq_l + 1) * sizeof(char), MEM_ALIG_SSE_SIZE);
-#else
 				read_seq = (char *) malloc((read_seq_l + 1) * sizeof(char));
 				comp_seq = (char *) malloc((read_seq_l + 1) * sizeof(char));
-#endif
 
 				assert(read);
 				new_sequence_from_bam_ref(read, read_seq, read_seq_l + 1);
@@ -557,10 +545,10 @@ alig_region_haplotype_process(alig_context_t *context)
 
 				//Get raw missmatch
 				//nucleotide_compare(ref_seq + read_disp_ref, read_seq, read_seq_l, comp_seq, &ref_miss);
-				ref_miss = 1;
+				//ref_miss = 1;
 
 				//If match reference perfectly, realign to reference and extract from process list
-				if(ref_miss == 0)
+				/*if(ref_miss == 0)
 				{
 					//Count unclipped bases
 					cigar32_count_nucleotides_not_clip(read_cigar, read->core.n_cigar, &read_bases);
@@ -576,10 +564,10 @@ alig_region_haplotype_process(alig_context_t *context)
 					cigar32_replace(read, aux_cigar, aux_cigar_l);
 
 					//Logging
-					//sprintf(log_msg, "%s \t%d:%d match reference perfectly\n", bam1_qname(read), read->core.tid + 1, read->core.pos + 1);
-					//LOG_INFO(log_msg);
+					sprintf(log_msg, "%s \t%d:%d match reference perfectly\n", bam1_qname(read), read->core.tid + 1, read->core.pos + 1);
+					LOG_INFO(log_msg);
 				}
-				else
+				else*/
 				{
 					//Obtain haplotypes
 
@@ -639,19 +627,31 @@ alig_region_haplotype_process(alig_context_t *context)
 				}//Match reference if
 
 				//Free
-#ifdef __SSE2__
-				_mm_free(read_seq);
-				_mm_free(comp_seq);
-#else
 				free(read_seq);
 				free(comp_seq);
-#endif
 
 			} //Valid cigar end if
 
 		} //Haplotypes while
 
 	} //Region if
+
+	//Print info
+	/*{
+	  	printf("-----------\n");
+		printf("Haplotypes in region: %d:%d\n", context->region.chrom, context->region.start_pos);
+		static char str[20];
+		int h;
+		haplo_l = array_list_size(context->haplo_list);
+		for(h = 0; h < haplo_l; h++)
+		{
+			aux_haplo = array_list_get(h, context->haplo_list);
+			assert(aux_haplo);
+
+			cigar32_to_string(&aux_haplo->indel, 1, str);
+			printf("Pos:%d,  Indel:%s\n", aux_haplo->ref_pos, str);
+		}
+	}*/
 
 	return NO_ERROR;
 }
@@ -712,6 +712,7 @@ alig_region_indel_realignment(alig_context_t *context)
 		return ALIG_INVALID_SCORES;
 	}
 
+	//Get best haplotype (alternative to H0)
 	alig_get_alternative_haplotype(context, &alt_haplo_index, &alt_haplo_score, &ref_haplo_score);
 
 	//Improvement
@@ -764,11 +765,7 @@ alig_region_clear(alig_context_t *context)
 	//Clear reference
 	if(context->reference.reference)
 	{
-#ifdef __SSE2__
-		_mm_free(context->reference.reference);
-#else
 		free(context->reference.reference);
-#endif
 	}
 	memset(&context->reference, 0, sizeof(alig_reference_t));
 
@@ -936,7 +933,7 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 						assert(read);
 
 						//Write to disk
-						//bam_write1(out_bam_f->bam_fd, read);
+						bam_write1(out_bam_f->bam_fd, read);
 
 						//Free read
 						bam_destroy1(read);
@@ -1274,14 +1271,14 @@ alig_get_scores(alig_context_t *context)
 	}
 
 	//Iterate reads
-	#pragma omp parallel private(read, err, j, i, v_total, v_positions, v_scores, index) firstprivate(read_list_l)
+	//#pragma omp parallel private(read, err, j, i, v_total, v_positions, v_scores, index) firstprivate(read_list_l)
 	{
 		//Allocate new scores
 		v_total = context->scores.m_ldim;
 		v_positions = (size_t *)malloc(v_total * sizeof(size_t));
 		v_scores = (uint32_t *)malloc(v_total * sizeof(uint32_t));
 
-		#pragma omp for
+		//#pragma omp for
 		for(i = 0; i < read_list_l; i++)
 		{
 			//Get read
@@ -1302,6 +1299,58 @@ alig_get_scores(alig_context_t *context)
 		free(v_scores);
 		free(v_positions);
 	}
+
+	//Print table
+	/*{
+		int r, h;
+		char indel[10];
+		aux_indel_t *haplo;
+		printf("------------------\n");
+		printf("Table for region %d:%d:%d\n", context->region.chrom + 1, context->region.start_pos + 1, context->region.end_pos + 1);
+
+		//Print haplos
+		printf("%20s %10s ", " ", "H0");
+		haplo_list_l = array_list_size(context->haplo_list);
+		for(h = 0; h < haplo_list_l; h++)
+		{
+			haplo = array_list_get(h, context->haplo_list);
+			assert(haplo);
+			cigar32_to_string(&haplo->indel, 1, indel);
+			printf("%10s ", indel);
+		}
+		printf("\n");
+
+		//Print scores
+		read_list_l = array_list_size(context->realign_list);
+		for(r = 0; r < read_list_l; r++)
+		{
+			read = array_list_get(r, read_list);
+			assert(read);
+			printf("%20s ", bam1_qname(read));
+			for(h = 0; h < haplo_list_l + 1; h++)
+			{
+				index = r * context->scores.m_ldim;
+				printf("%10d ", m_scores[index + h]);
+			}
+			printf("\n");
+		}
+
+		//Print positions
+		printf("---\n");
+		read_list_l = array_list_size(context->realign_list);
+		for(r = 0; r < read_list_l; r++)
+		{
+			read = array_list_get(r, read_list);
+			assert(read);
+			printf("%20s ", bam1_qname(read));
+			for(h = 0; h < haplo_list_l + 1; h++)
+			{
+				index = r * context->scores.m_ldim;
+				printf("%10d ", m_positions[index + h]);
+			}
+			printf("\n");
+		}
+	}*/
 
 	return NO_ERROR;
 }
@@ -1396,20 +1445,31 @@ alig_get_scores_from_read(bam1_t *read, alig_context_t *context, uint32_t *v_sco
 	cigar32_count_clip_displacement(read_cigar, read->core.n_cigar, &read_disp_clip);
 	cigar32_count_nucleotides_not_clip(read_cigar, read->core.n_cigar, &read_l);
 
-	//Leftalign cigar
-	read_disp_ref = read->core.pos - reference->position;
-	cigar32_leftmost(reference->reference + read_disp_ref, reference->length - read_disp_ref,
-			read_seq, read->core.l_qseq, bam1_cigar(read), read->core.n_cigar,
-			read_left_cigar, &read_left_cigar_l);
+	//Get read displacement to reference
+	read_disp_ref = read->core.pos  - reference->position;
+
+	//Get clean read
+	read_left_cigar[0] = (read_l << BAM_CIGAR_SHIFT) + BAM_CMATCH;
+	cigar32_reclip(bam1_cigar(read), read->core.n_cigar, read_left_cigar, 1, aux_cigar, &aux_cigar_l);
+	cigar32_create_ref(aux_cigar, aux_cigar_l,
+			ref_seq + read_disp_ref, context->reference.length - read_disp_ref,
+			read_seq, read->core.l_qseq,
+			read_seq_ref, &read_seq_ref_l);
 
 	//Get raw score with reference
-	nucleotide_miss_qual_sum(ref_seq + read_disp_ref, read_seq + read_disp_clip, quals_seq + read_disp_clip, read_l, comp_seq, &misses, &misses_sum);
+	nucleotide_miss_qual_sum(read_seq_ref, read_seq, quals_seq, read_l, comp_seq, &misses, &misses_sum);
 	v_scores[0] = misses_sum;
 	v_positions[0] = read->core.pos;
 
 	//Dont iterate haplotypes if perfect reference match
+	//printf("%s - %d - %d\n", bam1_qname(read), misses, misses_sum);
 	if(misses != 0)
 	{
+		//Leftalign cigar
+		cigar32_leftmost(reference->reference + read_disp_ref, reference->length - read_disp_ref,
+				read_seq, read->core.l_qseq, bam1_cigar(read), read->core.n_cigar,
+				read_left_cigar, &read_left_cigar_l);
+
 		//Iterate haplotypes
 		for(i = 0; i < haplo_list_l; i++)
 		{
@@ -1491,6 +1551,7 @@ alig_get_scores_from_read(bam1_t *read, alig_context_t *context, uint32_t *v_sco
 					//Better?
 					if(v_scores[i+1] > misses_sum)
 					{
+						//printf("%s - %d - %d\n", bam1_qname(read), misses, misses_sum);
 						//Update scores
 						v_scores[i+1] = misses_sum;
 						v_positions[i+1] = curr_pos;

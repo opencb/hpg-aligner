@@ -434,7 +434,7 @@ region_get_from_file(const char *bam_path)
 
 	//Open bam
 	printf("Opening BAM from \"%s\" ...\n", bam_path);
-	bam_f = bam_fopen(bam_path);
+	bam_f = bam_fopen((char *)bam_path);
 	printf("BAM opened!...\n");
 
 	//Read batch
