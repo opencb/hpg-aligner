@@ -968,7 +968,9 @@ array_list_t *create_cals(int num_seeds, fastq_read_t *read,
     #ifdef _TIMING
     gettimeofday(&start, NULL);
     #endif
-    cal_mng_to_array_list((read->length / 3), cal_list, cal_mng);
+    //    max_read_area = get_max_read_area(cal_list);
+    //    cal_mng_to_array_list((max_read_area > (read->length / 3) ? (read->length / 3) : max_read_area), cal_list, cal_mng);
+    cal_mng_to_array_list(read->length / 3, cal_list, cal_mng);
     #ifdef _TIMING
     gettimeofday(&stop, NULL);
     mapping_batch->func_times[FUNC_CAL_MNG_TO_LIST] += 
@@ -1196,31 +1198,55 @@ void fill_seed_gaps(array_list_t *cal_list, fastq_read_t *read, sa_index3_t *sa_
 
 inline static int is_invalid_cigar(cigar_t *cigar) {
   int name, value, count = 0;
-  //  printf("cheking cigar: %s\n", cigar_to_string(cigar));
+  int min = SW_FLANK * 2;
+  //printf("cheking cigar: %s\n", cigar_to_string(cigar));
   for (int i = 0; i < cigar->num_ops; i++) {
     cigar_get_op(i, &value, &name, cigar);
     if (value > SW_FLANK && name == '=') {
-      count++;
-      if (count > 1) return 0;
+      count += value;
+      if (count > min) return 0;
     }
   }  
-  return (count > 1 ? 0 : 1);
+  return (count > min ? 0 : 1);
 }
 
-void clean_cals(array_list_t *cal_list, fastq_read_t *read, sa_index3_t *sa_index) {
+void clean_cals(array_list_t **list, fastq_read_t *read, sa_index3_t *sa_index) {
 
   seed_t *prev_seed, *seed;
   linked_list_item_t *prev_item, *item;
+  linked_list_iterator_t* itr;
 
-  int overlap;
+  int trim, remove, overlap;
   seed_cal_t *cal;
+  array_list_t *cal_list = *list;
   size_t num_cals = array_list_size(cal_list);
 
+  remove = 0;
   for (int i = 0; i < num_cals; i++) {
     cal = array_list_get(i, cal_list);
     //    printf("in clean_cals:\n");
-    //    seed_cal_print(cal);
-    prev_item = cal->seed_list->first;
+    //    seed_cal_print(cal); 
+    
+    trim = 0;
+    while (1) {
+      item = cal->seed_list->first;
+      if (item) {
+	seed = item->item;
+	if (is_invalid_cigar(&seed->cigar)) {
+	  //printf("----> INVALID FIRST CIGAR %s (read %s):\n", cigar_to_string(&seed->cigar), read->id);
+	  linked_list_remove_item(item, cal->seed_list);
+	  seed_free(seed);
+	  remove = 1;
+	} else {
+	  break;
+	}
+      } else {
+	break;
+      }
+    }
+    if (!item) continue;
+    
+    prev_item = item;
     while ((item = prev_item->next) != NULL) {
       prev_seed = prev_item->item;
       seed = item->item;
@@ -1229,6 +1255,7 @@ void clean_cals(array_list_t *cal_list, fastq_read_t *read, sa_index3_t *sa_inde
 	//printf("----> INVALID CIGAR %s (read %s):\n", cigar_to_string(&seed->cigar), read->id);
 	linked_list_remove_item(item, cal->seed_list);
 	seed_free(seed);
+	remove = 1;
 	//seed_cal_print(cal);
       } else {
 	if ( (prev_seed->read_end >= seed->read_start &&
@@ -1239,6 +1266,7 @@ void clean_cals(array_list_t *cal_list, fastq_read_t *read, sa_index3_t *sa_inde
 	    //printf("----> TO RECOVER (overlap = %i, read %s):\n", overlap, read->id);
 	    //seed_cal_print(cal);
 	    
+	    trim = 1;
 	    seed_rtrim_read(overlap, prev_seed);
 	    seed_ltrim_read(overlap, seed);
 	    
@@ -1251,6 +1279,7 @@ void clean_cals(array_list_t *cal_list, fastq_read_t *read, sa_index3_t *sa_inde
 	    
 	    linked_list_remove_item(item, cal->seed_list);
 	    seed_free(seed);
+	    remove = 1;
 	  }
 	} else {
 	  prev_item = item;
@@ -1260,6 +1289,33 @@ void clean_cals(array_list_t *cal_list, fastq_read_t *read, sa_index3_t *sa_inde
 	}
       }
     }
+
+    if (trim) {
+      for (item = cal->seed_list->first; item != NULL; ) {
+	seed = item->item;
+	prev_item = item->next;
+	if (is_invalid_cigar(&seed->cigar)) {
+	  linked_list_remove_item(item, cal->seed_list);
+	  seed_free(seed);
+	  remove = 1;
+	}
+	item = prev_item;
+      }
+    }
+  }
+  
+  if (remove) {
+    array_list_t *new_cal_list = array_list_new(MAX_CALS, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
+    num_cals = array_list_size(cal_list);
+    for (int i = 0; i < num_cals; i++) {
+      cal = array_list_get(i, cal_list);
+      if (cal->seed_list->size > 0) {
+	array_list_insert(cal, new_cal_list);
+	array_list_set(i, NULL, cal_list);
+      }
+    }
+    array_list_free(cal_list, (void *) seed_cal_free);
+    *list = new_cal_list;
   }
 }
 
@@ -1463,7 +1519,7 @@ int prepare_sw(fastq_read_t *read,   array_list_t *sw_prepare_list,
       //print_seed("prev: ", prev_seed);
       //print_seed("curr: ", seed);
 
-      if (gap_read_len <= 0) {
+      if (gap_read_len < 0) {
 	// deletion
 	//	printf("gap_read_len = %i\n", gap_read_len);
 	//	exit(-1);
@@ -1485,7 +1541,7 @@ int prepare_sw(fastq_read_t *read,   array_list_t *sw_prepare_list,
 
 	//printf("case 1: %s\n", read->id);
 	//exit(-1);
-      } else if (gap_genome_len <= 0) {
+      } else if (gap_genome_len < 0) {
 	// insertion
 	//	cigarset->active[seed_count * 2] = CIGAR_FROM_GAP; //1;
 	//	cigarset->cigars[seed_count * 2] = cigar_new(gap_genome_len, 'I');	
@@ -1687,8 +1743,8 @@ void execute_sw(array_list_t *sw_prepare_list, sa_mapping_batch_t *mapping_batch
       if (query_start > 0) {
 	//	mapping_batch->counters[0]++;
 	cal->invalid = 1;
-	//printf("****** INVALID CAL because case query_start > 0: read %s\n", cal->read->id);
-	//seed_cal_print(cal);
+	printf("****** INVALID CAL because case query_start > 0: read %s\n", cal->read->id);
+	seed_cal_print(cal);
 	//#ifdef _VERBOSE
 	//	exit(-1);
         //#endif // _VERBOSE
@@ -1821,6 +1877,9 @@ void post_process_sw(int sw_post_read_counter, int *sw_post_read,
     // re-construct CIGAR for each CAL (from seed and gap CIGARS)
     for (int i = 0; i < num_cals; i++) {
       cal = array_list_get(i, cal_list);
+
+      if (cal->seed_list->size <= 0) continue;
+      
       //      cal->score = ((-4.0f) * cal->num_mismatches) 
       //	+ ((-10.0f) * cal->num_open_gaps) 
       //	+ ((-0.5f) * cal->num_extend_gaps);
@@ -1993,8 +2052,11 @@ int sa_mapper(void *data) {
 	((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);  
       #endif
 
+      //printf("before cleaning cals...\n");
+      //for (int kk = 0; kk < array_list_size(cal_list); kk++) { seed_cal_print(array_list_get(kk, cal_list)); }
+
       //fill_seed_gaps(cal_list, read, sa_index);
-      clean_cals(cal_list, read, sa_index);
+      clean_cals(&cal_list, read, sa_index);
 
       //printf("after cleaning cals and before preparing sw...\n");
       //for (int kk = 0; kk < array_list_size(cal_list); kk++) { seed_cal_print(array_list_get(kk, cal_list)); }
