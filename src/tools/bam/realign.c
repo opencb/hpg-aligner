@@ -312,12 +312,6 @@ align_launch(char *reference, char *bam, char *output, int threads)
 
 	printf("\n====== Iterations ======\n");
 
-	time_get_mean_slot(D_SLOT_ITERATION, TIME_GLOBAL_STATS, &mean);
-	time_get_min_slot(D_SLOT_ITERATION, TIME_GLOBAL_STATS, &min);
-	time_get_max_slot(D_SLOT_ITERATION, TIME_GLOBAL_STATS, &max);
-	printf("Time per iteration -> %.2f us - min/max = %.2f/%.2f\n",
-			mean*1000000.0, min*1000000.0, max*1000000.0);
-
 	time_get_mean_slot(D_SLOT_IT_PROCESS, TIME_GLOBAL_STATS, &mean);
 	time_get_min_slot(D_SLOT_IT_PROCESS, TIME_GLOBAL_STATS, &min);
 	time_get_max_slot(D_SLOT_IT_PROCESS, TIME_GLOBAL_STATS, &max);
@@ -338,22 +332,16 @@ align_launch(char *reference, char *bam, char *output, int threads)
 
 
 	printf("\n====== I/O ======\n");
-	time_get_mean_slot(D_SLOT_READ, TIME_GLOBAL_STATS, &mean);
-	time_get_min_slot(D_SLOT_READ, TIME_GLOBAL_STATS, &min);
-	time_get_max_slot(D_SLOT_READ, TIME_GLOBAL_STATS, &max);
+	time_get_mean_slot(D_SLOT_ALIG_READ, TIME_GLOBAL_STATS, &mean);
+	time_get_min_slot(D_SLOT_ALIG_READ, TIME_GLOBAL_STATS, &min);
+	time_get_max_slot(D_SLOT_ALIG_READ, TIME_GLOBAL_STATS, &max);
 	printf("Time used for read alignment (mean) -> %.2f us - min/max = %.2f/%.2f\n",
 			mean*1000000.0, min*1000000.0, max*1000000.0);
 
-	time_get_mean_slot(D_SLOT_WRITE, TIME_GLOBAL_STATS, &mean);
-	time_get_min_slot(D_SLOT_WRITE, TIME_GLOBAL_STATS, &min);
-	time_get_max_slot(D_SLOT_WRITE, TIME_GLOBAL_STATS, &max);
+	time_get_mean_slot(D_SLOT_ALIG_WRITE, TIME_GLOBAL_STATS, &mean);
+	time_get_min_slot(D_SLOT_ALIG_WRITE, TIME_GLOBAL_STATS, &min);
+	time_get_max_slot(D_SLOT_ALIG_WRITE, TIME_GLOBAL_STATS, &max);
 	printf("Time used for write alignment (mean) -> %.2f us - min/max = %.2f/%.2f\n",
-			mean*1000000.0, min*1000000.0, max*1000000.0);
-
-	time_get_mean_slot(D_SLOT_SORT, TIME_GLOBAL_STATS, &mean);
-	time_get_min_slot(D_SLOT_SORT, TIME_GLOBAL_STATS, &min);
-	time_get_max_slot(D_SLOT_SORT, TIME_GLOBAL_STATS, &max);
-	printf("Time used for sorting per read (mean) -> %.2f us - min/max = %.2f/%.2f\n",
 			mean*1000000.0, min*1000000.0, max*1000000.0);
 
 #endif

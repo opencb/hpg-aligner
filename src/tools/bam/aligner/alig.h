@@ -42,9 +42,9 @@
 #define ALIG_VER 			ALIG_VER_CURRENT"."ALIG_VER_REVISION"."ALIG_VER_AGE
 
 //OPTIONS
-#define ALIG_LIST_IN_SIZE	10000
+#define ALIG_LIST_IN_SIZE	1000
 #define ALIG_LIST_NEXT_SIZE 1000
-#define ALIG_LIST_COUNT_THRESHOLD_TO_WRITE 1000
+#define ALIG_LIST_COUNT_THRESHOLD_TO_WRITE 900
 
 #define ALIG_REFERENCE_ADDITIONAL_OFFSET 100
 #define ALIG_REFERENCE_CORRECTION_OFFSET 4
@@ -67,22 +67,20 @@
 		D_SLOT_INIT,
 
 		//ITERATION
-		D_SLOT_ITERATION,
 		D_SLOT_IT_PROCESS,
 		D_SLOT_IT_READ,
 		D_SLOT_IT_WRITE,
 
 		//BAM I/0
-		D_SLOT_READ,
-		D_SLOT_WRITE,
+		D_SLOT_ALIG_READ,
+		D_SLOT_ALIG_WRITE,
 
 		//REALIGN
 		D_SLOT_NEXT,
 		D_SLOT_REFERENCE_LOAD,
 		D_SLOT_HAPLO_GET,
 		D_SLOT_REALIG_PER_HAPLO,
-		D_SLOT_NUCLEO_CMP,
-		D_SLOT_SORT
+		D_SLOT_NUCLEO_CMP
 	};
 
 #endif
@@ -118,9 +116,6 @@ typedef struct {
  * REALIGNER CONTEXT
  */
 typedef struct {
-	//Input list
-	linked_list_t *in_list;
-
 	//Reference genome
 	genome_t *genome;
 
@@ -173,7 +168,7 @@ typedef enum {
  * \param[in] genome Context containing reference genome.
  * \param[in] flags Flags to configure realigner behavior. Can be ALIG_LEFT_ALIGN, ALIG_REFERENCE_PRIORITY and ALIG_ORIGINAL_PRIORITY.
  */
-EXTERNC ERROR_CODE alig_init(alig_context_t *context, linked_list_t *in_list, genome_t *genome, uint8_t flags);
+EXTERNC ERROR_CODE alig_init(alig_context_t *context, genome_t *genome, uint8_t flags);
 
 /**
  * \brief Free resources from realigner.
@@ -198,7 +193,8 @@ EXTERNC ERROR_CODE alig_validate(alig_context_t *context);
  *
  * \param[in] context Context to process.
  */
-EXTERNC ERROR_CODE alig_region_next(alig_context_t *context);
+EXTERNC ERROR_CODE alig_region_next(array_list_t *in_bams, alig_context_t *context);
+EXTERNC ERROR_CODE alig_region_filter_read(bam1_t *read, alig_context_t *context);
 
 /**
  * \brief Load reference sequence for present region in context.

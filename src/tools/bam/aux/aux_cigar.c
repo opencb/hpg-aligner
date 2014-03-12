@@ -437,11 +437,14 @@ cigar32_count_indels(uint32_t *cigar, size_t cigar_l, size_t *indels)
 	//assert(cigar_l > 0);
 	assert(indels);
 
+	indel_c = 0;
+
 	if(cigar_l == 0)
+	{
 		return 0;
+	}
 
 	//Iterate cigar elements
-	indel_c = 0;
 	for(i = 0; i < cigar_l; i++)
 	{
 		c_count = cigar[i] >> BAM_CIGAR_SHIFT;	//Get number of bases from cigar
