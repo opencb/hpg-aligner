@@ -12,6 +12,7 @@
 #define CIGAR_FROM_GAP  1
 #define CIGAR_FROM_SEED 2
 
+#define MAX_GAP_LENGTH 4000
 
 //--------------------------------------------------------------------
 // process_right_side & append_seed_linked_list
@@ -815,6 +816,13 @@ array_list_t *create_cals(int num_seeds, fastq_read_t *read,
   cal_mng->min_read_area = read->length;
   cal_mng->read_length = read->length;
 
+  /*
+  if (read->length > 5000) num_seeds = 400;
+  else if (read->length > 1000) num_seeds = 200;
+  else if (read->length > 200) num_seeds = 80;
+  else num_seeds = 20;
+  */
+
   int max_read_area;// = read->length * MISMATCH_PERC;
   int read_pos, read_inc;
   
@@ -1210,18 +1218,90 @@ inline static int is_invalid_cigar(cigar_t *cigar) {
   return (count > min ? 0 : 1);
 }
 
+
+int check_gap_lengths(int max_gap_length, array_list_t *cal_list) {
+  int invalid = 0;
+  int gap_read_len, gap_genome_len;
+  size_t gap_read_start, gap_read_end;
+  size_t gap_genome_start, gap_genome_end;
+  size_t seed_count, num_seeds, num_cals = array_list_size(cal_list);
+
+  seed_cal_t *cal;
+  seed_t *prev_seed, *seed;
+  linked_list_item_t *item;
+
+  for (int i = 0; i < num_cals; i++) {
+    cal = array_list_get(i, cal_list);
+    if (cal->invalid) {
+      invalid = 1;
+      continue;
+    }
+    num_seeds = cal->seed_list->size;
+    if (num_seeds <= 0) {
+      invalid = 1;
+      cal->invalid = 1;
+      continue;
+    }
+
+    // first seed
+    seed = linked_list_get_first(cal->seed_list);
+    if (seed->read_start > max_gap_length) {
+      invalid = 1;
+      cal->invalid = 1;
+      continue;
+    }
+    // seeds at the middle positions
+    prev_seed = seed;
+    for (item = cal->seed_list->first->next; item != NULL; item = item->next) {
+      seed = item->item;
+
+      // gap in read
+      gap_read_start = prev_seed->read_end + 1;
+      gap_read_end = seed->read_start - 1;
+      gap_read_len = gap_read_end - gap_read_start + 1;    
+      if (abs(gap_read_len) > max_gap_length) {
+	invalid = 1;
+	cal->invalid = 1;
+	continue;      
+      }
+
+      // gap in genome
+      gap_genome_start = prev_seed->genome_end + 1;
+      gap_genome_end = seed->genome_start - 1;
+      gap_genome_len = gap_genome_end - gap_genome_start + 1;
+      if (abs(gap_genome_len) > max_gap_length) {
+	invalid = 1;
+	cal->invalid = 1;
+	continue;      
+      }
+      
+      prev_seed = seed;
+    }
+    // last seed
+    seed = linked_list_get_last(cal->seed_list);
+    if (cal->read->length - seed->read_end > max_gap_length) {
+      invalid = 1;
+      cal->invalid = 1;
+      continue;      
+    }
+  }
+
+  return invalid;
+}
+
+
 void clean_cals(array_list_t **list, fastq_read_t *read, sa_index3_t *sa_index) {
 
   seed_t *prev_seed, *seed;
   linked_list_item_t *prev_item, *item;
   linked_list_iterator_t* itr;
 
-  int trim, remove, overlap;
+  int trim, invalid, overlap;
   seed_cal_t *cal;
   array_list_t *cal_list = *list;
   size_t num_cals = array_list_size(cal_list);
 
-  remove = 0;
+  invalid = 0;
   for (int i = 0; i < num_cals; i++) {
     cal = array_list_get(i, cal_list);
     //    printf("in clean_cals:\n");
@@ -1236,7 +1316,10 @@ void clean_cals(array_list_t **list, fastq_read_t *read, sa_index3_t *sa_index) 
 	  //printf("----> INVALID FIRST CIGAR %s (read %s):\n", cigar_to_string(&seed->cigar), read->id);
 	  linked_list_remove_item(item, cal->seed_list);
 	  seed_free(seed);
-	  remove = 1;
+	  if (cal->seed_list->size <= 0) {
+	    invalid = 1;
+	    cal->invalid = 1;
+	  }
 	} else {
 	  break;
 	}
@@ -1255,7 +1338,10 @@ void clean_cals(array_list_t **list, fastq_read_t *read, sa_index3_t *sa_index) 
 	//printf("----> INVALID CIGAR %s (read %s):\n", cigar_to_string(&seed->cigar), read->id);
 	linked_list_remove_item(item, cal->seed_list);
 	seed_free(seed);
-	remove = 1;
+	if (cal->seed_list->size <= 0) {
+	  invalid = 1;
+	  cal->invalid = 1;
+	}
 	//seed_cal_print(cal);
       } else {
 	if ( (prev_seed->read_end >= seed->read_start &&
@@ -1279,7 +1365,10 @@ void clean_cals(array_list_t **list, fastq_read_t *read, sa_index3_t *sa_index) 
 	    
 	    linked_list_remove_item(item, cal->seed_list);
 	    seed_free(seed);
-	    remove = 1;
+	    if (cal->seed_list->size <= 0) {
+	      invalid = 1;
+	      cal->invalid = 1;
+	    }
 	  }
 	} else {
 	  prev_item = item;
@@ -1297,19 +1386,22 @@ void clean_cals(array_list_t **list, fastq_read_t *read, sa_index3_t *sa_index) 
 	if (is_invalid_cigar(&seed->cigar)) {
 	  linked_list_remove_item(item, cal->seed_list);
 	  seed_free(seed);
-	  remove = 1;
+	  if (cal->seed_list->size <= 0) {
+	    invalid = 1;
+	    cal->invalid = 1;
+	  }
 	}
 	item = prev_item;
       }
     }
   }
   
-  if (remove) {
+  if (invalid || check_gap_lengths(MAX_GAP_LENGTH, cal_list)) {
     array_list_t *new_cal_list = array_list_new(MAX_CALS, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
     num_cals = array_list_size(cal_list);
     for (int i = 0; i < num_cals; i++) {
       cal = array_list_get(i, cal_list);
-      if (cal->seed_list->size > 0) {
+      if (!cal->invalid) {
 	array_list_insert(cal, new_cal_list);
 	array_list_set(i, NULL, cal_list);
       }
@@ -1743,8 +1835,8 @@ void execute_sw(array_list_t *sw_prepare_list, sa_mapping_batch_t *mapping_batch
       if (query_start > 0) {
 	//	mapping_batch->counters[0]++;
 	cal->invalid = 1;
-	printf("****** INVALID CAL because case query_start > 0: read %s\n", cal->read->id);
-	seed_cal_print(cal);
+	//printf("****** INVALID CAL because case query_start > 0: read %s\n", cal->read->id);
+	//seed_cal_print(cal);
 	//#ifdef _VERBOSE
 	//	exit(-1);
         //#endif // _VERBOSE

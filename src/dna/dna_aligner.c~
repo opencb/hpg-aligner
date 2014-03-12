@@ -6,6 +6,9 @@ extern int num_dup_reads;
 extern int num_total_dup_reads;
 #endif
 
+extern size_t num_mapped_reads;
+extern size_t num_unmapped_reads;
+
 //--------------------------------------------------------------------
 // main 
 //--------------------------------------------------------------------
@@ -176,9 +179,13 @@ void dna_aligner(options_t *options) {
     printf("----------------------------------------------\n");
     
 
-    //    for (int i = 0; i < NUM_COUNTERS; i++) {
-    //      printf("***** counter[%i] = %i\n", i, counters[i]);
-    //    }
+    printf("----------------------------------------------\n");
+    printf("NUM. READS         : %lu\nNUM. MAPPED READS  : %lu (%0.2f %%)\nNUM. UNMAPPED READS: %lu (%0.2f)\n",
+	   num_mapped_reads + num_unmapped_reads,
+	   num_mapped_reads, 100.0f * num_mapped_reads / (num_mapped_reads + num_unmapped_reads),
+	   num_unmapped_reads, 100.0f * num_unmapped_reads / (num_mapped_reads + num_unmapped_reads));
+    printf("----------------------------------------------\n");
+
 
   #ifdef _TIMING
     char func_name[1024];

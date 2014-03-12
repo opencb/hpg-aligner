@@ -101,6 +101,8 @@ int num_total_dup_reads = 0;
 
 size_t num_mapped_reads = 0;
 size_t num_unmapped_reads = 0;
+size_t num_unmapped_reads_by_invalid_cal = 0;
+size_t num_unmapped_reads_by_cigar_length = 0;
 
 //--------------------------------------------------------------------
 // SAM writer
@@ -134,6 +136,8 @@ int sa_sam_writer(void *data) {
   }
   #endif
 
+  int invalid;
+
   size_t flag, cigar_len, mapped, pnext = 0, tlen = 0;
   char *cigar_string, *rnext = "*";
 
@@ -161,8 +165,11 @@ int sa_sam_writer(void *data) {
 
     mapped = 0;
     if (num_mappings > 0) {
+      invalid = 0;
       for (size_t j = 0; j < num_mappings; j++) {
 	cal = (seed_cal_t *) array_list_get(j, mapping_list);
+
+	if (cal->invalid) invalid = 1;
 
 	if (!cal->invalid && ((cigar_len = cigar_get_length(&cal->cigar) <= read->length))) {
 	  mapped = 1;
@@ -193,6 +200,11 @@ int sa_sam_writer(void *data) {
     if (mapped) {
       num_mapped_reads++;
     } else {
+      if (invalid) {
+	num_unmapped_reads_by_invalid_cal++;
+      } else if (num_mappings > 0) {
+	num_unmapped_reads_by_cigar_length++;
+      }
       num_unmapped_reads++;
       fprintf(out_file, "%s\t4\t*\t0\t0\t*\t*\t0\t0\t%s\t%s\n", 
 	      read->id,
