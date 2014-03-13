@@ -24,6 +24,7 @@
 #include <stdint.h>
 #include <limits.h>
 #include <stddef.h>
+#include <unistd.h>
 
 #include <omp.h>
 
@@ -42,9 +43,9 @@
 #define ALIG_VER 			ALIG_VER_CURRENT"."ALIG_VER_REVISION"."ALIG_VER_AGE
 
 //OPTIONS
-#define ALIG_LIST_IN_SIZE	1000
+#define ALIG_LIST_IN_SIZE	10000
 #define ALIG_LIST_NEXT_SIZE 1000
-#define ALIG_LIST_COUNT_THRESHOLD_TO_WRITE 900
+#define ALIG_LIST_COUNT_THRESHOLD_TO_WRITE 500
 
 #define ALIG_REFERENCE_ADDITIONAL_OFFSET 100
 #define ALIG_REFERENCE_CORRECTION_OFFSET 4
@@ -193,8 +194,7 @@ EXTERNC ERROR_CODE alig_validate(alig_context_t *context);
  *
  * \param[in] context Context to process.
  */
-EXTERNC ERROR_CODE alig_region_next(array_list_t *in_bams, alig_context_t *context);
-EXTERNC ERROR_CODE alig_region_filter_read(bam1_t *read, alig_context_t *context);
+EXTERNC ERROR_CODE alig_region_next(bam1_t **v_bams, size_t v_bams_l, int force_incomplete, alig_context_t *context);
 
 /**
  * \brief Load reference sequence for present region in context.
