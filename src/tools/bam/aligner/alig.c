@@ -34,9 +34,9 @@ uint64_t cigar_changed = 0;
 char log_msg[1024];
 char aux_msg[512];
 
-static inline ERROR_CODE alig_aux_write_to_disk(array_list_t *write_buffer, bam_file_t *output_bam_f, uint8_t force);
-static inline ERROR_CODE alig_aux_read_from_disk(circular_buffer_t *read_buffer, bam_file_t *input_bam_f);
-static inline ERROR_CODE alig_region_filter_read(bam1_t *read, alig_context_t *context);
+static inline ERROR_CODE alig_aux_write_to_disk(array_list_t *write_buffer, bam_file_t *output_bam_f, uint8_t force) __ATTR_HOT;
+static inline ERROR_CODE alig_aux_read_from_disk(circular_buffer_t *read_buffer, bam_file_t *input_bam_f) __ATTR_HOT;
+static inline ERROR_CODE alig_region_filter_read(bam1_t *read, array_list_t *list, alig_context_t *context) __ATTR_HOT __ATTR_INLINE;
 
 /**
  * CONTEXT
@@ -200,7 +200,7 @@ alig_validate(alig_context_t *context)
 ERROR_CODE
 alig_region_next(bam1_t **v_bams, size_t v_bams_l, int force_incomplete, alig_context_t *context)
 {
-	ERROR_CODE err;
+	ERROR_CODE err, ret = NO_ERROR;
 	int i;
 
 	//List
@@ -214,6 +214,9 @@ alig_region_next(bam1_t **v_bams, size_t v_bams_l, int force_incomplete, alig_co
 	size_t interval_read_begin;
 	size_t interval_read_end;
 
+	//Aux list
+	static array_list_t *aux_list = NULL;
+
 	assert(context);
 
 	//Validate context
@@ -226,16 +229,15 @@ alig_region_next(bam1_t **v_bams, size_t v_bams_l, int force_incomplete, alig_co
 	//Set last readed to 0
 	context->last_readed_count = 0;
 
-	//Get first read
-	read = v_bams[0];
-	if(read == NULL)
-	{
-		//No more input reads
-		return NO_ERROR;
-	}
-
 	//Reset interval
 	memset(&context->region, 0, sizeof(alig_region_t));
+
+	//Init aux list
+	if(!aux_list)
+	{
+		aux_list = array_list_new(ALIG_LIST_NEXT_SIZE, 1.2f, 0);
+	}
+	array_list_clear(aux_list, NULL);
 
 	//Read alignments until interval reached
 	list_l = v_bams_l;
@@ -244,9 +246,10 @@ alig_region_next(bam1_t **v_bams, size_t v_bams_l, int force_incomplete, alig_co
 	{
 		//Get next read
 		read = v_bams[i];
+		assert(read);
 
 		//Filter read to obtain regions
-		err = alig_region_filter_read(read, context);
+		err = alig_region_filter_read(read, aux_list, context);
 		if(err)
 		{
 			if(err == ALIG_PAST_INTERVAL)
@@ -267,15 +270,21 @@ alig_region_next(bam1_t **v_bams, size_t v_bams_l, int force_incomplete, alig_co
 	}
 
 	//Interval is found?
-	if(i == list_l && force_incomplete == 0)
+	if(err != ALIG_PAST_INTERVAL)
 	{
-		//Not enough reads
-		return ALIG_INCOMPLETE_INTERVAL;
+		if(force_incomplete == 0)
+		{
+			//Incomplete or inexistent interval
+			return ALIG_INCOMPLETE_INTERVAL;
+		}
+
+		//Set return
+		ret = ALIG_INCOMPLETE_INTERVAL;
 	}
 
 	//Update progress
 	context->read_count += reads;
-	context->last_readed_count += reads;
+	context->last_readed_count = reads;
 
 	//There is an valid interval?
 	if(context->region.valid)
@@ -286,38 +295,30 @@ alig_region_next(bam1_t **v_bams, size_t v_bams_l, int force_incomplete, alig_co
 		LOG_INFO(log_msg);
 
 		//Save interval reads in filtered list
-		list_l = v_bams_l;
+		list_l = array_list_size(aux_list);
 		for(i = 0; i < list_l; i++)
 		{
 			//Get read
-			read = v_bams[i];
+			read = array_list_get(i, aux_list);
+			assert(read);
 
-			//FILTERS: MAP QUALITY = 0, BAM_FUNMAP | BAM_FSECONDARY | BAM_FQCFAIL | BAM_FDUP, DIFFERENT MATE CHROM, 1 INDEL, CIGAR PRESENT
-			if( read
-				&& read->core.qual != 0
-				&& !(read->core.flag & BAM_DEF_MASK)
-				&& read->core.mtid == read->core.tid
-				&& read->core.n_cigar != 0
-				)
+			if(region_bam_overlap(read, &context->region))
 			{
-				if(region_bam_overlap(read, &context->region))
-				{
-					//Logging
-					sprintf(log_msg, "%s \t%d:%d\n", bam1_qname(read), read->core.tid + 1, read->core.pos + 1);
-					LOG_INFO(log_msg);
+				//Logging
+				sprintf(log_msg, "%s \t%d:%d\n", bam1_qname(read), read->core.tid + 1, read->core.pos + 1);
+				LOG_INFO(log_msg);
 
-					//Add to filtered read list
-					array_list_insert(read, context->filtered_list);
-				}
+				//Add to filtered read list
+				array_list_insert(read, context->filtered_list);
 			}
-		}
+		} //For
 	} //Valid region if
 
-	return NO_ERROR;
+	return ret;
 }
 
 static inline ERROR_CODE
-alig_region_filter_read(bam1_t *read, alig_context_t *context)
+alig_region_filter_read(bam1_t *read, array_list_t *list, alig_context_t *context)
 {
 	int err;
 
@@ -326,7 +327,6 @@ alig_region_filter_read(bam1_t *read, alig_context_t *context)
 
 	//Read
 	int32_t read_pos;
-	size_t indels;
 	size_t interval_read_begin;
 	size_t interval_read_end;
 
@@ -337,9 +337,6 @@ alig_region_filter_read(bam1_t *read, alig_context_t *context)
 		&& read->core.n_cigar != 0
 		)
 	{
-		//Count indels
-		cigar32_count_indels(bam1_cigar(read), read->core.n_cigar, &indels);
-
 		//Get read position
 		read_pos = read->core.pos;
 
@@ -403,6 +400,9 @@ alig_region_filter_read(bam1_t *read, alig_context_t *context)
 				return ALIG_PAST_INTERVAL;
 			}
 		}//Cases if
+
+		//Insert to list
+		array_list_insert(read, list);
 
 	}	// Filters if
 
@@ -968,13 +968,6 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 
 		//while(in_buffer.end_condition == 0 || in_buffer.readed > 0)
 		{
-			/*#pragma omp single
-			{
-				printf("----------\n");
-				printf("Ended : %d\n", in_buffer.end_condition);
-				printf("Readed: %d\n", in_buffer.readed);
-				printf("Proces: %d\n", in_buffer.processed);
-			}*/
 
 			#pragma omp  sections
 			{
@@ -1022,13 +1015,30 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 					//Clear context
 					alig_region_clear(&context);
 
-					//Load next reads
+					//Load next reads until chrom change
 					array_list_clear(read_buffer, NULL);
 					filled = in_buffer.readed - in_buffer.processed;
+					int32_t chrom;
+					int chrom_changed = 0;
+					int force_region = 0;
+					chrom = in_buffer.buffer[(in_buffer.head_idx + in_buffer.processed) % in_buffer.size]->core.tid;
 					for(i = 0; i < filled; i++)
 					{
+						//Get read
 						read = in_buffer.buffer[(in_buffer.head_idx + in_buffer.processed + i) % in_buffer.size];
-						array_list_insert(read, read_buffer);
+
+						//Check if chrom changed
+						if(chrom == read->core.tid)
+						{
+							//Same chrom so continue
+							array_list_insert(read, read_buffer);
+						}
+						else
+						{
+							//Chrom changed!
+							chrom_changed = 1;
+							break;
+						}
 					}
 
 #ifdef D_TIME_DEBUG
@@ -1037,13 +1047,28 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 					//Load next region
 					v_reads = (bam1_t **)read_buffer->items;
 					v_reads_l = read_buffer->size;
-					err = alig_region_next(v_reads, v_reads_l, in_buffer.end_condition, &context);
+					err = alig_region_next(v_reads, v_reads_l, 1, &context);
 					if(err)
 					{
 						if(err != ALIG_INCOMPLETE_INTERVAL)
 						{
-							fprintf(stderr, "ERROR: Cannot obtain next region in buffer of size %d, error code = %d\n", err);
+							LOG_ERROR("Cannot obtain next region\n");
+							printf(stderr, "ERROR: Cannot obtain next region in buffer of size %d, error code = %d\n", err);
 							fflush(stdout);
+							omp_set_lock(&in_buffer.lock);
+							in_buffer.end_condition = 1;
+							omp_unset_lock(&in_buffer.lock);
+							break;
+						}
+						else
+						{
+							//Provoked by chrom change or end contition?
+							if(chrom_changed == 0 && in_buffer.end_condition == 0)
+							{
+								//Blocked
+								printf("Forcing region extraction on whole input buffer, i need bigger input buffer!\n");
+								LOG_WARN("Forcing region extraction on whole input buffer, i need bigger input buffer!\n");
+							}
 						}
 					}
 #ifdef D_TIME_DEBUG
@@ -1122,14 +1147,27 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 						v_reads += context.last_readed_count;
 						v_reads_l -= context.last_readed_count;
 
-#ifdef D_TIME_DEBUG
-						aux_time2 = omp_get_wtime();
-#endif
 						//Clear context
 						alig_region_clear(&context);
 
+#ifdef D_TIME_DEBUG
+						aux_time2 = omp_get_wtime();
+#endif
 						//Get next region
-						alig_region_next(v_reads, v_reads_l, in_buffer.end_condition, &context);
+						err = alig_region_next(v_reads, v_reads_l, chrom_changed || in_buffer.end_condition, &context);
+						if(err)
+						{
+							if(err != ALIG_INCOMPLETE_INTERVAL)
+							{
+								LOG_ERROR("Cannot obtain next region\n");
+								fprintf(stderr, "ERROR: Cannot obtain next region in buffer of size %d, error code = %d\n", err);
+								fflush(stdout);
+								omp_set_lock(&in_buffer.lock);
+								in_buffer.end_condition = 1;
+								omp_unset_lock(&in_buffer.lock);
+								break;
+							}
+						}
 #ifdef D_TIME_DEBUG
 						aux_time2 = omp_get_wtime() - aux_time2;
 						time_add_time_slot(D_SLOT_NEXT, TIME_GLOBAL_STATS, aux_time2);
@@ -1161,7 +1199,7 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 						//Update buffer
 						in_buffer.head_idx = (in_buffer.head_idx + list_l) % in_buffer.size;
 						in_buffer.readed -= list_l;
-						in_buffer.processed -= list_l;
+						in_buffer.processed = 0;
 					} //Fill write buffer
 
 #ifdef D_TIME_DEBUG
@@ -1172,19 +1210,9 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 						swap_buffer_ptr = write_buffer;
 						write_buffer = proc_buffer;
 						proc_buffer = swap_buffer_ptr;
-
 						omp_unset_lock(&in_buffer.writer);
 				} //Read section
 			}//OMP SECTIONS
-
-			//#pragma omp barrier
-
-			/*#pragma omp single
-			{
-				swap_buffer_ptr = write_buffer;
-				write_buffer = proc_buffer;
-				proc_buffer = swap_buffer_ptr;
-			}*/
 
 		} //While
 

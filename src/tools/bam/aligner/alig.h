@@ -37,8 +37,8 @@
 #include "alig_region.h"
 
 //VERSION
-#define ALIG_VER_CURRENT		"0"
-#define ALIG_VER_REVISION		"4"
+#define ALIG_VER_CURRENT		"1"
+#define ALIG_VER_REVISION		"0"
 #define ALIG_VER_AGE			"0"
 #define ALIG_VER 			ALIG_VER_CURRENT"."ALIG_VER_REVISION"."ALIG_VER_AGE
 
@@ -192,6 +192,9 @@ EXTERNC ERROR_CODE alig_validate(alig_context_t *context);
 /**
  * \brief Get next region of reads to process.
  *
+ * \param[in] v_bams Vector containing input bams.
+ * \param[in] v_bams_l Length of input vector.
+ * \param[in] force_incomplete Force region complete even if last input bam is inside the region.
  * \param[in] context Context to process.
  */
 EXTERNC ERROR_CODE alig_region_next(bam1_t **v_bams, size_t v_bams_l, int force_incomplete, alig_context_t *context);

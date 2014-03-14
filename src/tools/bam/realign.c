@@ -174,7 +174,8 @@ align_launch(char *reference, char *bam, char *output, int threads)
 
 	init_log();
 	LOG_FILE("realign.log","w");
-	LOG_LEVEL(LOG_ERROR_LEVEL);
+	LOG_LEVEL(LOG_INFO_LEVEL);
+	//LOG_LEVEL(LOG_ERROR_LEVEL);
 
 	//Set schedule if not defined
 	setenv("OMP_SCHEDULE", "static", 0);
@@ -295,19 +296,19 @@ align_launch(char *reference, char *bam, char *output, int threads)
 	time_get_mean_slot(D_SLOT_NEXT, TIME_GLOBAL_STATS, &mean);
 	time_get_min_slot(D_SLOT_NEXT, TIME_GLOBAL_STATS, &min);
 	time_get_max_slot(D_SLOT_NEXT, TIME_GLOBAL_STATS, &max);
-	printf("Time used for read region extraction -> %.2f us - min/max = %.2f/%.2f\n",
+	printf("Time used for alignment region extraction -> %.2f us - min/max = %.2f/%.2f\n",
 				mean*1000000.0, min*1000000.0, max*1000000.0);
 
 	time_get_mean_slot(D_SLOT_HAPLO_GET, TIME_GLOBAL_STATS, &mean);
 	time_get_min_slot(D_SLOT_HAPLO_GET, TIME_GLOBAL_STATS, &min);
 	time_get_max_slot(D_SLOT_HAPLO_GET, TIME_GLOBAL_STATS, &max);
-	printf("Time used for read haplotype extraction -> %.2f us - min/max = %.2f/%.2f\n",
+	printf("Time used for alignment haplotype extraction -> %.2f us - min/max = %.2f/%.2f\n",
 			mean*1000000.0, min*1000000.0, max*1000000.0);
 
 	time_get_mean_slot(D_SLOT_REALIG_PER_HAPLO, TIME_GLOBAL_STATS, &mean);
 	time_get_min_slot(D_SLOT_REALIG_PER_HAPLO, TIME_GLOBAL_STATS, &min);
 	time_get_max_slot(D_SLOT_REALIG_PER_HAPLO, TIME_GLOBAL_STATS, &max);
-	printf("Time used for read realign per haplotype -> %.2f us - min/max = %.2f/%.2f\n",
+	printf("Time used for alignment realign per haplotype -> %.2f us - min/max = %.2f/%.2f\n",
 			mean*1000000.0, min*1000000.0, max*1000000.0);
 
 	printf("\n====== Iterations ======\n");
