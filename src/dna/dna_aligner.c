@@ -186,10 +186,12 @@ void dna_aligner(options_t *options) {
 	   num_mapped_reads + num_unmapped_reads,
 	   num_mapped_reads, 100.0f * num_mapped_reads / (num_mapped_reads + num_unmapped_reads),
 	   num_unmapped_reads, 100.0f * num_unmapped_reads / (num_mapped_reads + num_unmapped_reads));
+    /*
     printf("\tNUM. UNMAPPED READS BY INVALID CAL  : %lu (%0.2f %%)\n",
 	   num_unmapped_reads_by_invalid_cal, 100.0f * num_unmapped_reads_by_invalid_cal / (num_mapped_reads + num_unmapped_reads));
     printf("\tNUM. UNMAPPED READS BY CIGAR LENGTH : %lu (%0.2f %%)\n",
 	   num_unmapped_reads_by_cigar_length, 100.0f * num_unmapped_reads_by_cigar_length / (num_mapped_reads + num_unmapped_reads));
+    */
     printf("----------------------------------------------\n");
 
 

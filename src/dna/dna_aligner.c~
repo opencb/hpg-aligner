@@ -8,6 +8,8 @@ extern int num_total_dup_reads;
 
 extern size_t num_mapped_reads;
 extern size_t num_unmapped_reads;
+extern size_t num_unmapped_reads_by_invalid_cal;
+extern size_t num_unmapped_reads_by_cigar_length;
 
 //--------------------------------------------------------------------
 // main 
@@ -180,10 +182,14 @@ void dna_aligner(options_t *options) {
     
 
     printf("----------------------------------------------\n");
-    printf("NUM. READS         : %lu\nNUM. MAPPED READS  : %lu (%0.2f %%)\nNUM. UNMAPPED READS: %lu (%0.2f)\n",
+    printf("NUM. READS         : %lu\nNUM. MAPPED READS  : %lu (%0.2f %%)\nNUM. UNMAPPED READS: %lu (%0.2f %%)\n",
 	   num_mapped_reads + num_unmapped_reads,
 	   num_mapped_reads, 100.0f * num_mapped_reads / (num_mapped_reads + num_unmapped_reads),
 	   num_unmapped_reads, 100.0f * num_unmapped_reads / (num_mapped_reads + num_unmapped_reads));
+    printf("\tNUM. UNMAPPED READS BY INVALID CAL  : %lu (%0.2f %%)\n",
+	   num_unmapped_reads_by_invalid_cal, 100.0f * num_unmapped_reads_by_invalid_cal / (num_mapped_reads + num_unmapped_reads));
+    printf("\tNUM. UNMAPPED READS BY CIGAR LENGTH : %lu (%0.2f %%)\n",
+	   num_unmapped_reads_by_cigar_length, 100.0f * num_unmapped_reads_by_cigar_length / (num_mapped_reads + num_unmapped_reads));
     printf("----------------------------------------------\n");
 
 

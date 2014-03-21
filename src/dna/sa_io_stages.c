@@ -169,9 +169,16 @@ int sa_sam_writer(void *data) {
       for (size_t j = 0; j < num_mappings; j++) {
 	cal = (seed_cal_t *) array_list_get(j, mapping_list);
 
+	cigar_len = cigar_get_length(&cal->cigar);
 	if (cal->invalid) invalid = 1;
 
-	if (!cal->invalid && ((cigar_len = cigar_get_length(&cal->cigar) <= read->length))) {
+	//	if (cigar_len != strlen(read->quality)) {
+	//	  printf("mismatch cigar (%s, %i) and quality length (%i): read length = %i, id = %s\n",
+	//		 cigar_to_string(&cal->cigar), cigar_len, strlen(read->quality), read->length, read->id);
+	//	  exit(-1);
+	//	}
+
+	if (!cal->invalid && (cigar_len == read->length)) {
 	  mapped = 1;
 	  flag = (cal->strand ? 16 : 0);
 	  cigar_string = cigar_to_string(&cal->cigar);
@@ -200,11 +207,13 @@ int sa_sam_writer(void *data) {
     if (mapped) {
       num_mapped_reads++;
     } else {
+      /*
       if (invalid) {
 	num_unmapped_reads_by_invalid_cal++;
       } else if (num_mappings > 0) {
 	num_unmapped_reads_by_cigar_length++;
       }
+      */
       num_unmapped_reads++;
       fprintf(out_file, "%s\t4\t*\t0\t0\t*\t*\t0\t0\t%s\t%s\n", 
 	      read->id,

@@ -12,7 +12,7 @@
 #define CIGAR_FROM_GAP  1
 #define CIGAR_FROM_SEED 2
 
-#define MAX_GAP_LENGTH 4000
+#define MAX_GAP_LENGTH 2000
 
 //--------------------------------------------------------------------
 // process_right_side & append_seed_linked_list
@@ -1834,7 +1834,7 @@ void execute_sw(array_list_t *sw_prepare_list, sa_mapping_batch_t *mapping_batch
     } else {
       if (query_start > 0) {
 	//	mapping_batch->counters[0]++;
-	cal->invalid = 1;
+	//cal->invalid = 1;
 	//printf("****** INVALID CAL because case query_start > 0: read %s\n", cal->read->id);
 	//seed_cal_print(cal);
 	//#ifdef _VERBOSE
@@ -1860,9 +1860,10 @@ void execute_sw(array_list_t *sw_prepare_list, sa_mapping_batch_t *mapping_batch
 	  }
 	} else {
 	  //printf("case query_start > 0 and ref_start = 0 (I): read %s\n", cal->read->id);
-	  cigar_append_op(query_start, '=', cigar);      
+	  cigar_append_op(query_start, 'I', cigar);      
 	}
       } else if (ref_start > 0) {
+	cigar_append_op(ref_start, 'D', cigar);      
 	//	printf("case ref_start > 0\n");
 	//	exit(-1);
 	//cigar_append_op(ref_start, 'D', cigar);      
