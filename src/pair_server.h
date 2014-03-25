@@ -59,8 +59,32 @@ void pair_server_input_init(pair_mng_t *pair_mng, report_optarg_t *report_optarg
 
 //====================================================================================
 
+typedef struct pair {
+  int index1;
+  int index2;
+  float score;
+} pair_t;
+
+inline static pair_t *pair_new(int index1, int index2, float score) {
+  pair_t *p = (pair_t *) calloc(1, sizeof(pair_t));
+  p->index1 = index1;
+  p->index2 = index2;
+  p->score = score;
+  return p;
+}
+
+inline static void pair_free(pair_t *p) {
+  if (p) {
+    free(p);
+  }
+}
+
+
+//====================================================================================
+
 void pair_server(pair_server_input_t* input);
 void prepare_pair_server(pair_server_input_t* input);
+
 //------------------------------------------------------------------------------------
 
 int apply_pair(pair_server_input_t* input, batch_t *batch);

@@ -136,15 +136,12 @@ int sa_sam_writer(void *data) {
   }
   #endif
 
-  int invalid;
-
-  size_t flag, cigar_len, mapped, pnext = 0, tlen = 0;
+  size_t flag, pnext = 0, tlen = 0;
   char *cigar_string, *rnext = "*";
 
   fastq_read_t *read;
   array_list_t *read_list = mapping_batch->fq_reads;
 
-  seed_cal_t *cal;
   array_list_t *mapping_list;
   FILE *out_file = (FILE *) wf_batch->writer_input->bam_file;
 
@@ -152,34 +149,86 @@ int sa_sam_writer(void *data) {
 
   size_t num_reads, num_mappings;
   num_reads = mapping_batch->num_reads;
-  for (size_t i = 0; i < num_reads; i++) {
-    read = (fastq_read_t *) array_list_get(i, read_list);
-    mapping_list = mapping_batch->mapping_lists[i];
-    num_mappings = array_list_size(mapping_list);
-    #ifdef _VERBOSE
-    if (num_mappings > 1) {
-      num_dup_reads++;
-      num_total_dup_reads += num_mappings;
+
+  if (mapping_batch->options->pair_mode != SINGLE_END_MODE) {
+    // PAIR MODE
+    alignment_t *alig;
+    for (size_t i = 0; i < num_reads; i++) {
+      read = (fastq_read_t *) array_list_get(i, read_list);
+      mapping_list = mapping_batch->mapping_lists[i];
+      num_mappings = array_list_size(mapping_list);
+      #ifdef _VERBOSE
+      if (num_mappings > 1) {
+	num_dup_reads++;
+	num_total_dup_reads += num_mappings;
+      }
+      #endif
+      
+      if (num_mappings > 0) {
+	num_mapped_reads++;
+	for (size_t j = 0; j < num_mappings; j++) {
+	  alig = (alignment_t *) array_list_get(j, mapping_list);
+
+	  flag = 0;
+	  if (alig->is_paired_end)                              flag += BAM_FPAIRED;
+	  if (alig->is_paired_end_mapped)                       flag += BAM_FPROPER_PAIR;
+	  if (!alig->is_seq_mapped)                             flag += BAM_FUNMAP;   
+	  if ((!alig->is_mate_mapped) && (alig->is_paired_end)) flag += BAM_FMUNMAP;
+	  if (alig->seq_strand)                                 flag += BAM_FREVERSE;
+	  if (alig->mate_strand)                                flag += BAM_FMREVERSE;
+	  if (alig->pair_num == 1)	                        flag += BAM_FREAD1;
+	  if (alig->pair_num == 2)                              flag += BAM_FREAD2;
+	  if (alig->secondary_alignment)                        flag += BAM_FSECONDARY;
+	  if (alig->fails_quality_check)                        flag += BAM_FQCFAIL;
+	  if (alig->pc_optical_duplicate)                       flag += BAM_FDUP;
+
+	  fprintf(out_file, "%s\t%i\t%s\t%lu\t%i\t%s\t%s\t%lu\t%i\t%s\t%s\t%s\n", 
+		  read->id,
+		  flag,
+		  genome->chrom_names[alig->chromosome],
+		  alig->position + 1,
+		  alig->map_quality,
+		  alig->cigar,
+		  genome->chrom_names[alig->mate_chromosome],
+		  alig->mate_position,
+		  alig->template_length,
+		  read->sequence,
+		  read->quality,
+		  (alig->optional_fields ? alig->optional_fields : "")
+		  );
+
+	}
+	alignment_free(alig);	 
+      } else {
+	num_unmapped_reads++;
+	fprintf(out_file, "%s\t4\t*\t0\t0\t*\t*\t0\t0\t%s\t%s\n", 
+		read->id,
+		read->sequence,
+		read->quality
+		);
+      }
+      
+      array_list_free(mapping_list, (void *) NULL);
     }
-    #endif
-
-    mapped = 0;
-    if (num_mappings > 0) {
-      invalid = 0;
-      for (size_t j = 0; j < num_mappings; j++) {
-	cal = (seed_cal_t *) array_list_get(j, mapping_list);
-
-	cigar_len = cigar_get_length(&cal->cigar);
-	if (cal->invalid) invalid = 1;
-
-	//	if (cigar_len != strlen(read->quality)) {
-	//	  printf("mismatch cigar (%s, %i) and quality length (%i): read length = %i, id = %s\n",
-	//		 cigar_to_string(&cal->cigar), cigar_len, strlen(read->quality), read->length, read->id);
-	//	  exit(-1);
-	//	}
-
-	if (!cal->invalid && (cigar_len == read->length)) {
-	  mapped = 1;
+  } else {
+    // SINGLE MODE
+    seed_cal_t *cal;
+    for (size_t i = 0; i < num_reads; i++) {
+      read = (fastq_read_t *) array_list_get(i, read_list);
+      mapping_list = mapping_batch->mapping_lists[i];
+      num_mappings = array_list_size(mapping_list);
+      #ifdef _VERBOSE
+      if (num_mappings > 1) {
+	num_dup_reads++;
+	num_total_dup_reads += num_mappings;
+      }
+      #endif
+      
+      if (num_mappings > 0) {
+	num_mapped_reads++;
+	for (size_t j = 0; j < num_mappings; j++) {
+	  cal = (seed_cal_t *) array_list_get(j, mapping_list);
+	  
 	  flag = (cal->strand ? 16 : 0);
 	  cigar_string = cigar_to_string(&cal->cigar);
 	  fprintf(out_file, "%s\t%i\t%s\t%lu\t%i\t%s\t%s\t%lu\t%lu\t%s\t%s\tNM:i:%i\n", 
@@ -199,29 +248,17 @@ int sa_sam_writer(void *data) {
 	  free(cigar_string);
 	}
 	seed_cal_free(cal);	 
+      } else {
+	num_unmapped_reads++;
+	fprintf(out_file, "%s\t4\t*\t0\t0\t*\t*\t0\t0\t%s\t%s\n", 
+		read->id,
+		read->sequence,
+		read->quality
+		);
       }
+      
+      array_list_free(mapping_list, (void *) NULL);
     }
-
-    array_list_free(mapping_list, (void *) NULL);
-
-    if (mapped) {
-      num_mapped_reads++;
-    } else {
-      /*
-      if (invalid) {
-	num_unmapped_reads_by_invalid_cal++;
-      } else if (num_mappings > 0) {
-	num_unmapped_reads_by_cigar_length++;
-      }
-      */
-      num_unmapped_reads++;
-      fprintf(out_file, "%s\t4\t*\t0\t0\t*\t*\t0\t0\t%s\t%s\n", 
-	      read->id,
-	      read->sequence,
-	      read->quality
-	      );
-    }
-
   }
 
   // free memory
@@ -264,7 +301,7 @@ int sa_bam_writer(void *data) {
   sa_mapping_batch_t *mapping_batch = (sa_mapping_batch_t *) wf_batch->mapping_batch;
   if (mapping_batch == NULL) {
     printf("bam_writer1: error, NULL mapping batch\n");
-    return;
+    return 0;
   }
 
   //  for (int i = 0; i < NUM_COUNTERS; i++) {
@@ -306,9 +343,11 @@ int sa_bam_writer(void *data) {
     if (num_mappings > 0) {
       num_mapped_reads++;
       for (size_t j = 0; j < num_mappings; j++) {
-	bam1 = (bam1_t *) array_list_get(j, mapping_list);
+	alig = (alignment_t *) array_list_get(j, mapping_list);
+	bam1 = convert_to_bam(alig, 33);
 	bam_fwrite(bam1, out_file);
 	bam_destroy1(bam1);
+	alignment_free(alig);
       }
     } else {
       num_unmapped_reads++;

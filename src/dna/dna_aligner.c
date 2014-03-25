@@ -162,8 +162,13 @@ void dna_aligner(options_t *options) {
     // create and initialize workflow
     workflow_t *wf = workflow_new();
     
-    workflow_stage_function_t stage_functions[] = {sa_mapper};
-    char *stage_labels[] = {"SA mapper"};
+    workflow_stage_function_t stage_functions[1];
+    char *stage_labels[1] = {"SA mapper"};
+    if (options->pair_mode == SINGLE_END_MODE) {
+      stage_functions[0] = sa_single_mapper;
+    } else {
+      stage_functions[0] = sa_pair_mapper;
+    }
     workflow_set_stages(1, &stage_functions, stage_labels, wf);
     
     // optional producer and consumer functions

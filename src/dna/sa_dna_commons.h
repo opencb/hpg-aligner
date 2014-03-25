@@ -7,6 +7,7 @@
 #include "options.h"
 #include "buffers.h"
 #include "cal_seeker.h"
+#include "pair_server.h"
 
 #include "sa/sa_index3.h"
 
@@ -72,6 +73,9 @@ typedef struct sa_mapping_batch {
   #ifdef _TIMING
   double func_times[NUM_TIMING];
   #endif
+
+  options_t *options;
+
   array_list_t *fq_reads;
   array_list_t **mapping_lists;
 } sa_mapping_batch_t;
@@ -820,6 +824,7 @@ typedef struct seed_cal {
   int read_area;
   int invalid;
 
+  int cigar_len;
 
   int num_mismatches;
   int num_open_gaps;
@@ -851,6 +856,8 @@ static inline seed_cal_t *seed_cal_new(const size_t chromosome_id,
   p->AS = 0;
   p->read_area = 0;
   p->invalid = 0;
+
+  p->cigar_len = 0;
 
   p->num_mismatches = 0;
   p->num_open_gaps = 0;
@@ -902,6 +909,7 @@ static inline void seed_cal_set_cigar_by_seed(seed_t *seed, seed_cal_t *cal) {
 }
 
 //--------------------------------------------------------------------
+void print_seed(char *msg, seed_t *s);
 
 static inline void seed_cal_print(seed_cal_t *cal) {
   printf(" CAL (%c)[%lu:%lu-%lu] (%s, x:%i, og:%i, eg:%i): (read id %s)\n", 
@@ -933,20 +941,34 @@ float get_max_score(array_list_t *cal_list);
 int get_min_num_mismatches(array_list_t *cal_list);
 int get_max_read_area(array_list_t *cal_list);
 
+//--------------------------------------------------------------------
+
 void filter_cals_by_min_read_area(int read_area, array_list_t **list);
 void filter_cals_by_max_read_area(int read_area, array_list_t **list);
 void filter_cals_by_max_score(float score, array_list_t **list);
 void filter_cals_by_max_num_mismatches(int num_mismatches, array_list_t **list);
+void filter_cals_by_pair_mode(int pair_mode, int pair_min_distance, int pair_max_distance, 
+			      int num_lists, array_list_t **cal_lists);
+
+//--------------------------------------------------------------------
+
+void create_bam_alignments(array_list_t *cal_list, fastq_read_t *read, 
+		       array_list_t *mapping_list);
 
 void create_alignments(array_list_t *cal_list, fastq_read_t *read, 
-		       array_list_t *mapping_list, sa_mapping_batch_t *mapping_batch);
+		       int bam_format, array_list_t *mapping_list);
+
+//--------------------------------------------------------------------
 
 void display_suffix_mappings(int strand, size_t r_start, size_t suffix_len, 
 			     size_t low, size_t high, sa_index3_t *sa_index);
-void print_seed(char *msg, seed_t *s);
 void display_sequence(uint j, sa_index3_t *index, uint len);
 char *get_subsequence(char *seq, size_t start, size_t len);
 void display_cmp_sequences(fastq_read_t *read, sa_index3_t *sa_index);
+
+//--------------------------------------------------------------------
+
+void complete_pairs(sa_mapping_batch_t *batch);
 
 //--------------------------------------------------------------------
 //--------------------------------------------------------------------

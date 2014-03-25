@@ -257,6 +257,8 @@ void append_seed_linked_list(seed_cal_t *cal,
     cal->start = ((seed_t*) linked_list_get_first(seed_list))->genome_start;
     cal->end = ((seed_t *) linked_list_get_last(seed_list))->genome_end;
   }
+
+  linked_list_iterator_free(itr);
 }
 
 //--------------------------------------------------------------------
@@ -510,13 +512,13 @@ void generate_cals_from_exact_read(int strand, fastq_read_t *read,
   seed_cal_t *cal;
   cigar_t *cigar;
   seed_t *seed;
-  linked_list_t *seed_list;
+  //  linked_list_t *seed_list;
   
   for (size_t suff = low; suff <= high; suff++) {
     chrom = sa_index->CHROM[suff];
     g_start = sa_index->SA[suff] - sa_index->genome->chrom_offsets[chrom];
     g_end = g_start + read->length - 1;
-    seed_list = linked_list_new(COLLECTION_MODE_ASYNCHRONIZED);
+    //    seed_list = linked_list_new(COLLECTION_MODE_ASYNCHRONIZED);
     seed = seed_new(0, read->length - 1, g_start, g_end);
     seed->chromosome_id = chrom;
     seed->strand = strand;
@@ -2053,8 +2055,6 @@ void post_process_sw(int sw_post_read_counter, int *sw_post_read,
 
       //printf("before computing score..\n");
       //seed_cal_print(cal);
-
-      cal->score = cigar_compute_score(5.0f, -4.0f, -10.0f, -0.05f, cigar);
     }
   }
 
@@ -2069,7 +2069,7 @@ void post_process_sw(int sw_post_read_counter, int *sw_post_read,
 // sa mapper
 //--------------------------------------------------------------------
 
-int sa_mapper(void *data) {
+int sa_single_mapper(void *data) {
 
   #ifdef _TIMING
   struct timeval stop, start;
@@ -2081,14 +2081,12 @@ int sa_mapper(void *data) {
   
   sa_wf_batch_t *wf_batch = (sa_wf_batch_t *) data;
 
-  int pair_mode = wf_batch->options->pair_mode;
-  int pair_min_distance = wf_batch->options->pair_min_distance;
-  int pair_max_distance = wf_batch->options->pair_max_distance;
-
   int num_seeds = wf_batch->options->num_seeds;
   int min_cal_size = wf_batch->options->min_cal_size;
   
   sa_mapping_batch_t *mapping_batch = wf_batch->mapping_batch;
+  mapping_batch->options = wf_batch->options;
+
   sa_index3_t *sa_index = (sa_index3_t *) wf_batch->sa_index;
   
   int bam_format = mapping_batch->bam_format;
@@ -2162,11 +2160,6 @@ int sa_mapper(void *data) {
     cal_lists[i] = cal_list;
   }
 
-  if (pair_mode != SINGLE_END_MODE) {
-    filter_cals_by_pair_mode(pair_mode, pair_min_distance, pair_max_distance, 
-			     num_reads, cal_lists);
-  }
-
   // 3) run SW to fill
   if (array_list_size(sw_prepare_list) > 0) {
     execute_sw(sw_prepare_list, mapping_batch);
@@ -2174,12 +2167,16 @@ int sa_mapper(void *data) {
   }
   array_list_free(sw_prepare_list, (void *) NULL);
 
-  // 4) for each read, create alignments
+  // 4) prepare mappings for the writer
   for (int i = 0; i < num_reads; i++) {
     cal_list = cal_lists[i];
     read = array_list_get(i, mapping_batch->fq_reads);
-
+    
     if (array_list_size(cal_list) > 0) {
+
+      //      printf("after preparing sw...\n");
+      //      for (int kk = 0; kk < array_list_size(cal_list); kk++) { seed_cal_print(array_list_get(kk, cal_list)); }
+
       // filter by score
       #ifdef _TIMING
       gettimeofday(&start, NULL);
@@ -2195,19 +2192,19 @@ int sa_mapper(void *data) {
 	((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);  
       #endif
     }
-
-    // create alignments structures
+    
+    // if BAM format, create alignments structures
     if (bam_format) {
       #ifdef _TIMING
       gettimeofday(&start, NULL);
       #endif
-      create_bam_alignments(cal_list, read, mapping_batch->mapping_lists[i]);
+      create_alignments(cal_list, read, bam_format, mapping_batch->mapping_lists[i]);
       #ifdef _TIMING
       gettimeofday(&stop, NULL);
       mapping_batch->func_times[FUNC_CREATE_ALIGNMENTS] += 
 	((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);  
       #endif
-    
+      
       // free cal list and clear seed manager for next read
       array_list_free(cal_list, (void *) NULL);
     } else {
@@ -2215,9 +2212,182 @@ int sa_mapper(void *data) {
 	array_list_free(mapping_batch->mapping_lists[i], (void *) NULL);
 	mapping_batch->mapping_lists[i] = cal_list;
       }
-
     }
   } // end of for reads
+  
+  // free memory
+  #ifdef _TIMING
+  gettimeofday(&start, NULL);
+  #endif
+  cal_mng_free(cal_mng);
+  #ifdef _TIMING
+  gettimeofday(&stop, NULL);
+  mapping_batch->func_times[FUNC_OTHER] += 
+    ((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);  
+  #endif
+  
+  return -1;
+}
+
+//--------------------------------------------------------------------
+
+int sa_pair_mapper(void *data) {
+
+  #ifdef _TIMING
+  struct timeval stop, start;
+  #endif
+
+  #ifdef _TIMING
+  gettimeofday(&start, NULL);
+  #endif
+  
+  sa_wf_batch_t *wf_batch = (sa_wf_batch_t *) data;
+
+  //wf_batch->options->pair_mode = 0;
+
+  int pair_mode = wf_batch->options->pair_mode;
+  int pair_min_distance = wf_batch->options->pair_min_distance;
+  int pair_max_distance = wf_batch->options->pair_max_distance;
+
+  int num_seeds = wf_batch->options->num_seeds;
+  int min_cal_size = wf_batch->options->min_cal_size;
+  
+  sa_mapping_batch_t *mapping_batch = wf_batch->mapping_batch;
+  mapping_batch->options = wf_batch->options;
+
+  sa_index3_t *sa_index = (sa_index3_t *) wf_batch->sa_index;
+  
+  int bam_format = mapping_batch->bam_format;
+
+  size_t num_reads = mapping_batch->num_reads;
+  int max_read_area, min_num_mismatches;
+  float max_score;
+
+  // CAL management
+  size_t num_cals;
+  seed_cal_t *cal;
+  cal_mng_t *cal_mng;
+  array_list_t *cal_list;
+
+  int sw_post_read_counter = 0;
+  int sw_post_read[num_reads];
+
+  array_list_t *cal_lists[num_reads];
+  array_list_t *sw_prepare_list = array_list_new(1000, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
+
+  fastq_read_t *read;
+
+  cal_mng = cal_mng_new(sa_index->genome);
+  #ifdef _TIMING
+  gettimeofday(&stop, NULL);
+  mapping_batch->func_times[FUNC_OTHER] += 
+    ((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);  
+  #endif
+
+  // for each read, create cals and prepare sw
+  for (int i = 0; i < num_reads; i++) {
+    read = array_list_get(i, mapping_batch->fq_reads);
+
+    // 1) extend using mini-sw from suffix
+    cal_list = create_cals(num_seeds, read, mapping_batch, sa_index, cal_mng);
+
+    if (array_list_size(cal_list) > 0) {
+
+      //printf("after create_cals: list size = %i\n", array_list_size(cal_list));
+      //for (int kk = 0; kk < array_list_size(cal_list); kk++) { seed_cal_print(array_list_get(kk, cal_list)); }
+
+      min_num_mismatches = get_min_num_mismatches(cal_list);
+      #ifdef _VERBOSE
+      printf("\t*** before SW> min_num_mismatches = %i\n", min_num_mismatches);
+      #endif
+      
+      #ifdef _TIMING
+      gettimeofday(&start, NULL);
+      #endif
+      filter_cals_by_max_num_mismatches(min_num_mismatches, &cal_list);
+      #ifdef _TIMING
+      gettimeofday(&stop, NULL);
+      mapping_batch->func_times[FUNC_FILTER_BY_NUM_MISMATCHES] += 
+	((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);  
+      #endif
+
+      //printf("before cleaning cals...\n");
+      //for (int kk = 0; kk < array_list_size(cal_list); kk++) { seed_cal_print(array_list_get(kk, cal_list)); }
+
+      //fill_seed_gaps(cal_list, read, sa_index);
+      clean_cals(&cal_list, read, sa_index);
+
+      //printf("after cleaning cals and before preparing sw...\n");
+      //for (int kk = 0; kk < array_list_size(cal_list); kk++) { seed_cal_print(array_list_get(kk, cal_list)); }
+    }
+    cal_lists[i] = cal_list;
+  }
+
+  // 2) filter cals by pairs
+  filter_cals_by_pair_mode(pair_mode, pair_min_distance, pair_max_distance, 
+			   num_reads, cal_lists);
+  
+  // 3) prepare Smith-Waterman to fill in the gaps
+  for (int i = 0; i < num_reads; i++) {
+    read = array_list_get(i, mapping_batch->fq_reads);
+    cal_list = cal_lists[i];
+
+    if (array_list_size(cal_list) > 0) {
+      if (prepare_sw(read, sw_prepare_list, mapping_batch, sa_index, cal_list)) {
+	sw_post_read[sw_post_read_counter++] = i;
+      }
+    }
+  }
+
+  // 4) run SW to fill
+  if (array_list_size(sw_prepare_list) > 0) {
+    execute_sw(sw_prepare_list, mapping_batch);
+    post_process_sw(sw_post_read_counter, sw_post_read, cal_lists, mapping_batch);
+  }
+  array_list_free(sw_prepare_list, (void *) NULL);
+
+  // 5) prepare mappings for the writer
+  for (int i = 0; i < num_reads; i++) {
+    cal_list = cal_lists[i];
+    read = array_list_get(i, mapping_batch->fq_reads);
+    
+    if (array_list_size(cal_list) > 0) {
+
+      //      printf("after preparing sw...\n");
+      //      for (int kk = 0; kk < array_list_size(cal_list); kk++) { seed_cal_print(array_list_get(kk, cal_list)); }
+
+      // filter by score
+      #ifdef _TIMING
+      gettimeofday(&start, NULL);
+      #endif
+      max_score = get_max_score(cal_list);
+      #ifdef _VERBOSE
+      printf("\n******* after SW> max. score = %0.2f (read %s)\n", max_score, read->id);
+      #endif
+      filter_cals_by_max_score(max_score, &cal_list);
+      #ifdef _TIMING
+      gettimeofday(&stop, NULL);
+      mapping_batch->func_times[FUNC_FILTER_BY_NUM_MISMATCHES] += 
+	((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);  
+      #endif
+    }
+    
+    // create alignments structures
+    #ifdef _TIMING
+    gettimeofday(&start, NULL);
+    #endif
+    create_alignments(cal_list, read, bam_format, mapping_batch->mapping_lists[i]);
+    #ifdef _TIMING
+    gettimeofday(&stop, NULL);
+    mapping_batch->func_times[FUNC_CREATE_ALIGNMENTS] += 
+      ((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);  
+    #endif
+      
+    // free cal list and clear seed manager for next read
+    array_list_free(cal_list, (void *) NULL);
+  } // end of for reads
+  
+  complete_pairs(mapping_batch);
 
   // free memory
   #ifdef _TIMING
@@ -2232,3 +2402,6 @@ int sa_mapper(void *data) {
   
   return -1;
 }
+
+//--------------------------------------------------------------------
+//--------------------------------------------------------------------

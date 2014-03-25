@@ -34,7 +34,8 @@ void cal_mng_select_best(int read_area, array_list_t *valid_list,
 // sa mapper
 //--------------------------------------------------------------------
 
-int sa_mapper(void *data);
+int sa_single_mapper(void *data);
+int sa_pair_mapper(void *data);
 
 //--------------------------------------------------------------------
 //--------------------------------------------------------------------
