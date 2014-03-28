@@ -84,7 +84,7 @@ void validate_options(options_t *options) {
 
   int mode = options->mode;
   
-  printf("%i == %i\n", mode, RNA_MODE);
+  //  printf("%i == %i\n", mode, RNA_MODE);
 
   if (mode == DNA_MODE) {
     strcpy(options->str_mode, "DNA");
