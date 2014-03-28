@@ -14,8 +14,8 @@ CONTACT
 ------- 
   You can contact any of the following developers:
 
-    * Joaquin Tarraga (jtarraga@cipf.es)
-    * Hector Martinez (martineh@cipf.es)
+    * Joaquín Tárraga (jtarraga@cipf.es)
+    * Héctor Martínez (martineh@cipf.es)
     * Ignacio Medina (imedina@cipf.es)
 
 
@@ -31,7 +31,7 @@ DOWNLOAD and BUILDING
     Receiving objects: 100% (1441/1441), 1.85 MiB | 122 KiB/s, done.
     Resolving deltas: 100% (882/882), done.
     $ cd hpg-aligner
-    $ git submodule update --ini
+    $ git submodule update --init
     Submodule 'lib/hpg-libs' (https://github.com/opencb/hpg-libs.git) registered for path 'lib/hpg-libs'
     Cloning into 'lib/hpg-libs'...
     remote: Reusing existing pack: 7735, done.
