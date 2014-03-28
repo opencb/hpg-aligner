@@ -246,8 +246,8 @@ int sa_sam_writer(void *data) {
 		  cal->num_mismatches
 		  );
 	  free(cigar_string);
+	  seed_cal_free(cal);	 
 	}
-	seed_cal_free(cal);	 
       } else {
 	num_unmapped_reads++;
 	fprintf(out_file, "%s\t4\t*\t0\t0\t*\t*\t0\t0\t%s\t%s\n", 
