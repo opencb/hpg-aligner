@@ -58,13 +58,14 @@ void dna_aligner(options_t *options) {
   // load SA index
   struct timeval stop, start;
   printf("\n");
+  printf("----------------------------------------------\n");
   printf("Loading SA tables...\n");
   gettimeofday(&start, NULL);
   sa_index3_t *sa_index = sa_index3_new(sa_dirname);
   gettimeofday(&stop, NULL);
-  sa_index3_display(sa_index);
-  printf("End of loading SA tables in %0.2f s. Done!!\n", 
-	 (stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);  
+  //sa_index3_display(sa_index);
+  printf("End of loading SA tables in %0.2f min. Done!!\n", 
+	 ((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f) / 60.0f);  
 
   // preparing input FastQ file
   fastq_batch_reader_input_t reader_input;
@@ -179,24 +180,26 @@ void dna_aligner(options_t *options) {
       workflow_set_consumer(sa_sam_writer, "SAM writer", wf);
     }
     
+    printf("----------------------------------------------\n");
+    printf("Starting mapping...\n");
+    gettimeofday(&start, NULL);
     workflow_run_with(num_threads, wf_input, wf);
+    gettimeofday(&stop, NULL);
+    printf("End of mapping in %0.2f min. Done!!\n", 
+	   ((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f)/60.0f);  
     
-    printf("----------------------------------------------\n");
-    workflow_display_timing(wf);
-    printf("----------------------------------------------\n");
+    //    printf("----------------------------------------------\n");
+    //    workflow_display_timing(wf);
+    //    printf("----------------------------------------------\n");
     
 
     printf("----------------------------------------------\n");
-    printf("NUM. READS         : %lu\nNUM. MAPPED READS  : %lu (%0.2f %%)\nNUM. UNMAPPED READS: %lu (%0.2f %%)\n",
+    printf("Output file        : %s\n", out_filename);
+    printf("\n");
+    printf("Num. reads         : %lu\nNum. mapped reads  : %lu (%0.2f %%)\nNum. unmapped reads: %lu (%0.2f %%)\n",
 	   num_mapped_reads + num_unmapped_reads,
 	   num_mapped_reads, 100.0f * num_mapped_reads / (num_mapped_reads + num_unmapped_reads),
 	   num_unmapped_reads, 100.0f * num_unmapped_reads / (num_mapped_reads + num_unmapped_reads));
-    /*
-    printf("\tNUM. UNMAPPED READS BY INVALID CAL  : %lu (%0.2f %%)\n",
-	   num_unmapped_reads_by_invalid_cal, 100.0f * num_unmapped_reads_by_invalid_cal / (num_mapped_reads + num_unmapped_reads));
-    printf("\tNUM. UNMAPPED READS BY CIGAR LENGTH : %lu (%0.2f %%)\n",
-	   num_unmapped_reads_by_cigar_length, 100.0f * num_unmapped_reads_by_cigar_length / (num_mapped_reads + num_unmapped_reads));
-    */
     printf("----------------------------------------------\n");
 
 
@@ -219,8 +222,6 @@ void dna_aligner(options_t *options) {
 	     100.0 * func_times[i] / total_func_times, func_times[i], total_func_times, func_names[i]);
     }
   #endif
-    
-    //  printf("Total num. mappings: %u\n", total_num_mappings);
     
     // free memory
     sa_wf_input_free(wf_input);
@@ -262,22 +263,22 @@ void dna_aligner(options_t *options) {
   }
 
   // post-processing: realignment and recalibration
-  printf("-----------------------------------\n");
-#ifdef D_TIME_DEBUG
-  //Initialize stats
-  if(time_new_stats(20, &TIME_GLOBAL_STATS))
-  {
-	printf("ERROR: FAILED TO INITIALIZE TIME STATS\n");
+  if (options->realignment || options->recalibration) {
+    printf("-----------------------------------\n");
+    #ifdef D_TIME_DEBUG
+    // Initialize stats
+    if(time_new_stats(20, &TIME_GLOBAL_STATS))  {
+      printf("ERROR: FAILED TO INITIALIZE TIME STATS\n");
+    } else {
+      printf("STATISTICS ACTIVATED\n");
+    }
+    #endif
   }
-  else
-  {
-	printf("STATISTICS ACTIVATED\n");
-  }
-#endif
+
   char *aux = out_filename;
   char realig_filename[len], recal_filename[len];
   if (options->realignment) {
-	printf("-----------------------------------\nRealigning...\n");
+    printf("-----------------------------------\nRealigning...\n");
     realig_filename[0] = 0;
     strcat(realig_filename, (options->output_name ? options->output_name : "."));
     strcat(realig_filename, "/");
@@ -289,6 +290,7 @@ void dna_aligner(options_t *options) {
 
     alig_bam_file(aux, "dna_compression.bin", sa_dirname, realig_filename);
     aux = realig_filename;
+    printf("Realigned file     : %s\n", realig_filename);
   }
 
 
@@ -314,8 +316,8 @@ void dna_aligner(options_t *options) {
     recal_calc_deltas(recal_info);
     printf("-----------------------------------\nRecalibrating...\n");
     recal_recalibrate_bam_file(aux, recal_info, recal_filename);
+    printf("Recalibrated file  : %s\n", recal_filename);
     recal_destroy_info(&recal_info);
-
   }
 
 

@@ -262,8 +262,8 @@ void create_alignments(array_list_t *cal_list, fastq_read_t *read,
     return;
   }
 
-  char *p, *optional_fields;
-  int AS, optional_fields_length;
+  char *p, *optional_fields, *cigar_string, *cigar_M_string;
+  int AS, optional_fields_length, num_mismatches, num_cigar_ops, len;
   linked_list_item_t *list_item; 
 
 
@@ -275,7 +275,11 @@ void create_alignments(array_list_t *cal_list, fastq_read_t *read,
     seed_cal_print(cal);
     #endif
     
-    optional_fields_length = 100;
+    cigar_string = cigar_to_string(&cal->cigar);
+    cigar_M_string = cigar_to_M_string(&num_mismatches, &num_cigar_ops, &cal->cigar);
+    len = strlen(cigar_string);
+
+    optional_fields_length = 100 + len;
 
     cal->AS = (cal->score * 253 / (read->length * 5));
     AS = (int) cal->score;
@@ -283,7 +287,7 @@ void create_alignments(array_list_t *cal_list, fastq_read_t *read,
     optional_fields = (char *) calloc(optional_fields_length, sizeof(char));
     if (bam_format) {
       p = optional_fields;
-      
+      /*
       sprintf(p, "ASi");
       p += 3;
       memcpy(p, &AS, sizeof(int));
@@ -293,20 +297,27 @@ void create_alignments(array_list_t *cal_list, fastq_read_t *read,
       p += 3;
       memcpy(p, &num_cals, sizeof(int));
       p += sizeof(int);
-      
+      */
       sprintf(p, "NMi");
       p += 3;
       memcpy(p, &cal->num_mismatches, sizeof(int));
       p += sizeof(int);
+
+      sprintf(p, "XCZ");
+      p += 3;
+      memcpy(p, cigar_string, len);
+      p += len;
     } else {
-      sprintf(optional_fields, "AS:i:%i\tNH:i:%i\tNM:i:%i", (int)cal->score, num_cals, cal->num_mismatches);
+      sprintf(optional_fields, "NM:i:%i\tXC:S:%s", num_mismatches, cigar_string);
     }
     
+    free(cigar_string);
+
     // create the aligments
     alignment = alignment_new();	       
     alignment_init_single_end(strdup(read->id), strdup(read->sequence), strdup(read->quality), 
 			      cal->strand, cal->chromosome_id, cal->start,
-			      cigar_to_string(&cal->cigar), cal->cigar.num_ops, cal->AS, 1, (num_cals > 1),
+			      cigar_M_string, num_cigar_ops, cal->AS, 1, (num_cals > 1),
 			      optional_fields_length, optional_fields, alignment);  
     
     alignment->mate_chromosome = 0;

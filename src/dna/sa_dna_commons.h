@@ -279,6 +279,39 @@ static inline char *cigar_to_string(cigar_t *p) {
 
 //--------------------------------------------------------------------
 
+static inline char *cigar_to_M_string(int *num_mismatches, int *num_cigar_ops, cigar_t *p) {
+  char *str = (char *) malloc(p->num_ops * 10);
+  int name, value, num_ops = 0, num_m = 0, mis = 0;
+  str[0] = 0;
+  for (int i = 0; i < p->num_ops; i++) {
+    cigar_get_op(i, &value, &name, p);
+    if (name == '=') {
+      num_m += value;
+    } else if (name == 'X') {
+      num_m += value;
+      mis += value;
+    } else {
+      if (num_m > 0) {
+	num_ops++;
+	sprintf(str, "%s%iM", str, num_m);
+	num_m = 0;
+      }
+      num_ops++;
+      sprintf(str, "%s%i%c", str, value, name);
+    }
+  }
+  if (num_m > 0) {
+    num_ops++;
+    sprintf(str, "%s%iM", str, num_m);
+  }
+
+  *num_mismatches = mis;
+  *num_cigar_ops = num_ops;
+  return str;
+}
+
+//--------------------------------------------------------------------
+
 static inline void cigar_set_op(int index, int value, int name, cigar_t *p) {
   p->ops[index] = ((value << 8) | (name & 255));
 }

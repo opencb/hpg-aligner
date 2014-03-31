@@ -136,8 +136,9 @@ int sa_sam_writer(void *data) {
   }
   #endif
 
+  int num_mismatches, num_cigar_ops;
   size_t flag, pnext = 0, tlen = 0;
-  char *cigar_string, *rnext = "*";
+  char *cigar_string, *cigar_M_string, *rnext = "*";
 
   fastq_read_t *read;
   array_list_t *read_list = mapping_batch->fq_reads;
@@ -231,20 +232,24 @@ int sa_sam_writer(void *data) {
 	  
 	  flag = (cal->strand ? 16 : 0);
 	  cigar_string = cigar_to_string(&cal->cigar);
-	  fprintf(out_file, "%s\t%i\t%s\t%lu\t%i\t%s\t%s\t%lu\t%lu\t%s\t%s\tNM:i:%i\n", 
+	  cigar_M_string = cigar_to_M_string(&num_mismatches, &num_cigar_ops, &cal->cigar);
+	  fprintf(out_file, "%s\t%i\t%s\t%lu\t%i\t%s\t%s\t%lu\t%lu\t%s\t%s\tNH:i:%i\tNM:i:%i\tXC:Z:%s\n", 
 		  read->id,
 		  flag,
 		  genome->chrom_names[cal->chromosome_id],
 		  cal->start + 1,
 		  cal->AS,
-		  cigar_string,
+		  cigar_M_string,
 		  rnext,
 		  pnext,
 		  tlen,
 		  read->sequence,
 		  read->quality,
-		  cal->num_mismatches
+		  num_mappings,
+		  num_mismatches,
+		  cigar_string
 		  );
+	  free(cigar_M_string);
 	  free(cigar_string);
 	  seed_cal_free(cal);	 
 	}

@@ -321,7 +321,7 @@ void options_display(options_t *options) {
      if (options->realignment || options->recalibration) {
        printf("Post-processing\n");
        if (options->realignment) {
-	 printf("\tRealignment\n");
+	 printf("\tIndel realignment\n");
        }
        if (options->recalibration) {
 	 printf("\tRecalibration\n");
@@ -375,7 +375,7 @@ void** argtable_options_new(int mode) {
   argtable[count++] = arg_int0("l", "log-level", NULL, "Log debug level");
   argtable[count++] = arg_lit0("h", "help", "Help option");
   argtable[count++] = arg_lit0(NULL, "bam-format", "BAM output format (otherwise, SAM format)");
-  argtable[count++] = arg_lit0(NULL, "realignment", "Indel-based realignment");
+  argtable[count++] = arg_lit0(NULL, "indel-realignment", "Indel-based realignment");
   argtable[count++] = arg_lit0(NULL, "recalibration", "Base quality score recalibration");
 
   if (mode == DNA_MODE) {

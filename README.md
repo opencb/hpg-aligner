@@ -48,6 +48,11 @@ DOWNLOAD and BUILDING
     $ git checkout develop
 
 
+  Before you can build HPG Aligner, you must install on your system:
+
+    * the GSL (GNU Scientific Library), http://www.gnu.org/software/gsl/
+    * the Check library, http://check.sourceforge.net/
+
   Finally, use Scons to build the HPG Aligner application:
 
     $ scons
@@ -68,10 +73,29 @@ RUNNING
 
       $ ./bin/hpg-aligner build-sa-index -g <ref-genome-fasta-file> -i <index-directory>
 
+      Example:
+
+      $./bin/hpg-aligner build-sa-index -g /hpg/genome/human/GRCH_37_ens73.fa -i /tmp/sa-index-human73/ 
+
     2) Map by invoking:
 
-      $ ./bin/hpg-aligner dna -i <index-directory> -f <fastq-file> -o <output-directory>
+      $./bin/hpg-aligner dna -i <index-directory> -f <fastq-file> -o <output-directory>
 
+      Example:
+
+      $./bin/hpg-aligner dna -i /tmp/sa-index-human73/ -f /hpg/fastq/simulated/human/DNA/GRCh37_ens73/4M_100nt_r0.01.bwa.read1.fastq 
+      ----------------------------------------------
+      Loading SA tables...
+      End of loading SA tables in 1.03 min. Done!!
+      ----------------------------------------------
+      Starting mapping...
+      End of mapping in 1.40 min. Done!!
+      ----------------------------------------------
+      Output file        : hpg_aligner_output/out.sam
+      Num. reads         : 4000000
+      Num. mapped reads  : 3994693 (99.87 %)
+      Num. unmapped reads: 5307 (0.13 %)
+      ----------------------------------------------
 
 
   In order to map RNA sequences:
