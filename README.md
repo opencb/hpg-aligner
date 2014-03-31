@@ -40,11 +40,15 @@ DOWNLOAD and BUILDING
     Resolving deltas: 100% (4430/4430), done.
     Submodule path 'lib/hpg-libs': checked out '962f531ef0ffa2a6a665ae6fba8bc2337c4351a9'
 
-  For the most recent HPG Aligner version, choose the 'develop' Git branch:
+  For the most recent HPG Aligner version, choose the 'develop' Git branch (both for the hpg-libs and the HPG Aligner):
 
+    $ cd lib/hpg-libs
+    $ git checkout develop
+    $ cd ../..
     $ git checkout develop
 
-  Finally, use Scons to build the HPG Aligner applilcation:
+
+  Finally, use Scons to build the HPG Aligner application:
 
     $ scons
 
