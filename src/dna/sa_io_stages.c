@@ -183,7 +183,7 @@ int sa_sam_writer(void *data) {
 	  if (alig->fails_quality_check)                        flag += BAM_FQCFAIL;
 	  if (alig->pc_optical_duplicate)                       flag += BAM_FDUP;
 
-	  fprintf(out_file, "%s\t%i\t%s\t%lu\t%i\t%s\t%s\t%lu\t%i\t%s\t%s\t%s\n", 
+	  fprintf(out_file, "%s\t%i\t%s\t%i\t%i\t%s\t%s\t%i\t%i\t%s\t%s\t%s\n", 
 		  read->id,
 		  flag,
 		  genome->chrom_names[alig->chromosome],
@@ -191,7 +191,7 @@ int sa_sam_writer(void *data) {
 		  alig->map_quality,
 		  alig->cigar,
 		  genome->chrom_names[alig->mate_chromosome],
-		  alig->mate_position,
+		  alig->mate_position + 1,
 		  alig->template_length,
 		  read->sequence,
 		  read->quality,
@@ -233,7 +233,7 @@ int sa_sam_writer(void *data) {
 	  flag = (cal->strand ? 16 : 0);
 	  cigar_string = cigar_to_string(&cal->cigar);
 	  cigar_M_string = cigar_to_M_string(&num_mismatches, &num_cigar_ops, &cal->cigar);
-	  fprintf(out_file, "%s\t%i\t%s\t%lu\t%i\t%s\t%s\t%lu\t%lu\t%s\t%s\tNH:i:%i\tNM:i:%i\tXC:Z:%s\n", 
+	  fprintf(out_file, "%s\t%i\t%s\t%i\t%i\t%s\t%s\t%lu\t%i\t%s\t%s\tNH:i:%i\tNM:i:%i\tXC:Z:%s\n", 
 		  read->id,
 		  flag,
 		  genome->chrom_names[cal->chromosome_id],
