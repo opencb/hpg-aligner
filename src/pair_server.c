@@ -517,6 +517,18 @@ void update_mispaired_pair(int pair_num, size_t num_items, array_list_t *list) {
     alig->mate_strand = 0;
     alig->pair_num = pair_num;
 
+    // tmp
+    if (num_items == 1) {
+      alig->map_quality = 3;
+    } else if (num_items == 2) {
+      alig->map_quality = 2;
+    } else if (num_items > 2 && num_items < 9) {
+      alig->map_quality = 1;
+    } else {
+      alig->map_quality = 0;
+    }
+
+
 //    printf("update_mispaired_pair = %i\n", alig->template_length);
   }
 }
@@ -990,11 +1002,13 @@ static inline void select_best (array_list_t *mapping_list) {
   size_t num_items = array_list_size(mapping_list);
   int max_quality = 0;
   alignment_t *alig;
+  int num_best = 0;
 
   //printf("===============================================================================\n");
   for (int i = 0; i < num_items; i++) {
     alig = array_list_get(i, mapping_list);
-    if (alig->map_quality > max_quality) {
+    if (alig->map_quality >= max_quality) {
+      num_best++;
       max_quality = alig->map_quality;
     }
     //alignment_print(alig);

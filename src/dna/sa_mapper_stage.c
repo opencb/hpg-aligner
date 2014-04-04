@@ -2353,8 +2353,8 @@ int sa_pair_mapper(void *data) {
     
     if (array_list_size(cal_list) > 0) {
 
-      //      printf("after preparing sw...\n");
-      //      for (int kk = 0; kk < array_list_size(cal_list); kk++) { seed_cal_print(array_list_get(kk, cal_list)); }
+      //printf("after preparing sw (read %s)...\n", read->id);
+      //for (int kk = 0; kk < array_list_size(cal_list); kk++) { seed_cal_print(array_list_get(kk, cal_list)); }
 
       // filter by score
       #ifdef _TIMING
@@ -2372,6 +2372,10 @@ int sa_pair_mapper(void *data) {
       #endif
     }
     
+    //printf("******* read %s\n", read->id);
+    //printf("after filtering by score (read %s, max. %0.2f)...\n", read->id, max_score);
+    //for (int kk = 0; kk < array_list_size(cal_list); kk++) { seed_cal_print(array_list_get(kk, cal_list)); }
+
     // create alignments structures
     #ifdef _TIMING
     gettimeofday(&start, NULL);

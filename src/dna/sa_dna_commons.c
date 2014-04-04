@@ -262,7 +262,7 @@ void create_alignments(array_list_t *cal_list, fastq_read_t *read,
     return;
   }
 
-  char *p, *optional_fields, *cigar_string, *cigar_M_string;
+  char *seq, *p, *optional_fields, *cigar_string, *cigar_M_string;
   int AS, optional_fields_length, num_mismatches, num_cigar_ops, len;
   linked_list_item_t *list_item; 
 
@@ -283,6 +283,7 @@ void create_alignments(array_list_t *cal_list, fastq_read_t *read,
 
     cal->AS = (cal->score * 253 / (read->length * 5));
     AS = (int) cal->score;
+
 
     optional_fields = (char *) calloc(optional_fields_length, sizeof(char));
     if (bam_format) {
@@ -308,14 +309,20 @@ void create_alignments(array_list_t *cal_list, fastq_read_t *read,
       memcpy(p, cigar_string, len);
       p += len;
     } else {
-      sprintf(optional_fields, "NM:i:%i\tXC:S:%s", num_mismatches, cigar_string);
+      sprintf(optional_fields, "NM:i:%i\tXC:Z:%s", num_mismatches, cigar_string);
     }
     
     free(cigar_string);
 
+    if (cal->strand) {
+      seq = read->revcomp;
+    } else {
+      seq = read->sequence;
+    }
+
     // create the aligments
     alignment = alignment_new();	       
-    alignment_init_single_end(strdup(read->id), strdup(read->sequence), strdup(read->quality), 
+    alignment_init_single_end(strdup(read->id), strdup(seq), strdup(read->quality), 
 			      cal->strand, cal->chromosome_id, cal->start,
 			      cigar_M_string, num_cigar_ops, cal->AS, 1, (num_cals > 1),
 			      optional_fields_length, optional_fields, alignment);  
@@ -586,7 +593,7 @@ array_list_t *create_list(size_t *valid_items, size_t num_valids, array_list_t *
 
 void complete_pairs(sa_mapping_batch_t *batch) {
 
-  size_t num_items1, num_items2, num_reads = array_list_size(batch->fq_reads);
+  size_t num_items1, num_items2, num_pairs, num_reads = array_list_size(batch->fq_reads);
 
   int distance;
   int min_distance = batch->options->pair_min_distance;
@@ -607,7 +614,9 @@ void complete_pairs(sa_mapping_batch_t *batch) {
 
   int pair_found;
 
-  float score;
+  int num_best1, num_best2;
+  float best_score, best_score1, best_score2, score;
+
   pair_t *pair, *new_pair;
   linked_list_t *pair_list = linked_list_new(COLLECTION_MODE_ASYNCHRONIZED);
   linked_list_iterator_t *pair_list_itr = linked_list_iterator_new(pair_list);
@@ -626,8 +635,17 @@ void complete_pairs(sa_mapping_batch_t *batch) {
   }
 
   for (int i = 0; i < num_reads; i += 2) {
-    //fastq_read_t *read = array_list_get(i, batch->fq_batch);
-    //printf("%s\n", read->sequence);
+    num_pairs = 0;
+    best_score = 0;
+
+    //    num_best1 = 0;
+    //    num_best2 = 0;
+    //    best_score1 = 0;
+    //    best_score2 = 0;
+
+    //fastq_read_t *read = array_list_get(i, batch->fq_reads);
+    //printf("read id %s\n", read->id);
+
     list1 = batch->mapping_lists[i];
     list2 = batch->mapping_lists[i+1];
 
@@ -662,14 +680,13 @@ void complete_pairs(sa_mapping_batch_t *batch) {
 	chr1 = alig1->chromosome;
 	strand1 = alig1->seq_strand;
 	end1 = alig1->position;
-	//printf("Item %i Pair1 [chr %i - start %i]\n", j1, chr1, end1);	
+	//printf("Item %i Pair1 [chr %i - start %i] cigar = %s, score = %0.2f\n", j1, chr1, end1, alig1->cigar, alig1->map_quality);	
 	for (size_t j2 = 0; j2 < num_items2; j2++) {
 	  //if (mapped2[j2] == 1) continue;
 	  alig2 = (alignment_t *) array_list_get(j2, list2);
 	  chr2 = alig2->chromosome;
 	  strand2 = alig2->seq_strand;
 	  start2 = alig2->position;
-	  //printf("Item Pair2 %i [chr %i - start %i]\n", j2, chr2, start2);
 	  // computes distance between alignments,
 	  // is a valid distance ?
 	  if (start2 > end1) {
@@ -688,9 +705,11 @@ void complete_pairs(sa_mapping_batch_t *batch) {
 	    distance = (end1 + alig1->map_len) - start2;
 	  }
 	  //distance = (start2 > end1 ? start2 - end1 : end1 - start2); // abs //
-	  
-	  //printf("*** chr1: %i == chr2: %i; str1: %i == str2: %i; distance = %lu, min_distance = %i, max_distance = %i, strand1 = %i, strand2 = %i, pair_mode = %i\n",  chr1, chr2, strand1, strand2, distance, min_distance, max_distance, strand1, strand2, pair_mode);
+	  //printf("\t\tItem %i Pair2 [chr %i - start %i], cigar = %s, score = %0.2f\n", 
+	  //	 j2, chr2, start2, alig1->cigar, alig2->map_quality);
+	  //	  printf("\t\t\t*** chr1: %i == chr2: %i; str1: %i == str2: %i; distance = %lu, min_distance = %i, max_distance = %i, strand1 = %i, strand2 = %i, pair_mode = %i\n",  chr1, chr2, strand1, strand2, distance, min_distance, max_distance, strand1, strand2, pair_mode);
 
+	  
 	  if ( (chr1 == chr2) &&
 	       (distance >= min_distance) && (distance <= max_distance)) { //&&
 	    //((strand1 != strand2 && pair_mode == PAIRED_END_MODE) ||
@@ -699,7 +718,10 @@ void complete_pairs(sa_mapping_batch_t *batch) {
 	    // order proper pairs by best score
 	    // create the new pair
 	    score = 0.5f * (alig1->map_quality + alig2->map_quality);
+	    if (score > best_score) best_score = score;
+	    //printf("\t\t\t\t-----> score = %0.2f\n", score);
 	    new_pair = pair_new(j1, j2, score);
+	    num_pairs++;
 	    // insert the new pair in the correct position
 	    // acording to its score
 	    linked_list_iterator_first(pair_list_itr);
@@ -720,6 +742,25 @@ void complete_pairs(sa_mapping_batch_t *batch) {
 	  }
 	} // end for j2
       } // end for j1
+
+      //      printf("\nnum pairs = %i\n", num_pairs);
+      // compute number of mappings with the best score
+      num_pairs = 0;
+      linked_list_iterator_first(pair_list_itr);
+      pair = (pair_t *) linked_list_iterator_curr(pair_list_itr);
+      while (pair != NULL) {
+	if (pair->score == best_score) {
+	  num_pairs++;
+	} else {
+	  break;
+	}
+	// continue loop...
+	linked_list_iterator_next(pair_list_itr);
+	pair = linked_list_iterator_curr(pair_list_itr);
+      }
+      //      printf("num pairs (best score = %0.2f) = %i\n\n", best_score, num_pairs);
+      
+      //batch->counters[(num_pairs > 9) ? 9 : num_pairs]++;
 
       // filter pairs
       counter_hits = 0;
@@ -773,6 +814,19 @@ void complete_pairs(sa_mapping_batch_t *batch) {
 	  }
 
 	  if ( (++counter_hits) >= num_hits) {
+	    if (num_pairs == 1) {
+	      alig1->map_quality = 3;
+	      alig2->map_quality = 3;
+	    } else if (num_pairs == 2) {
+	      alig1->map_quality = 2;
+	      alig2->map_quality = 2;
+	    } else if (num_pairs > 2 && num_pairs < 9) {
+	      alig1->map_quality = 1;
+	      alig2->map_quality = 1;
+	    } else {
+	      alig1->map_quality = 0;
+	      alig2->map_quality = 0;
+	    }
 	    break;
 	  }
 	}
@@ -783,6 +837,9 @@ void complete_pairs(sa_mapping_batch_t *batch) {
       }
 
       linked_list_clear(pair_list, (void *) pair_free);
+
+      //      printf("\n------------> counter_hits = %i\n", counter_hits);
+      //      printf("(all = %i, n_best = %i, n_hits = %i, best = %i)\n", all, n_best, n_hits, best);
 
       // check if there are unproperly aligned pairs
       if (counter_hits) {
@@ -831,12 +888,51 @@ void complete_pairs(sa_mapping_batch_t *batch) {
 	      }
 	    }
 	  }
+
+	  //------------------------------------------
+	  // temp
+	  {
+	    alignment_t *alig;
+	    array_list_t *list = batch->mapping_lists[i];
+	    int num_items = array_list_size(list);
+	    for (size_t ii = 0; ii < num_items; ii++) {
+	      alig = (alignment_t *) array_list_get(ii, list);
+	      if (num_items == 1) {
+		alig->map_quality = 3;
+	      } else if (num_items == 2) {
+		alig->map_quality = 2;
+	      } else if (num_items > 2 && num_items < 9) {
+		alig->map_quality = 1;
+	      } else {
+		alig->map_quality = 0;
+	      }
+	    }
+	    list = batch->mapping_lists[i + 1];
+	    num_items = array_list_size(list);
+	    for (size_t ii = 0; ii < num_items; ii++) {
+	      alig = (alignment_t *) array_list_get(ii, list);
+	      if (num_items == 1) {
+		alig->map_quality = 3;
+	      } else if (num_items == 2) {
+		alig->map_quality = 2;
+	      } else if (num_items > 2 && num_items < 9) {
+		alig->map_quality = 1;
+	      } else {
+		alig->map_quality = 0;
+	      }
+	    }
+	  }
+	  // end of temp
+	  //------------------------------------------
+
 	} else {
 	  array_list_clear(batch->mapping_lists[i], (void *) alignment_free);
 	  array_list_clear(batch->mapping_lists[i + 1], (void *) alignment_free);
 	}
       }
     } else {
+      //batch->counters[0]++;
+
       //printf("This section\n");
       // pairs are not properly aligned, only one is mapped
       if (!report_only_paired) {
@@ -851,6 +947,7 @@ void complete_pairs(sa_mapping_batch_t *batch) {
 	  list = batch->mapping_lists[i + 1];
 	  num_pair = 2;
 	} 
+
 	filter_alignments(all, n_best, n_hits, best, list);
 	update_mispaired_pair(num_pair, array_list_size(list), list);   
       } else {

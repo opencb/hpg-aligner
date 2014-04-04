@@ -15,9 +15,14 @@ extern size_t num_unmapped_reads_by_cigar_length;
 // main 
 //--------------------------------------------------------------------
 
-//int counters[NUM_COUNTERS];
+int counters[NUM_COUNTERS];
 
 void dna_aligner(options_t *options) {
+
+  for (int i = 0; i < NUM_COUNTERS; i++) {
+    counters[i] = 0;
+  }
+
   #ifdef _TIMING
   init_func_names();
   for (int i = 0; i < NUM_TIMING; i++) {
@@ -261,6 +266,19 @@ void dna_aligner(options_t *options) {
   } else {
     fclose((FILE *) writer_input.bam_file);
   }
+
+  /*
+  {
+    int total_pairs = 0;
+    for (int i = 0; i < NUM_COUNTERS; i++) {
+      total_pairs += counters[i];
+    }
+    printf("\tnum. total possible pairs: %i\n", total_pairs);
+    for (int i = 0; i < NUM_COUNTERS; i++) {
+      printf("\t\tcounters[%i] = %i (%0.2f %%)\n", i, counters[i], 100.0f * counters[i] / total_pairs);
+    }
+  }
+  */
 
   // post-processing: realignment and recalibration
   if (options->realignment || options->recalibration) {
