@@ -217,6 +217,7 @@ int sa_sam_writer(void *data) {
     }
   } else {
     // SINGLE MODE
+    int mapq;
     char *seq;
     seed_cal_t *cal;
     for (size_t i = 0; i < num_reads; i++) {
@@ -232,6 +233,17 @@ int sa_sam_writer(void *data) {
       
       if (num_mappings > 0) {
 	num_mapped_reads++;
+
+	if (num_mappings == 1) {
+	  mapq = 3;
+	} else if (num_mappings == 2) {
+	  mapq = 2;
+	} else if (num_mappings > 2 && num_mappings < 9) {
+	  mapq = 1;
+	} else {
+	  mapq = 0;
+	}
+
 	for (size_t j = 0; j < num_mappings; j++) {
 	  cal = (seed_cal_t *) array_list_get(j, mapping_list);
 	  
@@ -243,6 +255,10 @@ int sa_sam_writer(void *data) {
 	    seq = read->sequence;
 	  }
 
+	  if (i == 0) {
+	    flag += BAM_FSECONDARY;
+	  }
+
 	  cigar_string = cigar_to_string(&cal->cigar);
 	  cigar_M_string = cigar_to_M_string(&num_mismatches, &num_cigar_ops, &cal->cigar);
 	  fprintf(out_file, "%s\t%i\t%s\t%i\t%i\t%s\t%s\t%lu\t%i\t%s\t%s\tNH:i:%i\tNM:i:%i\tXC:Z:%s\n", 
@@ -250,7 +266,7 @@ int sa_sam_writer(void *data) {
 		  flag,
 		  genome->chrom_names[cal->chromosome_id],
 		  cal->start + 1,
-		  cal->AS,
+		  mapq,
 		  cigar_M_string,
 		  rnext,
 		  pnext,

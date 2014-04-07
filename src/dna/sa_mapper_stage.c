@@ -2323,10 +2323,16 @@ int sa_pair_mapper(void *data) {
     cal_lists[i] = cal_list;
   }
 
+  //  printf("before filtering by pair (read %s)...\n", read->id);
+  //  for (int kk = 0; kk < array_list_size(cal_list); kk++) { seed_cal_print(array_list_get(kk, cal_list)); }
+
   // 2) filter cals by pairs
   filter_cals_by_pair_mode(pair_mode, pair_min_distance, pair_max_distance, 
 			   num_reads, cal_lists);
   
+  //  printf("after filtering by pair (read %s)...\n", read->id);
+  //  for (int kk = 0; kk < array_list_size(cal_list); kk++) { seed_cal_print(array_list_get(kk, cal_list)); }
+
   // 3) prepare Smith-Waterman to fill in the gaps
   for (int i = 0; i < num_reads; i++) {
     read = array_list_get(i, mapping_batch->fq_reads);
@@ -2353,8 +2359,8 @@ int sa_pair_mapper(void *data) {
     
     if (array_list_size(cal_list) > 0) {
 
-      //printf("after preparing sw (read %s)...\n", read->id);
-      //for (int kk = 0; kk < array_list_size(cal_list); kk++) { seed_cal_print(array_list_get(kk, cal_list)); }
+      //      printf("before filtering by max. score (read %s)...\n", read->id);
+      //      for (int kk = 0; kk < array_list_size(cal_list); kk++) { seed_cal_print(array_list_get(kk, cal_list)); }
 
       // filter by score
       #ifdef _TIMING
@@ -2370,6 +2376,9 @@ int sa_pair_mapper(void *data) {
       mapping_batch->func_times[FUNC_FILTER_BY_NUM_MISMATCHES] += 
 	((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);  
       #endif
+
+      //      printf("after filtering by max. score (%0.2f) (read %s)...\n", max_score, read->id);
+      //      for (int kk = 0; kk < array_list_size(cal_list); kk++) { seed_cal_print(array_list_get(kk, cal_list)); }
     }
     
     //printf("******* read %s\n", read->id);
