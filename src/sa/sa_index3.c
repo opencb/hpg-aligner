@@ -844,10 +844,14 @@ sa_index3_t *sa_index3_new(char *sa_index_dirname) {
   PREFIX_TABLE_NT_VALUE['T'] = 3;
 
   sprintf(filename_tab, "%s/params.txt", sa_index_dirname, prefix);
-
-  //  printf("reading %s\n", filename_tab);
+  //printf("reading %s\n", filename_tab);
 
   f_tab = fopen(filename_tab, "r");
+  if (!f_tab) {
+    fprintf(stderr, "Error opening file %s!\n", filename_tab);
+    exit(-1);
+  }
+
   // prefix
   fgets(line, 1024, f_tab);
   line[strlen(line) - 1] = 0;
