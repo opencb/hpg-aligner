@@ -317,6 +317,7 @@ int cigar_code_validate_(fastq_read_t *fq_read, cigar_code_t *p) {
     }
     if (op->name == 'M' || 
 	op->name == 'I' || 
+	op->name == 'S' ||
 	op->name == 'H') {
       cigar_len += op->number;
     }
@@ -1141,7 +1142,10 @@ int metaexon_insert(unsigned int strand, unsigned int chromosome,
   //Calculating start chunk and end chunk
   //assert(chromosome <= 25);
 
-  if (end < start) { printf("META-ERR: %lu - %lu\n", start, end); exit(-1); }
+  if (end < start) { 
+    printf("META-ERR: %lu - %lu\n", start, end); 
+    exit(-1);
+  }
 
   //assert(start < end);
 

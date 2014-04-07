@@ -37,6 +37,17 @@
 
 //===============================================================================================================
 
+typedef struct info_sp {
+  size_t l_genome_start;
+  size_t l_genome_end;
+  size_t r_genome_start;
+  size_t r_genome_end;
+} info_sp_t;
+
+info_sp_t* sw_reference_splice_junction(cal_t *cal_prev, cal_t *cal_next,
+					char *query_map, genome_t *genome,
+					char *q, char *r);
+
 /**
  * @brief Structure for store splice junctions information.
  * 
@@ -225,5 +236,12 @@ cigar_code_t *fill_extrem_gap(char *query,
 			      metaexons_t *metaexons, 
 			      avls_list_t *avls_list);
 
+
+cigar_code_t *meta_alignment_fill_extrem_gap(char *query, 
+					     cal_t *cal,
+					     int type,
+					     genome_t *genome,
+					     metaexons_t *metaexons, 
+					     avls_list_t *avls_list);
 
 #endif

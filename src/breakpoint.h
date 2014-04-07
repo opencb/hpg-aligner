@@ -7,11 +7,13 @@
 #include "aligners/bwt/genome.h"
 #include "bioformats/bam/alignment.h"
 #include "bioformats/fastq/fastq_read.h"
+
 //--------------------------------------------------------------------------------------
 
-#define FIRST_SW 0
+#define FIRST_SW  0
 #define MIDDLE_SW 1
-#define LAST_SW 2
+#define LAST_SW   2
+#define SJ_SW     3
 
 //--------------------------------------------------------------------------------------
 //Metaexon constants

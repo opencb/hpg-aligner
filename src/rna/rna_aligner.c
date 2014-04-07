@@ -495,7 +495,11 @@ void rna_aligner(options_t *options) {
       rewind(f_hc);
       workflow_run_with(options->num_cpu_threads, wf_input_file_hc, wf_hc);
       printf("\t\t==================================================\n\n");
-  
+      stop_timer(time_start_alig, time_end_alig, time_alig);
+      //start_timer(time_start_alig);
+
+      basic_statistics_display(basic_st, 1, time_alig / 1000000, time_genome / 1000000);  
+
       // free memory
       workflow_free(wf);
       workflow_free(wf_last);
@@ -519,21 +523,29 @@ void rna_aligner(options_t *options) {
       sa_rna.avls_list = avls_list;
       sa_rna.metaexons = metaexons;
       sa_rna.sw_optarg = &sw_optarg;
-
+      sa_rna.file1 = f_sa;
+      sa_rna.file2 = f_hc;
+      //printf("FILEEEEEEEEEEEEEEEE %p\n", f_sa);
       sa_wf_batch_t *wf_batch = sa_wf_batch_new((void *)sa_index, &writer_input, NULL, &sa_rna);
       sa_wf_input_t *wf_input = sa_wf_input_new(&reader_input, wf_batch);
       
       // create and initialize workflow
-      workflow_t *wf = workflow_new();
-      
+      workflow_t *wf = workflow_new();      
       workflow_stage_function_t stage_functions[] = {sa_rna_mapper};
       char *stage_labels[] = {"SA mapper"};
-      workflow_set_stages(1, (workflow_stage_function_t *)&stage_functions, stage_labels, wf);
-      
+      workflow_set_stages(1, (workflow_stage_function_t *)&stage_functions, stage_labels, wf);      
       // optional producer and consumer functions
       workflow_set_producer(sa_fq_reader_rna, "FastQ reader", wf);
       workflow_set_consumer(sa_sam_writer_rna, "SAM writer", wf);
       
+      //Create and initialize second workflow
+      workflow_t *wf_last = workflow_new();
+      workflow_stage_function_t stage_functions_last[] = {sa_rna_mapper_last};
+      char *stage_labels_last[] = {"SA mapper last stage"};
+      workflow_set_stages(1, (workflow_stage_function_t *)&stage_functions_last, stage_labels_last, wf_last);
+      workflow_set_producer(sa_alignments_reader_rna, "FastQ reader", wf_last);
+      workflow_set_consumer(sa_sam_writer_rna, "SAM writer", wf_last);
+
       double time_total;
       struct timeval time_s1, time_e1;
 
@@ -543,15 +555,32 @@ void rna_aligner(options_t *options) {
       workflow_run_with(options->num_cpu_threads, wf_input, wf);
       stop_timer(time_s1, time_e1, time_total);
 
-      printf("TOTAL TIME : %f\n", time_total / 1000000);
-      printf("----------------------------------------------\n");
-      workflow_display_timing(wf);
-      printf("----------------------------------------------\n");   
+      printf("Time W1: %f(s)\n", time_total / 1000000);
+      
+      printf("=============== SECOND WORKFLOW ================\n");
+      start_timer(time_s1);
+      rewind(f_sa);
+      workflow_run_with(options->num_cpu_threads, wf_input, wf_last);      
+      stop_timer(time_s1, time_e1, time_total);
+
+      printf("Time W2: %f(s)\n", time_total / 1000000);
+
+      //printf("TOTAL TIME : %f\n", time_total / 1000000);
+      //printf("----------------------------------------------\n");
+      //workflow_display_timing(wf);
+      //printf("----------------------------------------------\n");   
       
       // free memory
       sa_wf_input_free(wf_input);
       sa_wf_batch_free(wf_batch);
       workflow_free(wf);      
+      workflow_free(wf_last);      
+
+      //printf("\n");
+      //for (int x = 0; x <= 10; x++) {
+      //printf("%i CALs: %i reads (%f)\n", x, tot_cals[x], ((float)tot_cals[x]*100)/(float)total_reads );
+      //}
+      
     }
 
     if (file1) { free(file1); }
@@ -586,7 +615,7 @@ void rna_aligner(options_t *options) {
 			exact_filename, num_chromosomes, avls_list);
   
   
-  stop_timer(time_start_alig, time_end_alig, time_alig);
+
 
   /*  
   printf("= = = = T I M I N G    W O R K F L O W    '1' = = = =\n");
@@ -602,7 +631,7 @@ void rna_aligner(options_t *options) {
   printf("= = = = - - - - - - - - - - - - - - - - - - - = = = =\n\n");
   */
   
-  basic_statistics_display(basic_st, 1, time_alig / 1000000, time_genome / 1000000);
+
   
   //Write statistics to file 
 
@@ -918,6 +947,7 @@ void rna_aligner(options_t *options) {
   if (genome) {
     genome_free(genome);
   }
+
   bwt_optarg_free(bwt_optarg);
   cal_optarg_free(cal_optarg);
   pair_mng_free(pair_mng);

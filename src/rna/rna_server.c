@@ -667,6 +667,120 @@ void extend_by_mismatches(char *ref_e1, char *ref_e2, char *query,
 
 }
 
+cigar_code_t *meta_alignment_fill_extrem_gap(char *query, 
+					     cal_t *cal,
+					     int type,
+					     genome_t *genome,
+					     metaexons_t *metaexons, 
+					     avls_list_t *avls_list) {
+
+  //return NULL;
+  //printf("FILL EXTREM GAPS...%s\n", type == FILL_GAP_LEFT? "LEFT" : "RIGHT");
+  int chromosome_id = cal->chromosome_id;
+  size_t genome_start, genome_end;
+  int read_start, read_end;
+  int read_gap = 0;
+  char reference[2048];
+  int type_search;
+  cigar_code_t *cigar_code = NULL;
+  int length = strlen(query);
+  metaexon_t *metaexon;
+
+  //cal_print(cal);
+
+  pthread_mutex_lock(&metaexons->mutex[cal->chromosome_id - 1]);
+
+  //FILL_GAP_LEFT  0
+  //FILL_GAP_RIGHT 1
+  if (type == FILL_GAP_LEFT) {
+    //printf("FILL_GAP_LEFT\n");
+    seed_region_t *s_prev = linked_list_get_first(cal->sr_list);
+    assert(s_prev != NULL);
+    read_start = 0;
+    read_end = s_prev->read_start - 1;
+    read_gap = s_prev->read_start;
+
+    if (read_gap >= s_prev->genome_start) {
+      genome_start = 0;
+    } else {
+      genome_start = s_prev->genome_start - read_gap;
+    }
+
+    genome_end = s_prev->genome_start - 1;
+    //printf("FILL_GAP_LEFT [%i-%i] %i\n", read_start, read_end, read_gap);
+    
+    metaexon_search(cal->strand, cal->chromosome_id - 1,
+		    cal->start, cal->start + 5, &metaexon,
+		    metaexons);
+    
+  } else {
+    seed_region_t *s_prev = linked_list_get_last(cal->sr_list);
+    assert(s_prev != NULL);
+    read_start = s_prev->read_end + 1;
+    read_end = length - 1;
+    read_gap = length - s_prev->read_end - 1;
+    genome_start = s_prev->genome_end + 1;
+    genome_end = s_prev->genome_end + read_gap + 1;
+    //printf("FILL_GAP_RIGHT [%i-%i] %i\n", read_start, read_end, read_gap);
+    metaexon_search(cal->strand, cal->chromosome_id - 1,
+		    cal->end - 5, cal->end, &metaexon,
+		    metaexons);
+    
+  }
+
+  //printf("FILL EXTREM GAP: [%i-%i]\n", read_start, read_end);
+
+  //printf("%i:%lu-%lu(%i)\n", cal->chromosome_id, cal->start, cal->end, cal->strand);
+
+  if (metaexon != NULL) {
+    //printf("METAEXON NOT NULL! %i-%i\n", metaexon->start, metaexon->end);
+    if (type == FILL_GAP_LEFT) {
+      type_search = 2;
+    } else {
+      type_search = 3;
+    }
+    //if (type_search == 2 &&
+    //!metaexon->left_closed) {
+    //type_search = 0;
+    //} else if (type_search == 3 &&
+    //	       !metaexon->right_closed) {
+    //type_search = 0;
+    //}
+  } else {
+    type_search = 0;
+  }
+  
+  
+  if (type_search == 2) {
+    //Search other
+    //printf("Search WITH RIGHT ANCHOR\n");
+    cigar_code = search_right_single_anchor(read_gap, 
+					    cal,
+					    0, 
+					    metaexon->left_breaks,
+					    query,
+					    metaexons,
+					    genome, 
+					    avls_list);    
+  } else if (type_search == 3) {
+    //printf("Search WITH LEFT ANCHOR\n");
+    cigar_code = search_left_single_anchor(read_gap, 
+					   cal,
+					   0, 
+					   metaexon->right_breaks,
+					   query,
+					   metaexons,
+					   genome, 
+					   avls_list);   
+  }
+  
+  pthread_mutex_unlock(&metaexons->mutex[cal->chromosome_id - 1]);
+
+
+  return cigar_code;
+
+}
+
 
 cigar_code_t *fill_extrem_gap(char *query, 
 			      cal_t *cal,
@@ -720,13 +834,16 @@ cigar_code_t *fill_extrem_gap(char *query,
 
   pthread_mutex_lock(&metaexons->mutex[cal->chromosome_id - 1]);
 
+  //printf("genome_start = %i, genome_end = %i\n", genome_start, genome_end);
+
   //printf("%i:%lu-%lu(%i)\n", cal->chromosome_id, cal->start, cal->end, cal->strand);
+
   metaexon_search(cal->strand, cal->chromosome_id - 1,
 		  cal->start, cal->end, &metaexon,
 		  metaexons);
 
   if (metaexon != NULL) {
-    //printf("METAEXON NOT NULL!\n");
+    //printf("METAEXON NOT NULL! %i-%i\n", metaexon->start, metaexon->end);
     if (type == FILL_GAP_LEFT) {
       //printf("genome_start(%i) >= metaexon->start(%i)\n", genome_start, metaexon->start);
       //if (genome_start >= metaexon->start) {
@@ -755,6 +872,7 @@ cigar_code_t *fill_extrem_gap(char *query,
   
   if (type_search == 2) {
     //Search other
+    //printf("RIGHT SINGLE ANCHOR SEARCH\n");
     cigar_code = search_right_single_anchor(read_gap, 
 					    cal,
 					    0, 
@@ -773,7 +891,10 @@ cigar_code_t *fill_extrem_gap(char *query,
 					   metaexons,
 					   genome, 
 					   avls_list);   
-  } else {
+  } //else {
+
+  
+  if (cigar_code == NULL) {
     //printf("Search NORMAL\n");
     if (genome_end - genome_start >= 2048) {
       pthread_mutex_unlock(&metaexons->mutex[cal->chromosome_id - 1]);
@@ -1490,12 +1611,6 @@ array_list_t *fusion_regions (array_list_t *regions_list, int max_distance) {
 
 //============================ STRUCTURES AND TYPES SECTION =============================//
 
-typedef struct info_sp {
-  size_t l_genome_start;
-  size_t l_genome_end;
-  size_t r_genome_start;
-  size_t r_genome_end;
-} info_sp_t;
 
 
 typedef struct sw_item {
@@ -2986,9 +3101,12 @@ int search_simple_splice_junction(seed_region_t *s_prev, seed_region_t *s_next,
     genome_start_aux += SEQURITY_FLANK;
   }
 
+  
   read_start = read_end_aux;
   read_end = read_start_aux;
+  
   gap_read = read_end - read_start - 1;
+  //printf("%i - %i - 1 = %i\n", read_end, read_start, gap_read);
 
   char left_exon[2048];
   char right_exon[2048];
@@ -2999,6 +3117,7 @@ int search_simple_splice_junction(seed_region_t *s_prev, seed_region_t *s_next,
   LOG_DEBUG_F("GAP READ %i - %i = %i\n", read_end, read_start, gap_read);
   LOG_DEBUG_F("SEQUENCE   : %s\n", sequence);
 
+  LOG_DEBUG_F("GAP READ %i - %i = %i\n", read_end, read_start, gap_read);
   genome_read_sequence_by_chr_index(left_exon, 0, 
 				    chromosome_id - 1, 
 				    &genome_start, &genome_end, genome);		  
@@ -3064,14 +3183,17 @@ int search_simple_splice_junction(seed_region_t *s_prev, seed_region_t *s_next,
   //						   1.25f, COLLECTION_MODE_ASYNCHRONIZED);
 
   //printf("FOUND STARTS %i, FOUND ENDS %i\n", found_starts, found_ends);
+  //printf("Left  exon: %s\n", left_exon);
+  //printf("Right exon: %s\n", right_exon);
 
   //If found more than one break...
   for (int i = 0; i < found_starts; i++) {
     for (int j = 0; j < found_ends; j++) {
       //printf("%i(%i) + %i(%i)=%i\n", breaks_starts[i], type_starts[i],
-      //     breaks_ends[j], type_ends[j], breaks_starts[i] + breaks_ends[j]);
+      //breaks_ends[j], type_ends[j], breaks_starts[i] + breaks_ends[j]);
       if (type_starts[i] == type_ends[j]) {
 	int gap_break = breaks_starts[i] + breaks_ends[j];
+	//printf("::(%i, %i), ¿%i - %i?\n", breaks_starts[i], breaks_ends[j], gap_break, gap_read);
 	if (gap_break == gap_read) {	  
 	  //printf("END:%i-START:%i\n", type_ends[j], type_starts[i]);
 	  array_list_insert((void *)breaks_starts[i], splice_junction);
@@ -3154,6 +3276,7 @@ int search_simple_splice_junction(seed_region_t *s_prev, seed_region_t *s_next,
   }
 
   if (max_score < 0.0) { 
+    //printf("Exit\n");
     intron_size = 0;
     goto exit;
   }
@@ -3255,7 +3378,7 @@ cigar_code_t *search_left_single_anchor(int gap_close,
   for (int s_0 = 0; s_0 < array_list_size(right_breaks); s_0++) {
     node_start = array_list_get(s_0, right_breaks);
     if (first_cal_end - 10 <= node_start->position) {
-      LOG_DEBUG_F("\tNode start %lu\n", node_start->position);
+      //LOG_DEBUG_F("\tNode start %lu\n", node_start->position);
       array_list_insert(node_start, starts_targets);
     }
   }
@@ -3273,6 +3396,7 @@ cigar_code_t *search_left_single_anchor(int gap_close,
       //printf("%lu - %lu\n", genome_start, genome_end);
 
       assert((genome_end - genome_start) + 5 < 2048);
+      
       //printf("::: %i+%i=%i <= %i\n", read_pos, gap_close, read_pos + gap_close, strlen(query_map));
       assert((read_pos + gap_close) <= strlen(query_map));
 
@@ -3289,6 +3413,7 @@ cigar_code_t *search_left_single_anchor(int gap_close,
 	  dist++;
 	}
       }
+
       //max_dist = lim_ref <= 5 ? 2 : lim_ref / 4 + 1;
       max_dist = lim_ref <= 5 ? 2 : lim_ref / 4;
       //printf("%i < %i\n", dist, max_dist);
@@ -3474,6 +3599,7 @@ cigar_code_t *search_left_single_anchor(int gap_close,
       max_dist = anchor_nt <= 5 ? 2 : anchor_nt / 4 + 1;
       //printf("%i > %i\n", ref_mismatches[pos], max_dist);
       if (ref_mismatches[pos] > max_dist) {
+	//printf("ohhhhhhhhhhhhh!\n");
 	free(ref_matches);
 	free(ref_mismatches);
 	break;
@@ -3668,14 +3794,29 @@ cigar_code_t *search_right_single_anchor(int gap_close,
   int cal_chromosome_id = cal->chromosome_id;
 
   cigar_code_t *cigar_code = NULL;
+  
+  //printf(" =============:> IN PARAMETERS: read_pos->%i, first_cal_end->%lu, gap_close->%i\n", read_pos, last_cal_start - 1, gap_close );
+  /*
+  printf("=========================================()====================================\n");
+  linked_list_t *list_meta = metaexons->metaexons_list[18];
+  linked_list_item_t *item_aux = list_meta->first;
+  while (item_aux != NULL) {
+    metaexon_t *meta_aux= item_aux->item;
+    if (meta_aux->start >= 17510000 && meta_aux->start <= 17528000) {
+      printf(" - %i-%i - ", meta_aux->start, meta_aux->end);
+    }
 
-  //printf("IN PARAMETERS: read_pos->%i, first_cal_end->%lu, gap_close->%i\n", read_pos, last_cal_start - 1, gap_close );
+    item_aux = item_aux->next;
+  }  
+  printf("\n=========================================()====================================\n");
+  */
 
   genome_end = last_cal_start -  1;
   //array_list_insert(genome_start, final_positions);
   //==== 1st-Select the correct start ====//
   for (int s_0 = 0; s_0 < array_list_size(left_breaks); s_0++) {
     node_end = array_list_get(s_0, left_breaks);
+    //printf("<XXX [%i >= %i] XXX>\n", last_cal_start + 10, node_end->position);
     if (last_cal_start + 10 >= node_end->position) {
       //printf("\tNode end %lu\n", node_end->position);
       array_list_insert(node_end, ends_targets);
@@ -3698,6 +3839,7 @@ cigar_code_t *search_right_single_anchor(int gap_close,
       reference_len = strlen(reference) - 1;
       dist = 0;
       //printf("Not Splice Exonic Read...cheking\n");
+     
       int c, lim_ref = gap_close;
       for (c  = 0; c < gap_close; c++) { 
 	//printf("\t\t[%c vs %c]\n", query_map[read_pos - c], reference[reference_len - c]);		
@@ -3757,6 +3899,7 @@ cigar_code_t *search_right_single_anchor(int gap_close,
 					&genome_start, &genome_end, genome);
       //printf("(%lu-%lu)Reference START_SP [[[START_SP]]]----[END_SP]: %s\n",  genome_start, genome_end, reference);
       int t, c;
+      //printf("Num targets %i\n", num_targets);
       for (t = 0; t < num_targets; t++) {
 	node_end = array_list_get(t, ends_targets);
 	lim_ref = genome_end - node_end->position;

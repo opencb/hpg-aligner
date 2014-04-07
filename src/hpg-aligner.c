@@ -60,6 +60,7 @@ size_t junction_id;
 size_t total_reads = 0, unmapped_reads = 0, correct_reads = 0;
 size_t seeds_1err = 0;
 
+int tot_cals[50];
 // timing
 //double main_time;
 //size_t TOTAL_SW, 
@@ -73,8 +74,9 @@ size_t seeds_1err = 0;
 //--------------------------------------------------------------------
 int main(int argc, char* argv[]) {
 
-  pthread_mutex_init(&mutex_sp, NULL);
-  
+  memset(tot_cals, 0, sizeof(int)*50);
+
+  pthread_mutex_init(&mutex_sp, NULL);  
   const char HEADER_FILE[1024] = "Human_NCBI37.hbam\0";
   basic_st = basic_statistics_new();
 
@@ -155,7 +157,6 @@ int main(int argc, char* argv[]) {
   }
   */
 
-  options_free(options);
 
   if (options->fast_mode) {  
     size_t mapped_reads = total_reads - unmapped_reads;
@@ -167,9 +168,11 @@ int main(int argc, char* argv[]) {
     printf("    INCORRECT READS  : %lu (%f%%)\n", mapped_reads - correct_reads,  ((float)(mapped_reads - correct_reads) * 100)/((float)total_reads));
     
 
-    printf("Seeds with one Error %i (%0.2f)\n", seeds_1err, seeds_1err*100/total_reads);
+    //printf("Seeds with one Error %i (%0.2f)\n", seeds_1err, seeds_1err*100/total_reads);
   }
 
+  options_free(options);
+  
   return 0;
 
 }
