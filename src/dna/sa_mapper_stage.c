@@ -290,7 +290,7 @@ void cal_mng_free(cal_mng_t *p) {
     if (p->cals_lists) {
       for (unsigned int i = 0; i < p->num_chroms; i++) {
 	if (p->cals_lists[i]) {
-	  linked_list_free(p->cals_lists[i], seed_cal_free);
+	  linked_list_free(p->cals_lists[i], (void *)seed_cal_free);
 	}
       }
       free(p->cals_lists);
@@ -301,12 +301,40 @@ void cal_mng_free(cal_mng_t *p) {
 
 //--------------------------------------------------------------------
 
-void cal_mng_clear(cal_mng_t *p) {
+void cal_mng_simple_free(cal_mng_t *p) {
   if (p) {
     if (p->cals_lists) {
       for (unsigned int i = 0; i < p->num_chroms; i++) {
 	if (p->cals_lists[i]) {
-	  linked_list_clear(p->cals_lists[i], seed_cal_free);
+	  linked_list_free(p->cals_lists[i], (void *)NULL);
+	}
+      }
+      free(p->cals_lists);
+    }
+    free(p);
+  }
+}
+
+//--------------------------------------------------------------------
+
+void cal_mng_simple_clear(cal_mng_t *p) {
+  int list_size;
+  linked_list_item_t *item;
+  linked_list_t *list;
+  cal_t *cal;
+  if (p) {
+    if (p->cals_lists) {
+      for (unsigned int i = 0; i < p->num_chroms; i++) {
+	list = p->cals_lists[i];
+	if (list) {
+	  item = list->first;
+	  while (item) {
+	    cal = item->item;
+	    linked_list_clear(cal->sr_list, seed_region_simple_free);
+	    cal_simple_free(cal);
+	    item = item->next;
+	  }
+	  linked_list_clear(p->cals_lists[i], (void *)NULL);
 	}
       }
     }
@@ -314,6 +342,21 @@ void cal_mng_clear(cal_mng_t *p) {
 }
 
 //--------------------------------------------------------------------
+
+void cal_mng_clear(cal_mng_t *p) {
+  if (p) {
+    if (p->cals_lists) {
+      for (unsigned int i = 0; i < p->num_chroms; i++) {
+	if (p->cals_lists[i]) {
+	  linked_list_clear(p->cals_lists[i], (void *)seed_cal_free);
+	}
+      }
+    }
+  }
+}
+
+//--------------------------------------------------------------------
+
 
 void cal_mng_update(seed_t *seed, fastq_read_t *read, cal_mng_t *p) {
   if (p->cals_lists) {
@@ -327,7 +370,6 @@ void cal_mng_update(seed_t *seed, fastq_read_t *read, cal_mng_t *p) {
       printf("\t\t\tinsert this seed to the CAL manager:\n");
       print_seed("\t\t\t", seed);
       #endif
-
       //      if (cal->read_area < p->min_read_area) {
 	//	printf("****************** set read min. area from %i to %i\n", p->min_read_area, cal->read_area);
       //	p->min_read_area = cal->read_area;
@@ -498,6 +540,7 @@ void cal_mng_select_best(int read_area, array_list_t *valid_list, array_list_t *
     }
   }
 }
+
 
 //--------------------------------------------------------------------
 // generate cal from an exact read
@@ -771,7 +814,9 @@ int generate_cals_from_suffixes(int strand, fastq_read_t *read,
       #ifdef _TIMING
       gettimeofday(&start, NULL);
       #endif
+
       cal_mng_update(seed, read, cal_mng);
+
       #ifdef _TIMING
       gettimeofday(&stop, NULL);
       mapping_batch->func_times[FUNC_CAL_MNG_INSERT] += 

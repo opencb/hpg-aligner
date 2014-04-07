@@ -894,7 +894,7 @@ sa_index3_t *sa_index3_new(char *sa_index_dirname) {
   sa_genome3_t *genome;
   uint *SA, *PRE, *A, *IA;
 
-  #pragma omp parallel sections 
+  #pragma omp parallel sections num_threads(2)
   {
     #pragma omp section
     {

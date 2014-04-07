@@ -24,10 +24,29 @@
 #include "aligners/bwt/genome.h"
 #include "aligners/sw/macros.h"
 
+#define FILL_GAP_LEFT  0
+#define FILL_GAP_RIGHT 1
+
+#define META_ALIGNMENT_NONE   0
+#define META_ALIGNMENT_MIDDLE 1
+#define META_ALIGNMENT_LEFT   2
+#define META_ALIGNMENT_RIGHT  3
+
 //#include "list.h"
 //#include "genome.h"
 
 //===============================================================================================================
+
+typedef struct info_sp {
+  size_t l_genome_start;
+  size_t l_genome_end;
+  size_t r_genome_start;
+  size_t r_genome_end;
+} info_sp_t;
+
+info_sp_t* sw_reference_splice_junction(cal_t *cal_prev, cal_t *cal_next,
+					char *query_map, genome_t *genome,
+					char *q, char *r);
 
 /**
  * @brief Structure for store splice junctions information.
@@ -169,5 +188,60 @@ int apply_sw_rna(sw_server_input_t* input_p, batch_t *batch);
 int apply_rna_last(sw_server_input_t* input_p, batch_t *batch);
 
 int apply_rna_last_hc(sw_server_input_t* input_p, batch_t *batch);
+
+int search_simple_splice_junction(seed_region_t *s_prev, seed_region_t *s_next,
+				  int chromosome_id, int strand, 
+				  char *sequence, genome_t *genome, 
+				  size_t *sp_start, size_t *sp_end,
+				  int *sp_type,
+				  int *distance);
+
+int search_simple_splice_junction_semi_cannonical(seed_region_t *s_prev, seed_region_t *s_next,
+						  int chromosome_id, int strand, 
+						  char *sequence, genome_t *genome, 
+						  size_t *sp_start, size_t *sp_end,
+						  int *sp_type,
+						  int *distance);
+
+cigar_code_t *search_double_anchors_cal(char *query_map,
+					cal_t *first_cal, 
+					cal_t *last_cal,
+					metaexons_t *metaexons, 
+					genome_t *genome,
+					fastq_read_t *fq_read,
+					int *type, 
+					avls_list_t *avls_list);
+
+cigar_code_t *search_right_single_anchor(int gap_close, 
+					 cal_t *cal,
+					 int filter_pos, 
+					 array_list_t *left_breaks,
+					 char *query_map, metaexons_t *metaexons,
+					 genome_t *genome,
+					 avls_list_t *avls_list);
+
+cigar_code_t *search_left_single_anchor(int gap_close, 
+					cal_t *cal,
+					int filter_pos, 
+					array_list_t *right_breaks,
+					char *query_map,
+					metaexons_t *metaexons,
+					genome_t *genome,
+					avls_list_t *avls_list);
+
+cigar_code_t *fill_extrem_gap(char *query, 
+			      cal_t *cal,
+			      int type,
+			      genome_t *genome,
+			      metaexons_t *metaexons, 
+			      avls_list_t *avls_list);
+
+
+cigar_code_t *meta_alignment_fill_extrem_gap(char *query, 
+					     cal_t *cal,
+					     int type,
+					     genome_t *genome,
+					     metaexons_t *metaexons, 
+					     avls_list_t *avls_list);
 
 #endif

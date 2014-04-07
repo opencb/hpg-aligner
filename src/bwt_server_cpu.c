@@ -33,7 +33,7 @@ void bwt_server_input_init(list_t* read_list_p, unsigned int batch_size, bwt_opt
 cal_t *convert_bwt_anchor_to_CAL(bwt_anchor_t *bwt_anchor, size_t read_start, size_t read_end) {
   linked_list_t *linked_list = linked_list_new(COLLECTION_MODE_ASYNCHRONIZED);
   seed_region_t *seed_region = seed_region_new(read_start, read_end,
-					       bwt_anchor->start, bwt_anchor->end, 0);
+					       bwt_anchor->start, bwt_anchor->end, 0, 0, 0);
 
   linked_list_insert_first(seed_region, linked_list);
 
@@ -361,18 +361,24 @@ int apply_bwt_rna(bwt_server_input_t* input, batch_t *batch) {
   size_t num_unmapped = 0;
   size_t num_anchors;
 
+  extern pthread_mutex_t mutex_sp;
+  //pthread_mutex_lock(&mutex_sp);
+  //extern size_t total_reads;
+  //total_reads += num_reads;
+  //pthread_mutex_unlock(&mutex_sp);
+  
   for (int i = 0; i < num_reads; i++) {
     fastq_read_t *read = array_list_get(i, mapping_batch->fq_batch);
     //printf("BWT: %s\n", read->id);
     list = mapping_batch->mapping_lists[i];    
     
     array_list_set_flag(1, list);
-    //array_list_set_flag(0, list); //TODO: DELETE!!!
 
     num_mappings = bwt_map_inexact_read(read,
 					input->bwt_optarg_p,
 					input->bwt_index_p,
 					list);
+
     if (array_list_get_flag(list) != 2) { //If flag 2, the read exceded the max number of mappings
       if (array_list_get_flag(list) == 1) {
 	if (num_mappings > 0) {

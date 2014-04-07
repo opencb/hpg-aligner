@@ -3,7 +3,7 @@
 #define NUM_SECTIONS_TIME 		8
 
 //--------------------------------------------------------------------
-// workflow input                                                                                                                                                     
+// workflow input                                                                                                                                                    
 //--------------------------------------------------------------------  
 extern int splice_junction_type(char nt_start_1, char nt_start_2, char nt_end_1, char nt_end_2);
 
@@ -56,8 +56,11 @@ void rna_aligner(options_t *options) {
   if (options->prefix_name) {
     strcat(reads_results, "/");
     strcat(reads_results, options->prefix_name);
-    strcat(reads_results, "_alignments.bam");  
-
+    if (!options->fast_mode) {
+      strcat(reads_results, "_alignments.bam");  
+    } else {
+      strcat(reads_results, "_alignments.sam");  
+    }
     strcat(log_results, "/");
     strcat(log_results, options->prefix_name);
     strcat(log_results, "_hpg-aligner.log");  
@@ -71,7 +74,11 @@ void rna_aligner(options_t *options) {
     strcat(exact_junctions, "_exact_junctions.bed");
  
   } else {
-    strcat(reads_results, "/alignments.bam");
+    if (!options->fast_mode) {
+      strcat(reads_results, "/alignments.bam");
+    } else {
+      strcat(reads_results, "/alignments.sam");
+    }
     strcat(log_results, "/hpg-aligner.log");
     strcat(extend_junctions, "/extend_junctions.bed");
     strcat(exact_junctions, "/exact_junctions.bed");
@@ -125,32 +132,69 @@ void rna_aligner(options_t *options) {
   double time_genome;
 
   metaexons_t *metaexons;
-  genome_t *genome, *genome1, *genome2;
+  genome_t *genome;
+  
   bwt_index_t *bwt_index;
-
+  sa_index3_t *sa_index;
+  int num_chromosomes;
   // load index for dna/rna or for bisulfite case
 
   start_timer(time_genome_s);
 
-  // genome parameters
-  LOG_DEBUG("Reading genome...");
-  //genome_t* genome = genome_new("dna_compression.bin", options->bwt_dirname);
-  genome = genome_new("dna_compression.bin", options->bwt_dirname);  
-  LOG_DEBUG("Done !!");
+  // genome parameters 
+  if (!options->fast_mode) {
+    //////////////// LOAD BWT INDEX //////////////////////    
+    // BWT index
+    LOG_DEBUG("Reading bwt index...");
+    bwt_index = bwt_index_new(options->bwt_dirname, false);
+    LOG_DEBUG("Reading bwt index done !!");
     
+    LOG_DEBUG("Reading genome...");
+    genome = genome_new("dna_compression.bin", options->bwt_dirname, BWT_MODE);  
+    LOG_DEBUG("Done !!");
+    //////////////////////////////////////////////////////
+  } else {    
+    ///////////////// LOAD SA INDEX ////////////////////// 
+    LOG_DEBUG("Loading SA tables...");
+    sa_index = sa_index3_new(options->bwt_dirname);
+    sa_index3_display(sa_index);
+
+    LOG_DEBUG("Reading genome...");
+    genome = genome_new("dna_compression.bin", options->bwt_dirname, SA_MODE);
+
+    genome->num_chromosomes = sa_index->genome->num_chroms;
+    genome->chr_name = (char **) calloc(genome->num_chromosomes, sizeof(char *));
+    genome->chr_size = (size_t *) calloc(genome->num_chromosomes, sizeof(size_t));
+    genome->chr_offset = (size_t *) calloc(genome->num_chromosomes, sizeof(size_t));
+    size_t offset = 0;
+
+    for (int c = 0; c < genome->num_chromosomes; c++) {
+      genome->chr_size[c] = sa_index->genome->chrom_lengths[c];
+      genome->chr_name[c] = strdup(sa_index->genome->chrom_names[c]);
+      genome->chr_offset[c] = offset;
+      offset += genome->chr_size[c];
+    }
+
+    LOG_DEBUG("Done !!");
+    //metaexons = metaexons_new(sa_index->genome->num_chroms, 
+    //			      sa_index->genome->chrom_lengths);    
+    //////////////////////////////////////////////////////
+  }
+
+  num_chromosomes = genome->num_chromosomes;
+
   // Metaexons structure
-  metaexons = metaexons_new(genome);
-
-  // BWT index
-  LOG_DEBUG("Reading bwt index...");
-  bwt_index = bwt_index_new(options->bwt_dirname, false);
-
-  LOG_DEBUG("Reading bwt index done !!");
+  metaexons = metaexons_new(genome->num_chromosomes, 
+			    genome->chr_size);
+  
   stop_timer(time_genome_s, time_genome_e, time_genome);
 
   //============================= INPUT INITIALIZATIONS =========================//  
   //BWT parameters
+  
+  
   bwt_optarg_t *bwt_optarg = bwt_optarg_new(1, 0,
+					    //500,
 					    options->filter_read_mappings, 
 					    options->filter_seed_mappings);
   
@@ -177,7 +221,7 @@ void rna_aligner(options_t *options) {
 						     options->report_only_paired,
 						     options->report_best);  
 
-  avls_list_t* avls_list = avls_list_new(genome->num_chromosomes);
+  avls_list_t* avls_list = avls_list_new(num_chromosomes);
 
   if (options->transcriptome_filename != NULL) {
     printf("Loading transcriptome...\n");
@@ -210,12 +254,12 @@ void rna_aligner(options_t *options) {
   //buffer,
   //buffer_reader_input);
 
-  if (options->pair_mode == SINGLE_END_MODE) {
-    reader_input.fq_file1 = fastq_fopen(options->in_filename);
-  } else {
-    reader_input.fq_file1 = fastq_fopen(options->in_filename);
-    reader_input.fq_file2 = fastq_fopen(options->in_filename2);
-  }
+  //if (options->pair_mode == SINGLE_END_MODE) {
+  //reader_input.fq_file1 = fastq_fopen(options->in_filename);
+  //} else {
+  //reader_input.fq_file1 = fastq_fopen(options->in_filename);
+  //reader_input.fq_file2 = fastq_fopen(options->in_filename2);
+  //}
 
   linked_list_t *alignments_list = linked_list_new(COLLECTION_MODE_SYNCHRONIZED);
   linked_list_set_flag(options->pair_mode, alignments_list);
@@ -263,13 +307,19 @@ void rna_aligner(options_t *options) {
   batch_writer_input_init( output_filename,
 			   exact_filename, 
 			   extend_filename, 
-			   alignments_list, genome, &writer_input);
+			   alignments_list, 
+			   genome, &writer_input);
 
-  bam_header_t *bam_header = create_bam_header_by_genome(genome);
-  printf("%s\n", output_filename);
-  writer_input.bam_file = bam_fopen_mode(output_filename, bam_header, "w");
-  bam_fwrite_header(bam_header, writer_input.bam_file);
-  
+  if (!options->fast_mode) {
+    bam_header_t *bam_header = create_bam_header_by_genome(genome);
+    //printf("%s\n", output_filename);
+    writer_input.bam_file = bam_fopen_mode(output_filename, bam_header, "w");
+    bam_fwrite_header(bam_header, writer_input.bam_file);
+  } else {
+    writer_input.bam_file = (bam_file_t *) fopen(output_filename, "w"); 
+    write_sam_header(sa_index->genome, (FILE *) writer_input.bam_file);
+  }
+
   extra_stage_t extra_stage_input;
   
   int workflow_enable = 1;
@@ -290,7 +340,8 @@ void rna_aligner(options_t *options) {
   array_list_t *files_fq2 = array_list_new(50,
 					   1.25f,
 					   COLLECTION_MODE_ASYNCHRONIZED);
-  int num_files1, num_files2;
+  int num_files1 = 0;
+  int num_files2 = 0;
 
   if (fq_list1) {
     ptr = strtok(fq_list1, token);    // Primera llamada => Primer token
@@ -317,12 +368,24 @@ void rna_aligner(options_t *options) {
   
   extern double main_time;
   double time_alig;
-  struct timeval time_start_alig, time_end_alig;
-  
+  struct timeval time_start_alig, time_end_alig;  
   char *file1, *file2;
+
+  printf("\n\n\t\t==================================================\n");
+  printf("\t\t|................. M A P P I N G ................|\n");
+  printf("\t\t==================================================\n");
+  printf("\t\t |                ___  ___  ___                 |\n");
+  printf("\t\t |              \\/ H \\/ P \\/ G \\/               |\n");
+  printf("\t\t |              /\\___/\\___/\\___/\\               |\n");
+  printf("\t\t |      ___  ___  ___  ___  ___  ___  ___       |\n");
+  printf("\t\t |    \\/ A \\/ L \\/ I \\/ G \\/ N \\/ E \\/ R \\/     |\n");
+  printf("\t\t |    /\\___/\\___/\\___/\\___/\\___/\\___/\\___/\\     |\n");
+  printf("\t\t |                                              |\n");
+  printf("\t\t==================================================\n");
+
   for (int f = 0; f < num_files1; f++) {
     file1 = array_list_get(f, files_fq1);
-    
+
     if (num_files2) {
       file2 = array_list_get(f, files_fq2);
     } else {
@@ -362,82 +425,163 @@ void rna_aligner(options_t *options) {
 
     sw_input.f_sa = f_sa;
     sw_input.f_hc = f_hc;
-    //===================================================================================
-    //-----------------------------------------------------------------------------------
-    // workflow management
-    //
-    //
-    // timing
-    //struct timeval start, end;
 
-    wf_input_t *wf_input = wf_input_new(&reader_input, batch);
-    wf_input_file_t *wf_input_file = wf_input_file_new(f_sa, batch);   
-    wf_input_file_t *wf_input_file_hc = wf_input_file_new(f_hc, batch);  
+    if (!options->fast_mode) {
+      ///////////////// BWT INDEX WORKFLOW //////////////////////
+      //===================================================================================
+      //-----------------------------------------------------------------------------------
+      // workflow management
+      //
+      //
+      // timing
+      //struct timeval start, end;
 
-    //create and initialize workflow
-    workflow_t *wf = workflow_new();
-    workflow_stage_function_t stage_functions[] = {bwt_stage, cal_stage, 
-						   sw_stage, post_pair_stage};
-    char *stage_labels[] = {"BWT", "CAL", "SW", "POST PAIR"};
-    workflow_set_stages(4, (workflow_stage_function_t *)&stage_functions, stage_labels, wf);
-    // optional producer and consumer functions
-    workflow_set_producer((workflow_producer_function_t *)fastq_reader, "FastQ reader", wf);
-    workflow_set_consumer((workflow_consumer_function_t *)bam_writer, "BAM writer", wf);
+      wf_input_t *wf_input = wf_input_new(&reader_input, batch);
+      wf_input_file_t *wf_input_file = wf_input_file_new(f_sa, batch);   
+      wf_input_file_t *wf_input_file_hc = wf_input_file_new(f_hc, batch);  
+
+      //create and initialize workflow
+      workflow_t *wf = workflow_new();
+      workflow_stage_function_t stage_functions[] = {bwt_stage, cal_stage, 
+						     sw_stage, post_pair_stage};
+      char *stage_labels[] = {"BWT", "CAL", "SW", "POST PAIR"};
+      workflow_set_stages(4, (workflow_stage_function_t *)&stage_functions, stage_labels, wf);
+      // optional producer and consumer functions
+      workflow_set_producer((workflow_producer_function_t *)fastq_reader, "FastQ reader", wf);
+      workflow_set_consumer((workflow_consumer_function_t *)bam_writer, "BAM writer", wf);
   
-    workflow_t *wf_last = workflow_new();
-    workflow_stage_function_t stage_functions_last[] = {rna_last_stage, post_pair_stage};
-    char *stage_labels_last[] = {"RNA LAST STAGE", "POST PAIR"};
-    workflow_set_stages(2, (workflow_stage_function_t *)&stage_functions_last, stage_labels_last, wf_last);
-    workflow_set_producer((workflow_producer_function_t *)file_reader, "Buffer reader", wf_last);
-    workflow_set_consumer((workflow_consumer_function_t *)bam_writer, "BAM writer", wf_last);
+      workflow_t *wf_last = workflow_new();
+      workflow_stage_function_t stage_functions_last[] = {rna_last_stage, post_pair_stage};
+      char *stage_labels_last[] = {"RNA LAST STAGE", "POST PAIR"};
+      workflow_set_stages(2, (workflow_stage_function_t *)&stage_functions_last, stage_labels_last, wf_last);
+      workflow_set_producer((workflow_producer_function_t *)file_reader, "Buffer reader", wf_last);
+      workflow_set_consumer((workflow_consumer_function_t *)bam_writer, "BAM writer", wf_last);
 
-    workflow_t *wf_hc = workflow_new();
-    workflow_stage_function_t stage_functions_hc[] = {rna_last_hc_stage, post_pair_stage};
-    char *stage_labels_hc[] = {"RNA HARD CLIPPINGS", "POST PAIR"};
-    workflow_set_stages(2, (workflow_stage_function_t *)&stage_functions_hc, stage_labels_hc, wf_hc);
-    workflow_set_producer((workflow_producer_function_t *)file_reader_2, "Buffer reader", wf_hc);
-    workflow_set_consumer((workflow_consumer_function_t *)bam_writer, "BAM writer", wf_hc);
+      workflow_t *wf_hc = workflow_new();
+      workflow_stage_function_t stage_functions_hc[] = {rna_last_hc_stage, post_pair_stage};
+      char *stage_labels_hc[] = {"RNA HARD CLIPPINGS", "POST PAIR"};
+      workflow_set_stages(2, (workflow_stage_function_t *)&stage_functions_hc, stage_labels_hc, wf_hc);
+      workflow_set_producer((workflow_producer_function_t *)file_reader_2, "Buffer reader", wf_hc);
+      workflow_set_consumer((workflow_consumer_function_t *)bam_writer, "BAM writer", wf_hc);
      
 
-    // Create new thread POSIX for search extra Splice Junctions
-    //============================================================
-    pthread_attr_t attr;
-    pthread_t thread;
-    void *status;
-    int ret;
+      // Create new thread POSIX for search extra Splice Junctions
+      //============================================================
+      pthread_attr_t attr;
+      pthread_t thread;
+      void *status;
+      int ret;
 
-    //Run workflow
-    size_t tot_reads_in;
-    size_t tot_reads_out;
+      //Run workflow
+      size_t tot_reads_in;
+      size_t tot_reads_out;
 
-    tot_reads_in = 0;
-    tot_reads_out = 0;
-
-
-    start_timer(time_start_alig);
-    fprintf(stderr, "START WORKWFLOW '1ph'\n");
-    workflow_run_with(options->num_cpu_threads, wf_input, wf);
-    fprintf(stderr, "END WORKWFLOW '1ph'\n\n");
-  
-    fprintf(stderr, "START WORKWFLOW '2ph'\n");
-    rewind(f_sa);
-    workflow_run_with(options->num_cpu_threads, wf_input_file, wf_last);
-    fprintf(stderr, "END WORKWFLOW '2ph'\n\n");
+      tot_reads_in = 0;
+      tot_reads_out = 0;
 
 
-    fprintf(stderr, "START WORKWFLOW '3ph'\n");
-    rewind(f_hc);
-    workflow_run_with(options->num_cpu_threads, wf_input_file_hc, wf_hc);
-    fprintf(stderr, "END WORKWFLOW '3ph'\n\n");
-  
-    // free memory
-    workflow_free(wf);
-    workflow_free(wf_last);
-    workflow_free(wf_hc);
+      start_timer(time_start_alig);
+      printf("\t\t|................................................|\n");
+      printf("\t\t|            W O R K W F L O W    1              |\n");
+      workflow_run_with(options->num_cpu_threads, wf_input, wf);
 
-    wf_input_free(wf_input);
-    wf_input_file_free(wf_input_file);
-    wf_input_file_free(wf_input_file_hc);
+      printf("\t\t|................................................|\n");
+      printf("\t\t|            W O R K W F L O W    2              |\n");
+      rewind(f_sa);
+      workflow_run_with(options->num_cpu_threads, wf_input_file, wf_last);
+
+      printf("\t\t|................................................|\n");
+      printf("\t\t|            W O R K W F L O W    3              |\n");
+      rewind(f_hc);
+      workflow_run_with(options->num_cpu_threads, wf_input_file_hc, wf_hc);
+      printf("\t\t==================================================\n\n");
+      stop_timer(time_start_alig, time_end_alig, time_alig);
+      //start_timer(time_start_alig);
+
+      basic_statistics_display(basic_st, 1, time_alig / 1000000, time_genome / 1000000);  
+
+      // free memory
+      workflow_free(wf);
+      workflow_free(wf_last);
+      workflow_free(wf_hc);
+
+      wf_input_free(wf_input);
+      wf_input_file_free(wf_input_file);
+      wf_input_file_free(wf_input_file_hc);
+    
+    } else {
+      ///////////////// SA INDEX WORKFLOW //////////////////////
+      //--------------------------------------------------------------------------------------
+      // workflow management
+      //
+      sw_optarg_t sw_optarg;
+      sw_optarg_init(options->gap_open, options->gap_extend, 
+		     options->match, options->mismatch, &sw_optarg);
+
+      sa_rna_input_t sa_rna;
+      sa_rna.genome    = genome;
+      sa_rna.avls_list = avls_list;
+      sa_rna.metaexons = metaexons;
+      sa_rna.sw_optarg = &sw_optarg;
+      sa_rna.file1 = f_sa;
+      sa_rna.file2 = f_hc;
+      //printf("FILEEEEEEEEEEEEEEEE %p\n", f_sa);
+      sa_wf_batch_t *wf_batch = sa_wf_batch_new(NULL, (void *)sa_index, &writer_input, NULL, &sa_rna);
+      sa_wf_input_t *wf_input = sa_wf_input_new(0, &reader_input, wf_batch);
+      
+      // create and initialize workflow
+      workflow_t *wf = workflow_new();      
+      workflow_stage_function_t stage_functions[] = {sa_rna_mapper};
+      char *stage_labels[] = {"SA mapper"};
+      workflow_set_stages(1, (workflow_stage_function_t *)&stage_functions, stage_labels, wf);      
+      // optional producer and consumer functions
+      workflow_set_producer(sa_fq_reader_rna, "FastQ reader", wf);
+      workflow_set_consumer(sa_sam_writer_rna, "SAM writer", wf);
+      
+      //Create and initialize second workflow
+      workflow_t *wf_last = workflow_new();
+      workflow_stage_function_t stage_functions_last[] = {sa_rna_mapper_last};
+      char *stage_labels_last[] = {"SA mapper last stage"};
+      workflow_set_stages(1, (workflow_stage_function_t *)&stage_functions_last, stage_labels_last, wf_last);
+      workflow_set_producer(sa_alignments_reader_rna, "FastQ reader", wf_last);
+      workflow_set_consumer(sa_sam_writer_rna, "SAM writer", wf_last);
+
+      double time_total;
+      struct timeval time_s1, time_e1;
+
+      printf("Run workflow with %i threads\n", options->num_cpu_threads);
+
+      start_timer(time_s1);
+      workflow_run_with(options->num_cpu_threads, wf_input, wf);
+      stop_timer(time_s1, time_e1, time_total);
+
+      printf("Time W1: %f(s)\n", time_total / 1000000);
+      
+      printf("=============== SECOND WORKFLOW ================\n");
+      start_timer(time_s1);
+      rewind(f_sa);
+      workflow_run_with(options->num_cpu_threads, wf_input, wf_last);      
+      stop_timer(time_s1, time_e1, time_total);
+
+      printf("Time W2: %f(s)\n", time_total / 1000000);
+
+      //printf("TOTAL TIME : %f\n", time_total / 1000000);
+      //printf("----------------------------------------------\n");
+      //workflow_display_timing(wf);
+      //printf("----------------------------------------------\n");   
+      
+      // free memory
+      sa_wf_input_free(wf_input);
+      sa_wf_batch_free(wf_batch);
+      workflow_free(wf);      
+      workflow_free(wf_last);      
+
+      //printf("\n");
+      //for (int x = 0; x <= 10; x++) {
+      //printf("%i CALs: %i reads (%f)\n", x, tot_cals[x], ((float)tot_cals[x]*100)/(float)total_reads );
+      //}
+      
+    }
 
     if (file1) { free(file1); }
     if (file2) { free(file2); }
@@ -460,8 +604,7 @@ void rna_aligner(options_t *options) {
 	fastq_fclose(reader_input.fq_file1);
 	fastq_fclose(reader_input.fq_file2);
       }
-    }
-    
+    }    
   }
 
   array_list_free(files_fq1, NULL);
@@ -469,10 +612,10 @@ void rna_aligner(options_t *options) {
 
   //Write chromosome avls
   write_chromosome_avls(extend_filename,
-			exact_filename, genome->num_chromosomes, avls_list);
+			exact_filename, num_chromosomes, avls_list);
   
   
-  stop_timer(time_start_alig, time_end_alig, time_alig);
+
 
   /*  
   printf("= = = = T I M I N G    W O R K F L O W    '1' = = = =\n");
@@ -488,9 +631,11 @@ void rna_aligner(options_t *options) {
   printf("= = = = - - - - - - - - - - - - - - - - - - - = = = =\n\n");
   */
   
-  basic_statistics_display(basic_st, 1, time_alig / 1000000, time_genome / 1000000);
+
   
-  free(basic_st);
+  //Write statistics to file 
+
+  //free(basic_st);
   
   //if (time_on){ timing_free(timing); }
   metaexons_free(metaexons);
@@ -782,10 +927,15 @@ void rna_aligner(options_t *options) {
   //}
   */
 
-  
-  //options_free(options);
-  bam_fclose(writer_input.bam_file);
-  
+  if (!options->fast_mode) {
+    // free memory
+    if (bwt_index) { bwt_index_free(bwt_index); }
+    bam_fclose(writer_input.bam_file);
+  } else {
+    // free memory
+    if (sa_index)  { sa_index3_free(sa_index);  }
+    fclose((FILE *) writer_input.bam_file);
+  }
  
   batch_free(batch);
 
@@ -794,8 +944,10 @@ void rna_aligner(options_t *options) {
   // end of workflow management
   //--------------------------------------------------------------------------------------
 
-  bwt_index_free(bwt_index);
-  genome_free(genome);
+  if (genome) {
+    genome_free(genome);
+  }
+
   bwt_optarg_free(bwt_optarg);
   cal_optarg_free(cal_optarg);
   pair_mng_free(pair_mng);

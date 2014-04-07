@@ -486,7 +486,7 @@ fastq_read_t *file_read_fastq_reads(size_t *num_items, FILE *fd) {
 
   bytes = fread(sizes_to_read, sizeof(size_t), 3, fd);
   if (!bytes) { return NULL; }
-
+  
   head_len   = sizes_to_read[0];
   seq_len    = sizes_to_read[1];
   *num_items = sizes_to_read[2];
@@ -494,8 +494,9 @@ fastq_read_t *file_read_fastq_reads(size_t *num_items, FILE *fd) {
   int tot_size = head_len + 2*seq_len;
   char *buffer = (char *)calloc(tot_size + 1, sizeof(char));
   bytes = fread(buffer, sizeof(char), tot_size, fd);
-  if (!bytes) { 
-    free(buffer);    
+
+  if (!bytes) {
+    free(buffer);
     return NULL; 
   }
 
@@ -517,7 +518,6 @@ fastq_read_t *file_read_fastq_reads(size_t *num_items, FILE *fd) {
   free(id);
   free(sequence);
   free(quality);
-
 
   return fq_read;
 
@@ -591,7 +591,7 @@ int file_read_meta_alignments(size_t num_items, array_list_t *list,
                                               simple_a->gap_start + map_len - 1,
                                               simple_a->map_start, 
                                               simple_a->map_start + map_len - 1,
-                                              0);
+                                              0, 0, 0);
     
     //printf("Exit with seed [%i:%i]\n", s_region->read_start, s_region->read_end);
     
@@ -833,8 +833,7 @@ void file_write_alignments(fastq_read_t *fq_read, array_list_t *items, FILE *fd)
       max_len_of = max_len_of * 2;
       buffer_of = realloc(buffer_of, max_len_cigar); 
     }
-    
-    
+        
   }
 
   fwrite(alignment_aux, sizeof(alignment_aux_t), num_items, fd);
@@ -873,11 +872,6 @@ void file_write_meta_alignments(fastq_read_t *fq_read, array_list_t *items, FILE
     char *cigar_str = new_cigar_code_string(cigar_code);
     int cigar_len = strlen(cigar_str);
 
-    //cal_print(first_cal);
-    //if (strcmp(fq_read->id, "@ENST00000463781@ENSG00000145113@protein_coding@3@195473636@195539148@-1@KNOWN_7557_7641_0_1_0_0_7:0:0_5:0:0_26e/1")==0) {	
-    //printf("WRITE: (%i) %s\n", meta_alignment->cigar_code->distance, new_cigar_code_string(meta_alignment->cigar_code));
-    //}
-
     simple_a = &simple_alignment[i];
 
     if (meta_alignment->cigar_left !=  NULL) {
@@ -913,27 +907,9 @@ void file_write_meta_alignments(fastq_read_t *fq_read, array_list_t *items, FILE
 
   }
 
-  //Write binary file 
-  //[size head][size seq][num items][HEAD][SEQUENCE][QUALITY][CAL 0][CAL n]
-  //size_t items_sizes[3] = {head_size, seq_size, num_items};
-
-  //[size head][size seq][num items]
-  //fwrite(items_sizes, sizeof(size_t), 3, fd);
-  
-  //[HEAD][SEQUENCE][QUALITY]
-  //size_t total_size = head_size + 2*seq_size;
-  //char *buffer = (char *)malloc(sizeof(char)*total_size);
-  //size_t total_size = head_size + 2*seq_size;
-  
-  //memcpy(buffer, fq_read->id, head_size);
-  //memcpy(&buffer[head_size], fq_read->sequence, seq_size);
-  //memcpy(&buffer[head_size + seq_size], fq_read->quality, seq_size);
-
-  //fwrite(buffer, sizeof(char), total_size, fd);  
   fwrite(simple_alignment, sizeof(simple_alignment_t), num_items, fd);
   fwrite(cigar_buffer, sizeof(char), tot_len, fd);  
 
-  //free(buffer);
   free(cigar_buffer);
 }
 
@@ -1040,6 +1016,181 @@ void file_write_items(fastq_read_t *fq_read, array_list_t *items,
   }
   
 }
+
+//=================================================================
+//File SA Functions
+
+void sa_file_write_alignments(fastq_read_t *fq_read, array_list_t *items, FILE *fd) {
+  //size_t head_size = strlen(fq_read->id);
+  size_t seq_size  = fq_read->length;
+  size_t num_items = array_list_size(items);
+  if (!num_items) { 
+    return;
+  } 
+
+  size_t max_len = num_items * 1024;
+  char *cigar_buffer = (char *)calloc(max_len, sizeof(char));
+  size_t tot_len = 0;
+
+  simple_alignment_t simple_alignment[num_items];
+  simple_alignment_t *simple_a;
+  //unsigned char type = MENTA_TYPE;
+  //fwrite(type, sizeof(unsigned char), 1, fd);
+
+  memset(simple_alignment, 0, sizeof(simple_alignment_t)*num_items);
+  //[type][size head][size seq][num items][HEAD][SEQUENCE][QUALITY][CAL 0][CAL n]
+  for (int i = 0; i < num_items; i++) {
+    sa_alignment_t *sa_alignment = array_list_get(i, items);
+    cal_t *first_cal = array_list_get(0, sa_alignment->cals_list);
+    cal_t *last_cal = array_list_get(sa_alignment->cals_list->size - 1, sa_alignment->cals_list);
+    seed_region_t *first_seed = linked_list_get_first(first_cal->sr_list);
+    seed_region_t *last_seed  = linked_list_get_last(last_cal->sr_list);
+    cigar_code_t *cigar_code = sa_alignment->c_final;    
+    char *cigar_str = new_cigar_code_string(cigar_code);
+    if (cigar_str == NULL) { 
+      cigar_str = (char *)calloc(1, sizeof(char));
+    }
+    int cigar_len = strlen(cigar_str);
+
+    simple_a = &simple_alignment[i];
+
+    simple_a->gap_start = first_seed->read_start;
+    simple_a->gap_end = seq_size - last_seed->read_end - 1;
+
+
+    simple_a->map_strand = first_cal->strand;
+    simple_a->map_chromosome = first_cal->chromosome_id;
+    simple_a->map_start = first_cal->start;
+    simple_a->map_distance = cigar_code->distance;
+    simple_a->cigar_len = cigar_len;
+    
+    //printf("==== Write to file ====\n");
+    //cal_print(first_cal);
+    //cal_print(last_cal);
+    // printf("==== Write to file ====\n");
+    //printf(" [%i:%lu] INSERT CIGAR(%i): %s\n", simple_a->map_chromosome, 
+    //	   simple_a->map_start, cigar_len, cigar_str);
+
+    memcpy(&cigar_buffer[tot_len], cigar_str, cigar_len);
+    tot_len += cigar_len;
+
+    if (tot_len >= max_len) { 
+      max_len = max_len * 2;
+      cigar_buffer = realloc(cigar_buffer, max_len); 
+    }
+
+  }
+
+  fwrite(simple_alignment, sizeof(simple_alignment_t), num_items, fd);
+  fwrite(cigar_buffer, sizeof(char), tot_len, fd);  
+
+  free(cigar_buffer);
+
+}
+
+//-------------------------------------------------------------------------------
+
+int sa_file_read_alignments(size_t num_items, array_list_t *list, 
+			    fastq_read_t *fq_read, FILE *fd) {
+
+  if (!num_items) { return 0; }
+
+  simple_alignment_t simple_alignment[num_items];
+  simple_alignment_t *simple_a;
+  int bytes;
+
+  bytes = fread(simple_alignment, sizeof(simple_alignment_t), num_items, fd);
+  if (!bytes) { LOG_FATAL("Corrupt file\n"); }
+  
+  size_t cigar_tot_len = 0;
+  for (int i = 0; i < num_items; i++) {
+    simple_a = &simple_alignment[i];
+    //printf("ITEM %i: (%i)[%i:%lu] [%i-%i]\n", i, simple_a->map_strand, simple_a->map_chromosome,
+    //	   simple_a->map_start, simple_a->gap_start, simple_a->gap_end);
+    cigar_tot_len += simple_a->cigar_len;
+  }
+    
+  char cigar_buffer[cigar_tot_len];
+  bytes = fread(cigar_buffer, sizeof(char), cigar_tot_len, fd);
+  if (!bytes) { LOG_FATAL("Corrupt file\n"); }
+
+  char cigars_test[num_items][1024];
+  size_t actual_read = 0;
+  for (int i = 0; i < num_items; i++) {
+    simple_a = &simple_alignment[i];
+    memcpy(&cigars_test[i], &cigar_buffer[actual_read], simple_a->cigar_len);
+    cigars_test[i][simple_a->cigar_len] = '\0';
+    actual_read += simple_a->cigar_len;
+    //printf("CIGAR %i: %s\n", i, cigars_test[i]);
+    size_t map_len = fq_read->length - simple_a->gap_start - simple_a->gap_end;
+    size_t map_genome_len = 0;
+
+    cigar_code_t *cc = cigar_code_new_by_string(cigars_test[i]);
+    array_list_t *list_aux = array_list_new(5, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
+    sa_alignment_t *sa_alignment = sa_alignment_new(list_aux);    
+
+    sa_alignment->c_final = cigar_code_new();
+
+    for (int m = 0; m < array_list_size(cc->ops); m++) {
+      cigar_op_t *op = array_list_get(m, cc->ops);
+      cigar_code_append_new_op(op->number, op->name, sa_alignment->c_final);
+
+      if (op->name == 'M' || op->name == 'D' || op->name == 'N') {
+	map_genome_len += op->number;
+      }
+
+    }
+    
+    //printf("SEED := len_read:%i - gap_read:%i - gap_end:%i = %i, SEED-END = %i\n", fq_read->length, 
+    //   simple_a->gap_start, 
+    //   simple_a->gap_end, 
+    //   map_len, simple_a->gap_start + map_len);
+
+    seed_region_t *s_region = seed_region_new(simple_a->gap_start, 
+                                              simple_a->gap_start + map_len - 1,
+                                              simple_a->map_start, 
+                                              simple_a->map_start + map_genome_len - 1,
+                                              0, 0, 0);
+    
+    //printf("Exit with seed [%i:%i]\n", s_region->read_start, s_region->read_end);    
+    linked_list_t *sr_list = linked_list_new(COLLECTION_MODE_ASYNCHRONIZED);
+    linked_list_insert(s_region, sr_list);
+    
+    cal_t *cal = cal_new(simple_a->map_chromosome, 
+                         simple_a->map_strand,
+                         simple_a->map_start,
+                         simple_a->map_start + map_len - 1,
+                         1,
+                         sr_list,
+                         linked_list_new(COLLECTION_MODE_ASYNCHRONIZED));
+
+
+    cc->distance = simple_a->map_distance;
+    cal->info = cc;
+
+    //printf("Cal & Cigar Ok, Insert list\n");
+
+
+    sa_alignment->c_final->distance = simple_a->map_distance;
+    
+    array_list_insert(cal, sa_alignment->cals_list);
+    array_list_insert(sa_alignment, list);
+
+  }
+
+  return 0;
+
+}
+
+//-------------------------------------------------------------------------------
+
+void sa_file_write_items(fastq_read_t *fq_read, array_list_t *items, FILE *fd) {
+  file_write_fastq_read(fq_read, array_list_size(items), fd);
+  sa_file_write_alignments(fq_read, items, fd);  
+}
+
+//=================================================================
+
 
 /*
 void insert_file_item (fastq_read_t *fq_read, array_list_t *items, FILE *f_sa) {

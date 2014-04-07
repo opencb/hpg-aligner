@@ -83,7 +83,8 @@ void *sa_fq_reader(void *input) {
     new_wf_batch = sa_wf_batch_new(curr_wf_batch->options,
 				   curr_wf_batch->sa_index,
 				   curr_wf_batch->writer_input, 
-				   sa_mapping_batch);
+				   sa_mapping_batch,
+				   NULL);
   }
 
   return new_wf_batch;

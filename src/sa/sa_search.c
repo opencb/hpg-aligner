@@ -27,15 +27,20 @@ size_t search_prefix(char *sequence, size_t *low, size_t *high,
   }
   
   size_t row2 = row + 1;
-  while ((ia2 = sa_index->IA[row2]) == max_uint) {
-    row2++;
-    if (row2 >= sa_index->IA_items) {
-      //      printf("\trow2 reaches IA_items limit (IA items = %lu)\n", sa_index->IA_items);
-      row2 = sa_index->IA_items;
-      ia2 = sa_index->A_items;
-      break;
+  //if (row2 >= sa_index->IA_items) {
+  //row2 = sa_index->IA_items;
+  //ia2 = sa_index->A_items;
+  //} else {
+    while ((ia2 = sa_index->IA[row2]) == max_uint) {
+      row2++;
+      if (row2 >= sa_index->IA_items) {
+	//      printf("\trow2 reaches IA_items limit (IA items = %lu)\n", sa_index->IA_items);
+	row2 = sa_index->IA_items;
+	ia2 = sa_index->A_items;
+	break;
+      }
     }
-  }
+    //}
   //  printf("\tfrom IA[%lu] = %lu to IA[%lu] = %lu -> num. columns = %lu\n", row, ia1, row2, ia2, ia2 - ia1);
   
   found_ja = 0;
@@ -99,7 +104,6 @@ size_t search_suffix(char *seq, uint len, int max_num_suffixes,
   printf("\t\tnum. prefixes = %lu\n", num_prefixes);
   #endif
 
-
   if (num_prefixes && num_prefixes < max_num_suffixes) {   
 
     //    *suffix_len = sa_index->k_value;
@@ -140,6 +144,7 @@ size_t search_suffix(char *seq, uint len, int max_num_suffixes,
       return num_prefixes;
     }
 
+    
     for (size_t i = *low; i < *high; i++) {
       query = seq + sa_index->k_value;
       ref = &sa_index->genome->S[sa_index->SA[i]] + sa_index->k_value;
@@ -158,6 +163,7 @@ size_t search_suffix(char *seq, uint len, int max_num_suffixes,
 	break;
       }
     }
+    
 
     if (first <= last) {
       *low = first;
@@ -174,6 +180,7 @@ size_t search_suffix(char *seq, uint len, int max_num_suffixes,
   
   return num_suffixes;
 }
+
 
 //--------------------------------------------------------------------
 //--------------------------------------------------------------------

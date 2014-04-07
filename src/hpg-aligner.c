@@ -34,9 +34,11 @@ size_t junction_id;
 // main parameters support
 //--------------------------------------------------------------------
 int main(int argc, char* argv[]) {
-
   pthread_mutex_init(&mutex_sp, NULL);
   
+  //memset(tot_cals, 0, sizeof(int)*50);
+  //const char HEADER_FILE[1024] = "Human_NCBI37.hbam\0";
+
   basic_st = basic_statistics_new();
 
   // init logs, after parsing the command-line
@@ -58,7 +60,7 @@ int main(int argc, char* argv[]) {
   // We need to consume command: {dna | rna | bs | build-index}
   argc -= 1;
   argv += 1;
-
+  
   if(strcmp(command, "dna") != 0 && 
      strcmp(command, "rna") != 0 &&
      strcmp(command, "bs" ) != 0 && 
@@ -91,9 +93,32 @@ int main(int argc, char* argv[]) {
     rna_aligner(options);
   }
 
-  options_free(options);
+  //} else if (strcmp(command, "bs") == 0) {
+  // BS commnad
+  //printf("Run BS mode...");
+  //run_bs_aligner(genome1, genome2, genome, bwt_index1, bwt_index2,
+  //                   bwt_optarg, cal_optarg, pair_mng, report_optarg, options);
+  //}   
 
+  /*
+  if (options->fast_mode) {  
+    size_t mapped_reads = total_reads - unmapped_reads;
+    printf("TOTAL READS    : %lu\n", total_reads);
+    printf("    UNMAPPED READS : %lu (%f%%)\n", unmapped_reads, ((float)unmapped_reads * 100)/((float)total_reads));
+    printf("    MAPPED READS   : %lu (%f%%)\n", mapped_reads, ((float)mapped_reads * 100)/((float)total_reads));
+    printf("-------------------------------\n");
+    printf("    CORRECT READS    : %lu (%f%%)\n", correct_reads,  ((float)correct_reads * 100)/((float)total_reads));
+    printf("    INCORRECT READS  : %lu (%f%%)\n", mapped_reads - correct_reads,  ((float)(mapped_reads - correct_reads) * 100)/((float)total_reads));
+    
+
+    //printf("Seeds with one Error %i (%0.2f)\n", seeds_1err, seeds_1err*100/total_reads);
+  }
+  */
+
+  options_free(options);
+  
   return 0;
+
 }
 
 

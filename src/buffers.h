@@ -198,7 +198,6 @@
 #define GC_AG_SPLICE  	5 //+
 #define CT_GC_SPLICE  	6 //-
 
-//===============================================
 
 //====================================================================================
 //  structures and prototypes
@@ -523,8 +522,47 @@ void buffer_item_free(buffer_item_t *buffer_item);
 void insert_file_item(fastq_read_t *fq_read, array_list_t *items, FILE *f_sa);
 
 void insert_file_item_2(fastq_read_t *fq_read, array_list_t *items, FILE *f_hc);
+
 //======================================================================================
 
+//------------------------------------------------------------------
+
+typedef struct sa_alignment {
+  int left_close;
+  int right_close;
+  int num_sp;
+  int complete;
+  array_list_t *cals_list;
+  cigar_code_t *c_left;
+  cigar_code_t *c_right;
+  cigar_code_t *c_final;
+  int sp_middle[20];
+  int reported;
+} sa_alignment_t;
+
+inline sa_alignment_t *sa_alignment_new(array_list_t *cals_list) {
+
+  sa_alignment_t *sa_a = (sa_alignment_t *) malloc(sizeof(sa_alignment_t));
+
+  sa_a->cals_list   = cals_list;
+  sa_a->left_close  = 0;
+  sa_a->right_close = 0;
+  sa_a->c_left  = NULL;
+  sa_a->c_right = NULL;
+
+  memset(sa_a->sp_middle, 0, 20);
+  sa_a->num_sp = 0;
+  sa_a->complete = 0;
+  sa_a->reported = 0;
+  return sa_a;
+
+}
+
+inline void sa_alignment_free(sa_alignment_t *sa_alignment) {
+  free(sa_alignment);
+}
+
+//------------------------------------------------------------------
 
 typedef struct meta_alignment {
   int status;
@@ -585,5 +623,12 @@ int file_read_meta_alignments(size_t num_items, array_list_t *list,
 
 int file_read_alignments(size_t num_items, array_list_t *list, 
 			 fastq_read_t *fq_read, FILE *fd);
+
+int sa_file_read_alignments(size_t num_items, array_list_t *list, 
+			    fastq_read_t *fq_read, FILE *fd);
+
+void sa_file_write_alignments(fastq_read_t *fq_read, array_list_t *items, FILE *fd);
+
+void sa_file_write_items(fastq_read_t *fq_read, array_list_t *items, FILE *fd);
 
 #endif // BUFFERS_H

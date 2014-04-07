@@ -7,11 +7,13 @@
 #include "aligners/bwt/genome.h"
 #include "bioformats/bam/alignment.h"
 #include "bioformats/fastq/fastq_read.h"
+
 //--------------------------------------------------------------------------------------
 
-#define FIRST_SW 0
+#define FIRST_SW  0
 #define MIDDLE_SW 1
-#define LAST_SW 2
+#define LAST_SW   2
+#define SJ_SW     3
 
 //--------------------------------------------------------------------------------------
 //Metaexon constants
@@ -172,7 +174,8 @@ typedef struct metaexons {
   //linked_list_t      ***metaexons_x;  
 } metaexons_t;
 
-metaexons_t *metaexons_new(genome_t *genome);
+metaexons_t *metaexons_new(unsigned int num_chromosomes, 
+			   size_t *chr_size);
 
 void metaexons_free(metaexons_t *metaexons);
 
