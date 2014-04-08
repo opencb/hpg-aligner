@@ -1048,7 +1048,8 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 						}
 #ifdef D_TIME_DEBUG
 						aux_time2 = omp_get_wtime() - aux_time2;
-						time_add_time_slot(D_SLOT_NEXT, TIME_GLOBAL_STATS, aux_time2);
+						if(context.last_readed_count > 0)
+							time_add_time_slot(D_SLOT_NEXT, TIME_GLOBAL_STATS, aux_time2 / (double)context.last_readed_count);
 #endif
 
 						while(context.last_readed_count != 0)
@@ -1075,8 +1076,7 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 								{
 #ifdef D_TIME_DEBUG
 									end_time_p = omp_get_wtime();
-									list_l = array_list_size(context.filtered_list);
-									time_add_time_slot(D_SLOT_HAPLO_GET, TIME_GLOBAL_STATS, (double)(end_time_p - init_time_p)/(double)list_l);
+									time_add_time_slot(D_SLOT_HAPLO_GET, TIME_GLOBAL_STATS, (double)(end_time_p - init_time_p)/(double)context.last_readed_count);
 #endif
 									//Realign
 #ifdef D_TIME_DEBUG
@@ -1087,14 +1087,8 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 									{
 #ifdef D_TIME_DEBUG
 										end_time_p = omp_get_wtime();
-										list_l = array_list_size(context.realign_list);
-										if(list_l > 0)
-										{
-											end_time_p = (double)(end_time_p - init_time_p)/(double)list_l;
-											list_l = array_list_size(context.haplo_list);
-											if(list_l > 0)
-												time_add_time_slot(D_SLOT_REALIG_PER_HAPLO, TIME_GLOBAL_STATS, end_time_p/(double)list_l);
-										}
+										if(context.last_readed_count > 0)
+												time_add_time_slot(D_SLOT_REALIG_PER_HAPLO, TIME_GLOBAL_STATS, (double)(end_time_p - init_time_p)/(double)context.last_readed_count);
 #endif
 									}
 									else
@@ -1145,7 +1139,8 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 							}
 #ifdef D_TIME_DEBUG
 							aux_time2 = omp_get_wtime() - aux_time2;
-							time_add_time_slot(D_SLOT_NEXT, TIME_GLOBAL_STATS, aux_time2);
+							if(context.last_readed_count > 0)
+								time_add_time_slot(D_SLOT_NEXT, TIME_GLOBAL_STATS, aux_time2 / (double)context.last_readed_count);
 #endif
 						}//last_readed != 0 while
 
@@ -1853,6 +1848,10 @@ alig_indel_realign_from_haplo(alig_context_t *context, size_t alt_haplo_index)
 
 	//Iterate list to realign
 	list_l = array_list_size(list);
+	#pragma omp parallel for default(none) \
+	shared(stderr) \
+	firstprivate(list, list_l, m_ldim, haplo, ref_seq, ref_length, m_scores, m_positions, alt_haplo_index, context, log_level) \
+	private(err, read, read_indels, ref_score, h_score, read_seq, read_seq_ref, read_seq_ref_l, comp_aux, read_quals, read_disp_ref, misses_sum, misses, min_score, log_msg, bases, best_cigar, best_cigar_l, best_pos)
 	for(i = 0; i < list_l; i++)
 	{
 		//Get read

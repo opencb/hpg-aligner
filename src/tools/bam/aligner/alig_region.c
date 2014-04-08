@@ -280,6 +280,8 @@ region_get_from_batch(const bam_batch_t* batch, alig_region_table_t *region_tabl
 			}
 		}
 	}
+
+	return NO_ERROR;
 }
 
 /**
@@ -353,5 +355,7 @@ region_get_from_file(const char *bam_path)
 	printf("\nClosing BAM file...\n");
 	bam_fclose(bam_f);
 	printf("BAM closed.\n");
+
+	return NO_ERROR;
 }
 
