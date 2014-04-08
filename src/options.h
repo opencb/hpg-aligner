@@ -56,7 +56,7 @@
 
 
 #define NUM_OPTIONS			29
-#define NUM_RNA_OPTIONS			 5
+#define NUM_RNA_OPTIONS			 6
 #define NUM_DNA_OPTIONS			 1
 
 //#define NUM_OPTIONS			26

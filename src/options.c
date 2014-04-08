@@ -315,7 +315,9 @@ void options_display(options_t *options) {
      if (options->mode == RNA_MODE) {
        printf("RNA parameters\n");
        printf("\tMode: %s\n", fast_mode ? "Fast":"Slow");
-       printf("\tSeed size: %d\n",  seed_size);
+       if (!fast_mode) {
+	 printf("\tSeed size: %d\n",  seed_size);
+       }
        printf("\tMax intron length: %d\n", max_intron_length);
        printf("\tMin intron length: %d\n", min_intron_length);
        printf("\tMin score        : %d\n", min_score);
