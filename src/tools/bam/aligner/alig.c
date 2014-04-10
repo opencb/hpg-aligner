@@ -958,7 +958,7 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 	//Init multithreading
 	omp_set_dynamic(1);
 	omp_set_nested(1);
-	if(omp_get_max_threads() < 2)
+	if(omp_get_max_threads() < 3)
 	{
 		//Only 1 available thread
 		//printf("Minimum threads required is 2, setting number of threads to 2\n");
