@@ -186,6 +186,11 @@ void validate_options(options_t *options) {
     options->report_n_hits = 0;    
     options->report_all = 0;
   }
+
+  if (!options->fast_mode) {
+    options->bam_format = 1;
+  }
+
 }
 
 
@@ -269,8 +274,9 @@ void options_display(options_t *options) {
      printf("\tFastQ gzip mode: %s\n", options->gzip == 1 ? "Enable" : "Disable");
      printf("\tIndex directory name: %s\n", bwt_dirname);
      printf("\tOutput directory name: %s\n", output_name);
+          
      printf("\tOutput file format: %s\n", 
-	    (options->bam_format || options->realignment || options->recalibration) ? "SAM" : "BAM");
+	    (options->bam_format || options->realignment || options->recalibration) ? "BAM" : "SAM");
      printf("\n");
 
      printf("Architecture parameters\n");
@@ -470,7 +476,9 @@ options_t *read_CLI_options(void **argtable, options_t *options) {
   if (((struct arg_str*)argtable[++count])->count) { options->prefix_name = strdup(*(((struct arg_str*)argtable[count])->sval)); }
   if (((struct arg_file*)argtable[++count])->count) { options->log_level = *(((struct arg_int*)argtable[count])->ival); }
   if (((struct arg_int*)argtable[++count])->count) { options->help = ((struct arg_int*)argtable[count])->count; }
+
   if (((struct arg_int*)argtable[++count])->count) { options->bam_format = ((struct arg_int*)argtable[count])->count; }
+
   if (((struct arg_int*)argtable[++count])->count) { options->realignment = ((struct arg_int*)argtable[count])->count; }
   if (((struct arg_int*)argtable[++count])->count) { options->recalibration = ((struct arg_int*)argtable[count])->count; }
 

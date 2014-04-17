@@ -530,6 +530,8 @@ void insert_file_item_2(fastq_read_t *fq_read, array_list_t *items, FILE *f_hc);
 typedef struct sa_alignment {
   int left_close;
   int right_close;
+  int left_dsp_w2;
+  int right_dsp_w2;
   int num_sp;
   int complete;
   array_list_t *cals_list;
@@ -537,6 +539,7 @@ typedef struct sa_alignment {
   cigar_code_t *c_right;
   cigar_code_t *c_final;
   int sp_middle[20];
+  void *cigar_middle[20];
   int reported;
 } sa_alignment_t;
 
@@ -549,11 +552,16 @@ inline sa_alignment_t *sa_alignment_new(array_list_t *cals_list) {
   sa_a->right_close = 0;
   sa_a->c_left  = NULL;
   sa_a->c_right = NULL;
+  sa_a->c_final = NULL;
 
   memset(sa_a->sp_middle, 0, 20);
   sa_a->num_sp = 0;
   sa_a->complete = 0;
   sa_a->reported = 0;
+
+  sa_a->left_dsp_w2  = 0;
+  sa_a->right_dsp_w2 = 0;
+
   return sa_a;
 
 }

@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "workflow_functions.h"
 #include "batch_writer.h"
 #include "sa/sa_search.h"
 #include "dna/sa_dna_commons.h"
@@ -21,6 +22,7 @@
 void *sa_alignments_reader_rna(void *input);
 void *sa_fq_reader_rna(void *input);
 int sa_sam_writer_rna(void *data);
+int sa_bam_writer_rna(void *data);
 
 //--------------------------------------------------------------------
 // sa_batch_t struct

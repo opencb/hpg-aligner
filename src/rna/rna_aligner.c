@@ -64,7 +64,7 @@ void rna_aligner(options_t *options) {
     strcat(log_results, "/");
     strcat(log_results, options->prefix_name);
     strcat(log_results, "_hpg-aligner.log");  
-
+    
     strcat(extend_junctions, "/");
     strcat(extend_junctions, options->prefix_name);
     strcat(extend_junctions, "_extend_junctions.bed");
@@ -77,7 +77,11 @@ void rna_aligner(options_t *options) {
     if (!options->fast_mode) {
       strcat(reads_results, "/alignments.bam");
     } else {
-      strcat(reads_results, "/alignments.sam");
+      if (options->bam_format) {
+	strcat(reads_results, "/alignments.bam");
+      } else {
+	strcat(reads_results, "/alignments.sam");
+      }
     }
     strcat(log_results, "/hpg-aligner.log");
     strcat(extend_junctions, "/extend_junctions.bed");
@@ -176,9 +180,7 @@ void rna_aligner(options_t *options) {
     }
 
     LOG_DEBUG("Done !!");
-    //metaexons = metaexons_new(sa_index->genome->num_chroms, 
-    //			      sa_index->genome->chrom_lengths);    
-    //////////////////////////////////////////////////////
+
   }
 
   num_chromosomes = genome->num_chromosomes;
@@ -310,9 +312,14 @@ void rna_aligner(options_t *options) {
 			   alignments_list, 
 			   genome, &writer_input);
 
-  if (!options->fast_mode) {
-    bam_header_t *bam_header = create_bam_header_by_genome(genome);
-    //printf("%s\n", output_filename);
+  
+  if (options->bam_format) {
+    bam_header_t *bam_header;
+    if (options->fast_mode) {
+      bam_header = create_bam_header(sa_index->genome);
+    } else {
+      bam_header = create_bam_header_by_genome(genome);
+    }
     writer_input.bam_file = bam_fopen_mode(output_filename, bam_header, "w");
     bam_fwrite_header(bam_header, writer_input.bam_file);
   } else {
@@ -370,6 +377,9 @@ void rna_aligner(options_t *options) {
   double time_alig;
   struct timeval time_start_alig, time_end_alig;  
   char *file1, *file2;
+
+  double time_total_1, time_total_2;
+  struct timeval time_s1, time_e1, time_s2, time_e2;
 
   printf("\n\n\t\t==================================================\n");
   printf("\t\t|................. M A P P I N G ................|\n");
@@ -526,8 +536,9 @@ void rna_aligner(options_t *options) {
       sa_rna.file1 = f_sa;
       sa_rna.file2 = f_hc;
       //printf("FILEEEEEEEEEEEEEEEE %p\n", f_sa);
+
       sa_wf_batch_t *wf_batch = sa_wf_batch_new(NULL, (void *)sa_index, &writer_input, NULL, &sa_rna);
-      sa_wf_input_t *wf_input = sa_wf_input_new(0, &reader_input, wf_batch);
+      sa_wf_input_t *wf_input = sa_wf_input_new(options->bam_format, &reader_input, wf_batch);
       
       // create and initialize workflow
       workflow_t *wf = workflow_new();      
@@ -536,35 +547,51 @@ void rna_aligner(options_t *options) {
       workflow_set_stages(1, (workflow_stage_function_t *)&stage_functions, stage_labels, wf);      
       // optional producer and consumer functions
       workflow_set_producer(sa_fq_reader_rna, "FastQ reader", wf);
-      workflow_set_consumer(sa_sam_writer_rna, "SAM writer", wf);
-      
+      if (options->bam_format) {
+	workflow_set_consumer(sa_bam_writer_rna, "BAM writer", wf);
+      } else {
+	workflow_set_consumer(sa_sam_writer_rna, "SAM writer", wf);
+      }
+
       //Create and initialize second workflow
       workflow_t *wf_last = workflow_new();
       workflow_stage_function_t stage_functions_last[] = {sa_rna_mapper_last};
       char *stage_labels_last[] = {"SA mapper last stage"};
       workflow_set_stages(1, (workflow_stage_function_t *)&stage_functions_last, stage_labels_last, wf_last);
       workflow_set_producer(sa_alignments_reader_rna, "FastQ reader", wf_last);
-      workflow_set_consumer(sa_sam_writer_rna, "SAM writer", wf_last);
-
-      double time_total;
-      struct timeval time_s1, time_e1;
+      if (options->bam_format) {
+	workflow_set_consumer(sa_bam_writer_rna, "BAM writer", wf_last);
+      } else {
+	workflow_set_consumer(sa_sam_writer_rna, "SAM writer", wf_last);
+      }
 
       printf("Run workflow with %i threads\n", options->num_cpu_threads);
 
       start_timer(time_s1);
       workflow_run_with(options->num_cpu_threads, wf_input, wf);
-      stop_timer(time_s1, time_e1, time_total);
+      stop_timer(time_s1, time_e1, time_total_1);
 
-      printf("Time W1: %f(s)\n", time_total / 1000000);
-      
-      printf("=============== SECOND WORKFLOW ================\n");
-      start_timer(time_s1);
+      printf("===== W1 %f(s) =====\n", time_total_1 / 1000000);
+      extern size_t total_reads;
+      extern size_t reads_no_map;
+      printf("Total Reads           : %i\n", total_reads);
+      printf("Total Reads Mapped    : %i (%f)\n", total_reads - reads_no_map, (float)((total_reads - reads_no_map) * 100) / (float)(total_reads) );
+      printf("Total Reads No Mapped : %i (%f)\n", reads_no_map, (float)((reads_no_map) * 100) / (float)(total_reads) );
+      printf("====================\n");
+
+      start_timer(time_s2);
       rewind(f_sa);
       workflow_run_with(options->num_cpu_threads, wf_input, wf_last);      
-      stop_timer(time_s1, time_e1, time_total);
+      stop_timer(time_s2, time_e2, time_total_2);
 
-      printf("Time W2: %f(s)\n", time_total / 1000000);
+      printf("===== W2 %f(s) =====\n", time_total_2 / 1000000);
+      printf("Total Reads           : %i\n", total_reads);
+      printf("Total Reads Mapped    : %i (%f)\n", total_reads - reads_no_map, (float)((total_reads - reads_no_map) * 100) / (float)(total_reads) );
+      printf("Total Reads No Mapped : %i (%f)\n", reads_no_map, (float)((reads_no_map) * 100) / (float)(total_reads) );
+      printf("====================\n");
 
+      //printf("Time W2: %f(s)\n", time_total / 1000000);
+      //fprintf(stderr, "========== FINISHED MAPPING in %f(s) =========\n", (time_total_1 + time_total_2) / 1000000);
       //printf("TOTAL TIME : %f\n", time_total / 1000000);
       //printf("----------------------------------------------\n");
       //workflow_display_timing(wf);
@@ -616,6 +643,11 @@ void rna_aligner(options_t *options) {
   
   
 
+  printf("Load Genome Time : %f(s)\n", time_genome / 1000000);
+  printf("         W1 Time : %f(s)\n", time_total_1 / 1000000);
+  printf("         W2 Time : %f(s)\n", time_total_2 / 1000000);
+  printf("         W TOTAL : %f(s)\n", (time_total_1 + time_total_2) / 1000000);
+  printf("         TOTAL   : %f(s)\n", (time_genome + time_total_1 + time_total_2) / 1000000);
 
   /*  
   printf("= = = = T I M I N G    W O R K F L O W    '1' = = = =\n");
@@ -930,11 +962,18 @@ void rna_aligner(options_t *options) {
   if (!options->fast_mode) {
     // free memory
     if (bwt_index) { bwt_index_free(bwt_index); }
+
     bam_fclose(writer_input.bam_file);
   } else {
     // free memory
     if (sa_index)  { sa_index3_free(sa_index);  }
-    fclose((FILE *) writer_input.bam_file);
+    
+    if (options->bam_format) {
+      bam_fclose(writer_input.bam_file);
+    } else {
+      fclose((FILE *) writer_input.bam_file);
+    }
+    
   }
  
   batch_free(batch);

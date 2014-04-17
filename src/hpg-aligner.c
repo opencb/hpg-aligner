@@ -30,6 +30,10 @@ pthread_mutex_t mutex_sp;
 FILE *fd_log;
 size_t junction_id;
 
+size_t total_reads = 0;
+size_t reads_no_map = 0;
+
+size_t total_sw = 0;
 //--------------------------------------------------------------------
 // main parameters support
 //--------------------------------------------------------------------
@@ -116,7 +120,9 @@ int main(int argc, char* argv[]) {
   */
 
   options_free(options);
-  
+
+  printf("TOTAL SW w2:  %ld\n", total_sw);
+
   return 0;
 
 }

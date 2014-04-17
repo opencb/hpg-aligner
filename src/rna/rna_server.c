@@ -2799,13 +2799,13 @@ int search_simple_splice_junction_semi_cannonical(seed_region_t *s_prev, seed_re
   size_t dsp_l, dsp_r, type;
 
   size_t breaks_starts[gap_read];
-  int found_starts = 0, found_starts_semi = 0;
+  int /*found_starts = 0, */found_starts_semi = 0;
 
   size_t breaks_ends[gap_read];
-  int found_ends = 0, found_ends_semi = 0;
+  int /*found_ends = 0, */found_ends_semi = 0;
 
-  size_t type_starts[gap_read];
-  size_t type_ends[gap_read];
+  //size_t type_starts[gap_read];
+  //size_t type_ends[gap_read];
 
   size_t breaks_starts_semi[gap_read];
   size_t breaks_ends_semi[gap_read];
@@ -2830,16 +2830,14 @@ int search_simple_splice_junction_semi_cannonical(seed_region_t *s_prev, seed_re
 
     //Search Start Marks
     if (left_exon[c_s] == 'G' && left_exon[c_s + 1] == 'T') {
-      type_starts[found_starts] = GT_AG_SPLICE;
-      breaks_starts[found_starts++] = c_s;
-
+      //type_starts[found_starts] = GT_AG_SPLICE;
+      //breaks_starts[found_starts++] = c_s;
       type_starts_semi[found_starts_semi] = GT_AT_SPLICE;
       breaks_starts_semi[found_starts_semi++] = c_s;
       LOG_DEBUG_F("S: FOUND GT (%i)\n", c_s);
     } else if (left_exon[c_s] == 'C' && left_exon[c_s + 1] == 'T') {
-      type_starts[found_starts] = CT_AC_SPLICE;
-      breaks_starts[found_starts++] = c_s;
-
+      //type_starts[found_starts] = CT_AC_SPLICE;
+      //breaks_starts[found_starts++] = c_s;
       type_starts_semi[found_starts_semi] = CT_GC_SPLICE;
       breaks_starts_semi[found_starts_semi++] = c_s;
       LOG_DEBUG_F("S: FOUND CT (%i)\n", c_s);
@@ -2855,15 +2853,15 @@ int search_simple_splice_junction_semi_cannonical(seed_region_t *s_prev, seed_re
 
     //Search End Marks
     if (right_exon[c_e - 1] == 'A' && right_exon[c_e] == 'G') {
-      type_ends[found_ends] = GT_AG_SPLICE;
-      breaks_ends[found_ends++] = strlen(right_exon) - c_e - 1;
+      //type_ends[found_ends] = GT_AG_SPLICE;
+      //breaks_ends[found_ends++] = strlen(right_exon) - c_e - 1;
 
       type_ends_semi[found_ends_semi] = GC_AG_SPLICE;
       breaks_ends_semi[found_ends_semi++] = strlen(right_exon) - c_e - 1;      
       LOG_DEBUG_F("E: FOUND AG (%i)\n", strlen(right_exon) - c_e - 1);
     } else if (right_exon[c_e - 1] == 'A' && right_exon[c_e] == 'C') {
-      type_ends[found_ends] = CT_AC_SPLICE;
-      breaks_ends[found_ends++] = strlen(right_exon) - c_e - 1;
+      //type_ends[found_ends] = CT_AC_SPLICE;
+      //breaks_ends[found_ends++] = strlen(right_exon) - c_e - 1;
 
       type_ends_semi[found_ends_semi] = AT_AC_SPLICE;
       breaks_ends_semi[found_ends_semi++] = strlen(right_exon) - c_e - 1;      
@@ -2881,13 +2879,13 @@ int search_simple_splice_junction_semi_cannonical(seed_region_t *s_prev, seed_re
   }
 
   //Not found any splice junction Cannonical
-  if ((found_starts <= 0 || found_ends <= 0) && 
+  if (//(found_starts <= 0 || found_ends <= 0) && 
       (found_starts_semi <= 0 || found_ends_semi <= 0)) {
     //Not found any splice junction Semmi-Cannonical
     return 0;
   }   
 
-  array_list_t *splice_junction = array_list_new(found_starts + found_ends, 
+  array_list_t *splice_junction = array_list_new(found_starts_semi + found_ends_semi, 
 						 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
 
   //array_list_t *splice_junction_1 = array_list_new(found_starts + found_ends, 
@@ -2895,7 +2893,7 @@ int search_simple_splice_junction_semi_cannonical(seed_region_t *s_prev, seed_re
   //printf("FOUND STARTS %i, FOUND ENDS %i, FOUND STARTS SEMI %i, FOUND ENDS SEMI %i\n", found_starts, found_ends, found_starts_semi, 
   //	 found_ends_semi);
 
-
+  /*
   //If found more than one break...Search cannonical
   for (int i = 0; i < found_starts; i++) {
     for (int j = 0; j < found_ends; j++) {
@@ -2911,26 +2909,25 @@ int search_simple_splice_junction_semi_cannonical(seed_region_t *s_prev, seed_re
       }
     }
   }
-
+*/
   
   //If not found cannonical sp, search semmi-cannonical
-  if (array_list_size(splice_junction) <= 0) {
-    for (int i = 0; i < found_starts_semi; i++) {
-      for (int j = 0; j < found_ends_semi; j++) {
-	//printf("%i(%i) + %i(%i)=%i\n", breaks_starts_semi[i], type_starts_semi[i],
-	//     breaks_ends_semi[j], type_ends_semi[j], breaks_starts_semi[i] + breaks_ends_semi[j]);
-	if (type_starts_semi[i] == type_ends_semi[j]) {
-	  int gap_break = breaks_starts_semi[i] + breaks_ends_semi[j];
-	  if (gap_break == gap_read) {
-	    array_list_insert((void *)breaks_starts_semi[i], splice_junction);
-	    array_list_insert((void *)breaks_ends_semi[j], splice_junction);
-	    array_list_insert((void *)type_ends_semi[j], splice_junction);
-	  }      
-	}
+  //if (array_list_size(splice_junction) <= 0) {
+  for (int i = 0; i < found_starts_semi; i++) {
+    for (int j = 0; j < found_ends_semi; j++) {
+      //printf("%i(%i) + %i(%i)=%i\n", breaks_starts_semi[i], type_starts_semi[i],
+      //     breaks_ends_semi[j], type_ends_semi[j], breaks_starts_semi[i] + breaks_ends_semi[j]);
+      if (type_starts_semi[i] == type_ends_semi[j]) {
+	int gap_break = breaks_starts_semi[i] + breaks_ends_semi[j];
+	if (gap_break == gap_read) {
+	  array_list_insert((void *)breaks_starts_semi[i], splice_junction);
+	  array_list_insert((void *)breaks_ends_semi[j], splice_junction);
+	  array_list_insert((void *)type_ends_semi[j], splice_junction);
+	}      
       }
-    } 
-  }
-
+    }
+  } 
+  //}
 
   //If not found splice-junctions exit.
   if (array_list_size(splice_junction) <= 0) {
@@ -3043,6 +3040,7 @@ int search_simple_splice_junction_semi_cannonical(seed_region_t *s_prev, seed_re
   *sp_type  = type;
 
   //printf("SP :=> [%i:%lu-%lu]\n", chromosome_id, start_splice, end_splice);
+
   intron_size = end_splice - start_splice + 1;
   
  exit:
@@ -3193,7 +3191,7 @@ int search_simple_splice_junction(seed_region_t *s_prev, seed_region_t *s_next,
       //breaks_ends[j], type_ends[j], breaks_starts[i] + breaks_ends[j]);
       if (type_starts[i] == type_ends[j]) {
 	int gap_break = breaks_starts[i] + breaks_ends[j];
-	//printf("::(%i, %i), ¿%i - %i?\n", breaks_starts[i], breaks_ends[j], gap_break, gap_read);
+	//printf("::(%i, %i), ¿gap_break=%i - gap_read=%i?\n", breaks_starts[i], breaks_ends[j], gap_break, gap_read);
 	if (gap_break == gap_read) {	  
 	  //printf("END:%i-START:%i\n", type_ends[j], type_starts[i]);
 	  array_list_insert((void *)breaks_starts[i], splice_junction);

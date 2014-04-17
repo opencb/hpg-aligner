@@ -1140,7 +1140,18 @@ int sa_file_read_alignments(size_t num_items, array_list_t *list,
       }
 
     }
+
+    //printf("-->Simple_a->gap_start = %i\n", simple_a->gap_start);
+    //printf("-->Simple_a->gap_start + map_len = %i\n", simple_a->gap_start + map_len);
+
+    if (simple_a->gap_start == 0) {
+      sa_alignment->left_close = 1;
+    }
     
+    if (simple_a->gap_start + map_len == fq_read->length) {
+      sa_alignment->right_close = 1;
+    }
+
     //printf("SEED := len_read:%i - gap_read:%i - gap_end:%i = %i, SEED-END = %i\n", fq_read->length, 
     //   simple_a->gap_start, 
     //   simple_a->gap_end, 

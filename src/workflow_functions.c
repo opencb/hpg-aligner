@@ -636,7 +636,7 @@ void write_mapped_read(array_list_t *array_list, bam_file_t *bam_file) {
     //printf("\t-----> %s\n", alig->cigar);
     LOG_DEBUG("writting bam..\n");
     //alignment_print(alig);
-
+    //exit(-1);
     if (alig != NULL) {
       bam1 = convert_to_bam(alig, 33);
       bam_fwrite(bam1, bam_file);
