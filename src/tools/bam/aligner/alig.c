@@ -833,7 +833,10 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 	ERROR_CODE err;
 	//	unsigned char outbam[30] = "output.bam";
 	int i, it;
+<<<<<<< HEAD
 	//int single_threaded = 0;
+=======
+>>>>>>> ca7a5ec5dbd9a889d70b57a6694654ca4b810773
 
 	//Times
 	double init_time, end_time;
@@ -958,6 +961,7 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 	//Init multithreading
 	omp_set_dynamic(1);
 	omp_set_nested(1);
+<<<<<<< HEAD
 	if(omp_get_max_threads() < 3)
 	{
 		//Only 1 available thread
@@ -969,6 +973,10 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 	{
 		//while(in_buffer.end_condition == 0 || in_buffer.readed > 0)
 		{
+=======
+	#pragma omp parallel private(i, bytes, read, v_reads, v_reads_l, list_l, filled, err, aux_time)
+	{
+>>>>>>> ca7a5ec5dbd9a889d70b57a6694654ca4b810773
 			#pragma omp  sections
 			{
 				//Read section
@@ -1181,7 +1189,11 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 						write_buffer = proc_buffer;
 						proc_buffer = swap_buffer_ptr;
 						omp_unset_lock(&in_buffer.writer);
+<<<<<<< HEAD
 					} while(/*single_threaded == 0 && */(in_buffer.end_condition == 0 || in_buffer.readed > 0));
+=======
+					} while(in_buffer.end_condition == 0 || in_buffer.readed > 0);
+>>>>>>> ca7a5ec5dbd9a889d70b57a6694654ca4b810773
 				}//Read section
 
 				//Write section
@@ -1209,11 +1221,14 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 #endif
 						//Accept more
 						omp_unset_lock(&in_buffer.reader);
+<<<<<<< HEAD
 					}while(/*single_threaded == 0 &&*/ (in_buffer.end_condition == 0 || in_buffer.readed > 0));//Write section
+=======
+					}while(in_buffer.end_condition == 0 || in_buffer.readed > 0);//Write section
+>>>>>>> ca7a5ec5dbd9a889d70b57a6694654ca4b810773
 				}
 
 			}//OMP SECTIONS
-		} //While
 
 	}//OMP PARALLEL
 
