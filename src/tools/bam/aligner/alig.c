@@ -833,7 +833,7 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 	ERROR_CODE err;
 	//	unsigned char outbam[30] = "output.bam";
 	int i, it;
-	int single_threaded = 0;
+	//int single_threaded = 0;
 
 	//Times
 	double init_time, end_time;
@@ -958,16 +958,16 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 	//Init multithreading
 	omp_set_dynamic(1);
 	omp_set_nested(1);
-	if(omp_get_max_threads() < 2)
+	if(omp_get_max_threads() < 3)
 	{
 		//Only 1 available thread
 		//printf("Minimum threads required is 2, setting number of threads to 2\n");
-		//omp_set_num_threads(2);
-		single_threaded = 1;
+		omp_set_num_threads(3);
+		//single_threaded = 1;
 	}
 	#pragma omp parallel private(i, bytes, read, v_reads, v_reads_l, list_l, filled, err, aux_time)
 	{
-		while(in_buffer.end_condition == 0 || in_buffer.readed > 0)
+		//while(in_buffer.end_condition == 0 || in_buffer.readed > 0)
 		{
 			#pragma omp  sections
 			{
@@ -1181,7 +1181,7 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 						write_buffer = proc_buffer;
 						proc_buffer = swap_buffer_ptr;
 						omp_unset_lock(&in_buffer.writer);
-					} while(single_threaded == 0 && (in_buffer.end_condition == 0 || in_buffer.readed > 0));
+					} while(/*single_threaded == 0 && */(in_buffer.end_condition == 0 || in_buffer.readed > 0));
 				}//Read section
 
 				//Write section
@@ -1209,7 +1209,7 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 #endif
 						//Accept more
 						omp_unset_lock(&in_buffer.reader);
-					}while(single_threaded == 0 && (in_buffer.end_condition == 0 || in_buffer.readed > 0));//Write section
+					}while(/*single_threaded == 0 &&*/ (in_buffer.end_condition == 0 || in_buffer.readed > 0));//Write section
 				}
 
 			}//OMP SECTIONS
