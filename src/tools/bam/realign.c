@@ -17,8 +17,10 @@
 
 #include "aux/timestats.h"
 #include "aligner/alig.h"
+#include "wanderer/wanderer.h"
 
 int align_launch(char *reference, char *bam, char *output, int threads);
+ERROR_CODE wander_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam);
 
 int alig_bam(int argc, char **argv)
 {
@@ -264,7 +266,8 @@ align_launch(char *reference, char *bam, char *output, int threads)
 #ifdef D_TIME_DEBUG
 	init_time = omp_get_wtime();
 #endif
-	alig_bam_file(bamc, base, dir, output);
+	//alig_bam_file(bamc, base, dir, output);
+	wander_bam_file(bamc, base, dir, output);
 #ifdef D_TIME_DEBUG
 	end_time = omp_get_wtime();
 	time_add_time_slot(D_SLOT_TOTAL, TIME_GLOBAL_STATS, end_time - init_time);
@@ -352,5 +355,102 @@ align_launch(char *reference, char *bam, char *output, int threads)
 	return 0;
 }
 
+int
+dummy_wander(bam_region_t *region)
+{
+	assert(region);
 
+	//Process
+	int val = region->size - 100;
+	if(val > 0)
+		region->processed = val;
+	else
+		region->processed = region->size;
+
+	printf("PROCESSED: %d\n", region->processed);
+
+	//Return
+	if(region->size == 0)
+		return WANDERER_SUCCESS;
+	else
+		return WANDERER_IN_PROGRESS;
+}
+
+ERROR_CODE
+wander_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
+{
+	//Files
+	bam_file_t *bam_f;
+	bam_file_t *out_bam_f;
+	genome_t* ref;
+	int bytes;
+
+	//Wanderer
+	bam_wanderer_t wanderer;
+
+	assert(bam_path);
+	assert(ref_name);
+	assert(ref_path);
+	assert(outbam);
+
+	//Open bam
+	{
+		printf("Opening BAM from \"%s\" ...\n", bam_path);
+		bam_f = bam_fopen(bam_path);
+		assert(bam_f);
+		printf("BAM opened!...\n");
+	}
+
+	//Open reference genome
+	{
+		printf("Opening reference genome from \"%s%s\" ...\n", ref_path, ref_name);
+		ref = genome_new(ref_name, ref_path);
+		assert(ref);
+		printf("Reference opened!...\n");
+	}
+
+	//Create new bam
+	{
+		printf("Creating new bam file in \"%s\"...\n", outbam);
+		//init_empty_bam_header(orig_bam_f->bam_header_p->n_targets, recal_bam_header);
+		out_bam_f = bam_fopen_mode(outbam, bam_f->bam_header_p, "w");
+		assert(out_bam_f);
+		bam_fwrite_header(out_bam_f->bam_header_p, out_bam_f);
+		out_bam_f->bam_header_p = NULL;
+		printf("New BAM initialized!...\n");
+	}
+
+	//Init wandering
+	bwander_init(&wanderer);
+
+	//Configure wanderer
+	bwander_configure(&wanderer, bam_f, out_bam_f, dummy_wander);
+
+	//Run wander
+	bwander_run(&wanderer);
+
+	//Destroy wanderer
+	bwander_destroy(&wanderer);
+
+	//Free context
+	//printf("\nDestroying context...\n");
+	//fflush(stdout);
+	//alig_destroy(&context);
+
+	printf("\nClosing BAM file...\n");
+	bam_fclose(bam_f);
+	printf("BAM closed.\n");
+
+	printf("\nClosing reference file...\n");
+	genome_free(ref);
+	printf("Reference closed.\n");
+
+	printf("Closing \"%s\" BAM file...\n", outbam);
+	bam_fclose(out_bam_f);
+	printf("BAM closed.\n");
+
+	printf("Realignment around indels DONE.\n");
+
+	return NO_ERROR;
+}
 
