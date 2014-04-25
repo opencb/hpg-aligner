@@ -66,6 +66,7 @@ bwander_run(bam_wanderer_t *wanderer)
 
 	//Load first region
 	breg_fill(wanderer->current_region, wanderer->input_file);
+	breg_filter(wanderer->current_region, FILTER_ZERO_QUAL | FILTER_DIFF_MATE_CHROM | FILTER_NO_CIGAR | FILTER_DEF_MASK);
 	
 	sprintf(str, "Wandering over region %d:%d-%d with %d reads\n",
 			wanderer->current_region->chrom + 1, wanderer->current_region->init_pos + 1,
@@ -87,15 +88,20 @@ bwander_run(bam_wanderer_t *wanderer)
 
 		//Load next region
 		breg_fill(wanderer->current_region, wanderer->output_file);
+		breg_filter(wanderer->current_region, FILTER_ZERO_QUAL | FILTER_DIFF_MATE_CHROM | FILTER_NO_CIGAR | FILTER_DEF_MASK);
 
 		//Logging
 		sprintf(str, "Wandering over region %d:%d-%d with %d reads\n",
 				wanderer->current_region->chrom, wanderer->current_region->init_pos,
 				wanderer->current_region->end_pos, wanderer->current_region->size);
 		printf(str);
+		printf("%d:%d-%d - Proc: %d - Size: %d\n", wanderer->current_region->chrom,
+				 wanderer->current_region->init_pos,  wanderer->current_region->end_pos,
+				 wanderer->current_region->processed,  wanderer->current_region->size);
 
 		//Execute wandering
-		err = wanderer->wander_f(wanderer->current_region);
+		//err = wanderer->wander_f(wanderer->current_region);
+		err = WANDERER_SUCCESS;
 	}
 
 	//Logging

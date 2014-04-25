@@ -56,16 +56,22 @@ breg_fill(bam_region_t *region, bam_file_t *input_file)
 	bam1_t *read;
 	size_t bytes;
 	size_t added;
-	size_t init_pos = 0;
-	size_t end_pos = 0;
-	int chrom = 0;
 
 	assert(region);
 	assert(input_file);
 
+	//Add next read
+	if(region->next_read != NULL)
+	{
+		region->reads[region->size] = region->next_read;
+		region->next_read = NULL;
+		region->size++;
+	}
+
 	//Get first read
 	if(region->size > 0)
 	{
+		printf("First read\n");
 		read = region->reads[0];
 	}
 	else
@@ -87,6 +93,7 @@ breg_fill(bam_region_t *region, bam_file_t *input_file)
 		region->reads[0] = read;
 		region->size = 1;
 	}
+	assert(read);
 
 	//Get free slots
 	free_slots = region->max_size - region->size;
@@ -96,10 +103,6 @@ breg_fill(bam_region_t *region, bam_file_t *input_file)
 		abort();
 	}
 	printf("FREE SLOTS: %d\n", free_slots);
-
-	//Get region chrom and initial position
-	init_pos = read->core.pos;
-	chrom = read->core.tid;
 
 	//Fill remaining slots
 	ptr = region->reads + region->size;
@@ -114,14 +117,6 @@ breg_fill(bam_region_t *region, bam_file_t *input_file)
 		//Valid read?
 		if(bytes > 0)
 		{
-			//Same chrom?
-			if(read->core.tid != chrom)
-			{
-				//Chrom changed
-				printf("Chrom changed!! %d->%d\n", chrom, read->core.tid);
-				break;
-			}
-
 			//Add read to region
 			ptr[i] = read;
 			added++;
@@ -140,15 +135,7 @@ breg_fill(bam_region_t *region, bam_file_t *input_file)
 	//Update region size
 	region->size += added;
 
-	printf("ADDED: %d\n", added);
-
-	//Get end position of region
-	end_pos = region->reads[region->size - 1]->core.pos;
-
-	//Update region attributes
-	region->init_pos = init_pos;
-	region->end_pos = end_pos;
-	region->chrom = chrom;
+	printf("ADDED: %d - SIZE: %d\n", added, region->size);
 }
 
 //Private compare function
@@ -181,21 +168,138 @@ breg_write_processed(bam_region_t *region, bam_file_t *output_file)
 		//Write to disk
 		bam_write1(output_file->bam_fd, read);
 		bam_destroy1(read);
+		region->reads[i] = NULL;
 	}
 
 	//Update array
 	region->size -= region->processed;
 	if(region->size > 0)
 	{
+		printf("Moving %d from index %d\n", region->size, region->processed);
 		memmove(region->reads, region->reads + region->processed, region->size);
+		memset(region->reads + region->size, 0, region->max_size - region->size);
 	}
 	region->processed = 0;
+}
 
-	//Write next read
-	if(region->next_read)
+void
+breg_load_window(bam_region_t *region, int chrom, size_t init_pos, size_t end_pos, uint8_t filters, bam_region_window_t *window)
+{
+	assert(region);
+	assert(window);
+
+	//Setup window
+	window->region = region;
+	window->chrom = chrom;
+	window->init_pos = init_pos;
+	window->end_pos = end_pos;
+
+	//Obtain filtered reads
+	breg_window_filter(window, filters);
+
+	printf("Window loaded, %d reads\n", window->size);
+	chrom != EMPTY_CHROM ? printf("Region %d:%d - %d\n", chrom, init_pos, end_pos) : printf("Whole region\n");
+}
+
+/**
+ * WINDOW OPERATIONS
+ */
+void
+breg_window_init(bam_region_window_t *window)
+{
+	assert(window);
+
+	//Set all to zero
+	memset(window, 0, sizeof(bam_region_window_t));
+
+	//Invalid chrom
+	window->chrom = EMPTY_CHROM;
+}
+
+void
+breg_window_destroy(bam_region_window_t *window)
+{
+	assert(window);
+
+	//Free filtered reads
+	if(window->filter_reads)
 	{
-		region->reads[region->size] = region->next_read;
-		region->next_read = NULL;
-		region->size++;
+		free(window->filter_reads);
+	}
+}
+
+void
+breg_window_filter(bam_region_window_t *window, uint8_t filters)
+{
+	int i;
+	bam1_t *read;
+	size_t reads_l;
+	bam_region_t *region;
+
+	assert(window);
+	assert(window->region);
+
+	//Clean filter
+	window->size = 0;
+
+	//Allocate if not
+	if(!window->filter_reads)
+	{
+		window->filter_reads = (bam1_t **)malloc(BAM_REGION_DEFAULT_SIZE * sizeof(bam1_t *));
+		assert(window->filter_reads);
+	}
+
+	//Iterate reads
+	region = window->region;
+	reads_l = region->size;
+	for(i = 0; i < reads_l; i++)
+	{
+		//Get next read
+		read = region->reads[i];
+		assert(read);
+
+		//Filter read
+		{
+			if(filters & FILTER_ZERO_QUAL)
+			{
+				if(read->core.qual == 0)
+					continue;
+			}
+
+			if(filters & FILTER_DIFF_MATE_CHROM)
+			{
+				if(read->core.tid != read->core.mtid)
+					continue;
+			}
+
+			if(filters & FILTER_NO_CIGAR)
+			{
+				if(read->core.n_cigar == 0)
+					continue;
+			}
+
+			if(filters & FILTER_DEF_MASK)
+			{
+				if(read->core.flag & BAM_DEF_MASK)
+					continue;
+			}
+		}
+
+		//Check window region
+		if(window->chrom != EMPTY_CHROM)
+		{
+			//Is in window region?
+			if(	window->chrom != read->core.tid
+					|| window->init_pos > read->core.pos + read->core.l_qseq
+					|| window->end_pos < read->core.pos)
+			{
+				//Not in window region
+				continue;
+			}
+		}
+
+		//Read is valid and inside region
+		window->filter_reads[window->size] = read;
+		window->size++;
 	}
 }
