@@ -187,9 +187,9 @@ void validate_options(options_t *options) {
     options->report_all = 0;
   }
 
-  if (!options->fast_mode) {
-    options->bam_format = 1;
-  }
+  //if (!options->fast_mode) {
+  //options->bam_format = 1;
+  //}
 
 }
 

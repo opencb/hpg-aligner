@@ -6336,7 +6336,6 @@ int apply_sw_rna(sw_server_input_t* input_p, batch_t *batch) {
 }
 
 int apply_rna_last(sw_server_input_t* input_p, batch_t *batch) {
-
   int min_intron_size = input_p->min_intron_size;
   size_t max_intron_size = input_p->max_intron_size;
   mapping_batch_t *mapping_batch = batch->mapping_batch;
@@ -7528,8 +7527,8 @@ int apply_rna_last(sw_server_input_t* input_p, batch_t *batch) {
   //============================= Delete!!! ===============================
 
   return LAST_RNA_POST_PAIR_STAGE;
-
-  }
+  
+}
 
 int apply_rna_last_hc(sw_server_input_t* input_p, batch_t *batch) {
   int min_intron_size = input_p->min_intron_size;

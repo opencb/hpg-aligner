@@ -3,8 +3,19 @@
 #define NUM_SECTIONS_TIME 		8
 
 //--------------------------------------------------------------------
-// workflow input                                                                                                                                                    
-//--------------------------------------------------------------------  
+// workflow input                                                                                                                                    //--------------------------------------------------------------------  
+
+void *write_sam_header_BWT(genome_t *genome, FILE *f) {
+  fprintf(f, "@PG\tID:HPG-Aligner\tVN:2.0\n");
+  for (int i = 0; i < genome->num_chromosomes; i++) {
+    fprintf(f, "@SQ\tSN:%s\tLN:%lu\n", genome->chr_name[i], genome->chr_size[i] + 1);
+    //printf("%iName %s\n", i, genome->chr_name[i]);
+  }
+  //fclose(f);
+  //exit(-1);
+}
+
+
 extern int splice_junction_type(char nt_start_1, char nt_start_2, char nt_end_1, char nt_end_2);
 
 
@@ -74,14 +85,10 @@ void rna_aligner(options_t *options) {
     strcat(exact_junctions, "_exact_junctions.bed");
  
   } else {
-    if (!options->fast_mode) {
+    if (options->bam_format) {
       strcat(reads_results, "/alignments.bam");
     } else {
-      if (options->bam_format) {
-	strcat(reads_results, "/alignments.bam");
-      } else {
-	strcat(reads_results, "/alignments.sam");
-      }
+      strcat(reads_results, "/alignments.sam");    
     }
     strcat(log_results, "/hpg-aligner.log");
     strcat(extend_junctions, "/extend_junctions.bed");
@@ -324,7 +331,11 @@ void rna_aligner(options_t *options) {
     bam_fwrite_header(bam_header, writer_input.bam_file);
   } else {
     writer_input.bam_file = (bam_file_t *) fopen(output_filename, "w"); 
-    write_sam_header(sa_index->genome, (FILE *) writer_input.bam_file);
+    if (options->fast_mode) {
+      write_sam_header(sa_index->genome, (FILE *) writer_input.bam_file);
+    } else {
+      write_sam_header_BWT(genome, (FILE *) writer_input.bam_file);
+    }
   }
 
   extra_stage_t extra_stage_input;
@@ -458,21 +469,37 @@ void rna_aligner(options_t *options) {
       workflow_set_stages(4, (workflow_stage_function_t *)&stage_functions, stage_labels, wf);
       // optional producer and consumer functions
       workflow_set_producer((workflow_producer_function_t *)fastq_reader, "FastQ reader", wf);
-      workflow_set_consumer((workflow_consumer_function_t *)bam_writer, "BAM writer", wf);
-  
+
+      if (options->bam_format) {
+	workflow_set_consumer((workflow_consumer_function_t *)bam_writer, "BAM writer", wf);
+      } else {
+	workflow_set_consumer((workflow_consumer_function_t *)sam_writer, "SAM writer", wf);
+      }
+
       workflow_t *wf_last = workflow_new();
       workflow_stage_function_t stage_functions_last[] = {rna_last_stage, post_pair_stage};
       char *stage_labels_last[] = {"RNA LAST STAGE", "POST PAIR"};
       workflow_set_stages(2, (workflow_stage_function_t *)&stage_functions_last, stage_labels_last, wf_last);
       workflow_set_producer((workflow_producer_function_t *)file_reader, "Buffer reader", wf_last);
-      workflow_set_consumer((workflow_consumer_function_t *)bam_writer, "BAM writer", wf_last);
+
+      if (options->bam_format) {
+	workflow_set_consumer((workflow_consumer_function_t *)bam_writer, "BAM writer", wf_last);
+      } else {
+	workflow_set_consumer((workflow_consumer_function_t *)sam_writer, "SAM writer", wf_last);
+      }
+
 
       workflow_t *wf_hc = workflow_new();
       workflow_stage_function_t stage_functions_hc[] = {rna_last_hc_stage, post_pair_stage};
       char *stage_labels_hc[] = {"RNA HARD CLIPPINGS", "POST PAIR"};
       workflow_set_stages(2, (workflow_stage_function_t *)&stage_functions_hc, stage_labels_hc, wf_hc);
       workflow_set_producer((workflow_producer_function_t *)file_reader_2, "Buffer reader", wf_hc);
-      workflow_set_consumer((workflow_consumer_function_t *)bam_writer, "BAM writer", wf_hc);
+
+      if (options->bam_format) {
+	workflow_set_consumer((workflow_consumer_function_t *)bam_writer, "BAM writer", wf_hc);
+      } else {
+	workflow_set_consumer((workflow_consumer_function_t *)sam_writer, "SAM writer", wf_hc);
+      }
      
 
       // Create new thread POSIX for search extra Splice Junctions
@@ -607,6 +634,12 @@ void rna_aligner(options_t *options) {
       //for (int x = 0; x <= 10; x++) {
       //printf("%i CALs: %i reads (%f)\n", x, tot_cals[x], ((float)tot_cals[x]*100)/(float)total_reads );
       //}
+
+      printf("Load Genome Time : %f(s)\n", time_genome / 1000000);
+      printf("         W1 Time : %f(s)\n", time_total_1 / 1000000);
+      printf("         W2 Time : %f(s)\n", time_total_2 / 1000000);
+      printf("         W TOTAL : %f(s)\n", (time_total_1 + time_total_2) / 1000000);
+      printf("         TOTAL   : %f(s)\n", (time_genome + time_total_1 + time_total_2) / 1000000);
       
     }
 
@@ -643,11 +676,6 @@ void rna_aligner(options_t *options) {
   
   
 
-  printf("Load Genome Time : %f(s)\n", time_genome / 1000000);
-  printf("         W1 Time : %f(s)\n", time_total_1 / 1000000);
-  printf("         W2 Time : %f(s)\n", time_total_2 / 1000000);
-  printf("         W TOTAL : %f(s)\n", (time_total_1 + time_total_2) / 1000000);
-  printf("         TOTAL   : %f(s)\n", (time_genome + time_total_1 + time_total_2) / 1000000);
 
   /*  
   printf("= = = = T I M I N G    W O R K F L O W    '1' = = = =\n");
@@ -962,19 +990,17 @@ void rna_aligner(options_t *options) {
   if (!options->fast_mode) {
     // free memory
     if (bwt_index) { bwt_index_free(bwt_index); }
-
-    bam_fclose(writer_input.bam_file);
   } else {
     // free memory
     if (sa_index)  { sa_index3_free(sa_index);  }
-    
-    if (options->bam_format) {
-      bam_fclose(writer_input.bam_file);
-    } else {
-      fclose((FILE *) writer_input.bam_file);
-    }
-    
   }
+
+  if (options->bam_format) {
+    bam_fclose(writer_input.bam_file);
+  } else {
+    fclose((FILE *) writer_input.bam_file);
+  }
+    
  
   batch_free(batch);
 

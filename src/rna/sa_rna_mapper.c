@@ -223,69 +223,6 @@ int sa_sam_writer_rna(void *data) {
     num_mappings = array_list_size(mapping_list);
     //printf("%i.Read %s (num_mappings %i)\n", i, read->id, num_mappings);    
     if (num_mappings > 0) {
-      //============================= Delete!!! ===============================
-      //For debug... Validate Reads
-      //--- Extract correct position ---//
-      
-      int CHROMOSOME;
-      size_t START, END;
-      
-      char *id = read->id;
-      int c = 0, len = strlen(id);
-      int pos = 0;
-      while (c < len && pos < 3) {
-	//printf("while pos [%c]\n", id[c]);
-	if (id[c++] == '@') { pos++; }
-      }
-      
-      if (pos) {
-	//printf("Actual pos %c\n", id[c]);
-	char value[128];
-	int p = 0;
-	while (id[c] != '@') {
-	  value[p++] = id[c++];
-	}
-	c++;
-	value[p] = '\0';
-	if (strcmp(value, "X") == 0) { CHROMOSOME = 23; }
-	else if (strcmp(value, "Y") == 0) { CHROMOSOME = 24; }
-	else if (strcmp(value, "MT") == 0) { CHROMOSOME = 25; }
-	else { CHROMOSOME = atoi(value); }
-      
-	//printf("Actual pos %c\n", id[c]);
-	p = 0;
-	while (id[c] != '@') {
-	  //printf("while pos [%c]\n", id[c]);
-	  value[p++] = id[c++];
-	}
-	c++;
-	value[p] = '\0';
-	START = atol(value);
-      
-      
-	p = 0;
-	while (id[c] != '@') {
-	  //printf("while pos [%c]\n", id[c]);
-	  value[p++] = id[c++];
-	}
-	c++;
-	value[p] = '\0';
-	END = atol(value);
-      
-	//---                          ---//
-	int map = 0;
-	for (int j = 0; j < array_list_size(mapping_list); j++) {
-	  alignment_t *alignment = array_list_get(j, mapping_list);
-	  if ((alignment->chromosome - 1) == CHROMOSOME - 1 && 
-	      alignment->position >= START && 
-	      alignment->position <= END) {
-	    map = 1;
-	    break;
-	  }
-	}
-      }
-
-      //============================= Delete!!! ===============================      
       for (size_t j = 0; j < num_mappings; j++) {
 	alig = (alignment_t *) array_list_get(j, mapping_list);
 	flag = (alig->seq_strand ? 16 : 0);
@@ -2620,7 +2557,6 @@ int sa_rna_mapper(void *data) {
 	  //printf("Search %s:\n", read->id);
 	  //cal_print(cal_prev);
 	  //cal_print(cal_next);
-
 	  //printf("nt = %i\n", nt);
 
 	  if (nt > MIN_INTRON_SIZE && 
@@ -3730,18 +3666,17 @@ int sa_rna_mapper_last(void *data) {
 	      //cal_print(cal_prev);
 	      //cal_print(cal_next);
 	      //printf("s_prev->id = %i != s->id = %i\n", s_prev->id, s->id);
-
+	      
 	      int ok = 0;
 	      if (s->read_start > s_prev->read_end) {
 		ok = 1;
 	      } else if (s_prev->read_end - s->read_start <= 5) {
 		ok = 1;
 	      }
-
+	      
 	      if (ok &&
 		  cal_prev->chromosome_id == cal_next->chromosome_id && 
 		  cal_prev->strand == cal_next->strand && 
-		  //abs(s->read_start - s_prev->read_end) <= 5 &&
 		  s_prev->id != s->id &&
 		  cal_next->start <= (cal_prev->end + MAX_INTRON_SIZE)) {
 		//printf("Merge!! cal_prev->end = %lu, cal_next->start = %lu\n", cal_prev->end, cal_next->start);
