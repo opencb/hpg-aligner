@@ -102,6 +102,8 @@ int num_total_dup_reads = 0;
 
 size_t num_mapped_reads = 0;
 size_t num_unmapped_reads = 0;
+size_t num_total_mappings = 0;
+size_t num_multihit_reads = 0;
 size_t num_unmapped_reads_by_invalid_cal = 0;
 size_t num_unmapped_reads_by_cigar_length = 0;
 
@@ -168,7 +170,7 @@ int sa_sam_writer(void *data) {
       }
       #endif
       
-      if (num_mappings > 0) {
+      if (num_mappings == 1) {
 	num_mapped_reads++;
 	for (size_t j = 0; j < num_mappings; j++) {
 	  alig = (alignment_t *) array_list_get(j, mapping_list);
@@ -188,12 +190,13 @@ int sa_sam_writer(void *data) {
 	    seq = read->revcomp;
 	  }
 
+	  num_total_mappings++;
 	  fprintf(out_file, "%s\t%i\t%s\t%i\t%i\t%s\t%s\t%i\t%i\t%s\t%s\t%s\n", 
 		  read->id,
 		  flag,
 		  genome->chrom_names[alig->chromosome],
 		  alig->position + 1,
-		  (alig->map_quality > 3 ? 0 : alig->map_quality),
+		  3, //(alig->map_quality > 3 ? 0 : alig->map_quality),
 		  alig->cigar,
 		  genome->chrom_names[alig->mate_chromosome],
 		  alig->mate_position + 1,
@@ -206,6 +209,14 @@ int sa_sam_writer(void *data) {
 	}
 	alignment_free(alig);	 
       } else {
+	if (num_mappings > 0) {
+	  num_multihit_reads++;
+	  for (size_t j = 0; j < num_mappings; j++) {
+	    alig = (alignment_t *) array_list_get(j, mapping_list);
+	    alignment_free(alig);        
+	  }
+	}
+
 	num_unmapped_reads++;
 	fprintf(out_file, "%s\t4\t*\t0\t0\t*\t*\t0\t0\t%s\t%s\n", 
 		read->id,
@@ -232,7 +243,7 @@ int sa_sam_writer(void *data) {
       }
       #endif
       
-      if (num_mappings > 0) {
+      if (num_mappings == 1) {
 	num_mapped_reads++;
 
 	if (num_mappings == 1) {
@@ -262,6 +273,7 @@ int sa_sam_writer(void *data) {
 
 	  cigar_string = cigar_to_string(&cal->cigar);
 	  cigar_M_string = cigar_to_M_string(&num_mismatches, &num_cigar_ops, &cal->cigar);
+	  num_total_mappings++;
 	  fprintf(out_file, "%s\t%i\t%s\t%i\t%i\t%s\t%s\t%lu\t%i\t%s\t%s\tNH:i:%i\tNM:i:%i\tXC:Z:%s\n", 
 		  read->id,
 		  flag,
@@ -283,6 +295,14 @@ int sa_sam_writer(void *data) {
 	  seed_cal_free(cal);	 
 	}
       } else {
+	if (num_mappings > 0) {
+	  num_multihit_reads++;
+	  for (size_t j = 0; j < num_mappings; j++) {
+	    cal = (seed_cal_t *) array_list_get(j, mapping_list);
+	    seed_cal_free(cal);  
+	  }
+	}
+
 	num_unmapped_reads++;
 	fprintf(out_file, "%s\t4\t*\t0\t0\t*\t*\t0\t0\t%s\t%s\n", 
 		read->id,

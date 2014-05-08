@@ -8,6 +8,8 @@ extern int num_total_dup_reads;
 
 extern size_t num_mapped_reads;
 extern size_t num_unmapped_reads;
+extern size_t num_multihit_reads;
+extern size_t num_total_mappings;
 extern size_t num_unmapped_reads_by_invalid_cal;
 extern size_t num_unmapped_reads_by_cigar_length;
 
@@ -206,6 +208,9 @@ void dna_aligner(options_t *options) {
 	   num_mapped_reads + num_unmapped_reads,
 	   num_mapped_reads, 100.0f * num_mapped_reads / (num_mapped_reads + num_unmapped_reads),
 	   num_unmapped_reads, 100.0f * num_unmapped_reads / (num_mapped_reads + num_unmapped_reads));
+    printf("\n");
+    printf("Num. mappings      : %lu\n", num_total_mappings);
+    printf("Num. multihit reads: %lu\n", num_multihit_reads);
     printf("----------------------------------------------\n");
 
 
