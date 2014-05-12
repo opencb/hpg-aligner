@@ -856,6 +856,7 @@ void complete_pairs(sa_mapping_batch_t *batch) {
 	//printf("Alignments are unpaired\n");
 	if (!report_only_paired && (all || n_best || n_hits || best)) {
 	  size_t num_items = num_items1 + num_items2;
+	  // report all mappings 
 	  if (all || num_items <= n_best || num_items <= n_hits) {
 	    // report all mappings 
 	    update_mispaired_pairs(num_items1, num_items2, list1, list2);
@@ -948,7 +949,7 @@ void complete_pairs(sa_mapping_batch_t *batch) {
 	  num_pair = 2;
 	} 
 
-	filter_alignments(all, n_best, n_hits, best, list);
+	//filter_alignments(all, n_best, n_hits, best, list);
 	update_mispaired_pair(num_pair, array_list_size(list), list);   
       } else {
 	// no report_unpaired option set, delete all mappings found

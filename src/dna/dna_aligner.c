@@ -62,6 +62,12 @@ void dna_aligner(options_t *options) {
     strcat(out_filename, "out.sam");
   }
 
+
+  options->report_best = 1;
+  options->report_n_best = 0;
+  options->report_n_hits = 0;
+  options->report_all = 0;
+
   // load SA index
   struct timeval stop, start;
   printf("\n");

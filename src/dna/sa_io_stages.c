@@ -196,7 +196,7 @@ int sa_sam_writer(void *data) {
 		  flag,
 		  genome->chrom_names[alig->chromosome],
 		  alig->position + 1,
-		  3, //(alig->map_quality > 3 ? 0 : alig->map_quality),
+		  60, //(alig->map_quality > 3 ? 0 : alig->map_quality),
 		  alig->cigar,
 		  genome->chrom_names[alig->mate_chromosome],
 		  alig->mate_position + 1,

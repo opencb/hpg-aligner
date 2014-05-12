@@ -163,7 +163,6 @@ void validate_options(options_t *options) {
     options->flank_length = DEFAULT_FLANK_LENGTH;
   }
 
-
   if (options->report_best) {
     options->report_all = 0;
     options->report_n_hits = 0;
