@@ -397,16 +397,25 @@ int sa_bam_writer(void *data) {
     }
     #endif
 
-    if (num_mappings > 0) {
+    if (num_mappings == 1) {
       num_mapped_reads++;
       for (size_t j = 0; j < num_mappings; j++) {
 	alig = (alignment_t *) array_list_get(j, mapping_list);
+	alig->map_quality = 60;
 	bam1 = convert_to_bam(alig, 33);
 	bam_fwrite(bam1, out_file);
 	bam_destroy1(bam1);
 	alignment_free(alig);
+	num_total_mappings++;
       }
     } else {
+      if (num_mappings > 0) {
+	num_multihit_reads++;
+	for (size_t j = 0; j < num_mappings; j++) {
+	  alig = (alignment_t *) array_list_get(j, mapping_list);
+	  alignment_free(alig);        
+	}
+      }
       num_unmapped_reads++;
       alig = alignment_new();       
       alignment_init_single_end(strdup(read->id), read->sequence, read->quality,
