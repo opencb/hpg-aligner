@@ -216,12 +216,15 @@ int sa_sam_writer(void *data) {
 	    alignment_free(alig);        
 	  }
 	}
+	char xmi[100];
+	sprintf(xmi, "XM:i:%i", num_mappings);
 
 	num_unmapped_reads++;
-	fprintf(out_file, "%s\t4\t*\t0\t0\t*\t*\t0\t0\t%s\t%s\n", 
+	fprintf(out_file, "%s\t4\t*\t0\t0\t*\t*\t0\t0\t%s\t%s\t%s\n", 
 		read->id,
 		read->sequence,
-		read->quality
+		read->quality,
+		xmi
 		);
       }
       

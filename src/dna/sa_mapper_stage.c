@@ -616,7 +616,8 @@ array_list_t *search_mate_cal_by_prefixes(cal_t *cal, fastq_read_t *read,
 
 //--------------------------------------------------------------------
 int is_valid_cal_pair(seed_cal_t *cal1, seed_cal_t *cal2,
-		      int min_distance, int max_distance) {
+		      int min_distance, int max_distance, 
+		      int *out_distance) {
   int distance, valid_pair = 0;
   if (cal1->chromosome_id == cal2->chromosome_id) {
     if (cal2->start > cal1->end) {
@@ -626,6 +627,7 @@ int is_valid_cal_pair(seed_cal_t *cal1, seed_cal_t *cal2,
     }
     if (distance >= min_distance && distance <= max_distance) {
       valid_pair = 1;
+      *out_distance = distance;
     }
   }
   return valid_pair;
@@ -654,47 +656,93 @@ void check_pairs(array_list_t **cal_lists, sa_index3_t *sa_index,
 
     list1_size = array_list_size(list1);
     list2_size = array_list_size(list2);
-
+    /*
+    list = list1;
+    printf("======> list #1 size = %i\n", array_list_size(list));
+    for (int kk = 0; kk < array_list_size(list); kk++) { seed_cal_print(array_list_get(kk, list)); }
+    list = list2;
+    printf("======> list #2 size = %i\n", array_list_size(list));
+    for (int kk = 0; kk < array_list_size(list); kk++) { seed_cal_print(array_list_get(kk, list)); }
+    */
     if (list1_size == 0 && list2_size == 0) continue;
     // no mate #1
     if (list1_size == 0) {
-      /*
+      continue;
+      array_list_clear(list2, (void *) seed_cal_free);
+      continue;
+      if (list2_size > 10) {
+	array_list_clear(list2, (void *) seed_cal_free);
+	continue;
+      }
       // search mate by prefixes
-      printf("mate #2, not found\n");
+      array_list_t *new_list = array_list_new(10, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
       for (int i2 = 0; i2 < list2_size; i2++) {
-      cal2 = array_list_get(i2, list2);
-      seed_cal_print(cal2);
-      list = search_mate_cal_by_prefixes(cal2, read1, sa_index, batch, cal_mng);
-      if (array_list_size(list) > 0) {
-      cal_lists[i] = list;
-      array_list_free(list1, (void *) NULL);
-      printf("======> list size = %i\n", array_list_size(list));
-      for (int kk = 0; kk < array_list_size(list); kk++) { seed_cal_print(array_list_get(kk, list)); }
-      break;
+	cal2 = array_list_get(i2, list2);
+	//printf("mate #1, not found for, cal %i of %i\n", i2, list2_size);
+	//seed_cal_print(cal2);
+	list = search_mate_cal_by_prefixes(cal2, read1, sa_index, batch, cal_mng);
+	//printf("======> list size = %i\n", array_list_size(list));
+	if (array_list_size(list) > 0) {
+	  for (int kk = 0; kk < array_list_size(list); kk++) { 
+	    cal = array_list_get(kk, list); 
+	    //seed_cal_print(cal);
+	    if (is_valid_cal_pair(cal1, cal, min_distance, max_distance, &distance)) {
+	      array_list_insert(cal, new_list);
+	      array_list_set(kk, NULL, list);
+	      //printf("\t\tpair found: distance = %i\n", distance);
+	      //} else {
+	      //printf("\t\tno pair found!!\n");
+	    }
+	  }
+	}
       }
+      if (array_list_size(new_list) > 0) {
+	cal_lists[i] = new_list;
+	array_list_free(list1, (void *) NULL);
+      } else {
+	array_list_free(new_list, (void *) NULL);
       }
-      */
       continue;
     }
 
     // no mate #2
     if (list2_size == 0) {
-      /*
-      // search mate by prefixes
-      printf("mate #2, not found\n");
-      for (int i1 = 0; i1 < list1_size; i1++) {
-      cal1 = array_list_get(i1, list1);
-      seed_cal_print(cal1);
-      list = search_mate_cal_by_prefixes(cal1, read2, sa_index, batch, cal_mng);
-      if (array_list_size(list) > 0) {
-      cal_lists[i+1] = list;
-      array_list_free(list2, (void *) NULL);
-      printf("======> list size = %i\n", array_list_size(list));
-      for (int kk = 0; kk < array_list_size(list); kk++) { seed_cal_print(array_list_get(kk, list)); }
-      break;
+      continue;
+      array_list_clear(list1, (void *) seed_cal_free);
+      continue;
+      if (list1_size > 10) {
+	array_list_clear(list1, (void *) seed_cal_free);
+	continue;
       }
-      } 
-      */
+      // search mate by prefixes
+      array_list_t *new_list = array_list_new(10, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
+      for (int i1 = 0; i1 < list1_size; i1++) {
+	cal1 = array_list_get(i1, list1);
+	//printf("mate #2, not found for, cal %i of %i\n", i1, list1_size);
+	//seed_cal_print(cal1);
+	list = search_mate_cal_by_prefixes(cal1, read2, sa_index, batch, cal_mng);
+	//printf("======> list size = %i\n", array_list_size(list));
+	if (array_list_size(list) > 0) {
+	  for (int kk = 0; kk < array_list_size(list); kk++) { 
+	    cal = array_list_get(kk, list);
+	    //seed_cal_print(cal); 
+	    if (is_valid_cal_pair(cal1, cal, min_distance, max_distance, &distance)) {
+	      array_list_insert(cal, new_list);
+	      array_list_set(kk, NULL, list);
+	      //printf("\t\tpair found: distance = %i\n", distance);
+	      //} else {
+	      //printf("\t\tno pair found!!\n");
+	    }
+	  }
+	}
+	array_list_free(list, (void *) seed_cal_free);
+      }
+      if (array_list_size(new_list) > 0) {
+	cal_lists[i+1] = new_list;
+	array_list_free(list2, (void *) NULL);
+      } else {
+	array_list_free(new_list, (void *) NULL);
+      }
       continue;
     }
 
@@ -703,44 +751,22 @@ void check_pairs(array_list_t **cal_lists, sa_index3_t *sa_index,
       cal1 = array_list_get(i1, list1);
       for (int i2 = 0; i2 < list2_size; i2++) {
 	cal2 = array_list_get(i2, list2);
-	valid_pair = is_valid_cal_pair(cal1, cal2, min_distance, max_distance);
+	valid_pair = is_valid_cal_pair(cal1, cal2, min_distance, max_distance, &distance);
 	if (valid_pair) break;
       }
       if (valid_pair) break;
     }
     if (valid_pair) continue;
 
-      /*
-    if (list1_size != 1 || list2_size != 1) {
-      if (valid_pair) {
-	printf("multiple: valid pair (list1 = %i, list2 = %i): %s\n", 
-	       list1_size, list2_size, read1->id);
-      } else {
-	printf("multiple: invalid pair (list1 = %i, list2 = %i): %s\n", 
-	       list1_size, list2_size, read1->id);
-
-	if (list1_size > 0) {
-	  printf("===> list #1\n");
-	  for (int kk = 0; kk < list1_size; kk++) { seed_cal_print(array_list_get(kk, list1)); }
-	}
-	if (list2_size > 0) {
-	  printf("===> list #2\n");
-	  for (int kk = 0; kk < list2_size; kk++) { seed_cal_print(array_list_get(kk, list2)); }
-	}
-      }
-      continue;
-    }
-      */
-
     max_read_area = 0;
     mate1_list = array_list_new(10, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
     mate2_list = array_list_new(10, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
-
-    //printf("======> list #1 size = %i\n", array_list_size(list1));
-    //for (int kk = 0; kk < array_list_size(list1); kk++) { seed_cal_print(array_list_get(kk, list1)); }
-    //printf("======> list #2 size = %i\n", array_list_size(list2));
-    //for (int kk = 0; kk < array_list_size(list2); kk++) { seed_cal_print(array_list_get(kk, list2)); }
-
+    /*
+    printf("======> list #1 size = %i\n", array_list_size(list1));
+    for (int kk = 0; kk < array_list_size(list1); kk++) { seed_cal_print(array_list_get(kk, list1)); }
+    printf("======> list #2 size = %i\n", array_list_size(list2));
+    for (int kk = 0; kk < array_list_size(list2); kk++) { seed_cal_print(array_list_get(kk, list2)); }
+    */
     for (int k = 0; k < 2; k++) {
       if  (k == 0) {
 	list_size = list1_size;
@@ -787,12 +813,13 @@ void check_pairs(array_list_t **cal_lists, sa_index3_t *sa_index,
 		}
 		array_list_insert(mate_cal, mate1_list);
 	      }
-	      
-	      //printf("\t------ best read area = %i (before = %i)\n", read_area, max_read_area);
-	      //printf("list for mate #1\n");
-	      //for (int kk = 0; kk < array_list_size(mate1_list); kk++) { seed_cal_print(array_list_get(kk, mate1_list)); }
-	      //printf("list for mate #2\n");
-	      //for (int kk = 0; kk < array_list_size(mate2_list); kk++) { seed_cal_print(array_list_get(kk, mate2_list)); }
+	      /*	      
+	      printf("\t------ best read area = %i (before = %i)\n", read_area, max_read_area);
+	      printf("list for mate #1\n");
+	      for (int kk = 0; kk < array_list_size(mate1_list); kk++) { seed_cal_print(array_list_get(kk, mate1_list)); }
+	      printf("list for mate #2\n");
+	      for (int kk = 0; kk < array_list_size(mate2_list); kk++) { seed_cal_print(array_list_get(kk, mate2_list)); }
+	      */
 	      // update max read area
 	      max_read_area = read_area;	      
 	    } else {
@@ -861,104 +888,13 @@ void check_pairs(array_list_t **cal_lists, sa_index3_t *sa_index,
 
     cal_lists[i] = mate1_list;
     cal_lists[i+1] = mate2_list;
-
-    //printf("======> result: max read area = %i\n", max_read_area);
-    //printf("=========> mate #1 list size = %i\n", array_list_size(mate1_list));
-    //for (int kk = 0; kk < array_list_size(mate1_list); kk++) { seed_cal_print(array_list_get(kk, mate1_list)); }
-    //printf("=========> mate #2 list size = %i\n", array_list_size(mate2_list));
-    //for (int kk = 0; kk < array_list_size(mate2_list); kk++) { seed_cal_print(array_list_get(kk, mate2_list)); }
-
-
-
     /*
-    for (int i1 = 0; i1 < list1_size; i1++) {
-      cal1 = array_list_get(i1, list1);
-      for (int i2 = 0; i2 < list2_size; i2++) {
-	cal2 = array_list_get(i2, list2);
-
-	//    cal1 = array_list_get(0, list1);
-	//    cal2 = array_list_get(0, list2);
-
-//	printf("mate #1\n");
-//	seed_cal_print(cal1);
-//	printf("mate #2\n");
-//	seed_cal_print(cal2);
-
-	read_area = 0;
-	valid_pair = is_valid_cal_pair(cal1, cal2, min_distance, max_distance);
-
-	// if it is not a valid pair, then select the best cal and search its mate
-	if (!valid_pair) {
-	  if (cal1->num_mismatches < cal2->num_mismatches) {
-	    //	printf("======> search mate for mate #1\n");
-	    cal = cal1;
-	    read = read2;
-	  } else {
-	    //	printf("======> search mate for mate #2\n");
-	    cal = cal2;
-	    read = read1;
-	  }
-	  list = search_mate_cal_by_prefixes(cal, read, sa_index, batch, cal_mng);
-	  if (array_list_size(list) > 0) {
-	    if (cal == cal1) {
-	      //cal_lists[i+1] = list;
-	      //array_list_free(list2, (void *) seed_cal_free);
-	    } else {
-	      //cal_lists[i] = list;
-	      //array_list_free(list1, (void *) seed_cal_free);
-	    }
-	printf("======> for cal\n");
-	seed_cal_print(cal);
-	printf("======> found, list size = %i\n", array_list_size(list));
-	for (int kk = 0; kk < array_list_size(list); kk++) { seed_cal_print(array_list_get(kk, list)); }
-
-	//	    found = 1;
-	//	    break;
-	  } else {
-	    if (cal == cal1) {
-	      cal = cal2;
-	      read = read1;
-	    } else {
-	      cal = cal2;
-	      read = read1;
-	    }
-	    list = search_mate_cal_by_prefixes(cal, read, sa_index, batch, cal_mng);
-	    if (array_list_size(list) > 0) {
-	      if (cal == cal1) {
-		//cal_lists[i+1] = list;
-		//array_list_free(list2, (void *) seed_cal_free);
-	      } else {
-		//cal_lists[i] = list;
-		//		array_list_free(list1, (void *) seed_cal_free);
-	      }
-	printf("======> for cal\n");
-	seed_cal_print(cal);
-	printf("======> found, list size = %i\n", array_list_size(list));
-	for (int kk = 0; kk < array_list_size(list); kk++) { seed_cal_print(array_list_get(kk, list)); }
-
-	//	      found = 1;
-	//	      break;
-	    } else {
-	      //	      array_list_free(list, (void *) NULL);
-	      // if it does not find a mate, then search using SW algorithm
-	      // from the right and left side of the CAL
-	      //list = search_mate_cal_by_sw(cal, read, sa_index, batch);
-
-	      //		printf("*** SW must be apply\n");
-	      //		printf("mate #1\n");
-	      //		seed_cal_print(cal1);
-	      //		printf("mate #2\n");
-	      //		seed_cal_print(cal2);
-
-	    }
-	  }
-	}
-      }
-      if (found) {
-	//break;
-      }
-    }
-*/
+    printf("======> result: max read area = %i\n", max_read_area);
+    printf("=========> mate #1 list size = %i\n", array_list_size(mate1_list));
+    for (int kk = 0; kk < array_list_size(mate1_list); kk++) { seed_cal_print(array_list_get(kk, mate1_list)); }
+    printf("=========> mate #2 list size = %i\n", array_list_size(mate2_list));
+    for (int kk = 0; kk < array_list_size(mate2_list); kk++) { seed_cal_print(array_list_get(kk, mate2_list)); }
+    */
   }
 }
 

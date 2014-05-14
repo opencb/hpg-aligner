@@ -88,11 +88,13 @@ float get_max_score(array_list_t *cal_list) {
 int get_min_num_mismatches(array_list_t *cal_list) {
   seed_cal_t *cal;
   size_t num_cals = array_list_size(cal_list);
-  int min_num_mismatches = 100000;
+  int num_mismatches, min_num_mismatches = 100000;
   for (size_t j = 0; j < num_cals; j++) {
     cal = array_list_get(j, cal_list);
-    if (cal->num_mismatches < min_num_mismatches) {
-      min_num_mismatches = cal->num_mismatches;
+    //    num_mismatches = cal->num_mismatches;
+    num_mismatches = cal->num_mismatches + cal->num_open_gaps + cal->num_extend_gaps;
+    if (num_mismatches < min_num_mismatches) {
+      min_num_mismatches = num_mismatches;
     }
   }
   return min_num_mismatches;
@@ -110,9 +112,6 @@ int get_max_read_area(array_list_t *cal_list) {
     if (cal->read_area > max_read_area) {
       max_read_area = cal->read_area;
     }
-    //    if (cal->read_area - cal->num_mismatches > max_read_area) {
-    //      max_read_area = cal->read_area - cal->num_mismatches;
-    //    }
   }
 
   return max_read_area;
@@ -130,7 +129,6 @@ void filter_cals_by_max_read_area(int max_read_area, array_list_t **list) {
     cal = array_list_get(j, cal_list);
     //    seed_cal_print(cal);
     if (cal->read_area >= max_read_area) {
-      //    if (cal->read_area - cal->num_mismatches >= max_read_area) {
       array_list_insert(cal, new_cal_list);
       array_list_set(j, NULL, cal_list);
       //      break;
@@ -180,15 +178,18 @@ void filter_cals_by_max_score(float score, array_list_t **list) {
 
 //--------------------------------------------------------------------
 
-void filter_cals_by_max_num_mismatches(int num_mismatches, array_list_t **list) {
+void filter_cals_by_max_num_mismatches(int min_num_mismatches, array_list_t **list) {
   seed_cal_t *cal;
   array_list_t *cal_list = *list;
   size_t num_cals = array_list_size(cal_list);
   array_list_t *new_cal_list = array_list_new(MAX_CALS, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
+  int num_mismatches;
 
   for (size_t j = 0; j < num_cals; j++) {
     cal = array_list_get(j, cal_list);
-    if (cal->num_mismatches <= num_mismatches) {
+    //    num_mismatches = cal->num_mismatches;
+    num_mismatches = cal->num_mismatches + cal->num_open_gaps + cal->num_extend_gaps;
+    if (num_mismatches <= min_num_mismatches) {
       array_list_insert(cal, new_cal_list);
       array_list_set(j, NULL, cal_list);
     }
