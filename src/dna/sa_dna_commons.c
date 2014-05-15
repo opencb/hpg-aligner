@@ -106,14 +106,17 @@ int get_max_read_area(array_list_t *cal_list) {
   seed_cal_t *cal;
   size_t num_cals = array_list_size(cal_list);
   int max_read_area = 0;
+  //printf("------> begin get max read area (num_cals = %i)\n", num_cals);
   for (size_t j = 0; j < num_cals; j++) {
     cal = array_list_get(j, cal_list);
-    seed_cal_update_info(cal);
+    //seed_cal_update_info(cal);
+    //seed_cal_print(cal);
     if (cal->read_area > max_read_area) {
       max_read_area = cal->read_area;
     }
   }
 
+  //printf("<------ begin get max read area = %i\n", max_read_area);
   return max_read_area;
 }
 
@@ -815,6 +818,7 @@ void complete_pairs(sa_mapping_batch_t *batch) {
 	  }
 
 	  if ( (++counter_hits) >= num_hits) {
+	    /*
 	    if (num_pairs == 1) {
 	      alig1->map_quality = 3;
 	      alig2->map_quality = 3;
@@ -828,6 +832,7 @@ void complete_pairs(sa_mapping_batch_t *batch) {
 	      alig1->map_quality = 0;
 	      alig2->map_quality = 0;
 	    }
+	    */
 	    break;
 	  }
 	}

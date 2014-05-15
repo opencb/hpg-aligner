@@ -480,7 +480,7 @@ int cal_mng_find(int strand, int chrom, size_t start, size_t end, cal_mng_t *p) 
 
 //--------------------------------------------------------------------
 
-void cal_mng_to_array_list(int read_area, array_list_t *out_list, cal_mng_t *p) {
+void cal_mng_to_array_list(int min_read_area, array_list_t *out_list, cal_mng_t *p) {
   seed_t *first, *last;
   seed_cal_t *cal;
   linked_list_iterator_t itr;
@@ -488,6 +488,7 @@ void cal_mng_to_array_list(int read_area, array_list_t *out_list, cal_mng_t *p) 
   #ifdef _VERBOSE
   printf("-----> cal_mng_to_array_list\n");
   #endif
+  //printf("-----> cal_mng_to_array_list\n");
 
   if (p->cals_lists) {
     linked_list_t *cal_list;
@@ -501,7 +502,12 @@ void cal_mng_to_array_list(int read_area, array_list_t *out_list, cal_mng_t *p) 
 	last = linked_list_get_last(cal->seed_list);
 	cal->start = first->genome_start;
 	cal->end = last->genome_end;
-	if ((cal->end - cal->start) >= read_area) {
+	seed_cal_update_info(cal);
+	if (cal->read_area >= min_read_area &&
+	    cal->num_open_gaps < (0.05f * cal->read->length) &&
+	    cal->num_mismatches < (0.09f * cal->read->length) ) {
+	  //seed_cal_print(cal);
+	//if ((cal->end - cal->start) >= read_area) {
 	  array_list_insert(cal, out_list);
 	} else {
 	  // free CAL
