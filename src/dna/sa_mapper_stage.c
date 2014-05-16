@@ -793,6 +793,7 @@ void check_pairs(array_list_t **cal_lists, sa_index3_t *sa_index,
 
 	  for (int jj = 0; jj < array_list_size(mate_list); jj++) { 
 	    mate_cal = array_list_get(jj, mate_list);
+	    mate_cal->mapq = 1;
 	    //printf("----->> found cals for the previous cal:\n");
 	    //seed_cal_print(mate_cal);
 	    read_area = cal->read_area + mate_cal->read_area;
@@ -819,13 +820,13 @@ void check_pairs(array_list_t **cal_lists, sa_index3_t *sa_index,
 		}
 		array_list_insert(mate_cal, mate1_list);
 	      }
-	      /*	      
-	      printf("\t------ best read area = %i (before = %i)\n", read_area, max_read_area);
-	      printf("list for mate #1\n");
-	      for (int kk = 0; kk < array_list_size(mate1_list); kk++) { seed_cal_print(array_list_get(kk, mate1_list)); }
-	      printf("list for mate #2\n");
-	      for (int kk = 0; kk < array_list_size(mate2_list); kk++) { seed_cal_print(array_list_get(kk, mate2_list)); }
-	      */
+
+	      //printf("\t------ best read area = %i (before = %i)\n", read_area, max_read_area);
+	      //printf("list for mate #1\n");
+	      //for (int kk = 0; kk < array_list_size(mate1_list); kk++) { seed_cal_print(array_list_get(kk, mate1_list)); }
+	      //printf("list for mate #2\n");
+	      //for (int kk = 0; kk < array_list_size(mate2_list); kk++) { seed_cal_print(array_list_get(kk, mate2_list)); }
+
 	      // update max read area
 	      max_read_area = read_area;	      
 	    } else {
@@ -847,7 +848,7 @@ void check_pairs(array_list_t **cal_lists, sa_index3_t *sa_index,
 	      }
 	      //array_list_set(i, NULL, list);
 	    }
-	    //	      printf("======> total read area = %i\n", read_area);
+	    //printf("======> total read area = %i\n", read_area);
 	  }
 	}
 	// free memory
@@ -855,8 +856,10 @@ void check_pairs(array_list_t **cal_lists, sa_index3_t *sa_index,
       }
       //array_list_free(list, (void *) seed_cal_free);
     }
-    
-    // update cal lists whit the found mate lists
+   
+    if (max_read_area == 0) continue;
+
+    // update cal lists with the found mate lists
     list_size = array_list_size(mate1_list);
     for (int ii = 0; ii < list1_size; ii++) { 
       cal1 = array_list_get(ii, list1); 
@@ -891,16 +894,15 @@ void check_pairs(array_list_t **cal_lists, sa_index3_t *sa_index,
     }
     array_list_free(list2, (void *) seed_cal_free);
 
-
     cal_lists[i] = mate1_list;
     cal_lists[i+1] = mate2_list;
-    /*
-    printf("======> result: max read area = %i\n", max_read_area);
-    printf("=========> mate #1 list size = %i\n", array_list_size(mate1_list));
-    for (int kk = 0; kk < array_list_size(mate1_list); kk++) { seed_cal_print(array_list_get(kk, mate1_list)); }
-    printf("=========> mate #2 list size = %i\n", array_list_size(mate2_list));
-    for (int kk = 0; kk < array_list_size(mate2_list); kk++) { seed_cal_print(array_list_get(kk, mate2_list)); }
-    */
+
+    //printf("======> result: max read area = %i\n", max_read_area);
+    //printf("=========> mate #1 list size = %i\n", array_list_size(mate1_list));
+    //for (int kk = 0; kk < array_list_size(mate1_list); kk++) { seed_cal_print(array_list_get(kk, mate1_list)); }
+    //printf("=========> mate #2 list size = %i\n", array_list_size(mate2_list));
+    //for (int kk = 0; kk < array_list_size(mate2_list); kk++) { seed_cal_print(array_list_get(kk, mate2_list)); }
+
   }
 }
 

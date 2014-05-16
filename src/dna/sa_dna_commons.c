@@ -76,10 +76,17 @@ float get_max_score(array_list_t *cal_list) {
     //    printf("(invalid, read length, cigar_len, score) = (%i, %i, %i, %0.2f)\n",
     //	     cal->invalid, cal->read->length, cal->cigar_len, cal->score);
 
-    if (!cal->invalid && (cal->cigar_len == cal->read->length) && (cal->score > max_score)) {
+    //seed_cal_print(cal);
+
+    if (!cal->invalid && 
+	(cal->cigar_len == cal->read->length) && 
+	(cal->num_open_gaps < (0.05f * cal->read->length)) &&
+	(cal->num_mismatches < (0.09f * cal->read->length)) &&
+	(cal->score > max_score)) {
       max_score = cal->score;
     }
   }
+  //printf("----> max. score = %0.2f\n", max_score);
   return max_score;
 }
 
@@ -91,6 +98,20 @@ int get_min_num_mismatches(array_list_t *cal_list) {
   int num_mismatches, min_num_mismatches = 100000;
   for (size_t j = 0; j < num_cals; j++) {
     cal = array_list_get(j, cal_list);
+
+    //    printf("previous mapq = %i -> updated (num-cals = %i) = %i\n", cal->mapq, num_cals, cal->mapq + (61 - num_cals));
+
+    /*
+    if (cal->mapq > 1000) {
+      cal->mapq = (61 - num_cals) - log(cal->mapq);
+    } else {
+      cal->mapq = (61 - num_cals);
+    }
+    */
+    cal->mapq = (61 - num_cals);
+    if (cal->mapq > 60) cal->mapq = 60; 
+    if (cal->mapq <= 0) cal->mapq = 1; 
+
     //    num_mismatches = cal->num_mismatches;
     num_mismatches = cal->num_mismatches + cal->num_open_gaps + cal->num_extend_gaps;
     if (num_mismatches < min_num_mismatches) {
@@ -107,8 +128,13 @@ int get_max_read_area(array_list_t *cal_list) {
   size_t num_cals = array_list_size(cal_list);
   int max_read_area = 0;
   //printf("------> begin get max read area (num_cals = %i)\n", num_cals);
+  //printf("num-cals %04i\n", num_cals);
   for (size_t j = 0; j < num_cals; j++) {
     cal = array_list_get(j, cal_list);
+    cal->mapq = num_cals;
+    //cal->mapq = 61 - num_cals;
+    //if (cal->mapq <= 0) cal->mapq = 1; 
+    //    cal->mapq = (num_cals == 1 ? 60 : 1);
     //seed_cal_update_info(cal);
     //seed_cal_print(cal);
     if (cal->read_area > max_read_area) {
@@ -170,7 +196,11 @@ void filter_cals_by_max_score(float score, array_list_t **list) {
 
   for (size_t j = 0; j < num_cals; j++) {
     cal = array_list_get(j, cal_list);
-    if (!cal->invalid && (cal->cigar_len == cal->read->length) && (cal->score >= score)) {
+    if (!cal->invalid && 
+	(cal->cigar_len == cal->read->length) && 
+	(cal->num_open_gaps < (0.05f * cal->read->length)) &&
+	(cal->num_mismatches < (0.09f * cal->read->length)) &&
+	(cal->score >= score)) {
       array_list_insert(cal, new_cal_list);
       array_list_set(j, NULL, cal_list);
     }
@@ -330,7 +360,7 @@ void create_alignments(array_list_t *cal_list, fastq_read_t *read,
 			      cal->strand, cal->chromosome_id, cal->start,
 			      cigar_M_string, num_cigar_ops, cal->AS, 1, (num_cals > 1),
 			      optional_fields_length, optional_fields, alignment);  
-    
+    alignment->mapq = cal->mapq;
     alignment->mate_chromosome = 0;
     alignment->mate_position = 0;
 

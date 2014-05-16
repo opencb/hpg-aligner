@@ -151,16 +151,26 @@ int sa_sam_writer(void *data) {
 
   sa_genome3_t *genome = wf_batch->sa_index->genome;
 
-  size_t num_reads, num_mappings;
+  size_t num_reads, num_mappings, num_mate_mappings;
   num_reads = mapping_batch->num_reads;
 
   if (mapping_batch->options->pair_mode != SINGLE_END_MODE) {
     // PAIR MODE
     char *seq;
     alignment_t *alig;
+    array_list_t *mate_list;
     for (size_t i = 0; i < num_reads; i++) {
       read = (fastq_read_t *) array_list_get(i, read_list);
       seq = read->sequence;
+
+      if (i % 2 == 0)  {
+	mate_list = mapping_batch->mapping_lists[i+1];
+	num_mate_mappings = array_list_size(mate_list);
+      } else {
+	mate_list = mapping_list;
+	num_mate_mappings = num_mappings;
+      }
+
       mapping_list = mapping_batch->mapping_lists[i];
       num_mappings = array_list_size(mapping_list);
       #ifdef _VERBOSE
@@ -174,6 +184,14 @@ int sa_sam_writer(void *data) {
 	num_mapped_reads++;
 	for (size_t j = 0; j < num_mappings; j++) {
 	  alig = (alignment_t *) array_list_get(j, mapping_list);
+	  
+	  // update alignment
+	  alig->secondary_alignment = 0;
+	  if (num_mate_mappings != 1) {
+	    alig->is_mate_mapped = 0;
+	    alig->is_paired_end_mapped = 0;
+	    alig->mate_strand = 0;
+	  }
 
 	  flag = 0;
 	  if (alig->is_paired_end)                              flag += BAM_FPAIRED;
@@ -196,7 +214,7 @@ int sa_sam_writer(void *data) {
 		  flag,
 		  genome->chrom_names[alig->chromosome],
 		  alig->position + 1,
-		  60, //(alig->map_quality > 3 ? 0 : alig->map_quality),
+		  alig->mapq, //60, //(alig->map_quality > 3 ? 0 : alig->map_quality),
 		  alig->cigar,
 		  genome->chrom_names[alig->mate_chromosome],
 		  alig->mate_position + 1,
@@ -249,6 +267,7 @@ int sa_sam_writer(void *data) {
       if (num_mappings == 1) {
 	num_mapped_reads++;
 
+	/*
 	if (num_mappings == 1) {
 	  mapq = 3;
 	} else if (num_mappings == 2) {
@@ -258,6 +277,7 @@ int sa_sam_writer(void *data) {
 	} else {
 	  mapq = 0;
 	}
+	*/
 
 	for (size_t j = 0; j < num_mappings; j++) {
 	  cal = (seed_cal_t *) array_list_get(j, mapping_list);
@@ -270,9 +290,11 @@ int sa_sam_writer(void *data) {
 	    seq = read->sequence;
 	  }
 
+	  /*
 	  if (i == 0) {
 	    flag += BAM_FSECONDARY;
 	  }
+	  */
 
 	  cigar_string = cigar_to_string(&cal->cigar);
 	  cigar_M_string = cigar_to_M_string(&num_mismatches, &num_cigar_ops, &cal->cigar);
@@ -282,7 +304,7 @@ int sa_sam_writer(void *data) {
 		  flag,
 		  genome->chrom_names[cal->chromosome_id],
 		  cal->start + 1,
-		  mapq,
+		  cal->mapq,
 		  cigar_M_string,
 		  rnext,
 		  pnext,
@@ -379,15 +401,24 @@ int sa_bam_writer(void *data) {
 
   bam1_t *bam1;
   alignment_t *alig;
-  array_list_t *mapping_list;
+  array_list_t *mapping_list, *mate_list;
   bam_file_t *out_file = wf_batch->writer_input->bam_file;
 
   sa_genome3_t *genome = wf_batch->sa_index->genome;
 
-  size_t num_reads, num_mappings;
+  size_t num_reads, num_mappings, num_mate_mappings;
   num_reads = mapping_batch->num_reads;
   for (size_t i = 0; i < num_reads; i++) {
     read = (fastq_read_t *) array_list_get(i, read_list);
+
+    if (i % 2 == 0)  {
+      mate_list = mapping_batch->mapping_lists[i+1];
+      num_mate_mappings = array_list_size(mate_list);
+    } else {
+      mate_list = mapping_list;
+      num_mate_mappings = num_mappings;
+    }
+
     mapping_list = mapping_batch->mapping_lists[i];
     num_mappings = array_list_size(mapping_list);
     #ifdef _VERBOSE
@@ -401,7 +432,16 @@ int sa_bam_writer(void *data) {
       num_mapped_reads++;
       for (size_t j = 0; j < num_mappings; j++) {
 	alig = (alignment_t *) array_list_get(j, mapping_list);
-	alig->map_quality = 60;
+
+	// update alignment
+	alig->secondary_alignment = 0;
+	if (num_mate_mappings != 1) {
+	  alig->is_mate_mapped = 0;
+	  alig->is_paired_end_mapped = 0;
+	  alig->mate_strand = 0;
+	}
+
+	alig->map_quality = alig->mapq;
 	bam1 = convert_to_bam(alig, 33);
 	bam_fwrite(bam1, out_file);
 	bam_destroy1(bam1);
