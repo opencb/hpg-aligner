@@ -19,6 +19,7 @@
 //Fastq Reader & Writer
 //--------------------------------------------------------------------
 
+int write_to_file(void *data);
 void *sa_alignments_reader_rna(void *input);
 void *sa_fq_reader_rna(void *input);
 int sa_sam_writer_rna(void *data);

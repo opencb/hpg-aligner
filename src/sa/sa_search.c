@@ -27,10 +27,10 @@ size_t search_prefix(char *sequence, size_t *low, size_t *high,
   }
   
   size_t row2 = row + 1;
-  //if (row2 >= sa_index->IA_items) {
-  //row2 = sa_index->IA_items;
-  //ia2 = sa_index->A_items;
-  //} else {
+  if (row2 >= sa_index->IA_items) {
+    row2 = sa_index->IA_items;
+    ia2 = sa_index->A_items;
+  } else {
     while ((ia2 = sa_index->IA[row2]) == max_uint) {
       row2++;
       if (row2 >= sa_index->IA_items) {
@@ -40,7 +40,8 @@ size_t search_prefix(char *sequence, size_t *low, size_t *high,
 	break;
       }
     }
-    //}
+  }
+  //}
   //  printf("\tfrom IA[%lu] = %lu to IA[%lu] = %lu -> num. columns = %lu\n", row, ia1, row2, ia2, ia2 - ia1);
   
   found_ja = 0;

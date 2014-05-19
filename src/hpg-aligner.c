@@ -34,6 +34,18 @@ size_t total_reads = 0;
 size_t reads_no_map = 0;
 
 size_t total_sw = 0;
+
+
+
+double time_free_alig = 0;
+double time_free_list = 0;
+double time_free_batch = 0;
+
+double time_timer0 = 0;
+double time_timer1 = 0;
+double time_timer2 = 0;
+double time_timer3 = 0;
+
 //--------------------------------------------------------------------
 // main parameters support
 //--------------------------------------------------------------------

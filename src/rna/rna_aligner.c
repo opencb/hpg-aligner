@@ -1,4 +1,5 @@
 #include "rna_aligner.h"
+#include "extrae_user_events.h" 
 
 #define NUM_SECTIONS_TIME 		8
 
@@ -166,6 +167,7 @@ void rna_aligner(options_t *options) {
     //////////////////////////////////////////////////////
   } else {    
     ///////////////// LOAD SA INDEX ////////////////////// 
+
     LOG_DEBUG("Loading SA tables...");
     sa_index = sa_index3_new(options->bwt_dirname);
     sa_index3_display(sa_index);
@@ -319,7 +321,7 @@ void rna_aligner(options_t *options) {
 			   alignments_list, 
 			   genome, &writer_input);
 
-  
+
   if (options->bam_format) {
     bam_header_t *bam_header;
     if (options->fast_mode) {
@@ -574,10 +576,12 @@ void rna_aligner(options_t *options) {
       workflow_set_stages(1, (workflow_stage_function_t *)&stage_functions, stage_labels, wf);      
       // optional producer and consumer functions
       workflow_set_producer(sa_fq_reader_rna, "FastQ reader", wf);
+
       if (options->bam_format) {
 	workflow_set_consumer(sa_bam_writer_rna, "BAM writer", wf);
       } else {
-	workflow_set_consumer(sa_sam_writer_rna, "SAM writer", wf);
+	//workflow_set_consumer(sa_sam_writer_rna, "SAM writer", wf);
+	workflow_set_consumer(write_to_file, "SAM writer", wf);
       }
 
       //Create and initialize second workflow
@@ -586,36 +590,68 @@ void rna_aligner(options_t *options) {
       char *stage_labels_last[] = {"SA mapper last stage"};
       workflow_set_stages(1, (workflow_stage_function_t *)&stage_functions_last, stage_labels_last, wf_last);
       workflow_set_producer(sa_alignments_reader_rna, "FastQ reader", wf_last);
+      
       if (options->bam_format) {
 	workflow_set_consumer(sa_bam_writer_rna, "BAM writer", wf_last);
       } else {
-	workflow_set_consumer(sa_sam_writer_rna, "SAM writer", wf_last);
+	//workflow_set_consumer(sa_sam_writer_rna, "SAM writer", wf_last);
+	workflow_set_consumer(write_to_file, "SAM writer", wf_last);
       }
 
       printf("Run workflow with %i threads\n", options->num_cpu_threads);
+
+      Extrae_init(); 
 
       start_timer(time_s1);
       workflow_run_with(options->num_cpu_threads, wf_input, wf);
       stop_timer(time_s1, time_e1, time_total_1);
 
-      printf("===== W1 %f(s) =====\n", time_total_1 / 1000000);
-      extern size_t total_reads;
-      extern size_t reads_no_map;
-      printf("Total Reads           : %i\n", total_reads);
-      printf("Total Reads Mapped    : %i (%f)\n", total_reads - reads_no_map, (float)((total_reads - reads_no_map) * 100) / (float)(total_reads) );
-      printf("Total Reads No Mapped : %i (%f)\n", reads_no_map, (float)((reads_no_map) * 100) / (float)(total_reads) );
-      printf("====================\n");
+
+      //extern size_t total_reads;
+      //extern size_t reads_no_map;
+      //printf("===== W1 %f(s) =====\n", time_total_1 / (double) 1000000);
+
+      //printf("Total Reads           : %lu\n", total_reads);
+      //printf("Total Reads Mapped    : %lu (%f)\n", total_reads - reads_no_map, (double)((total_reads - reads_no_map) * 100) / (double)(total_reads) );
+      //printf("Total Reads No Mapped : %lu (%f)\n", reads_no_map, (double)((reads_no_map) * 100) / (double)(total_reads) );
+      //printf("====================\n");
+
+      printf("= = = = T I M I N G    W O R K F L O W    '1' = = = =\n");
+      workflow_display_timing(wf);
+      printf("= = = = - - - - - - - - - - - - - - - - - - - = = = =\n\n");
+
+      Extrae_event(6000019, 9); 
+      sleep(2);
+      Extrae_event(6000019, 0); 
+      //extern double time_free_alig, time_free_list, time_free_batch;
+      //printf("Time free Writer Alig-free=%f(s), list-free=%f(s), batch-free=%f\n", time_free_alig / (double)1000000, time_free_list / (double)1000000, time_free_batch / (double)1000000);
+
+      //extern double time_timer0;
+      //extern double time_timer1;
+      //extern double time_timer2;
+      //extern double time_timer3;
+
+      //printf("Metaexon times: Timer0 = %f, Timer1 = %f, Timer2 = %f, Timer3 = %f\n", time_timer0 / (double)1000000, 
+      //     time_timer1 / (double)1000000, time_timer2 / (double)1000000, time_timer3 / (double)1000000);
+
 
       start_timer(time_s2);
       rewind(f_sa);
       workflow_run_with(options->num_cpu_threads, wf_input, wf_last);      
       stop_timer(time_s2, time_e2, time_total_2);
 
-      printf("===== W2 %f(s) =====\n", time_total_2 / 1000000);
-      printf("Total Reads           : %i\n", total_reads);
-      printf("Total Reads Mapped    : %i (%f)\n", total_reads - reads_no_map, (float)((total_reads - reads_no_map) * 100) / (float)(total_reads) );
-      printf("Total Reads No Mapped : %i (%f)\n", reads_no_map, (float)((reads_no_map) * 100) / (float)(total_reads) );
-      printf("====================\n");
+      Extrae_fini();
+
+      //printf("===== W2 %f(s) =====\n", time_total_2 / (double)1000000);
+      //printf("Total Reads           : %i\n", total_reads);
+      //printf("Total Reads Mapped    : %i (%f)\n", total_reads - reads_no_map, (double)((total_reads - reads_no_map) * 100) / (double)(total_reads) );
+      //printf("Total Reads No Mapped : %i (%f)\n", reads_no_map, (double)((reads_no_map) * 100) / (double)(total_reads) );
+      //printf("====================\n");
+      
+      printf("= = = = T I M I N G    W O R K F L O W    '2' = = = =\n");
+      workflow_display_timing(wf_last);
+      printf("= = = = - - - - - - - - - - - - - - - - - - - = = = =\n\n");
+
 
       //printf("Time W2: %f(s)\n", time_total / 1000000);
       //fprintf(stderr, "========== FINISHED MAPPING in %f(s) =========\n", (time_total_1 + time_total_2) / 1000000);
@@ -635,12 +671,14 @@ void rna_aligner(options_t *options) {
       //printf("%i CALs: %i reads (%f)\n", x, tot_cals[x], ((float)tot_cals[x]*100)/(float)total_reads );
       //}
 
+     
       printf("Load Genome Time : %f(s)\n", time_genome / 1000000);
       printf("         W1 Time : %f(s)\n", time_total_1 / 1000000);
       printf("         W2 Time : %f(s)\n", time_total_2 / 1000000);
       printf("         W TOTAL : %f(s)\n", (time_total_1 + time_total_2) / 1000000);
       printf("         TOTAL   : %f(s)\n", (time_genome + time_total_1 + time_total_2) / 1000000);
-      
+     
+
     }
 
     if (file1) { free(file1); }

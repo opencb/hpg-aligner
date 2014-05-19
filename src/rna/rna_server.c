@@ -543,6 +543,8 @@ cigar_code_t *generate_cigar_sw_output(char *seq_sw,
     }
   }
   
+  cigar_code->distance += (insertions_tot + deletions_tot);
+  
   //printf(" :::: => %s\n", new_cigar_code_string(cigar_code));
 
   return cigar_code;
@@ -2680,7 +2682,7 @@ info_sp_t* sw_reference_splice_junction(cal_t *cal_prev, cal_t *cal_next,
     read_start = read_end;
     read_end = aux_start;
   } else if (read_start == read_end) {
-    LOG_FATAL("ERROR COORDS FUSION\n");
+    //LOG_FATAL("ERROR COORDS FUSION\n");    
   }
 
   //if (read_start > read_end) { LOG_FATAL_F("READ COORDS ERROR %s\n", query_map); }
@@ -2825,57 +2827,65 @@ int search_simple_splice_junction_semi_cannonical(seed_region_t *s_prev, seed_re
  
   //printf("search start!\n");
   // Search step by step (GT)/(AG) 
-  for (c_s = 0, c_e = strlen(right_exon) - 1;
-       c_s < end_search; c_s++, c_e--) {
-
+  
+  c_s = 0;
+  c_e = strlen(right_exon) - 1;
+  
+  //c_s = 0, c_e = strlen(right_exon) - 1;
+  for (int pos = 0; pos < end_search - 1; pos++) {
     //Search Start Marks
-    if (left_exon[c_s] == 'G' && left_exon[c_s + 1] == 'T') {
-      //type_starts[found_starts] = GT_AG_SPLICE;
-      //breaks_starts[found_starts++] = c_s;
-      type_starts_semi[found_starts_semi] = GT_AT_SPLICE;
-      breaks_starts_semi[found_starts_semi++] = c_s;
-      LOG_DEBUG_F("S: FOUND GT (%i)\n", c_s);
-    } else if (left_exon[c_s] == 'C' && left_exon[c_s + 1] == 'T') {
-      //type_starts[found_starts] = CT_AC_SPLICE;
-      //breaks_starts[found_starts++] = c_s;
-      type_starts_semi[found_starts_semi] = CT_GC_SPLICE;
-      breaks_starts_semi[found_starts_semi++] = c_s;
-      LOG_DEBUG_F("S: FOUND CT (%i)\n", c_s);
-    } else if (left_exon[c_s] == 'A' && left_exon[c_s + 1] == 'T') {
-      LOG_DEBUG_F("S: FOUND AT (%i)\n", strlen(right_exon) - c_e - 1);
-      type_starts_semi[found_starts_semi] = AT_AC_SPLICE;
-      breaks_starts_semi[found_starts_semi++] = c_s;
-    } else if (left_exon[c_s] == 'G' && left_exon[c_s + 1] == 'C') {
-      LOG_DEBUG_F("S: FOUND GC (%i)\n", strlen(right_exon) - c_e - 1);
-      type_starts_semi[found_starts_semi] = GC_AG_SPLICE;
-      breaks_starts_semi[found_starts_semi++] = c_s;
+    if (c_s < strlen(left_exon) - 1) {
+      if (left_exon[c_s] == 'G' && left_exon[c_s + 1] == 'T') {
+	//type_starts[found_starts] = GT_AG_SPLICE;
+	//breaks_starts[found_starts++] = c_s;
+	type_starts_semi[found_starts_semi] = GT_AT_SPLICE;
+	breaks_starts_semi[found_starts_semi++] = c_s;
+	LOG_DEBUG_F("S: FOUND GT (%i)\n", c_s);
+      } else if (left_exon[c_s] == 'C' && left_exon[c_s + 1] == 'T') {
+	//type_starts[found_starts] = CT_AC_SPLICE;
+	//breaks_starts[found_starts++] = c_s;
+	type_starts_semi[found_starts_semi] = CT_GC_SPLICE;
+	breaks_starts_semi[found_starts_semi++] = c_s;
+	LOG_DEBUG_F("S: FOUND CT (%i)\n", c_s);
+      } else if (left_exon[c_s] == 'A' && left_exon[c_s + 1] == 'T') {
+	LOG_DEBUG_F("S: FOUND AT (%i)\n", strlen(right_exon) - c_e - 1);
+	type_starts_semi[found_starts_semi] = AT_AC_SPLICE;
+	breaks_starts_semi[found_starts_semi++] = c_s;
+      } else if (left_exon[c_s] == 'G' && left_exon[c_s + 1] == 'C') {
+	LOG_DEBUG_F("S: FOUND GC (%i)\n", strlen(right_exon) - c_e - 1);
+	type_starts_semi[found_starts_semi] = GC_AG_SPLICE;
+	breaks_starts_semi[found_starts_semi++] = c_s;
+      }
     }
 
-    //Search End Marks
-    if (right_exon[c_e - 1] == 'A' && right_exon[c_e] == 'G') {
-      //type_ends[found_ends] = GT_AG_SPLICE;
-      //breaks_ends[found_ends++] = strlen(right_exon) - c_e - 1;
-
-      type_ends_semi[found_ends_semi] = GC_AG_SPLICE;
-      breaks_ends_semi[found_ends_semi++] = strlen(right_exon) - c_e - 1;      
-      LOG_DEBUG_F("E: FOUND AG (%i)\n", strlen(right_exon) - c_e - 1);
-    } else if (right_exon[c_e - 1] == 'A' && right_exon[c_e] == 'C') {
-      //type_ends[found_ends] = CT_AC_SPLICE;
-      //breaks_ends[found_ends++] = strlen(right_exon) - c_e - 1;
-
-      type_ends_semi[found_ends_semi] = AT_AC_SPLICE;
-      breaks_ends_semi[found_ends_semi++] = strlen(right_exon) - c_e - 1;      
-      LOG_DEBUG_F("E: FOUND AC (%i)\n", strlen(right_exon) - c_e - 1);
-    } else if (right_exon[c_e - 1] == 'A' && right_exon[c_e] == 'T') {
-      type_ends_semi[found_ends_semi] = GT_AT_SPLICE;
-      breaks_ends_semi[found_ends_semi++] = strlen(right_exon) - c_e - 1;
-      LOG_DEBUG_F("E: FOUND AT (%i)\n", strlen(right_exon) - c_e - 1);
-    } else if (right_exon[c_e - 1] == 'G' && right_exon[c_e] == 'C') {
-      LOG_DEBUG_F("E: FOUND GC (%i)\n", strlen(right_exon) - c_e - 1);
-      type_ends_semi[found_ends_semi] = CT_GC_SPLICE;
-      breaks_ends_semi[found_ends_semi++] = strlen(right_exon) - c_e - 1;      
+    if (c_e >= 1) {
+      //Search End Marks
+      if (right_exon[c_e - 1] == 'A' && right_exon[c_e] == 'G') {
+	//type_ends[found_ends] = GT_AG_SPLICE;
+	//breaks_ends[found_ends++] = strlen(right_exon) - c_e - 1;
+	type_ends_semi[found_ends_semi] = GC_AG_SPLICE;
+	breaks_ends_semi[found_ends_semi++] = strlen(right_exon) - c_e - 1;      
+	LOG_DEBUG_F("E: FOUND AG (%i)\n", strlen(right_exon) - c_e - 1);
+      } else if (right_exon[c_e - 1] == 'A' && right_exon[c_e] == 'C') {
+	//type_ends[found_ends] = CT_AC_SPLICE;
+	//breaks_ends[found_ends++] = strlen(right_exon) - c_e - 1;
+	type_ends_semi[found_ends_semi] = AT_AC_SPLICE;
+	breaks_ends_semi[found_ends_semi++] = strlen(right_exon) - c_e - 1;      
+	LOG_DEBUG_F("E: FOUND AC (%i)\n", strlen(right_exon) - c_e - 1);
+      } else if (right_exon[c_e - 1] == 'A' && right_exon[c_e] == 'T') {
+	type_ends_semi[found_ends_semi] = GT_AT_SPLICE;
+	breaks_ends_semi[found_ends_semi++] = strlen(right_exon) - c_e - 1;
+	LOG_DEBUG_F("E: FOUND AT (%i)\n", strlen(right_exon) - c_e - 1);
+      } else if (right_exon[c_e - 1] == 'G' && right_exon[c_e] == 'C') {
+	LOG_DEBUG_F("E: FOUND GC (%i)\n", strlen(right_exon) - c_e - 1);
+	type_ends_semi[found_ends_semi] = CT_GC_SPLICE;
+	breaks_ends_semi[found_ends_semi++] = strlen(right_exon) - c_e - 1;      
+      }
     }
 
+    c_s++;
+    c_e--;
+    
   }
 
   //Not found any splice junction Cannonical

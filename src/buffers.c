@@ -1107,7 +1107,7 @@ int sa_file_read_alignments(size_t num_items, array_list_t *list,
     simple_a = &simple_alignment[i];
     //printf("ITEM %i: (%i)[%i:%lu] [%i-%i]\n", i, simple_a->map_strand, simple_a->map_chromosome,
     //	   simple_a->map_start, simple_a->gap_start, simple_a->gap_end);
-    cigar_tot_len += simple_a->cigar_len;
+    cigar_tot_len += simple_alignment[i].cigar_len;//simple_a->cigar_len;
   }
     
   char cigar_buffer[cigar_tot_len];
@@ -1129,16 +1129,14 @@ int sa_file_read_alignments(size_t num_items, array_list_t *list,
     array_list_t *list_aux = array_list_new(5, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
     sa_alignment_t *sa_alignment = sa_alignment_new(list_aux);    
 
-    sa_alignment->c_final = cigar_code_new();
+    //sa_alignment->c_final = cigar_code_new();
 
     for (int m = 0; m < array_list_size(cc->ops); m++) {
       cigar_op_t *op = array_list_get(m, cc->ops);
-      cigar_code_append_new_op(op->number, op->name, sa_alignment->c_final);
-
+      //cigar_code_append_new_op(op->number, op->name, sa_alignment->c_final);
       if (op->name == 'M' || op->name == 'D' || op->name == 'N') {
 	map_genome_len += op->number;
       }
-
     }
 
     //printf("-->Simple_a->gap_start = %i\n", simple_a->gap_start);
@@ -1176,13 +1174,15 @@ int sa_file_read_alignments(size_t num_items, array_list_t *list,
                          linked_list_new(COLLECTION_MODE_ASYNCHRONIZED));
 
 
+    s_region->info = cc;
     cc->distance = simple_a->map_distance;
-    cal->info = cc;
+
+    //cal->info = cc;
 
     //printf("Cal & Cigar Ok, Insert list\n");
 
 
-    sa_alignment->c_final->distance = simple_a->map_distance;
+    //sa_alignment->c_final->distance = simple_a->map_distance;
     
     array_list_insert(cal, sa_alignment->cals_list);
     array_list_insert(sa_alignment, list);
