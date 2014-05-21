@@ -1,6 +1,8 @@
 #ifndef _SA_MAPPER_STAGE_H
 #define _SA_MAPPER_STAGE_H
 
+#include "adapter.h"
+
 #include "sa/sa_search.h"
 #include "dna/sa_dna_commons.h"
 #include "dna/doscadfun.h"

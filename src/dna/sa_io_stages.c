@@ -156,12 +156,15 @@ int sa_sam_writer(void *data) {
 
   if (mapping_batch->options->pair_mode != SINGLE_END_MODE) {
     // PAIR MODE
+    int len;
+    char *sequence, *quality;
+
     char *seq;
     alignment_t *alig;
     array_list_t *mate_list;
     for (size_t i = 0; i < num_reads; i++) {
       read = (fastq_read_t *) array_list_get(i, read_list);
-      seq = read->sequence;
+      //      seq = read->sequence;
 
       if (i % 2 == 0)  {
 	mate_list = mapping_batch->mapping_lists[i+1];
@@ -204,8 +207,9 @@ int sa_sam_writer(void *data) {
 	  if (alig->secondary_alignment)                        flag += BAM_FSECONDARY;
 	  if (alig->fails_quality_check)                        flag += BAM_FQCFAIL;
 	  if (alig->pc_optical_duplicate)                       flag += BAM_FDUP;
-	  if (alig->seq_strand) {                               flag += BAM_FREVERSE;
-	    seq = read->revcomp;
+	  if (alig->seq_strand) {                               
+	    flag += BAM_FREVERSE;
+	    //seq = read->revcomp;
 	  }
 
 	  num_total_mappings++;
@@ -219,8 +223,8 @@ int sa_sam_writer(void *data) {
 		  genome->chrom_names[alig->mate_chromosome],
 		  alig->mate_position + 1,
 		  alig->template_length,
-		  seq,
-		  read->quality,
+		  alig->sequence,
+		  alig->quality,
 		  (alig->optional_fields ? alig->optional_fields : "")
 		  );
 
@@ -237,22 +241,53 @@ int sa_sam_writer(void *data) {
 	char xmi[100];
 	sprintf(xmi, "XM:i:%i", num_mappings);
 
+	if (read->adapter) {
+	  len = read->length + abs(read->adapter_length);
+	  sequence = (char *) malloc(len + 1);
+	  quality = (char *) malloc(len + 1);
+	  if (read->adapter_length < 0) {
+	    strcpy(sequence, read->adapter);
+	    strcat(sequence, read->sequence);
+	    strcpy(quality, read->adapter_quality);
+	    strcat(quality, read->quality);
+	  } else {
+	    strcpy(sequence, read->sequence);
+	    strcat(sequence, read->adapter);
+	    strcpy(quality, read->quality);
+	    strcat(quality, read->adapter_quality);
+	  }
+	  sequence[len] = 0; 
+	  quality[len] = 0; 
+	} else {
+	  sequence = read->sequence;
+	  quality = read->quality;
+	}
+
 	num_unmapped_reads++;
 	fprintf(out_file, "%s\t4\t*\t0\t0\t*\t*\t0\t0\t%s\t%s\t%s\n", 
 		read->id,
-		read->sequence,
-		read->quality,
+		sequence,
+		quality,
 		xmi
 		);
+
+	if (read->adapter) {
+	  free(sequence);
+	  free(quality);
+	}
       }
       
       array_list_free(mapping_list, (void *) NULL);
     }
   } else {
     // SINGLE MODE
-    int mapq;
+    int len, mapq;
     char *seq;
     seed_cal_t *cal;
+
+    cigar_t *cigar;
+    char *sequence, *revcomp, *quality;
+
     for (size_t i = 0; i < num_reads; i++) {
       read = (fastq_read_t *) array_list_get(i, read_list);
       mapping_list = mapping_batch->mapping_lists[i];
@@ -264,6 +299,35 @@ int sa_sam_writer(void *data) {
       }
       #endif
       
+      if (read->adapter) {
+	len = read->length + abs(read->adapter_length);
+	sequence = (char *) malloc(len + 1);
+	revcomp = (char *) malloc(len + 1);
+	quality = (char *) malloc(len + 1);
+	if (read->adapter_length < 0) {
+	  strcpy(sequence, read->adapter);
+	  strcat(sequence, read->sequence);
+	  strcpy(revcomp, read->adapter_revcomp);
+	  strcat(revcomp, read->revcomp);
+	  strcpy(quality, read->adapter_quality);
+	  strcat(quality, read->quality);
+	} else {
+	  strcpy(sequence, read->sequence);
+	  strcat(sequence, read->adapter);
+	  strcpy(revcomp, read->revcomp);
+	  strcat(revcomp, read->adapter_revcomp);
+	  strcpy(quality, read->quality);
+	  strcat(quality, read->adapter_quality);
+	}
+	sequence[len] = 0; 
+	revcomp[len] = 0; 
+	quality[len] = 0; 
+      } else {
+	sequence = read->sequence;
+	revcomp = read->revcomp;
+	quality = read->quality;
+      }
+	
       if (num_mappings == 1) {
 	num_mapped_reads++;
 
@@ -284,10 +348,23 @@ int sa_sam_writer(void *data) {
 	  
 	  if (cal->strand) {
 	    flag = 16;
-	    seq = read->revcomp;
+	    seq = revcomp;
 	  } else {
 	    flag = 0;
-	    seq = read->sequence;
+	    seq = sequence;
+	  }
+
+	  if (read->adapter) {
+	    cigar = cigar_new_empty();
+	    if (read->adapter_length < 0) {
+	      cigar_append_op(abs(read->adapter_length), 'S', cigar);
+	      cigar_concat(&cal->cigar, cigar);
+	    } else {
+	      cigar_concat(&cal->cigar, cigar);
+	      cigar_append_op(read->adapter_length, 'S', cigar);
+	    }
+	  } else {
+	    cigar = &cal->cigar;
 	  }
 
 	  /*
@@ -296,8 +373,8 @@ int sa_sam_writer(void *data) {
 	  }
 	  */
 
-	  cigar_string = cigar_to_string(&cal->cigar);
-	  cigar_M_string = cigar_to_M_string(&num_mismatches, &num_cigar_ops, &cal->cigar);
+	  cigar_string = cigar_to_string(cigar);
+	  cigar_M_string = cigar_to_M_string(&num_mismatches, &num_cigar_ops, cigar);
 	  num_total_mappings++;
 	  fprintf(out_file, "%s\t%i\t%s\t%i\t%i\t%s\t%s\t%lu\t%i\t%s\t%s\tNH:i:%i\tNM:i:%i\tXC:Z:%s\n", 
 		  read->id,
@@ -310,7 +387,7 @@ int sa_sam_writer(void *data) {
 		  pnext,
 		  tlen,
 		  seq,
-		  read->quality,
+		  quality,
 		  num_mappings,
 		  num_mismatches,
 		  cigar_string
@@ -331,12 +408,18 @@ int sa_sam_writer(void *data) {
 	num_unmapped_reads++;
 	fprintf(out_file, "%s\t4\t*\t0\t0\t*\t*\t0\t0\t%s\t%s\n", 
 		read->id,
-		read->sequence,
-		read->quality
+		sequence,
+		quality
 		);
       }
       
       array_list_free(mapping_list, (void *) NULL);
+
+      if (read->adapter) {
+	free(sequence);
+	free(revcomp);
+	free(quality);
+      }
     }
   }
 

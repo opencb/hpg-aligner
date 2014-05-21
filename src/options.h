@@ -55,7 +55,7 @@
 //#define BS_MODE  2
 
 
-#define NUM_OPTIONS			29
+#define NUM_OPTIONS			30
 #define NUM_RNA_OPTIONS			 6
 #define NUM_DNA_OPTIONS			 1
 
@@ -109,6 +109,7 @@ typedef struct options {
   int filter_seed_mappings;
   int bs_index;
   int fast_mode;
+  int adapter_length;
   double min_score;
   double match;
   double mismatch;
@@ -124,6 +125,8 @@ typedef struct options {
   char* header_filename;
   char* transcriptome_filename;
   char* intron_filename;
+  char* adapter;
+  char* adapter_revcomp;
   // new variables for bisulphite case
 } options_t;
 

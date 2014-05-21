@@ -78,6 +78,11 @@ int main(int argc, char* argv[]) {
   // parsing options
   options_t *options = parse_options(argc, argv);
 
+  if (options->adapter) {
+    options->adapter_revcomp = strdup(options->adapter);
+    seq_reverse_complementary(options->adapter_revcomp, strlen(options->adapter_revcomp));
+  }
+
   // now, we can set logs according to the command-line
   init_log_custom(options->log_level, 1, "hpg-aligner.log", "w");
   LOG_DEBUG_F("Command Mode: %s\n", command);

@@ -19,6 +19,7 @@ options_t *options_new(void) {
   options->bam_format = 0;
   options->realignment = 0;
   options->recalibration = 0;
+  options->adapter = NULL;
   //GET Number System Cores
   //----------------------------------------------
   if (num_cores = get_optimal_cpu_num_threads()) {
@@ -68,6 +69,8 @@ options_t *options_new(void) {
   options->flank_length = 0;
   options->fast_mode = 0;
 
+  options->adapter_length = 0;
+
   //new variables for bisulphite case in index generation
   options->bs_index = 0;
   return options;
@@ -84,7 +87,6 @@ void validate_options(options_t *options) {
   int DEFAULT_SEEDS_MAX_DISTANCE;
 
   int mode = options->mode;
-
 
   if (mode == DNA_MODE) {
     strcpy(options->str_mode, "DNA");
@@ -197,6 +199,7 @@ void options_free(options_t *options) {
      if (options->genome_filename  != NULL) { free(options->genome_filename); }
      if (options->output_name  != NULL)	{ free(options->output_name); }
      if (options->prefix_name != NULL) { free(options->prefix_name); }
+     if (options->adapter != NULL) { free(options->adapter); }
 
      if (options->mode == RNA_MODE) {
        if (options->transcriptome_filename != NULL) { free(options->transcriptome_filename); }
@@ -242,6 +245,10 @@ void options_display(options_t *options) {
      unsigned int pair_max_distance =  (unsigned int)options->pair_max_distance;
      unsigned int min_intron_length =  (unsigned int)options->min_intron_length;
      unsigned int fast_mode =   (unsigned int)options->fast_mode;
+     char* adapter =  NULL;
+     if (options->adapter) {
+       adapter = strdup(options->adapter);
+     }
 
      //unsigned int gpu_process = (unsigned int)options->gpu_process;
 
@@ -270,6 +277,8 @@ void options_display(options_t *options) {
      printf("\tOutput directory name: %s\n", output_name);
      printf("\tOutput file format: %s\n", 
 	    (options->bam_format || options->realignment || options->recalibration) ? "SAM" : "BAM");
+     printf("\tFastQ gzip mode: %s\n", options->gzip == 1 ? "Enable" : "Disable");
+     printf("\tAdapter: %s\n", (adapter ? adapter : "Not present"));
      printf("\n");
 
      printf("Architecture parameters\n");
@@ -338,6 +347,7 @@ void options_display(options_t *options) {
      free(bwt_dirname);
      free(genome_filename);
      free(output_name);
+     if (adapter) free(adapter);
 }
 
 //--------------------------------------------------------------------
@@ -381,6 +391,7 @@ void** argtable_options_new(int mode) {
   argtable[count++] = arg_lit0(NULL, "bam-format", "BAM output format (otherwise, SAM format)");
   argtable[count++] = arg_lit0(NULL, "indel-realignment", "Indel-based realignment");
   argtable[count++] = arg_lit0(NULL, "recalibration", "Base quality score recalibration");
+  argtable[count++] = arg_str0("a", "adapter", NULL, "Adapter sequence in the read");
 
   if (mode == DNA_MODE) {
     argtable[count++] = arg_int0(NULL, "num-seeds", NULL, "Number of seeds");
@@ -472,6 +483,9 @@ options_t *read_CLI_options(void **argtable, options_t *options) {
   if (((struct arg_int*)argtable[++count])->count) { options->bam_format = ((struct arg_int*)argtable[count])->count; }
   if (((struct arg_int*)argtable[++count])->count) { options->realignment = ((struct arg_int*)argtable[count])->count; }
   if (((struct arg_int*)argtable[++count])->count) { options->recalibration = ((struct arg_int*)argtable[count])->count; }
+  if (((struct arg_str*)argtable[++count])->count) { options->adapter = strdup(*(((struct arg_str*)argtable[count])->sval)); }
+
+  if (options->adapter) options->adapter_length = strlen(options->adapter);
 
   if (options->mode == DNA_MODE) {
     if (((struct arg_int*)argtable[++count])->count) { options->num_seeds = *(((struct arg_int*)argtable[count])->ival); }

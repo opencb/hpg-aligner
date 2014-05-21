@@ -296,10 +296,42 @@ void create_alignments(array_list_t *cal_list, fastq_read_t *read,
     return;
   }
 
+  cigar_t *cigar;
+  char *sequence, *revcomp, *quality;
+
   char *seq, *p, *optional_fields, *cigar_string, *cigar_M_string;
   int AS, optional_fields_length, num_mismatches, num_cigar_ops, len;
   linked_list_item_t *list_item; 
 
+  if (read->adapter) {
+    len = read->length + abs(read->adapter_length);
+    sequence = (char *) malloc(len + 1);
+    revcomp = (char *) malloc(len + 1);
+    quality = (char *) malloc(len + 1);
+    if (read->adapter_length < 0) {
+      strcpy(sequence, read->adapter);
+      strcat(sequence, read->sequence);
+      strcpy(revcomp, read->adapter_revcomp);
+      strcat(revcomp, read->revcomp);
+      strcpy(quality, read->adapter_quality);
+      strcat(quality, read->quality);
+    } else {
+      strcpy(sequence, read->sequence);
+      strcat(sequence, read->adapter);
+      strcpy(revcomp, read->revcomp);
+      strcat(revcomp, read->adapter_revcomp);
+      strcpy(quality, read->quality);
+      strcat(quality, read->adapter_quality);
+    }
+    sequence[len] = 0; 
+    revcomp[len] = 0; 
+    quality[len] = 0; 
+    printf("len = %i (seq = %s)\n", len, sequence);
+  } else {
+    sequence = read->sequence;
+    revcomp = read->revcomp;
+    quality = read->quality;
+  }
 
   for (int i = 0; i < num_cals; i++) {
     cal = array_list_get(i, cal_list);
@@ -308,9 +340,22 @@ void create_alignments(array_list_t *cal_list, fastq_read_t *read,
     printf("--> CAL #%i (cigar %s):\n", i, cigar_to_string(&cal->cigar));
     seed_cal_print(cal);
     #endif
-    
-    cigar_string = cigar_to_string(&cal->cigar);
-    cigar_M_string = cigar_to_M_string(&num_mismatches, &num_cigar_ops, &cal->cigar);
+
+    if (read->adapter) {
+      cigar = cigar_new_empty();
+      if (read->adapter_length < 0) {
+	cigar_append_op(abs(read->adapter_length), 'S', cigar);
+	cigar_concat(&cal->cigar, cigar);
+      } else {
+	cigar_concat(&cal->cigar, cigar);
+	cigar_append_op(read->adapter_length, 'S', cigar);
+      }
+    } else {
+      cigar = &cal->cigar;
+    }
+
+    cigar_string = cigar_to_string(cigar);
+    cigar_M_string = cigar_to_M_string(&num_mismatches, &num_cigar_ops, cigar);
     len = strlen(cigar_string);
 
     optional_fields_length = 100 + len;
@@ -349,14 +394,14 @@ void create_alignments(array_list_t *cal_list, fastq_read_t *read,
     free(cigar_string);
 
     if (cal->strand) {
-      seq = read->revcomp;
+      seq = revcomp;
     } else {
-      seq = read->sequence;
+      seq = sequence;
     }
 
     // create the aligments
     alignment = alignment_new();	       
-    alignment_init_single_end(strdup(read->id), strdup(seq), strdup(read->quality), 
+    alignment_init_single_end(strdup(read->id), strdup(seq), strdup(quality), 
 			      cal->strand, cal->chromosome_id, cal->start,
 			      cigar_M_string, num_cigar_ops, cal->AS, 1, (num_cals > 1),
 			      optional_fields_length, optional_fields, alignment);  
@@ -368,7 +413,17 @@ void create_alignments(array_list_t *cal_list, fastq_read_t *read,
     
     // free memory
     seed_cal_free(cal);
+    if (read->adapter) {
+      cigar_free(cigar);
+    }
   }
+
+  if (read->adapter) {
+    free(sequence);
+    free(revcomp);
+    free(quality);
+  }
+
 }
 
 //--------------------------------------------------------------------

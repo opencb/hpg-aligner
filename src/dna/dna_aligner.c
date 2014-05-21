@@ -19,8 +19,36 @@ extern size_t num_unmapped_reads_by_cigar_length;
 
 int counters[NUM_COUNTERS];
 
-void dna_aligner(options_t *options) {
+#include "adapter.h"
 
+void dna_aligner(options_t *options) {
+  /*
+  {
+    int num_reads, eof = 0;
+    fastq_read_t *read;
+    fastq_file_t *fq_file = fastq_fopen(options->in_filename);
+    array_list_t *reads;
+    while (1) {
+      reads = array_list_new(options->batch_size, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
+      num_reads = fastq_fread_se(reads, options->batch_size, fq_file);
+      if (num_reads == 0) {
+	break;
+      }
+      for (int i = 0; i < num_reads; i++) {
+	read = array_list_get(i, reads);
+
+	cut_adapter(options->adapter, options->adapter_length, read);
+	if (i > 100) {
+	  abort();
+	}
+      }
+      array_list_free(reads, (void *) fastq_read_free);
+    }
+    
+    fastq_fclose(fq_file);
+    exit(-1);
+  }
+  */
   for (int i = 0; i < NUM_COUNTERS; i++) {
     counters[i] = 0;
   }
