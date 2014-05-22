@@ -303,36 +303,6 @@ void create_alignments(array_list_t *cal_list, fastq_read_t *read,
   int AS, optional_fields_length, num_mismatches, num_cigar_ops, len;
   linked_list_item_t *list_item; 
 
-  if (read->adapter) {
-    len = read->length + abs(read->adapter_length);
-    sequence = (char *) malloc(len + 1);
-    revcomp = (char *) malloc(len + 1);
-    quality = (char *) malloc(len + 1);
-    if (read->adapter_length < 0) {
-      strcpy(sequence, read->adapter);
-      strcat(sequence, read->sequence);
-      strcpy(revcomp, read->adapter_revcomp);
-      strcat(revcomp, read->revcomp);
-      strcpy(quality, read->adapter_quality);
-      strcat(quality, read->quality);
-    } else {
-      strcpy(sequence, read->sequence);
-      strcat(sequence, read->adapter);
-      strcpy(revcomp, read->revcomp);
-      strcat(revcomp, read->adapter_revcomp);
-      strcpy(quality, read->quality);
-      strcat(quality, read->adapter_quality);
-    }
-    sequence[len] = 0; 
-    revcomp[len] = 0; 
-    quality[len] = 0; 
-    printf("len = %i (seq = %s)\n", len, sequence);
-  } else {
-    sequence = read->sequence;
-    revcomp = read->revcomp;
-    quality = read->quality;
-  }
-
   for (int i = 0; i < num_cals; i++) {
     cal = array_list_get(i, cal_list);
     
@@ -342,15 +312,52 @@ void create_alignments(array_list_t *cal_list, fastq_read_t *read,
     #endif
 
     if (read->adapter) {
+      // sequences and cigar
+      len = read->length + abs(read->adapter_length);
+      sequence = (char *) malloc(len + 1);
+      revcomp = (char *) malloc(len + 1);
+      quality = (char *) malloc(len + 1);
       cigar = cigar_new_empty();
+
       if (read->adapter_length < 0) {
+	strcpy(quality, read->adapter_quality);
+	strcat(quality, read->quality);
+      } else {
+	strcpy(quality, read->quality);
+	strcat(quality, read->adapter_quality);
+      }
+
+      if ( (cal->strand == 1 && 
+	    ((read->adapter_strand == 0 && read->adapter_length > 0) || 
+	     (read->adapter_strand == 1 && read->adapter_length < 0)))
+	   ||
+	   (cal->strand == 0 && 
+	    ((read->adapter_strand == 0 && read->adapter_length < 0) ||
+	     (read->adapter_strand == 1 && read->adapter_length > 0))) ) {
+	strcpy(sequence, read->adapter);
+	strcat(sequence, read->sequence);
+	strcpy(revcomp, read->adapter_revcomp);
+	strcat(revcomp, read->revcomp);
+	
 	cigar_append_op(abs(read->adapter_length), 'S', cigar);
 	cigar_concat(&cal->cigar, cigar);
       } else {
+	strcpy(sequence, read->sequence);
+	strcat(sequence, read->adapter);
+	strcpy(revcomp, read->revcomp);
+	strcat(revcomp, read->adapter_revcomp);
+	
 	cigar_concat(&cal->cigar, cigar);
 	cigar_append_op(read->adapter_length, 'S', cigar);
       }
+      sequence[len] = 0; 
+      revcomp[len] = 0; 
+      quality[len] = 0; 
     } else {
+      // sequences and cigar
+      sequence = read->sequence;
+      revcomp = read->revcomp;
+      quality = read->quality;
       cigar = &cal->cigar;
     }
 
@@ -414,16 +421,13 @@ void create_alignments(array_list_t *cal_list, fastq_read_t *read,
     // free memory
     seed_cal_free(cal);
     if (read->adapter) {
+      // sequences and cigar
+      free(sequence);
+      free(revcomp);
+      free(quality);
       cigar_free(cigar);
     }
   }
-
-  if (read->adapter) {
-    free(sequence);
-    free(revcomp);
-    free(quality);
-  }
-
 }
 
 //--------------------------------------------------------------------

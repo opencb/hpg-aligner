@@ -245,17 +245,24 @@ int sa_sam_writer(void *data) {
 	  len = read->length + abs(read->adapter_length);
 	  sequence = (char *) malloc(len + 1);
 	  quality = (char *) malloc(len + 1);
+
 	  if (read->adapter_length < 0) {
-	    strcpy(sequence, read->adapter);
-	    strcat(sequence, read->sequence);
 	    strcpy(quality, read->adapter_quality);
 	    strcat(quality, read->quality);
 	  } else {
-	    strcpy(sequence, read->sequence);
-	    strcat(sequence, read->adapter);
 	    strcpy(quality, read->quality);
 	    strcat(quality, read->adapter_quality);
 	  }
+	  
+	  if ((read->adapter_strand == 0 && read->adapter_length < 0) || 
+	      (read->adapter_strand == 1 && read->adapter_length > 0)) {
+	    strcpy(sequence, read->adapter);
+	    strcat(sequence, read->sequence);
+	  } else {
+	    strcpy(sequence, read->sequence);
+	    strcat(sequence, read->adapter);
+	  }
+
 	  sequence[len] = 0; 
 	  quality[len] = 0; 
 	} else {
@@ -299,35 +306,6 @@ int sa_sam_writer(void *data) {
       }
       #endif
       
-      if (read->adapter) {
-	len = read->length + abs(read->adapter_length);
-	sequence = (char *) malloc(len + 1);
-	revcomp = (char *) malloc(len + 1);
-	quality = (char *) malloc(len + 1);
-	if (read->adapter_length < 0) {
-	  strcpy(sequence, read->adapter);
-	  strcat(sequence, read->sequence);
-	  strcpy(revcomp, read->adapter_revcomp);
-	  strcat(revcomp, read->revcomp);
-	  strcpy(quality, read->adapter_quality);
-	  strcat(quality, read->quality);
-	} else {
-	  strcpy(sequence, read->sequence);
-	  strcat(sequence, read->adapter);
-	  strcpy(revcomp, read->revcomp);
-	  strcat(revcomp, read->adapter_revcomp);
-	  strcpy(quality, read->quality);
-	  strcat(quality, read->adapter_quality);
-	}
-	sequence[len] = 0; 
-	revcomp[len] = 0; 
-	quality[len] = 0; 
-      } else {
-	sequence = read->sequence;
-	revcomp = read->revcomp;
-	quality = read->quality;
-      }
-	
       if (num_mappings == 1) {
 	num_mapped_reads++;
 
@@ -346,25 +324,62 @@ int sa_sam_writer(void *data) {
 	for (size_t j = 0; j < num_mappings; j++) {
 	  cal = (seed_cal_t *) array_list_get(j, mapping_list);
 	  
+	  if (read->adapter) {
+	    // sequences and cigar
+	    len = read->length + abs(read->adapter_length);
+	    sequence = (char *) malloc(len + 1);
+	    revcomp = (char *) malloc(len + 1);
+	    quality = (char *) malloc(len + 1);
+	    cigar = cigar_new_empty();
+
+	    if (read->adapter_length < 0) {
+	      strcpy(quality, read->adapter_quality);
+	      strcat(quality, read->quality);
+	    } else {
+	      strcpy(quality, read->quality);
+	      strcat(quality, read->adapter_quality);
+	    }
+	    
+	    if ( (cal->strand == 1 && 
+		  ((read->adapter_strand == 0 && read->adapter_length > 0) || 
+		   (read->adapter_strand == 1 && read->adapter_length < 0)))
+		 ||
+		 (cal->strand == 0 && 
+		  ((read->adapter_strand == 0 && read->adapter_length < 0) ||
+		   (read->adapter_strand == 1 && read->adapter_length > 0))) ) {
+	      strcpy(sequence, read->adapter);
+	      strcat(sequence, read->sequence);
+	      strcpy(revcomp, read->adapter_revcomp);
+	      strcat(revcomp, read->revcomp);
+	      
+	      cigar_append_op(abs(read->adapter_length), 'S', cigar);
+	      cigar_concat(&cal->cigar, cigar);
+	    } else {
+	      strcpy(sequence, read->sequence);
+	      strcat(sequence, read->adapter);
+	      strcpy(revcomp, read->revcomp);
+	      strcat(revcomp, read->adapter_revcomp);
+	      
+	      cigar_concat(&cal->cigar, cigar);
+	      cigar_append_op(read->adapter_length, 'S', cigar);
+	    }
+	    sequence[len] = 0; 
+	    revcomp[len] = 0; 
+	    quality[len] = 0; 
+	  } else {
+	    // sequences and cigar
+	    sequence = read->sequence;
+	    revcomp = read->revcomp;
+	    quality = read->quality;
+	    cigar = &cal->cigar;
+	  }
+
 	  if (cal->strand) {
 	    flag = 16;
 	    seq = revcomp;
 	  } else {
 	    flag = 0;
 	    seq = sequence;
-	  }
-
-	  if (read->adapter) {
-	    cigar = cigar_new_empty();
-	    if (read->adapter_length < 0) {
-	      cigar_append_op(abs(read->adapter_length), 'S', cigar);
-	      cigar_concat(&cal->cigar, cigar);
-	    } else {
-	      cigar_concat(&cal->cigar, cigar);
-	      cigar_append_op(read->adapter_length, 'S', cigar);
-	    }
-	  } else {
-	    cigar = &cal->cigar;
 	  }
 
 	  /*
@@ -392,9 +407,17 @@ int sa_sam_writer(void *data) {
 		  num_mismatches,
 		  cigar_string
 		  );
+
+	  // free memory
 	  free(cigar_M_string);
 	  free(cigar_string);
 	  seed_cal_free(cal);	 
+	  if (read->adapter) {
+	    free(sequence);
+	    free(revcomp);
+	    free(quality);
+	    cigar_free(cigar);
+	  }
 	}
       } else {
 	if (num_mappings > 0) {
@@ -405,21 +428,51 @@ int sa_sam_writer(void *data) {
 	  }
 	}
 
+	if (read->adapter) {
+	  // sequences and cigar
+	  len = read->length + abs(read->adapter_length);
+	  sequence = (char *) malloc(len + 1);
+	  quality = (char *) malloc(len + 1);
+
+	  if (read->adapter_length < 0) {
+	    strcpy(quality, read->adapter_quality);
+	    strcat(quality, read->quality);
+	  } else {
+	    strcpy(quality, read->quality);
+	    strcat(quality, read->adapter_quality);
+	  }
+	  
+	  if ((read->adapter_strand == 0 && read->adapter_length < 0) || 
+	      (read->adapter_strand == 1 && read->adapter_length > 0)) {
+	    strcpy(sequence, read->adapter);
+	    strcat(sequence, read->sequence);
+	  } else {
+	    strcpy(sequence, read->sequence);
+	    strcat(sequence, read->adapter);
+	  }
+
+	  sequence[len] = 0; 
+	  quality[len] = 0; 
+	} else {
+	  // sequences
+	  sequence = read->sequence;
+	  quality = read->quality;
+	}
+	
 	num_unmapped_reads++;
 	fprintf(out_file, "%s\t4\t*\t0\t0\t*\t*\t0\t0\t%s\t%s\n", 
 		read->id,
 		sequence,
 		quality
 		);
+
+	if (read->adapter) {
+	  free(sequence);
+	  free(quality);
+	}
       }
       
       array_list_free(mapping_list, (void *) NULL);
-
-      if (read->adapter) {
-	free(sequence);
-	free(revcomp);
-	free(quality);
-      }
     }
   }
 
@@ -476,8 +529,8 @@ int sa_bam_writer(void *data) {
   }
   #endif
 
-  int flag, pnext = 0, tlen = 0;
-  char *rnext = "*", *optional_flags = "NM:i:3";
+  int flag, len, pnext = 0, tlen = 0;
+  char *sequence, *quality, *rnext = "*", *optional_flags = "NM:i:3";
 
   fastq_read_t *read;
   array_list_t *read_list = mapping_batch->fq_reads;
@@ -540,8 +593,39 @@ int sa_bam_writer(void *data) {
 	}
       }
       num_unmapped_reads++;
+
+      if (read->adapter) {
+	// sequences and cigar
+	len = read->length + abs(read->adapter_length);
+	sequence = (char *) malloc(len + 1);
+	quality = (char *) malloc(len + 1);
+
+	if (read->adapter_length < 0) {
+	  strcpy(quality, read->adapter_quality);
+	  strcat(quality, read->quality);
+	} else {
+	  strcpy(quality, read->quality);
+	  strcat(quality, read->adapter_quality);
+	}
+	
+	if ((read->adapter_strand == 0 && read->adapter_length < 0) || 
+	    (read->adapter_strand == 1 && read->adapter_length > 0)) {
+	  strcpy(sequence, read->adapter);
+	  strcat(sequence, read->sequence);
+	} else {
+	  strcpy(sequence, read->sequence);
+	  strcat(sequence, read->adapter);
+	}
+	sequence[len] = 0; 
+	quality[len] = 0; 
+      } else {
+	// sequences
+	sequence = read->sequence;
+	quality = read->quality;
+      }
+      
       alig = alignment_new();       
-      alignment_init_single_end(strdup(read->id), read->sequence, read->quality,
+      alignment_init_single_end(strdup(read->id), sequence, quality,
 				0, -1, -1, /*strdup(aux)*/"", 0, 0, 0, 0, 0, NULL, alig);
       
       bam1 = convert_to_bam(alig, 33);
@@ -553,6 +637,10 @@ int sa_bam_writer(void *data) {
       alig->quality = NULL;
       alig->cigar = NULL;
       alignment_free(alig);
+      if (read->adapter) {
+	free(sequence);
+	free(quality);
+      }
     }
     array_list_free(mapping_list, (void *) NULL);
   }
