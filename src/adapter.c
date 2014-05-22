@@ -91,14 +91,14 @@ void cut_adapter(char *adapter, int adapter_length, fastq_read_t *read) {
   adapter_match_t *match = adapter_match_new();
 
   // search adapter in the 'forward' sequence
-  printf("seq    : %s (adapter %s)\n", read->sequence, adapter);
+  //printf("seq    : %s (adapter %s)\n", read->sequence, adapter);
   match_adapter(adapter, adapter_length, read->sequence, read->length, 0.1f, match);
-  adapter_match_display("\t\t", match);
+  //adapter_match_display("\t\t", match);
   if (match->match) {
     read->adapter_strand = 0;
     pos = read->length - (read->length / 3);
-    fastq_read_display(read);
-    printf("trimming adapter...\n");
+    //fastq_read_display(read);
+    //printf("trimming adapter...\n");
     if (match->seq_start > pos || match->seq_end > pos) {
 
       // set adapter sequence and quality
@@ -157,17 +157,17 @@ void cut_adapter(char *adapter, int adapter_length, fastq_read_t *read) {
 	//	abort();
       }
     }
-    fastq_read_display(read);      
+    //fastq_read_display(read);      
   } else {
     // search adapter in the reverse-complementary sequence
-    printf("revcomp: %s (adapter %s)\n", read->revcomp, adapter);
+    //printf("revcomp: %s (adapter %s)\n", read->revcomp, adapter);
     match_adapter(adapter, adapter_length, read->revcomp, read->length, 0.1f, match);
-    adapter_match_display("\t\t", match);
+    //adapter_match_display("\t\t", match);
     if (match->match) {
       read->adapter_strand = 1;
       pos = read->length - (read->length / 3);
-      fastq_read_display(read);
-      printf("trimming adapter...\n");
+      //fastq_read_display(read);
+      //printf("trimming adapter...\n");
       if (match->seq_start > pos || match->seq_end > pos) {
 	
 	// set adapter sequence and quality
@@ -226,7 +226,7 @@ void cut_adapter(char *adapter, int adapter_length, fastq_read_t *read) {
 	  //	  abort();
 	}
       }
-      fastq_read_display(read);      
+      //fastq_read_display(read);      
     } else {
       /*
       printf("*******************\n");
