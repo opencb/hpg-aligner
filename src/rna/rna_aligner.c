@@ -1,5 +1,5 @@
 #include "rna_aligner.h"
-#include "extrae_user_events.h" 
+//#include "extrae_user_events.h" 
 
 #define NUM_SECTIONS_TIME 		8
 
@@ -48,6 +48,24 @@ int w3_function(void *data) {
 
 
 void rna_aligner(options_t *options) {
+  //convert ASCII fill 
+  extern char convert_ASCII[128];
+  convert_ASCII['a'] = 'T';
+  convert_ASCII['A'] = 'T';
+
+  convert_ASCII['c'] = 'G';
+  convert_ASCII['C'] = 'G';
+
+  convert_ASCII['g'] = 'C';
+  convert_ASCII['G'] = 'C';
+
+  convert_ASCII['t'] = 'a';
+  convert_ASCII['T'] = 'A';
+
+  convert_ASCII['n'] = 'N';
+  convert_ASCII['N'] = 'N';
+  //End fill 
+
   int path_length = strlen(options->output_name);
   int prefix_length = 0;
   
@@ -600,7 +618,7 @@ void rna_aligner(options_t *options) {
 
       printf("Run workflow with %i threads\n", options->num_cpu_threads);
 
-      Extrae_init(); 
+      //Extrae_init(); 
 
       start_timer(time_s1);
       workflow_run_with(options->num_cpu_threads, wf_input, wf);
@@ -620,9 +638,9 @@ void rna_aligner(options_t *options) {
       workflow_display_timing(wf);
       printf("= = = = - - - - - - - - - - - - - - - - - - - = = = =\n\n");
 
-      Extrae_event(6000019, 9); 
-      sleep(2);
-      Extrae_event(6000019, 0); 
+      //Extrae_event(6000019, 9); 
+      //sleep(2);
+      //Extrae_event(6000019, 0); 
       //extern double time_free_alig, time_free_list, time_free_batch;
       //printf("Time free Writer Alig-free=%f(s), list-free=%f(s), batch-free=%f\n", time_free_alig / (double)1000000, time_free_list / (double)1000000, time_free_batch / (double)1000000);
 
@@ -640,7 +658,7 @@ void rna_aligner(options_t *options) {
       workflow_run_with(options->num_cpu_threads, wf_input, wf_last);      
       stop_timer(time_s2, time_e2, time_total_2);
 
-      Extrae_fini();
+      //Extrae_fini();
 
       //printf("===== W2 %f(s) =====\n", time_total_2 / (double)1000000);
       //printf("Total Reads           : %i\n", total_reads);
@@ -652,7 +670,13 @@ void rna_aligner(options_t *options) {
       workflow_display_timing(wf_last);
       printf("= = = = - - - - - - - - - - - - - - - - - - - = = = =\n\n");
 
-
+      //extern double time_read_fq  ;
+      //extern double time_read_fq_process ;
+      //extern double time_read_alig ;
+      //extern double time_read_proc ;
+      
+      //printf("Tiempo Lectura fq = %f, Tiempo procesamiento lectura = %f, Tiempo lectura Alig & buffer = %f, Tiempo procesamiento = %f\n", time_read_fq / (double)1000000, time_read_fq_process / (double)1000000, time_read_alig / (double)1000000, time_read_proc / (double)1000000);
+      
       //printf("Time W2: %f(s)\n", time_total / 1000000);
       //fprintf(stderr, "========== FINISHED MAPPING in %f(s) =========\n", (time_total_1 + time_total_2) / 1000000);
       //printf("TOTAL TIME : %f\n", time_total / 1000000);

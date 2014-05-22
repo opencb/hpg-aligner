@@ -21,12 +21,12 @@ env = Environment(tools = ['default', 'packaging'],
       		  CC = compiler,
                   variables = vars,
                   CFLAGS = '-std=c99 -D_XOPEN_SOURCE=600 -D_GNU_SOURCE -fopenmp -D_REENTRANT',
-                  CPPPATH = ['#', '#src', '#src/tools/bam', bioinfo_path, commons_path, "%s/commons/argtable" % commons_path, "%s/commons/config" % commons_path, system_include, '%s/libxml2' % system_include, '%s/' % extrae_include, '%s/' % other_include],
-                  #CPPPATH = ['#', '#src', '#src/tools/bam', bioinfo_path, commons_path, "%s/commons/argtable" % commons_path, "%s/commons/config" % commons_path, system_include, '%s/libxml2' % system_include],
-                  LIBPATH = [commons_path, bioinfo_path, system_libs, extrae_libs, other_libs],
-		  #LIBPATH = [commons_path, bioinfo_path, system_libs],	    
-                  LIBS = ['xml2', 'm', 'z', 'curl', 'bioinfo', 'common', 'pttrace', 'unwind'],
-		  #LIBS = ['xml2', 'm', 'z', 'curl', 'bioinfo', 'common'],	    
+                  #CPPPATH = ['#', '#src', '#src/tools/bam', bioinfo_path, commons_path, "%s/commons/argtable" % commons_path, "%s/commons/config" % commons_path, system_include, '%s/libxml2' % system_include, '%s/' % extrae_include, '%s/' % other_include],
+                  CPPPATH = ['#', '#src', '#src/tools/bam', bioinfo_path, commons_path, "%s/commons/argtable" % commons_path, "%s/commons/config" % commons_path, system_include, '%s/libxml2' % system_include],
+                  #LIBPATH = [commons_path, bioinfo_path, system_libs, extrae_libs, other_libs],
+		  LIBPATH = [commons_path, bioinfo_path, system_libs],	    
+                  #LIBS = ['xml2', 'm', 'z', 'curl', 'bioinfo', 'common', 'pttrace', 'unwind'],
+		  LIBS = ['xml2', 'm', 'z', 'curl', 'bioinfo', 'common'],	    
                   LINKFLAGS = ['-fopenmp'])
 
 if int(ARGUMENTS.get('debug', '0')) == 1:

@@ -29,8 +29,8 @@ void *sa_alignments_reader_rna(void *input) {
   sa_wf_batch_t *new_wf_batch = NULL;
   sa_wf_batch_t *curr_wf_batch = wf_input->wf_batch;  
   FILE *fd = ((sa_rna_input_t *)curr_wf_batch->data)->file1;
-
-  const int MAX_READS = 200;
+ 
+  const int MAX_READS = 100;
   fastq_batch_reader_input_t *fq_reader_input = wf_input->fq_reader_input;
   array_list_t *reads = array_list_new(MAX_READS, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
   size_t num_reads = 0;
@@ -39,11 +39,11 @@ void *sa_alignments_reader_rna(void *input) {
 
   //printf("===== Read from %p =====\n", fd);
 
-  while (1) {
+  while (1) { 
     fastq_read_t *fq_read = file_read_fastq_reads(&num_items, fd);
-
+    
     if (fq_read == NULL) { printf("fq NULL\n"); break; }
-
+    
     //printf("(num items %i)\nID : %s\nSEQ: %s\nQUA: %s\n", num_items, fq_read->id, fq_read->sequence, fq_read->quality);
     array_list_insert(fq_read, reads);
     
@@ -1817,7 +1817,13 @@ void cal_fill_gaps_2(cal_t *cal,
     //}
 
 void convert_batch_to_str(sa_wf_batch_t *wf_batch) {
+  wf_batch->data = NULL;
+  wf_batch->data_size = 0;
+  
   sa_batch_t *sa_batch = wf_batch->mapping_batch;  
+  size_t num_reads, num_mappings;
+  num_reads = sa_batch->num_reads;
+  if (!num_reads) { return; }
 
   int flag, pnext = 0, tlen = 0;
   char rnext[4] = "*\0";
@@ -1829,10 +1835,7 @@ void convert_batch_to_str(sa_wf_batch_t *wf_batch) {
   array_list_t *mapping_list;
 
   sa_genome3_t *genome = wf_batch->sa_index->genome;
-
-  size_t num_reads, num_mappings;
-  num_reads = sa_batch->num_reads;
-
+  
   //extern size_t total_reads, unmapped_reads, correct_reads;
   extern size_t total_reads;
   extern size_t reads_no_map;
@@ -1843,7 +1846,8 @@ void convert_batch_to_str(sa_wf_batch_t *wf_batch) {
   read = (fastq_read_t *) array_list_get(0, read_list);
 
   //                 (read id len) + (flags) + (cigar) + (sequence + quality) + optional_flags;
-  int read_size   = ((strlen(read->id + 50)) + ((read->length + 50)*2) + (500));
+  //printf("id (%i) : %s, length = %i\n", strlen(read->id), read->id, read->length);
+  int read_size   = ((strlen(read->id) + 50) + ((read->length + 50)*2) + (500));
   int buffer_max_size = read_size * (num_reads * MAX_ALIG);
   int buffer_size = 0;
 
@@ -1868,7 +1872,7 @@ void convert_batch_to_str(sa_wf_batch_t *wf_batch) {
 	char alig_str[read_size];
 	alig_str[0] = '\0';
 	
-	sprintf(alig_str, "%s\t%i\t%s\t%lu\t%i\t%s\t%s\t%lu\t%i\t%s\t%s\t%s\n\0", 
+	sprintf(alig_str, "%s\t%i\t%s\t%lu\t%i\t%s\t%s\t%i\t%i\t%s\t%s\t%s\n\0", 
 		alig->query_name,
 		flag,
 		genome->chrom_names[alig->chromosome - 1],
@@ -1931,6 +1935,8 @@ void convert_batch_to_str(sa_wf_batch_t *wf_batch) {
 
 int write_to_file(void *data) {
   sa_wf_batch_t *wf_batch = (sa_wf_batch_t *) data;
+  if (!wf_batch->data_size) { return 0; }
+
   FILE *out_file = (FILE *) wf_batch->writer_input->bam_file;
 
   //convert_batch_to_str(wf_batch);
@@ -1942,6 +1948,115 @@ int write_to_file(void *data) {
   if (wf_batch) sa_wf_batch_free(wf_batch);
 
   return 0;
+
+}
+
+extern inline void fastq_read_revcomp(fastq_read_t *read) {
+  extern char convert_ASCII[128];
+
+  read->revcomp = (char *)malloc((read->length + 1)*sizeof(char));
+
+  register int i, j;
+
+  for (i = read->length - 1, j = 0; i >= 0; i--, j++) {
+    read->revcomp[j] = convert_ASCII[read->sequence[i]];
+  }
+  
+  read->revcomp[j] = '\0';
+
+}
+
+
+extern inline void parse_alignment_data(array_list_t *list, fastq_read_t *fq_read) {
+  //start_timer(time_start);
+  if (!array_list_size(list)) { return; }
+  alignment_data_t *p = array_list_get(0, list);
+  array_list_clear(list, (void *)NULL);
+
+  int num_items = p->num_items;
+
+  char cigars_test[num_items][1024];
+  size_t actual_read = 0;
+  simple_alignment_t *simple_a;
+  for (int i = 0; i < num_items; i++) {
+    //simple_a = &simple_alignment[i];
+    simple_a = &p->simple_alignments_array[i];
+    //memcpy(&cigars_test[i], &cigar_buffer[actual_read], simple_a->cigar_len);
+    memcpy(&cigars_test[i], &p->cigars_str[actual_read], simple_a->cigar_len);
+    cigars_test[i][simple_a->cigar_len] = '\0';
+    actual_read += simple_a->cigar_len;
+    
+    //printf("CIGAR %i: %s\n", i, cigars_test[i]);
+    size_t map_len = fq_read->length - simple_a->gap_start - simple_a->gap_end;
+    size_t map_genome_len = 0;
+    
+    cigar_code_t *cc = cigar_code_new_by_string(cigars_test[i]);
+    array_list_t *list_aux = array_list_new(5, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
+    sa_alignment_t *sa_alignment = sa_alignment_new(list_aux);    
+
+    //sa_alignment->c_final = cigar_code_new();
+
+    for (int m = 0; m < array_list_size(cc->ops); m++) {
+      cigar_op_t *op = array_list_get(m, cc->ops);
+      //cigar_code_append_new_op(op->number, op->name, sa_alignment->c_final);
+      if (op->name == 'M' || op->name == 'D' || op->name == 'N') {
+	map_genome_len += op->number;
+      }
+    }
+
+    //printf("-->Simple_a->gap_start = %i\n", simple_a->gap_start);
+    //printf("-->Simple_a->gap_start + map_len = %i\n", simple_a->gap_start + map_len);
+
+    if (simple_a->gap_start == 0) {
+      sa_alignment->left_close = 1;
+    }
+    
+    if (simple_a->gap_start + map_len == fq_read->length) {
+      sa_alignment->right_close = 1;
+    }
+
+    //printf("SEED := len_read:%i - gap_read:%i - gap_end:%i = %i, SEED-END = %i\n", fq_read->length, 
+    //   simple_a->gap_start, 
+    //   simple_a->gap_end, 
+    //   map_len, simple_a->gap_start + map_len);
+
+    seed_region_t *s_region = seed_region_new(simple_a->gap_start, 
+                                              simple_a->gap_start + map_len - 1,
+                                              simple_a->map_start, 
+                                              simple_a->map_start + map_genome_len - 1,
+                                              0, 0, 0);
+    
+    //printf("Exit with seed [%i:%i]\n", s_region->read_start, s_region->read_end);    
+    linked_list_t *sr_list = linked_list_new(COLLECTION_MODE_ASYNCHRONIZED);
+    linked_list_insert(s_region, sr_list);
+    
+    cal_t *cal = cal_new(simple_a->map_chromosome, 
+                         simple_a->map_strand,
+                         simple_a->map_start,
+                         simple_a->map_start + map_len - 1,
+                         1,
+                         sr_list,
+                         linked_list_new(COLLECTION_MODE_ASYNCHRONIZED));
+
+
+    s_region->info = cc;
+    cc->distance = simple_a->map_distance;
+    
+    //cal->info = cc;
+    //printf("Cal & Cigar Ok, Insert list\n");    
+    //sa_alignment->c_final->distance = simple_a->map_distance;
+    
+    array_list_insert(cal, sa_alignment->cals_list);
+    array_list_insert(sa_alignment, list);
+    
+    //free(simple_a);
+  }
+
+  free(p->simple_alignments_array);
+  free(p->cigars_str);
+  free(p);
+
+  //stop_timer(time_start, time_end, time_read_proc);
 
 }
 
@@ -2034,16 +2149,19 @@ int sa_rna_mapper(void *data) {
   seed_region_t *seed_prev, *seed_next, *s_prev;
   int num_sa_alignments;
   float cals_score[2048];
-
-  
-
+    
   //printf("****************** Batch ******************\n");
   for (int r = 0; r < num_reads; r++) {
     delete_targets[r] = 0;
     read = array_list_get(r, sa_batch->fq_reads);
+    
+    //Rev-comp
+    fastq_read_revcomp(read);
+    //printf("seq: %s\nrev: %s\n", read->sequence, read->revcomp);
+    
     seq = read->sequence;
-    //printf("...== %s ==...\n", read->id);
     seq_revcomp = read->revcomp;
+
     alignments_list = sa_batch->mapping_lists[r];
     total_suffix = 0;
     len_seq = read->length;
@@ -2057,6 +2175,7 @@ int sa_rna_mapper(void *data) {
 
     //Extrae_event(6000019, 3);
 
+    
     //Search strand(+)
     num_suffixes_p = search_suffix(&seq[0], sa_index->k_value, 
 				   MAX_NUM_SUFFIXES, sa_index, 
@@ -2072,7 +2191,7 @@ int sa_rna_mapper(void *data) {
       //Report Exact Maps! (+)
       alignment_t *alignment;
       
-      int n_alig = high_p - low_p;
+      int n_alig = high_p - low_p + 1;
       if (n_alig > MAX_ALIG) {
 	n_alig = MAX_ALIG;
       }
@@ -2092,12 +2211,11 @@ int sa_rna_mapper(void *data) {
 				  0, chrom + 1,
 				  g_start,
 				  strdup(cigar_str), 
-				  1, 0, 1, (num_suffixes_p > 1),
+				  1, 0, 1, (n_alig > 1),
 				  0, 0, alignment);
 
 	array_list_insert(alignment, alignments_list);
-
-
+	/*
 	metaexon_insert(0, 
 			chrom,
 			g_start,
@@ -2106,7 +2224,7 @@ int sa_rna_mapper(void *data) {
 			METAEXON_RIGHT_END,
 			NULL,
 			metaexons);      
-
+	*/
       }
     } 
 
@@ -2114,7 +2232,7 @@ int sa_rna_mapper(void *data) {
       //Report Exact Map! (-)
       alignment_t *alignment;
       //for (size_t suff = low_n; suff <= high_n; suff++) {
-      int n_alig = high_n - low_n;
+      int n_alig = high_n - low_n + 1;
       if (n_alig > MAX_ALIG) {
 	n_alig = MAX_ALIG;
       }
@@ -2135,9 +2253,87 @@ int sa_rna_mapper(void *data) {
 				  1, chrom + 1,
 				  g_start, 
 				  strdup(cigar_str), 
-				  1, 0, 1, (num_suffixes_n > 1),
+				  1, 0, 1, (n_alig > 1),
 				  0, 0, alignment);
 
+	array_list_insert(alignment, alignments_list);
+	/*
+	metaexon_insert(1, 
+			chrom,
+			g_start,
+			g_start + len_seq,
+			MIN_INTRON_SIZE,
+			METAEXON_RIGHT_END,
+			NULL,
+			metaexons);
+	*/
+      }
+    }
+
+    //Extrae_event(6000019, 0);
+    
+
+    /*
+    //Search strand(+)
+    num_suffixes_p = search_suffix(&seq[0], sa_index->k_value, 
+				   MAX_NUM_SUFFIXES, sa_index, 
+				   &low_p, &high_p, &suffix_len_p);
+    
+    //Search strand(-)
+    num_suffixes_n = search_suffix(&seq_revcomp[0], sa_index->k_value, 
+				   MAX_NUM_SUFFIXES, sa_index, 
+				   &low_n, &high_n, &suffix_len_n);
+    
+    // exact search for exact reads
+    if (suffix_len_p == len_seq) {
+      //Report Exact Maps! (+)
+      alignment_t *alignment;
+      for (size_t suff = low_p; suff <= high_p; suff++) {
+	chrom = sa_index->CHROM[suff];	
+	g_start = sa_index->SA[suff] - sa_index->genome->chrom_offsets[chrom];
+	
+	char cigar_str[2048];
+	sprintf(cigar_str, "%luM", len_seq);     
+	alignment = alignment_new();
+	alignment_init_single_end(strdup(read->id), 
+				  strdup(read->sequence), 
+				  strdup(read->quality), 
+				  0, chrom + 1,
+				  g_start,
+				  strdup(cigar_str), 1, 254, 1, (num_suffixes_p > 1),
+				  0, 0, alignment);
+	array_list_insert(alignment, alignments_list);
+
+	metaexon_insert(0, 
+			chrom,
+			g_start,
+			g_start + len_seq,
+			MIN_INTRON_SIZE,
+			METAEXON_RIGHT_END,
+			NULL,
+			metaexons);      
+
+      }
+    } 
+
+    if (suffix_len_n == len_seq) {
+      //Report Exact Map! (-)
+      alignment_t *alignment;
+      for (size_t suff = low_n; suff <= high_n; suff++) {
+	chrom = sa_index->CHROM[suff];
+	g_start = sa_index->SA[suff] - sa_index->genome->chrom_offsets[chrom];
+	
+	char cigar_str[2048];
+	sprintf(cigar_str, "%luM", len_seq);
+
+	alignment = alignment_new();
+	alignment_init_single_end(strdup(read->id), 
+				  strdup(read->revcomp), 
+				  strdup(read->quality), 
+				  1, chrom + 1,
+				  g_start, 
+				  strdup(cigar_str), 1, 254, 1, (num_suffixes_n > 1),
+				  0, 0, alignment);
 	array_list_insert(alignment, alignments_list);
 
 	metaexon_insert(1, 
@@ -2151,9 +2347,7 @@ int sa_rna_mapper(void *data) {
 
       }
     } 
-
-    //Extrae_event(6000019, 0);
-
+    */
     if (array_list_size(alignments_list)) {
       continue;
     }
@@ -2833,7 +3027,7 @@ int sa_rna_mapper(void *data) {
 	sa_alignment_t *sa_alignment = array_list_get(n_sa, sa_alignments_list[r]);
 	//Complete Cigar
 	if  (!sa_alignment->reported && 
-	     cals_score[n_sa] > 70) {
+	     cals_score[n_sa] > 60) {
 	  merge_cals = sa_alignment->cals_list;
 	  cal = array_list_get(0, merge_cals);
 
@@ -3031,7 +3225,7 @@ int sa_rna_mapper(void *data) {
 
 
   convert_batch_to_str(wf_batch);
-
+  
   return -1;
   
 }
@@ -3074,6 +3268,9 @@ int sa_rna_mapper_last(void *data) {
     fastq_read_t *read = array_list_get(r, sa_batch->fq_reads);
     sa_list = sa_batch->mapping_lists[r];
 
+    fastq_read_revcomp(read);
+    parse_alignment_data(sa_list, read);
+    
     //if (!array_list_size(sa_list)) { continue; }
     //if (strcmp("seq.5a", read->id) == 0) {       
     //exit(-1);
@@ -3085,17 +3282,21 @@ int sa_rna_mapper_last(void *data) {
     //pthread_mutex_lock(&mutex_sp);
     //printf("@@@@@@ READ SECOND (%i): %s\n", num_items, read->id);
     //pthread_mutex_unlock(&mutex_sp);
-    
+
+    //printf("seq: %s\nrev: %s\n", read->sequence, read->revcomp);
     for (int i = 0; i < num_items; i++) {
       sa_alignment_t *sa_alignment = array_list_get(i, sa_list);
       cal_t *cal = array_list_get(0, sa_alignment->cals_list);
-      //cal_print(cal);
       seed_region_t *region = linked_list_get_first(cal->sr_list);
       
       assert(region);
-      //region->info = sa_alignment->c_final;
-      
-      //printf("\tSEED: %i:[%lu|%i - %i|%lu] = %s\n", cal->chromosome_id, region->genome_start, region->read_start, region->read_end, region->genome_end, new_cigar_code_string(sa_alignment->c_final));
+
+      //if (!strcmp("seq.10a", read->id)) {
+      //cal_print(cal);
+      //printf("\tSEED: (%i)%i:[%lu|%i - %i|%lu] = %s\n", cal->strand, cal->chromosome_id, region->genome_start, region->read_start, region->read_end, region->genome_end, new_cigar_code_string(sa_alignment->c_final));
+      //exit(-1);
+      //}
+
 
       if (cal->strand) {
 	query = read->revcomp;

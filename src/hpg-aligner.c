@@ -46,6 +46,13 @@ double time_timer1 = 0;
 double time_timer2 = 0;
 double time_timer3 = 0;
 
+double time_read_fq   = 0;
+double time_read_fq_process   = 0;
+double time_read_alig = 0;
+double time_read_proc = 0;
+
+char convert_ASCII[128];
+
 //--------------------------------------------------------------------
 // main parameters support
 //--------------------------------------------------------------------
