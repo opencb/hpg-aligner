@@ -1601,6 +1601,12 @@ void rna_aligner(options_t *options) {
       //for (int x = 0; x <= 10; x++) {
       //printf("%i CALs: %i reads (%f)\n", x, tot_cals[x], ((float)tot_cals[x]*100)/(float)total_reads );
       //}
+      extern size_t search_calls;
+      extern size_t insert_calls;
+      extern double time_search;
+      extern double time_insert;
+
+      printf("Numero de búsquedas : %lu (%f)\nNúmero de Inserciones: %lu (%f)\n", search_calls, time_search / 1000000, insert_calls, time_insert / 1000000);
 
      
       printf("Load Genome Time : %f(s)\n", time_genome / 1000000);

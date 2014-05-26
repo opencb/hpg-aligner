@@ -1216,15 +1216,31 @@ int metaexon_search(unsigned int strand,
 		    metaexon_t **metaexon_found,	    
 		    metaexons_t *metaexons) {
 
+  extern size_t search_calls;
+  extern size_t insert_calls;
+  extern pthread_mutex_t mutex_calls;
+  
+  struct timeval stop, start;
+  double time = 0.0;
+  extern double time_search;
+  extern double time_insert;
+
   Extrae_event(6000019, 5);
   
   skip_list_item_t *skip_item;
+  start_timer(start); 
   skip_item = skip_list_get_first_overlapped_item(metaexons->metaexons_list[chromosome], 
 						  start, end);
-  
+  stop_timer(start, end, time);
+
   *metaexon_found = (skip_item) ? (skip_item)->data : NULL;
   
   Extrae_event(6000019, 0);   
+
+  pthread_mutex_lock(&(mutex_calls));
+  search_calls++;
+  time_search += time;
+  pthread_mutex_unlock(&(mutex_calls));
   
   return *metaexon_found == NULL ? 0 : 1;
   
@@ -1414,6 +1430,15 @@ int metaexon_insert(unsigned int strand, unsigned int chromosome,
 		    unsigned char type, void *info_break, 
 		    metaexons_t *metaexons) {
 
+  extern size_t search_calls;
+  extern size_t insert_calls;
+  extern pthread_mutex_t mutex_calls;
+  
+  struct timeval stop, start;
+  double time = 0.0;
+  extern double time_search;
+  extern double time_insert;
+
   metaexon_t *metaexon;
   
   metaexon = metaexon_new(start, end);
@@ -1423,7 +1448,9 @@ int metaexon_insert(unsigned int strand, unsigned int chromosome,
   Extrae_event(6000019, 0);   
   
   Extrae_event(6000019, 6);   
+  start_timer(start); 
   skip_list_insert_item(metaexons->metaexons_list[chromosome], metaexon, start, end, min_intron_size);
+  stop_timer(start, end, time);
   Extrae_event(6000019, 0);
 
   if (info_break) {
@@ -1431,6 +1458,12 @@ int metaexon_insert(unsigned int strand, unsigned int chromosome,
   }
 
   pthread_mutex_unlock(&(metaexons->mutex[chromosome]));
+
+
+  pthread_mutex_lock(&(mutex_calls));
+  insert_calls++;
+  time_insert += time;
+  pthread_mutex_unlock(&(mutex_calls));
 
   return 1;
 

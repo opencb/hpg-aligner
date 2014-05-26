@@ -53,12 +53,21 @@ double time_read_proc = 0;
 
 char convert_ASCII[128];
 
+
+size_t search_calls = 0;
+size_t insert_calls = 0;
+double time_search = 0.0;
+double time_insert = 0.0;
+pthread_mutex_t mutex_calls;
+
 //--------------------------------------------------------------------
 // main parameters support
 //--------------------------------------------------------------------
 int main(int argc, char* argv[]) {
   pthread_mutex_init(&mutex_sp, NULL);
   
+  pthread_mutex_init(&mutex_calls, NULL);
+
   //memset(tot_cals, 0, sizeof(int)*50);
   //const char HEADER_FILE[1024] = "Human_NCBI37.hbam\0";
 
