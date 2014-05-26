@@ -1,6 +1,6 @@
 #include "rna_aligner.h"
 
-#include "extrae_user_events.h" 
+//#include "extrae_user_events.h" 
 
 #define NUM_SECTIONS_TIME 		8
 
@@ -1525,7 +1525,7 @@ void rna_aligner(options_t *options) {
 
       printf("Run workflow with %i threads\n", options->num_cpu_threads);
 
-      Extrae_init(); 
+      //Extrae_init(); 
 
       start_timer(time_s1);
       workflow_run_with(options->num_cpu_threads, wf_input, wf);
@@ -1565,7 +1565,7 @@ void rna_aligner(options_t *options) {
       workflow_run_with(options->num_cpu_threads, wf_input, wf_last);      
       stop_timer(time_s2, time_e2, time_total_2);
 
-      Extrae_fini();
+      //Extrae_fini();
 
       //printf("===== W2 %f(s) =====\n", time_total_2 / (double)1000000);
       //printf("Total Reads           : %i\n", total_reads);
@@ -1673,13 +1673,13 @@ void rna_aligner(options_t *options) {
   //free(basic_st);
   
   //if (time_on){ timing_free(timing); }
-  size_t total_meta = 0;
-  for (unsigned int i = 0; i < num_chromosomes; i++) {
-    printf("Chr %i : %lu\n", i + 1, linked_list_size(metaexons->metaexons_list[i]));
-    total_meta += linked_list_size(metaexons->metaexons_list[i]);
-  }
-  printf("Total Metaexons = %lu\n", total_meta);
-  metaexons_free(metaexons);
+  //size_t total_meta = 0;
+  //for (unsigned int i = 0; i < num_chromosomes; i++) {
+  //printf("Chr %i : %lu\n", i + 1, linked_list_size(metaexons->metaexons_list[i]));
+  //total_meta += linked_list_size(metaexons->metaexons_list[i]);
+  //}
+  //printf("Total Metaexons = %lu\n", total_meta);
+  //metaexons_free(metaexons);
   
   /*  
   //========================= O P E N M P    P I P E L I N E =============================//

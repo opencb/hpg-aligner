@@ -1,7 +1,7 @@
 #include "breakpoint.h"
 #include "rna/rna_splice.h"
 
-#include "extrae_user_events.h" 
+//#include "extrae_user_events.h" 
 
 #define CHUNK_SHIFT   10
 
@@ -1220,22 +1220,22 @@ int metaexon_search(unsigned int strand,
   extern size_t insert_calls;
   extern pthread_mutex_t mutex_calls;
   
-  struct timeval stop, start;
+  struct timeval t_end, t_start;
   double time = 0.0;
   extern double time_search;
   extern double time_insert;
 
-  Extrae_event(6000019, 5);
+  //Extrae_event(6000019, 5);
   
   skip_list_item_t *skip_item;
-  start_timer(start); 
+  start_timer(t_start); 
   skip_item = skip_list_get_first_overlapped_item(metaexons->metaexons_list[chromosome], 
 						  start, end);
-  stop_timer(start, end, time);
+  stop_timer(t_start, t_end, time);
 
   *metaexon_found = (skip_item) ? (skip_item)->data : NULL;
   
-  Extrae_event(6000019, 0);   
+  //Extrae_event(6000019, 0);   
 
   pthread_mutex_lock(&(mutex_calls));
   search_calls++;
@@ -1434,7 +1434,7 @@ int metaexon_insert(unsigned int strand, unsigned int chromosome,
   extern size_t insert_calls;
   extern pthread_mutex_t mutex_calls;
   
-  struct timeval stop, start;
+  struct timeval t_stop, t_start;
   double time = 0.0;
   extern double time_search;
   extern double time_insert;
@@ -1443,15 +1443,15 @@ int metaexon_insert(unsigned int strand, unsigned int chromosome,
   
   metaexon = metaexon_new(start, end);
 
-  Extrae_event(6000019, 4);   
+  //Extrae_event(6000019, 4);   
   pthread_mutex_lock(&(metaexons->mutex[chromosome]));
-  Extrae_event(6000019, 0);   
+  //Extrae_event(6000019, 0);   
   
-  Extrae_event(6000019, 6);   
-  start_timer(start); 
+  //Extrae_event(6000019, 6);   
+  start_timer(t_start); 
   skip_list_insert_item(metaexons->metaexons_list[chromosome], metaexon, start, end, min_intron_size);
-  stop_timer(start, end, time);
-  Extrae_event(6000019, 0);
+  stop_timer(t_start, t_stop, time);
+  //Extrae_event(6000019, 0);
 
   if (info_break) {
     metaexon_insert_break(info_break, type, metaexon, strand);
