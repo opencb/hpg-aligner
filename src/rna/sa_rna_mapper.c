@@ -4317,6 +4317,7 @@ cigar_code_t* search_splice_junction(sw_optarg_t *sw_optarg,
   const int SEQURITY_FLANK_2 = 10;
 
   int gap_read = read_end - read_start - 1;
+
   if (gap_read == 0) {
     gap_read = -1;
   }
@@ -4336,7 +4337,7 @@ cigar_code_t* search_splice_junction(sw_optarg_t *sw_optarg,
   } else {
     s_prev->read_end     -= SEQURITY_FLANK;
     s_next->read_start   += SEQURITY_FLANK;
-
+    
     s_prev->genome_end   -= SEQURITY_FLANK;
     s_next->genome_start += SEQURITY_FLANK;
   }
@@ -4347,7 +4348,7 @@ cigar_code_t* search_splice_junction(sw_optarg_t *sw_optarg,
   
   gap_read = read_end - read_start - 1;
   //printf("%i - %i - 1 = %i\n", read_end, read_start, gap_read);
-
+  
   char left_exon[2048];
   char right_exon[2048];
   
@@ -4411,9 +4412,9 @@ cigar_code_t* search_splice_junction(sw_optarg_t *sw_optarg,
       breaks_ends[found_ends++] = strlen(right_exon) - c_e - 1;
       //printf("E.FOUND AC (%i)\n", strlen(right_exon) - c_e - 1);
     }
-
   }
 
+  /*
   if (found_starts == 0) {
     s_prev->read_end     -= SEQURITY_FLANK_2;
     assert(s_prev->read_end > 0);
@@ -4442,6 +4443,9 @@ cigar_code_t* search_splice_junction(sw_optarg_t *sw_optarg,
     }
     
   }
+*/
+
+  /*
 
   if (found_ends == 0) {
     s_next->read_start   += SEQURITY_FLANK_2;    
@@ -4468,6 +4472,7 @@ cigar_code_t* search_splice_junction(sw_optarg_t *sw_optarg,
     }
 
   }
+  */
 
   //Not found any splice junction
   if (found_starts == 0 || found_ends == 0) {
@@ -4487,7 +4492,7 @@ cigar_code_t* search_splice_junction(sw_optarg_t *sw_optarg,
     return NULL;
   } 
 
-  array_list_t *splice_junction = array_list_new(2*found_starts + found_ends, 
+  array_list_t *splice_junction = array_list_new(2*(found_starts + found_ends), 
 						 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
 
 
@@ -4536,7 +4541,8 @@ cigar_code_t* search_splice_junction(sw_optarg_t *sw_optarg,
     memcpy(rl, left_exon, limit_left);
     //printf(">>>>>>> %s (%i)\n", rl, strlen(rl));
 
-    assert(limit_right < 1024);
+    assert(limit_right + limit_left + 1 < 1024);
+
     memcpy(&rl[limit_left], &right_exon[gap_r_exon], limit_right);
     rl[limit_left + limit_right] = '\0';
 
