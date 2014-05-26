@@ -2216,14 +2216,16 @@ int sa_rna_mapper(void *data) {
 
 	array_list_insert(alignment, alignments_list);
 	/*
-	metaexon_insert(0, 
-			chrom,
-			g_start,
-			g_start + len_seq,
-			MIN_INTRON_SIZE,
-			METAEXON_RIGHT_END,
-			NULL,
-			metaexons);      
+	if (n_alig <= 2) {
+	  metaexon_insert(0, 
+			  chrom,
+			  g_start,
+			  g_start + len_seq,
+			  MIN_INTRON_SIZE,
+			  METAEXON_RIGHT_END,
+			  NULL,
+			  metaexons);      
+	}
 	*/
       }
     } 
@@ -2258,14 +2260,16 @@ int sa_rna_mapper(void *data) {
 
 	array_list_insert(alignment, alignments_list);
 	/*
-	metaexon_insert(1, 
-			chrom,
-			g_start,
-			g_start + len_seq,
-			MIN_INTRON_SIZE,
-			METAEXON_RIGHT_END,
-			NULL,
-			metaexons);
+	if (n_alig <= 2) {
+	  metaexon_insert(1, 
+			  chrom,
+			  g_start,
+			  g_start + len_seq,
+			  MIN_INTRON_SIZE,
+			  METAEXON_RIGHT_END,
+			  NULL,
+			  metaexons);
+	}
 	*/
       }
     }

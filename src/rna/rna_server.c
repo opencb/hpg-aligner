@@ -690,7 +690,7 @@ cigar_code_t *meta_alignment_fill_extrem_gap(char *query,
 
   //cal_print(cal);
 
-  pthread_mutex_lock(&metaexons->mutex[cal->chromosome_id - 1]);
+  pthread_mutex_lock(&(metaexons->mutex[cal->chromosome_id - 1]));
 
   //FILL_GAP_LEFT  0
   //FILL_GAP_RIGHT 1
@@ -776,7 +776,7 @@ cigar_code_t *meta_alignment_fill_extrem_gap(char *query,
 					   avls_list);   
   }
   
-  pthread_mutex_unlock(&metaexons->mutex[cal->chromosome_id - 1]);
+  pthread_mutex_unlock(&(metaexons->mutex[cal->chromosome_id - 1]));
 
 
   return cigar_code;
@@ -834,7 +834,7 @@ cigar_code_t *fill_extrem_gap(char *query,
 
   //printf("FILL EXTREM GAP: [%i-%i]\n", read_start, read_end);
 
-  pthread_mutex_lock(&metaexons->mutex[cal->chromosome_id - 1]);
+  pthread_mutex_lock(&(metaexons->mutex[cal->chromosome_id - 1]));
 
   //printf("genome_start = %i, genome_end = %i\n", genome_start, genome_end);
 
@@ -899,7 +899,7 @@ cigar_code_t *fill_extrem_gap(char *query,
   if (cigar_code == NULL) {
     //printf("Search NORMAL\n");
     if (genome_end - genome_start >= 2048) {
-      pthread_mutex_unlock(&metaexons->mutex[cal->chromosome_id - 1]);
+      pthread_mutex_unlock(&(metaexons->mutex[cal->chromosome_id - 1]));
       return NULL;
     }    
    
@@ -942,7 +942,7 @@ cigar_code_t *fill_extrem_gap(char *query,
     
   }
   
-  pthread_mutex_unlock(&metaexons->mutex[cal->chromosome_id - 1]);
+  pthread_mutex_unlock(&(metaexons->mutex[cal->chromosome_id - 1]));
 
 
   return cigar_code;
@@ -4227,7 +4227,7 @@ cigar_code_t *search_double_anchors_cal(char *query_map,
 
   *type = META_ALIGNMENT_MIDDLE;
 
-  pthread_mutex_lock(&metaexons->mutex[first_cal->chromosome_id - 1]);
+  pthread_mutex_lock(&(metaexons->mutex[first_cal->chromosome_id - 1]));
 
   //printf("-------------------------------------------\n");
   //cal_print(first_cal);
@@ -4611,7 +4611,7 @@ cigar_code_t *search_double_anchors_cal(char *query_map,
 
   //if (cigar_code == NULL) { exit(-1); }
 
-  pthread_mutex_unlock(&metaexons->mutex[first_cal->chromosome_id - 1]);  
+  pthread_mutex_unlock(&(metaexons->mutex[first_cal->chromosome_id - 1]));  
 
   return cigar_code;
 

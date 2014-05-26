@@ -3,6 +3,7 @@
 
 #include "containers/array_list.h"
 #include "containers/linked_list.h"
+#include "containers/skip_list.h"
 
 #include "aligners/bwt/genome.h"
 #include "bioformats/bam/alignment.h"
@@ -168,11 +169,16 @@ typedef struct metaexons {
   unsigned int       num_chromosomes;
   size_t             *num_chunks;
   pthread_mutex_t    *mutex;
-  linked_list_t      **metaexons_list;  
+  //linked_list_t      **metaexons_list;  
+  skip_list_t        **metaexons_list;  
   metaexon_pair_t    **bypass_pointer;
-
+  
   //linked_list_t      ***metaexons_x;  
 } metaexons_t;
+
+
+void metaexon_merge_breaks(void *source, void *target);
+
 
 metaexons_t *metaexons_new(unsigned int num_chromosomes, 
 			   size_t *chr_size);
