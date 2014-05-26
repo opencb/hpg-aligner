@@ -1162,7 +1162,7 @@ int metaexon_search(unsigned int strand,
 		    size_t start, size_t end,
 		    metaexon_t **metaexon_found,	    
 		    metaexons_t *metaexons) {
-
+  /*
   extern size_t search_calls;
   extern size_t insert_calls;
   extern pthread_mutex_t mutex_calls;
@@ -1173,7 +1173,7 @@ int metaexon_search(unsigned int strand,
   extern double time_insert;
 
   start_timer(t_start);
-  
+  */
   int chunk_start = start >> CHUNK_SHIFT; //metaexons->chunk_size;
   int chunk_end   = end   >> CHUNK_SHIFT; //metaexons->chunk_size;
   linked_list_iterator_t itr;
@@ -1211,17 +1211,17 @@ int metaexon_search(unsigned int strand,
     }
   }
   
-  stop_timer(t_start, t_end, time);
+  //stop_timer(t_start, t_end, time);
 
   //pthread_mutex_unlock(&metaexons->mutex[chromosome]);  
 
   //linked_list_iterator_free(itr);
-
+  /*
   pthread_mutex_lock(&(mutex_calls));
   search_calls++;
   time_search += time;
   pthread_mutex_unlock(&(mutex_calls));
-
+  */
   return *metaexon_found == NULL ? 0 : 1;
   
 }
@@ -1495,6 +1495,7 @@ int metaexon_insert(unsigned int strand, unsigned int chromosome,
 		     metaexons_t *metaexons) {
 
     //assert(chromosome <= 25);
+  /*
   extern size_t search_calls;
   extern size_t insert_calls;
   extern pthread_mutex_t mutex_calls;
@@ -1503,11 +1504,11 @@ int metaexon_insert(unsigned int strand, unsigned int chromosome,
   double time = 0.0;
   extern double time_search;
   extern double time_insert;
-
-    if (end < start) {
-      printf("META-ERR: %lu - %lu\n", start, end);
-      exit(-1);
-    }
+  */
+  if (end < start) {
+    printf("META-ERR: %lu - %lu\n", start, end);
+    exit(-1);
+  }
 
     //assert(start < end);
 
@@ -1522,7 +1523,7 @@ int metaexon_insert(unsigned int strand, unsigned int chromosome,
 
     pthread_mutex_lock(&metaexons->mutex[chromosome]);
 
-    start_timer(t_start);
+    //start_timer(t_start);
 
     for (ck = ck_start; ck <= ck_end; ck++) {
       if (metaexons->bypass_pointer[chromosome][ck].first) {
@@ -1647,13 +1648,14 @@ int metaexon_insert(unsigned int strand, unsigned int chromosome,
 
     array_list_free(delete_items, (void *)NULL);
 
+    /*
     stop_timer(t_start, t_stop, time);
 
     pthread_mutex_lock(&(mutex_calls));
     insert_calls++;
     time_insert += time;
     pthread_mutex_unlock(&(mutex_calls));
-
+    */
     return db_type;
 
 }
