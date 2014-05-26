@@ -1050,7 +1050,7 @@ linked_list_item_t *__metaexon_insert(linked_list_t* list_p,
 }
 
 //-----------------------------------------------------------------------------
-/*
+
 metaexons_t *metaexons_new(unsigned int num_chromosomes, size_t *chr_size) {
   metaexons_t *metaexons = (metaexons_t *)malloc(sizeof(metaexons_t));
   //unsigned int num_chromosomes = genome->num_chromosomes;
@@ -1093,8 +1093,8 @@ metaexons_t *metaexons_new(unsigned int num_chromosomes, size_t *chr_size) {
   return metaexons;
 
 }
-*/
 
+/*
 
 metaexons_t *metaexons_new(unsigned int num_chromosomes, size_t *chr_size) {
   metaexons_t *metaexons = (metaexons_t *)malloc(sizeof(metaexons_t));
@@ -1122,9 +1122,9 @@ metaexons_t *metaexons_new(unsigned int num_chromosomes, size_t *chr_size) {
   return metaexons;
 
 }
+*/
 
 
-/*
 void metaexons_free(metaexons_t *metaexons) {
   for (int i = 0; i < metaexons->num_chromosomes; i++) {
     linked_list_free(metaexons->metaexons_list[i], (void *)metaexon_free);
@@ -1139,9 +1139,9 @@ void metaexons_free(metaexons_t *metaexons) {
   free(metaexons);
 
 }
-*/
 
 
+/*
 void metaexons_free(metaexons_t *metaexons) {
   if (metaexons) {
     for (int i = 0; i < metaexons->num_chromosomes; i++) {
@@ -1153,15 +1153,26 @@ void metaexons_free(metaexons_t *metaexons) {
     free(metaexons);
   }
 }
+*/
 
 
 
-/*
 int metaexon_search(unsigned int strand, 
 		    unsigned int chromosome,
 		    size_t start, size_t end,
 		    metaexon_t **metaexon_found,	    
 		    metaexons_t *metaexons) {
+
+  extern size_t search_calls;
+  extern size_t insert_calls;
+  extern pthread_mutex_t mutex_calls;
+  
+  struct timeval t_end, t_start;
+  double time = 0.0;
+  extern double time_search;
+  extern double time_insert;
+
+  start_timer(t_start);
   
   int chunk_start = start >> CHUNK_SHIFT; //metaexons->chunk_size;
   int chunk_end   = end   >> CHUNK_SHIFT; //metaexons->chunk_size;
@@ -1200,16 +1211,23 @@ int metaexon_search(unsigned int strand,
     }
   }
   
+  stop_timer(t_start, t_end, time);
+
   //pthread_mutex_unlock(&metaexons->mutex[chromosome]);  
 
   //linked_list_iterator_free(itr);
 
+  pthread_mutex_lock(&(mutex_calls));
+  search_calls++;
+  time_search += time;
+  pthread_mutex_unlock(&(mutex_calls));
+
   return *metaexon_found == NULL ? 0 : 1;
   
 }
-*/
 
 
+/*
 int metaexon_search(unsigned int strand, 
 		    unsigned int chromosome,
 		    size_t start, size_t end,
@@ -1245,7 +1263,7 @@ int metaexon_search(unsigned int strand,
   return *metaexon_found == NULL ? 0 : 1;
   
 }
-
+*/
 
 /*
 int metaexon_insert(unsigned int strand, unsigned int chromosome,
@@ -1424,7 +1442,7 @@ int metaexon_insert(unsigned int strand, unsigned int chromosome,
 }
 */
 
-
+/*
 int metaexon_insert(unsigned int strand, unsigned int chromosome,
 		    size_t start, size_t end, int min_intron_size, 
 		    unsigned char type, void *info_break, 
@@ -1468,15 +1486,23 @@ int metaexon_insert(unsigned int strand, unsigned int chromosome,
   return 1;
 
 }
+*/
 
 
-/*
 int metaexon_insert(unsigned int strand, unsigned int chromosome,
 		     size_t start, size_t end, int min_intron_size, 
 		     unsigned char type, void *info_break, 
 		     metaexons_t *metaexons) {
 
     //assert(chromosome <= 25);
+  extern size_t search_calls;
+  extern size_t insert_calls;
+  extern pthread_mutex_t mutex_calls;
+  
+  struct timeval t_stop, t_start;
+  double time = 0.0;
+  extern double time_search;
+  extern double time_insert;
 
     if (end < start) {
       printf("META-ERR: %lu - %lu\n", start, end);
@@ -1495,6 +1521,8 @@ int metaexon_insert(unsigned int strand, unsigned int chromosome,
     array_list_t *delete_items = array_list_new(50, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
 
     pthread_mutex_lock(&metaexons->mutex[chromosome]);
+
+    start_timer(t_start);
 
     for (ck = ck_start; ck <= ck_end; ck++) {
       if (metaexons->bypass_pointer[chromosome][ck].first) {
@@ -1619,10 +1647,17 @@ int metaexon_insert(unsigned int strand, unsigned int chromosome,
 
     array_list_free(delete_items, (void *)NULL);
 
+    stop_timer(t_start, t_stop, time);
+
+    pthread_mutex_lock(&(mutex_calls));
+    insert_calls++;
+    time_insert += time;
+    pthread_mutex_unlock(&(mutex_calls));
+
     return db_type;
 
 }
-*/    
+    
 
 
 

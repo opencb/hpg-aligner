@@ -169,8 +169,8 @@ typedef struct metaexons {
   unsigned int       num_chromosomes;
   size_t             *num_chunks;
   pthread_mutex_t    *mutex;
-  //linked_list_t      **metaexons_list;  
-  skip_list_t        **metaexons_list;  
+  linked_list_t      **metaexons_list;  
+  //skip_list_t        **metaexons_list;  
   metaexon_pair_t    **bypass_pointer;
   
   //linked_list_t      ***metaexons_x;  
