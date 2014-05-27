@@ -313,6 +313,7 @@ void sa_index3_parallel_genome_new(char *sa_index_dirname, int num_threads,
 	}
 
 	genome_ = genome_new("dna_compression.bin", sa_index_dirname, SA_MODE);	
+
 	genome_->num_chromosomes = num_chroms;
 	genome_->chr_name = (char **) calloc(genome_->num_chromosomes, sizeof(char *));
 	genome_->chr_size = (size_t *) calloc(genome_->num_chromosomes, sizeof(size_t));
@@ -321,7 +322,7 @@ void sa_index3_parallel_genome_new(char *sa_index_dirname, int num_threads,
 	
 	for (int c = 0; c < num_chroms; c++) {
 	  genome_->chr_size[c] = chrom_lengths[c];
-	  genome_->chr_name[c] = chrom_names[c];
+	  genome_->chr_name[c] = strdup(chrom_names[c]);
 	  genome_->chr_offset[c] = offset;
 	  offset += genome_->chr_size[c];
 	}
