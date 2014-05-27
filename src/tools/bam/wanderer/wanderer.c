@@ -66,15 +66,14 @@ bwander_run(bam_wanderer_t *wanderer)
 
 	//Load first region
 	breg_fill(wanderer->current_region, wanderer->input_file);
-	breg_filter(wanderer->current_region, FILTER_ZERO_QUAL | FILTER_DIFF_MATE_CHROM | FILTER_NO_CIGAR | FILTER_DEF_MASK);
 	
-	sprintf(str, "Wandering over region %d:%d-%d with %d reads\n",
+	sprintf(str, "\n============== Wandering over region %d:%d-%d with %d reads ============== \n",
 			wanderer->current_region->chrom + 1, wanderer->current_region->init_pos + 1,
 			wanderer->current_region->end_pos + 1, wanderer->current_region->size);
-	printf(str);
+	LOG_INFO(str);
 
 	//Run loop
-	err = wanderer->wander_f(wanderer->current_region);
+	err = wanderer->wander_f(wanderer);
 	while(err != 0)
 	{
 		//Check error
@@ -87,24 +86,38 @@ bwander_run(bam_wanderer_t *wanderer)
 		breg_write_processed(wanderer->current_region, wanderer->output_file);
 
 		//Load next region
-		breg_fill(wanderer->current_region, wanderer->output_file);
-		breg_filter(wanderer->current_region, FILTER_ZERO_QUAL | FILTER_DIFF_MATE_CHROM | FILTER_NO_CIGAR | FILTER_DEF_MASK);
+		breg_fill(wanderer->current_region, wanderer->input_file);
 
 		//Logging
-		sprintf(str, "Wandering over region %d:%d-%d with %d reads\n",
-				wanderer->current_region->chrom, wanderer->current_region->init_pos,
-				wanderer->current_region->end_pos, wanderer->current_region->size);
-		printf(str);
-		printf("%d:%d-%d - Proc: %d - Size: %d\n", wanderer->current_region->chrom,
-				 wanderer->current_region->init_pos,  wanderer->current_region->end_pos,
-				 wanderer->current_region->processed,  wanderer->current_region->size);
+		sprintf(str, "\n============== Wandering over region %d:%d-%d with %d reads ============== \n",
+				wanderer->current_region->chrom + 1, wanderer->current_region->init_pos + 1,  wanderer->current_region->end_pos + 1, wanderer->current_region->size);
+		LOG_INFO(str);
 
 		//Execute wandering
-		//err = wanderer->wander_f(wanderer->current_region);
-		err = WANDERER_SUCCESS;
+		err = wanderer->wander_f(wanderer);
+		//err = WANDERER_SUCCESS;
 	}
 
 	//Logging
-	LOG_INFO("Wanderer end execution\n");
+	LOG_INFO("Wanderer SUCCESS!\n");
+}
+
+/**
+ * REGISTER WINDOW
+ */
+void
+bwander_window_register(bam_wanderer_t *wanderer, bam_region_window_t *window)
+{
+	char str[100];
+
+	assert(wanderer);
+	assert(wanderer->current_region);
+	assert(window);
+
+	//Logging
+	sprintf(str, "Window %d:%d-%d with %d reads has been registered\n",
+			window->region->chrom + 1, window->init_pos + 1,
+			window->end_pos + 1, window->size);
+	LOG_INFO(str);
 }
 

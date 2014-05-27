@@ -18,6 +18,7 @@ breg_init(bam_region_t *region)
 	//Allocate reads array
 	region->reads = (bam1_t **)malloc(BAM_REGION_DEFAULT_SIZE * sizeof(bam1_t *));
 	assert(region->reads);
+	memset(region->reads, 0, BAM_REGION_DEFAULT_SIZE * sizeof(bam1_t *));
 	region->max_size = BAM_REGION_DEFAULT_SIZE;
 }
 
@@ -52,17 +53,32 @@ void
 breg_fill(bam_region_t *region, bam_file_t *input_file)
 {
 	int free_slots, i;
-	bam1_t **ptr;
 	bam1_t *read;
 	size_t bytes;
 	size_t added;
+	int64_t end_pos = -1;
+
+	char str[100];
 
 	assert(region);
 	assert(input_file);
 
+	added = region->size;
+
+	//Get free slots
+	free_slots = region->max_size - region->size;
+	if(free_slots == 0)
+	{
+		LOG_ERROR("NOT ENOUGH FREE SLOTS, CANT FILL BUFFER. Aborting...\n");
+		abort();
+	}
+	printf("FREE SLOTS: %d\n", free_slots);
+
 	//Add next read
 	if(region->next_read != NULL)
 	{
+		sprintf(str, "NEXT at %d\n", region->size);
+		LOG_INFO(str);
 		region->reads[region->size] = region->next_read;
 		region->next_read = NULL;
 		region->size++;
@@ -71,7 +87,8 @@ breg_fill(bam_region_t *region, bam_file_t *input_file)
 	//Get first read
 	if(region->size > 0)
 	{
-		printf("First read\n");
+		sprintf(str, "First read of %d reads\n", region->size);
+		LOG_INFO(str);
 		read = region->reads[0];
 	}
 	else
@@ -85,29 +102,24 @@ breg_fill(bam_region_t *region, bam_file_t *input_file)
 		if(bytes == 0)
 		{
 			//End of file
+			LOG_INFO("EOF\n");
 			bam_destroy1(read);
 			return;
 		}
 
 		//Add read to region
 		region->reads[0] = read;
-		region->size = 1;
+		region->size++;
 	}
 	assert(read);
 
-	//Get free slots
-	free_slots = region->max_size - region->size;
-	if(free_slots == 0)
-	{
-		LOG_ERROR("NOT ENOUGHT FREE SLOTS, CANT FILL BUFFER. Aborting...\n");
-		abort();
-	}
-	printf("FREE SLOTS: %d\n", free_slots);
+	//Set region init locus and chrom
+	region->init_pos = read->core.pos;
+	region->chrom = read->core.tid;
 
 	//Fill remaining slots
-	ptr = region->reads + region->size;
-	added = 0;
-	for(i = 0; i < free_slots; i++)
+	fflush(stdout);
+	for(i =  region->size; i < region->max_size; i++)
 	{
 		//Read next bam read
 		read = bam_init1();
@@ -117,25 +129,38 @@ breg_fill(bam_region_t *region, bam_file_t *input_file)
 		//Valid read?
 		if(bytes > 0)
 		{
+			//Different chrom?
+			if(read->core.tid != region->chrom)
+			{
+				sprintf(str, "Different chrom - Reg:%d - Read:%d\n", region->chrom+1, read->core.tid+1);
+				LOG_INFO(str);
+
+				//Save next read
+				region->next_read = read;
+
+				break;
+			}
+
 			//Add read to region
-			ptr[i] = read;
-			added++;
+			region->reads[i] = read;
+			region->size++;
 		}
 		else
 		{
-			LOG_INFO("End of file\n");
+			LOG_INFO("EOF\n");
 			bam_destroy1(read);
 			read = NULL;
 			break;
 		}
 	}
-	//Save next read
-	region->next_read = read;
 
 	//Update region size
-	region->size += added;
+	added = region->size - added;
 
 	printf("ADDED: %d - SIZE: %d\n", added, region->size);
+
+	//Set region end locus
+	region->end_pos = region->reads[region->size - 1]->core.pos;
 }
 
 //Private compare function
@@ -151,9 +176,13 @@ breg_write_processed(bam_region_t *region, bam_file_t *output_file)
 {
 	int i;
 	bam1_t *read;
+	char str[100];
 
 	assert(region);
 	assert(output_file);
+
+	sprintf(str, "Writing %d processed reads\n", region->processed);
+	LOG_INFO(str);
 
 	//Sort reads
 	qsort(region->reads, region->processed, sizeof(void *), compare_pos);
@@ -175,30 +204,28 @@ breg_write_processed(bam_region_t *region, bam_file_t *output_file)
 	region->size -= region->processed;
 	if(region->size > 0)
 	{
-		printf("Moving %d from index %d\n", region->size, region->processed);
-		memmove(region->reads, region->reads + region->processed, region->size);
-		memset(region->reads + region->size, 0, region->max_size - region->size);
+		sprintf(str, "Moving %d from index %d, new size: %d\n", region->size, region->processed, region->size);
+		LOG_INFO(str);
+
+		memmove(region->reads, region->reads + region->processed, region->size * sizeof(bam1_t *));
+		memset(region->reads + region->size, 0, (region->max_size - region->size) * sizeof(bam1_t *));
 	}
 	region->processed = 0;
 }
 
 void
-breg_load_window(bam_region_t *region, int chrom, size_t init_pos, size_t end_pos, uint8_t filters, bam_region_window_t *window)
+breg_load_window(bam_region_t *region, size_t init_pos, size_t end_pos, uint8_t filters, bam_region_window_t *window)
 {
 	assert(region);
 	assert(window);
 
 	//Setup window
 	window->region = region;
-	window->chrom = chrom;
 	window->init_pos = init_pos;
 	window->end_pos = end_pos;
 
 	//Obtain filtered reads
 	breg_window_filter(window, filters);
-
-	printf("Window loaded, %d reads\n", window->size);
-	chrom != EMPTY_CHROM ? printf("Region %d:%d - %d\n", chrom, init_pos, end_pos) : printf("Whole region\n");
 }
 
 /**
@@ -211,9 +238,6 @@ breg_window_init(bam_region_window_t *window)
 
 	//Set all to zero
 	memset(window, 0, sizeof(bam_region_window_t));
-
-	//Invalid chrom
-	window->chrom = EMPTY_CHROM;
 }
 
 void
@@ -243,7 +267,7 @@ breg_window_filter(bam_region_window_t *window, uint8_t filters)
 	window->size = 0;
 
 	//Allocate if not
-	if(!window->filter_reads)
+	if(window->filter_reads == NULL)
 	{
 		window->filter_reads = (bam1_t **)malloc(BAM_REGION_DEFAULT_SIZE * sizeof(bam1_t *));
 		assert(window->filter_reads);
@@ -256,7 +280,11 @@ breg_window_filter(bam_region_window_t *window, uint8_t filters)
 	{
 		//Get next read
 		read = region->reads[i];
-		assert(read);
+		if(read == NULL)
+		{
+			printf("ERROR en lectura: %d\n", i);
+			continue;
+		}
 
 		//Filter read
 		{
@@ -286,10 +314,10 @@ breg_window_filter(bam_region_window_t *window, uint8_t filters)
 		}
 
 		//Check window region
-		if(window->chrom != EMPTY_CHROM)
+		if(window->region->chrom != EMPTY_CHROM)
 		{
 			//Is in window region?
-			if(	window->chrom != read->core.tid
+			if(	window->region->chrom != read->core.tid
 					|| window->init_pos > read->core.pos + read->core.l_qseq
 					|| window->end_pos < read->core.pos)
 			{

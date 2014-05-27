@@ -356,9 +356,15 @@ align_launch(char *reference, char *bam, char *output, int threads)
 }
 
 int
-dummy_wander(bam_region_t *region)
+dummy_wander(bam_wanderer_t *wanderer)
 {
-	assert(region);
+	bam_region_t *region;
+	bam_region_window_t *window;
+
+	assert(wanderer);
+	assert(wanderer->current_region);
+
+	region = wanderer->current_region;
 
 	//Process
 	int val = region->size - 100;
@@ -368,6 +374,20 @@ dummy_wander(bam_region_t *region)
 		region->processed = region->size;
 
 	printf("PROCESSED: %d\n", region->processed);
+
+	//Init window
+	window = (bam_region_window_t *)malloc(sizeof(bam_region_window_t));
+	breg_window_init(window);
+
+	//Load window
+	breg_load_window(region, region->init_pos, region->end_pos,
+			FILTER_ZERO_QUAL | FILTER_DIFF_MATE_CHROM | FILTER_NO_CIGAR | FILTER_DEF_MASK, window);
+
+	//Register window
+	bwander_window_register(wanderer, window);
+
+	breg_window_destroy(window);
+	free(window);
 
 	//Return
 	if(region->size == 0)
@@ -420,11 +440,13 @@ wander_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 		printf("New BAM initialized!...\n");
 	}
 
+	LOG_VERBOSE(1);
+
 	//Init wandering
 	bwander_init(&wanderer);
 
 	//Configure wanderer
-	bwander_configure(&wanderer, bam_f, out_bam_f, dummy_wander);
+	bwander_configure(&wanderer, bam_f, out_bam_f, (int (*)(void *))dummy_wander);
 
 	//Run wander
 	bwander_run(&wanderer);

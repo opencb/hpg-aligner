@@ -22,7 +22,7 @@
 /**
  * WANDERING FUNCTION DEFINITION
  */
-typedef int (*wandering_function)(bam_region_t *) ;
+typedef int (*wandering_function)(void *) ;
 
 /**
  * BAM WANDERER STRUCT
@@ -48,5 +48,10 @@ EXTERNC void bwander_destroy(bam_wanderer_t *wanderer);
 EXTERNC void bwander_configure(bam_wanderer_t *wanderer, bam_file_t *in_file, bam_file_t *out_file, wandering_function f);
 
 EXTERNC void bwander_run(bam_wanderer_t *wanderer);
+
+/**
+ * REGISTER WINDOW
+ */
+EXTERNC void bwander_window_register(bam_wanderer_t *wanderer, bam_region_window_t *window);
 
 #endif /* WANDERER_H_ */
