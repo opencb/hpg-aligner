@@ -39,6 +39,7 @@ cigar_code_t *cigar_code_new() {
   return p;
 }
 
+
 cigar_code_t *cigar_code_new_by_string(char *cigar_str) {
   cigar_code_t *p = cigar_code_new();
   
