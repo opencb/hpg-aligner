@@ -10,6 +10,9 @@
 void
 bwander_init(bam_wanderer_t *wanderer)
 {
+	int i;
+	bam_region_window_t *window;
+
 	assert(wanderer);
 
 	//Set all to zero
@@ -18,11 +21,23 @@ bwander_init(bam_wanderer_t *wanderer)
 	//Create region struct
 	wanderer->current_region = (bam_region_t *)malloc(sizeof(bam_region_t));
 	breg_init(wanderer->current_region);
+
+	//Create windows
+	wanderer->windows = (bam_region_window_t *)malloc(WANDERER_WINDOWS_MAX * sizeof(bam_region_window_t));
+	memset(wanderer->windows, 0, WANDERER_WINDOWS_MAX * sizeof(bam_region_window_t));
+	for(i = 0; i < WANDERER_WINDOWS_MAX; i++)
+	{
+		window = &wanderer->windows[i];
+		breg_window_init(window);
+	}
 }
 
 void
 bwander_destroy(bam_wanderer_t *wanderer)
 {
+	int i;
+	bam_region_window_t *window;
+
 	assert(wanderer);
 
 	//Region exists?
@@ -31,21 +46,31 @@ bwander_destroy(bam_wanderer_t *wanderer)
 		breg_destroy(wanderer->current_region, 0);
 		free(wanderer->current_region);
 	}
+
+	//Free windows
+	for(i = 0; i < WANDERER_WINDOWS_MAX; i++)
+	{
+		window = &wanderer->windows[i];
+		breg_window_destroy(window);
+	}
+	free(wanderer->windows);
 }
 
 void 
-bwander_configure(bam_wanderer_t *wanderer, bam_file_t *in_file, bam_file_t *out_file, wandering_function f)
+bwander_configure(bam_wanderer_t *wanderer, bam_file_t *in_file, bam_file_t *out_file, wandering_function wf, processing_function pf)
 {
 	assert(wanderer);
 	assert(in_file);
-	assert(f);
+	assert(wf);
+	assert(pf);
 
 	//Set I/O
 	wanderer->input_file = in_file;
 	wanderer->output_file = out_file;		
 
-	//Set wandering function
-	wanderer->wander_f = f;
+	//Set functions
+	wanderer->wander_f = wf;
+	wanderer->processing_f = pf;
 
 	//Logging
 	LOG_INFO("Wanderer configured\n");
@@ -119,5 +144,7 @@ bwander_window_register(bam_wanderer_t *wanderer, bam_region_window_t *window)
 			window->region->chrom + 1, window->init_pos + 1,
 			window->end_pos + 1, window->size);
 	LOG_INFO(str);
+
+
 }
 

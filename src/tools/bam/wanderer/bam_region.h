@@ -68,5 +68,6 @@ EXTERNC void breg_load_window(bam_region_t *region, size_t init_pos, size_t end_
 EXTERNC void breg_window_init(bam_region_window_t *window);
 EXTERNC void breg_window_destroy(bam_region_window_t *window);
 EXTERNC void breg_window_filter(bam_region_window_t *window, uint8_t filters);
+EXTERNC void breg_window_clear(bam_region_window_t *window);
 
 #endif /* BAM_REGION_H_ */

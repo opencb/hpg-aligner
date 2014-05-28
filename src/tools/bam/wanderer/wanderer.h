@@ -15,6 +15,8 @@
 #include "aux/timestats.h"
 #include "bam_region.h"
 
+#define WANDERER_WINDOWS_MAX 1000
+
 #define WANDERER_SUCCESS 0
 #define WANDERER_IN_PROGRESS 1
 #define WANDERER_ERROR -1
@@ -23,6 +25,7 @@
  * WANDERING FUNCTION DEFINITION
  */
 typedef int (*wandering_function)(void *) ;
+typedef int (*processing_function)(void *) ;
 
 /**
  * BAM WANDERER STRUCT
@@ -35,8 +38,13 @@ typedef struct {
 	//Loaded reads
 	bam_region_t *current_region;
 
+	//Windows to process
+	bam_region_window_t *windows;
+	size_t windows_l;
+
 	//Function to execute
 	wandering_function wander_f;
+	processing_function processing_f;
 } bam_wanderer_t;
 
 /**
@@ -45,7 +53,7 @@ typedef struct {
 EXTERNC void bwander_init(bam_wanderer_t *wanderer);
 EXTERNC void bwander_destroy(bam_wanderer_t *wanderer);
 
-EXTERNC void bwander_configure(bam_wanderer_t *wanderer, bam_file_t *in_file, bam_file_t *out_file, wandering_function f);
+EXTERNC void bwander_configure(bam_wanderer_t *wanderer, bam_file_t *in_file, bam_file_t *out_file, wandering_function wf, processing_function pf);
 
 EXTERNC void bwander_run(bam_wanderer_t *wanderer);
 

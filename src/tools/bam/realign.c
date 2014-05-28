@@ -364,7 +364,7 @@ dummy_wander(bam_wanderer_t *wanderer)
 	size_t length;
 	bam1_t *read;
 	bam_region_t *region;
-	bam_region_window_t *window;
+	bam_region_window_t *global_window;
 	bam_region_window_t *aux_window;
 
 	//Current region
@@ -380,18 +380,22 @@ dummy_wander(bam_wanderer_t *wanderer)
 
 	region = wanderer->current_region;
 
+	//Allocate window
+	global_window = (bam_region_window_t *)malloc(sizeof(bam_region_window_t));
+	aux_window = (bam_region_window_t *)malloc(sizeof(bam_region_window_t));
+	breg_window_init(global_window);
+	breg_window_init(aux_window);
+
 	//Get global filtered window
-	window = (bam_region_window_t *)malloc(sizeof(bam_region_window_t));
-	breg_window_init(window);
 	breg_load_window(region, region->init_pos, region->end_pos,
-			FILTER_ZERO_QUAL | FILTER_DIFF_MATE_CHROM | FILTER_NO_CIGAR | FILTER_DEF_MASK, window);
+			FILTER_ZERO_QUAL | FILTER_DIFF_MATE_CHROM | FILTER_NO_CIGAR | FILTER_DEF_MASK, global_window);
 
 	//Process
-	length = window->size;
+	length = global_window->size;
 	for(i = 0; i < length; i++)
 	{
 		//Get next read
-		read = window->filter_reads[i];
+		read = global_window->filter_reads[i];
 		assert(read);
 
 		//Get read position
@@ -455,11 +459,10 @@ dummy_wander(bam_wanderer_t *wanderer)
 			{
 				//Interval end!
 				//Register new window
-				aux_window = (bam_region_window_t *)malloc(sizeof(bam_region_window_t));
-				breg_window_init(aux_window);
 				breg_load_window(region, init_pos, end_pos,
 						FILTER_ZERO_QUAL | FILTER_DIFF_MATE_CHROM | FILTER_NO_CIGAR | FILTER_DEF_MASK, aux_window);
 				bwander_window_register(wanderer, aux_window);
+				breg_window_clear(aux_window);
 
 				//Reset interval
 				reg_valid = 0;
@@ -473,11 +476,11 @@ dummy_wander(bam_wanderer_t *wanderer)
 	//Set alignments processed
 	region->processed = processed;
 
-	//printf("PROCESSED: %d\n", region->processed);
-
-	//Destroy global window
-	breg_window_destroy(window);
-	free(window);
+	//Destroy windows
+	breg_window_destroy(aux_window);
+	breg_window_destroy(global_window);
+	free(global_window);
+	free(aux_window);
 
 	//Return
 	if(region->size == 0)

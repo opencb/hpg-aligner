@@ -345,3 +345,16 @@ breg_window_filter(bam_region_window_t *window, uint8_t filters)
 		window->size++;
 	}
 }
+
+void
+breg_window_clear(bam_region_window_t *window)
+{
+	assert(window);
+
+	//Set all to zero
+	window->size = 0;
+	window->filter_flags = 0;
+	window->init_pos = 0;
+	window->end_pos = 0;
+	window->region = NULL;
+}
