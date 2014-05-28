@@ -54,7 +54,7 @@ breg_fill(bam_region_t *region, bam_file_t *input_file)
 {
 	int free_slots, i;
 	bam1_t *read;
-	size_t bytes;
+	int bytes;
 	size_t added;
 	int64_t end_pos = -1;
 
@@ -72,13 +72,13 @@ breg_fill(bam_region_t *region, bam_file_t *input_file)
 		LOG_ERROR("NOT ENOUGH FREE SLOTS, CANT FILL BUFFER. Aborting...\n");
 		abort();
 	}
-	printf("FREE SLOTS: %d\n", free_slots);
+	//printf("FREE SLOTS: %d\n", free_slots);
 
 	//Add next read
 	if(region->next_read != NULL)
 	{
-		sprintf(str, "NEXT at %d\n", region->size);
-		LOG_INFO(str);
+		//sprintf(str, "NEXT at %d\n", region->size);
+		//LOG_INFO(str);
 		region->reads[region->size] = region->next_read;
 		region->next_read = NULL;
 		region->size++;
@@ -87,8 +87,8 @@ breg_fill(bam_region_t *region, bam_file_t *input_file)
 	//Get first read
 	if(region->size > 0)
 	{
-		sprintf(str, "First read of %d reads\n", region->size);
-		LOG_INFO(str);
+		//sprintf(str, "First read of %d reads\n", region->size);
+		//LOG_INFO(str);
 		read = region->reads[0];
 	}
 	else
@@ -99,10 +99,17 @@ breg_fill(bam_region_t *region, bam_file_t *input_file)
 		bytes = bam_read1(input_file->bam_fd, read);
 
 		//Check
-		if(bytes == 0)
+		if(bytes <= 0)
 		{
 			//End of file
-			LOG_INFO("EOF\n");
+			if(bytes == -1)
+			{
+				LOG_INFO("EOF\n");
+			}
+			else
+			{
+				LOG_INFO("TRUNCATED\n");
+			}
 			bam_destroy1(read);
 			return;
 		}
@@ -147,7 +154,14 @@ breg_fill(bam_region_t *region, bam_file_t *input_file)
 		}
 		else
 		{
-			LOG_INFO("EOF\n");
+			if(bytes == -1)
+			{
+				LOG_INFO("EOF\n");
+			}
+			else
+			{
+				LOG_INFO("TRUNCATED\n");
+			}
 			bam_destroy1(read);
 			read = NULL;
 			break;
@@ -157,7 +171,7 @@ breg_fill(bam_region_t *region, bam_file_t *input_file)
 	//Update region size
 	added = region->size - added;
 
-	printf("ADDED: %d - SIZE: %d\n", added, region->size);
+	//printf("ADDED: %d - SIZE: %d\n", added, region->size);
 
 	//Set region end locus
 	region->end_pos = region->reads[region->size - 1]->core.pos;
@@ -204,8 +218,8 @@ breg_write_processed(bam_region_t *region, bam_file_t *output_file)
 	region->size -= region->processed;
 	if(region->size > 0)
 	{
-		sprintf(str, "Moving %d from index %d, new size: %d\n", region->size, region->processed, region->size);
-		LOG_INFO(str);
+		//sprintf(str, "Moving %d from index %d, new size: %d\n", region->size, region->processed, region->size);
+		//LOG_INFO(str);
 
 		memmove(region->reads, region->reads + region->processed, region->size * sizeof(bam1_t *));
 		memset(region->reads + region->size, 0, (region->max_size - region->size) * sizeof(bam1_t *));

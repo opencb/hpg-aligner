@@ -14,7 +14,7 @@
 #include "aux/aux_library.h"
 #include "aux/timestats.h"
 
-#define BAM_REGION_DEFAULT_SIZE 10000
+#define BAM_REGION_DEFAULT_SIZE 100000
 
 #define FILTER_ZERO_QUAL 1
 #define FILTER_DIFF_MATE_CHROM 2

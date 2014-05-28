@@ -358,34 +358,124 @@ align_launch(char *reference, char *bam, char *output, int threads)
 int
 dummy_wander(bam_wanderer_t *wanderer)
 {
+	int i, err;
+	int processed = 0;
+	char str[256];
+	size_t length;
+	bam1_t *read;
 	bam_region_t *region;
 	bam_region_window_t *window;
+	bam_region_window_t *aux_window;
+
+	//Current region
+	int reg_valid = 0;
+	size_t init_pos = SIZE_MAX;
+	size_t end_pos = SIZE_MAX;
+	size_t aux_init_pos;
+	size_t aux_end_pos;
+	size_t read_pos;
 
 	assert(wanderer);
 	assert(wanderer->current_region);
 
 	region = wanderer->current_region;
 
-	//Process
-	int val = region->size - 100;
-	if(val > 0)
-		region->processed = val;
-	else
-		region->processed = region->size;
-
-	printf("PROCESSED: %d\n", region->processed);
-
-	//Init window
+	//Get global filtered window
 	window = (bam_region_window_t *)malloc(sizeof(bam_region_window_t));
 	breg_window_init(window);
-
-	//Load window
 	breg_load_window(region, region->init_pos, region->end_pos,
 			FILTER_ZERO_QUAL | FILTER_DIFF_MATE_CHROM | FILTER_NO_CIGAR | FILTER_DEF_MASK, window);
 
-	//Register window
-	bwander_window_register(wanderer, window);
+	//Process
+	length = window->size;
+	for(i = 0; i < length; i++)
+	{
+		//Get next read
+		read = window->filter_reads[i];
+		assert(read);
 
+		//Get read position
+		read_pos = read->core.pos;
+
+		//Obtain intervals
+		//Cases
+		if(reg_valid == 0)
+		{
+			//NO INTERVAL CASE
+
+			//Get interval for this alignment
+			err = region_get_from_bam1(read, &aux_init_pos, &aux_end_pos);
+			if(err)
+			{
+				sprintf(str, "Trying to get region from invalid read: %s\n", bam1_qname(read));
+				LOG_ERROR(str);
+				return INVALID_INPUT_BAM;
+			}
+
+			//This alignment have an interval?
+			if(aux_init_pos != SIZE_MAX)
+			{
+				//Interval found
+				//Set interval values
+				init_pos = aux_init_pos;
+				end_pos = aux_end_pos;
+				reg_valid = 1;
+
+				assert(init_pos <= end_pos);
+			}
+
+		}
+		else
+		{
+			//INTERVAL CASE
+
+			//Is alignment inside interval?
+			if (end_pos > read_pos && region->chrom == read->core.tid)
+			{
+				//Get interval for this alignment
+				region_get_from_bam1(read, &aux_init_pos, &aux_end_pos);
+
+				//This alignment have an interval?
+				if(aux_init_pos != SIZE_MAX)
+				{
+					//Interval found
+					//Set interval begin
+					if(aux_init_pos < init_pos)
+						init_pos = aux_init_pos;
+
+					//Set interval end
+					if(aux_end_pos > end_pos)
+						end_pos = aux_end_pos;
+
+					//Check
+					assert(init_pos <= end_pos);
+				}
+			}
+			else //Alignment past interval
+			{
+				//Interval end!
+				//Register new window
+				aux_window = (bam_region_window_t *)malloc(sizeof(bam_region_window_t));
+				breg_window_init(aux_window);
+				breg_load_window(region, init_pos, end_pos,
+						FILTER_ZERO_QUAL | FILTER_DIFF_MATE_CHROM | FILTER_NO_CIGAR | FILTER_DEF_MASK, aux_window);
+				bwander_window_register(wanderer, aux_window);
+
+				//Reset interval
+				reg_valid = 0;
+				init_pos = SIZE_MAX;
+				end_pos = SIZE_MAX;
+				processed = i + 1;
+			}
+		}//Cases if
+	}
+
+	//Set alignments processed
+	region->processed = processed;
+
+	//printf("PROCESSED: %d\n", region->processed);
+
+	//Destroy global window
 	breg_window_destroy(window);
 	free(window);
 
