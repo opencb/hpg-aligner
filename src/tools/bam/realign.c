@@ -356,11 +356,10 @@ align_launch(char *reference, char *bam, char *output, int threads)
 }
 
 int
-dummy_wander(bam_wanderer_t *wanderer)
+realign_wanderer(bam_wanderer_t *wanderer)
 {
 	int i, err;
 	int processed = 0;
-	char str[256];
 	size_t length;
 	bam1_t *read;
 	bam_region_t *region;
@@ -411,8 +410,7 @@ dummy_wander(bam_wanderer_t *wanderer)
 			err = region_get_from_bam1(read, &aux_init_pos, &aux_end_pos);
 			if(err)
 			{
-				sprintf(str, "Trying to get region from invalid read: %s\n", bam1_qname(read));
-				LOG_ERROR(str);
+				LOG_ERROR_F("Trying to get region from invalid read: %s\n", bam1_qname(read));
 				return INVALID_INPUT_BAM;
 			}
 
@@ -461,8 +459,21 @@ dummy_wander(bam_wanderer_t *wanderer)
 				//Register new window
 				breg_load_window(region, init_pos, end_pos,
 						FILTER_ZERO_QUAL | FILTER_DIFF_MATE_CHROM | FILTER_NO_CIGAR | FILTER_DEF_MASK, aux_window);
-				bwander_window_register(wanderer, aux_window);
+				err = bwander_window_register(wanderer, aux_window);
 				breg_window_clear(aux_window);
+
+				if(err)
+				{
+					if(err == WANDER_WINDOW_BUFFER_FULL)
+					{
+						//Window buffer is full so break for
+						break;
+					}
+					else
+					{
+						LOG_FATAL_F("Fatal error: %d\n", err);
+					}
+				}
 
 				//Reset interval
 				reg_valid = 0;
@@ -474,7 +485,7 @@ dummy_wander(bam_wanderer_t *wanderer)
 	}
 
 	//Set alignments processed
-	region->processed = processed;
+	wanderer->processed = processed;
 
 	//Destroy windows
 	breg_window_destroy(aux_window);
@@ -487,6 +498,24 @@ dummy_wander(bam_wanderer_t *wanderer)
 		return WANDERER_SUCCESS;
 	else
 		return WANDERER_IN_PROGRESS;
+}
+
+int
+realign_processor(bam_wanderer_t *wanderer, bam_region_window_t *window)
+{
+	int i;
+
+	assert(wanderer);
+	assert(window);
+
+	LOG_INFO_F("Processing over window %d:%d-%d with %d reads\n", wanderer->current_region->chrom + 1, window->init_pos + 1, window->end_pos +1, window->size);
+
+	for(i = 0; i < window->size; i++)
+	{
+		assert(window->filter_reads[i]);
+	}
+
+	return NO_ERROR;
 }
 
 ERROR_CODE
@@ -533,13 +562,14 @@ wander_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 		printf("New BAM initialized!...\n");
 	}
 
-	LOG_VERBOSE(1);
+	//LOG_VERBOSE(1);
+	LOG_LEVEL(LOG_WARN_LEVEL);
 
 	//Init wandering
 	bwander_init(&wanderer);
 
 	//Configure wanderer
-	bwander_configure(&wanderer, bam_f, out_bam_f, (int (*)(void *))dummy_wander);
+	bwander_configure(&wanderer, bam_f, out_bam_f, (int (*)(void *))realign_wanderer, (int (*)(void *, void *))realign_processor);
 
 	//Run wander
 	bwander_run(&wanderer);

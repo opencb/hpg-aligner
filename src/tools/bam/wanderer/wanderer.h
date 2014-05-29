@@ -24,8 +24,8 @@
 /**
  * WANDERING FUNCTION DEFINITION
  */
-typedef int (*wandering_function)(void *) ;
-typedef int (*processing_function)(void *) ;
+typedef int (*wanderer_function)(void *) ;
+typedef int (*processor_function)(void *, void *) ;
 
 /**
  * BAM WANDERER STRUCT
@@ -37,14 +37,15 @@ typedef struct {
 
 	//Loaded reads
 	bam_region_t *current_region;
+	size_t processed;
 
 	//Windows to process
 	bam_region_window_t *windows;
 	size_t windows_l;
 
 	//Function to execute
-	wandering_function wander_f;
-	processing_function processing_f;
+	wanderer_function wander_f;
+	processor_function processing_f;
 } bam_wanderer_t;
 
 /**
@@ -53,13 +54,14 @@ typedef struct {
 EXTERNC void bwander_init(bam_wanderer_t *wanderer);
 EXTERNC void bwander_destroy(bam_wanderer_t *wanderer);
 
-EXTERNC void bwander_configure(bam_wanderer_t *wanderer, bam_file_t *in_file, bam_file_t *out_file, wandering_function wf, processing_function pf);
+EXTERNC void bwander_configure(bam_wanderer_t *wanderer, bam_file_t *in_file, bam_file_t *out_file, wanderer_function wf, processor_function pf);
 
 EXTERNC void bwander_run(bam_wanderer_t *wanderer);
 
 /**
- * REGISTER WINDOW
+ * WINDOWS
  */
-EXTERNC void bwander_window_register(bam_wanderer_t *wanderer, bam_region_window_t *window);
+EXTERNC int bwander_window_register(bam_wanderer_t *wanderer, bam_region_window_t *window);
+EXTERNC void bwander_window_clear(bam_wanderer_t *wanderer);
 
 #endif /* WANDERER_H_ */
