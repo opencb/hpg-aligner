@@ -356,15 +356,11 @@ align_launch(char *reference, char *bam, char *output, int threads)
 }
 
 int
-realign_wanderer(bam_wanderer_t *wanderer)
+realign_wanderer(bam_wanderer_t *wanderer, bam_region_t *current_region, bam1_t *read)
 {
 	int i, err;
 	int processed = 0;
 	size_t length;
-	bam1_t *read;
-	bam_region_t *region;
-	bam_region_window_t *global_window;
-	bam_region_window_t *aux_window;
 
 	//Current region
 	int reg_valid = 0;
@@ -375,144 +371,84 @@ realign_wanderer(bam_wanderer_t *wanderer)
 	size_t read_pos;
 
 	assert(wanderer);
-	assert(wanderer->current_region);
+	assert(current_region);
+	assert(read);
 
-	region = wanderer->current_region;
-
-	//Allocate window
-	global_window = (bam_region_window_t *)malloc(sizeof(bam_region_window_t));
-	aux_window = (bam_region_window_t *)malloc(sizeof(bam_region_window_t));
-	breg_window_init(global_window);
-	breg_window_init(aux_window);
-
-	//Get global filtered window
-	breg_load_window(region, region->init_pos, region->end_pos,
-			FILTER_ZERO_QUAL | FILTER_DIFF_MATE_CHROM | FILTER_NO_CIGAR | FILTER_DEF_MASK, global_window);
-
-	//Process
-	length = global_window->size;
-	for(i = 0; i < length; i++)
+	//Filter read
+	if(filter_read(read, FILTER_ZERO_QUAL | FILTER_DIFF_MATE_CHROM | FILTER_NO_CIGAR | FILTER_DEF_MASK))
 	{
-		//Get next read
-		read = global_window->filter_reads[i];
-		assert(read);
-
-		//Get read position
-		read_pos = read->core.pos;
-
-		//Obtain intervals
-		//Cases
-		if(reg_valid == 0)
-		{
-			//NO INTERVAL CASE
-
-			//Get interval for this alignment
-			err = region_get_from_bam1(read, &aux_init_pos, &aux_end_pos);
-			if(err)
-			{
-				LOG_ERROR_F("Trying to get region from invalid read: %s\n", bam1_qname(read));
-				return INVALID_INPUT_BAM;
-			}
-
-			//This alignment have an interval?
-			if(aux_init_pos != SIZE_MAX)
-			{
-				//Interval found
-				//Set interval values
-				init_pos = aux_init_pos;
-				end_pos = aux_end_pos;
-				reg_valid = 1;
-
-				assert(init_pos <= end_pos);
-			}
-
-		}
-		else
-		{
-			//INTERVAL CASE
-
-			//Is alignment inside interval?
-			if (end_pos > read_pos && region->chrom == read->core.tid)
-			{
-				//Get interval for this alignment
-				region_get_from_bam1(read, &aux_init_pos, &aux_end_pos);
-
-				//This alignment have an interval?
-				if(aux_init_pos != SIZE_MAX)
-				{
-					//Interval found
-					//Set interval begin
-					if(aux_init_pos < init_pos)
-						init_pos = aux_init_pos;
-
-					//Set interval end
-					if(aux_end_pos > end_pos)
-						end_pos = aux_end_pos;
-
-					//Check
-					assert(init_pos <= end_pos);
-				}
-			}
-			else //Alignment past interval
-			{
-				//Interval end!
-				//Register new window
-				breg_load_window(region, init_pos, end_pos,
-						FILTER_ZERO_QUAL | FILTER_DIFF_MATE_CHROM | FILTER_NO_CIGAR | FILTER_DEF_MASK, aux_window);
-				err = bwander_window_register(wanderer, aux_window);
-				breg_window_clear(aux_window);
-
-				if(err)
-				{
-					if(err == WANDER_WINDOW_BUFFER_FULL)
-					{
-						//Window buffer is full so break for
-						break;
-					}
-					else
-					{
-						LOG_FATAL_F("Fatal error: %d\n", err);
-					}
-				}
-
-				//Reset interval
-				reg_valid = 0;
-				init_pos = SIZE_MAX;
-				end_pos = SIZE_MAX;
-				processed = i + 1;
-			}
-		}//Cases if
+		//Read is not valid for process
+		return WANDER_READ_FILTERED;
 	}
 
-	//Set alignments processed
-	wanderer->processed = processed;
+	//Get read position
+	read_pos = read->core.pos;
 
-	//Destroy windows
-	breg_window_destroy(aux_window);
-	breg_window_destroy(global_window);
-	free(global_window);
-	free(aux_window);
+	//Has region an init position?
+	/*if(current_region->init_pos == SIZE_MAX)
+	{
+		current_region->chrom = read->core.tid;
+		current_region->init_pos = read_pos;
+	}*/
 
-	//Return
-	if(region->size == 0)
-		return WANDERER_SUCCESS;
-	else
-		return WANDERER_IN_PROGRESS;
+	//Inside this region?
+	if(current_region->end_pos != SIZE_MAX)
+	{
+		if(	current_region->chrom != read->core.tid
+				|| current_region->end_pos < read->core.pos)
+		{
+			LOG_INFO_F("READ %d:%d\n",
+					read->core.tid + 1, read->core.pos + 1);
+			//Not in window region
+			return WANDER_REGION_CHANGED;
+		}
+	}
+
+	//Get interval for this alignment
+	err = region_get_from_bam1(read, &aux_init_pos, &aux_end_pos);
+	if(err)
+	{
+		LOG_ERROR_F("Trying to get region from invalid read: %s\n", bam1_qname(read));
+		return INVALID_INPUT_BAM;
+	}
+
+	//This alignment have an interval?
+	if(aux_end_pos != SIZE_MAX)
+	{
+		//Interval found
+
+		//Update region chrom
+		current_region->chrom = read->core.tid;
+
+		//Update region start position
+		if(current_region->init_pos == SIZE_MAX || current_region->init_pos > aux_init_pos)
+		{
+			current_region->init_pos = aux_init_pos;
+		}
+
+		//Update region end position
+		if(current_region->end_pos == SIZE_MAX || current_region->end_pos < aux_end_pos)
+		{
+			current_region->end_pos = aux_end_pos;
+		}
+	}
+
+	return NO_ERROR;
 }
 
 int
-realign_processor(bam_wanderer_t *wanderer, bam_region_window_t *window)
+realign_processor(bam_wanderer_t *wanderer, bam_region_t *region)
 {
 	int i;
 
 	assert(wanderer);
-	assert(window);
+	assert(region);
 
-	LOG_INFO_F("Processing over window %d:%d-%d with %d reads\n", wanderer->current_region->chrom + 1, window->init_pos + 1, window->end_pos +1, window->size);
+	LOG_INFO_F("Processing over window %d:%d-%d with %d reads\n", region->chrom + 1, region->init_pos + 1, region->end_pos +1, region->size);
 
-	for(i = 0; i < window->size; i++)
+	for(i = 0; i < region->size; i++)
 	{
-		assert(window->filter_reads[i]);
+		assert(region->reads[i]);
 	}
 
 	return NO_ERROR;
@@ -562,14 +498,16 @@ wander_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 		printf("New BAM initialized!...\n");
 	}
 
-	//LOG_VERBOSE(1);
-	LOG_LEVEL(LOG_WARN_LEVEL);
+	LOG_VERBOSE(1);
+	//LOG_LEVEL(LOG_WARN_LEVEL);
 
 	//Init wandering
 	bwander_init(&wanderer);
 
 	//Configure wanderer
-	bwander_configure(&wanderer, bam_f, out_bam_f, (int (*)(void *))realign_wanderer, (int (*)(void *, void *))realign_processor);
+	bwander_configure(&wanderer, bam_f, out_bam_f,
+			(int (*)(void *, bam_region_t *, bam1_t *))realign_wanderer,
+			(int (*)(void *, bam_region_t *))realign_processor);
 
 	//Run wander
 	bwander_run(&wanderer);

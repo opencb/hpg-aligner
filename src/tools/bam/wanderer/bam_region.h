@@ -14,7 +14,7 @@
 #include "aux/aux_library.h"
 #include "aux/timestats.h"
 
-#define BAM_REGION_DEFAULT_SIZE 100000
+#define BAM_REGION_DEFAULT_SIZE 1000
 
 #define FILTER_ZERO_QUAL 1
 #define FILTER_DIFF_MATE_CHROM 2
@@ -32,6 +32,7 @@ typedef struct {
 	size_t size;
 	size_t max_size;
 	bam1_t *next_read;
+	size_t processed;
 
 	//Locus
 	size_t init_pos;
@@ -39,34 +40,24 @@ typedef struct {
 	int chrom;
 } bam_region_t;
 
-typedef struct {
-	bam_region_t *region;
-	bam1_t **filter_reads;
-	size_t size;
-	uint8_t filter_flags;
-
-	//Locus
-	size_t init_pos;
-	size_t end_pos;
-} bam_region_window_t;
-
 /**
  * REGION OPERATIONS
  */
 EXTERNC void breg_init(bam_region_t *region);
 EXTERNC void breg_destroy(bam_region_t *region, int free_bam);
 
-EXTERNC int breg_fill(bam_region_t *region, bam_file_t *input_file);
+//EXTERNC int breg_fill(bam_region_t *region, bam_file_t *input_file);
 EXTERNC void breg_write_n(bam_region_t *region, size_t n, bam_file_t *output_file);
 
-EXTERNC void breg_load_window(bam_region_t *region, size_t init_pos, size_t end_pos, uint8_t filters, bam_region_window_t *window);
+//EXTERNC void breg_load_window(bam_region_t *region, size_t init_pos, size_t end_pos, uint8_t filters, bam_region_window_t *window);
+//EXTERNC void breg_load_subwindow(bam_region_window_t *window, size_t init_pos, size_t end_pos, bam_region_window_t *out_window);
 
 /**
  * WINDOW OPERATIONS
  */
-EXTERNC void breg_window_init(bam_region_window_t *window);
+/*EXTERNC void breg_window_init(bam_region_window_t *window);
 EXTERNC void breg_window_destroy(bam_region_window_t *window);
 EXTERNC void breg_window_filter(bam_region_window_t *window, uint8_t filters);
-EXTERNC void breg_window_clear(bam_region_window_t *window);
+EXTERNC void breg_window_clear(bam_region_window_t *window);*/
 
 #endif /* BAM_REGION_H_ */

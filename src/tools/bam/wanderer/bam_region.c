@@ -20,6 +20,11 @@ breg_init(bam_region_t *region)
 	assert(region->reads);
 	memset(region->reads, 0, BAM_REGION_DEFAULT_SIZE * sizeof(bam1_t *));
 	region->max_size = BAM_REGION_DEFAULT_SIZE;
+
+	//Default values
+	region->chrom = EMPTY_CHROM;
+	region->init_pos = SIZE_MAX;
+	region->end_pos = SIZE_MAX;
 }
 
 void
@@ -49,7 +54,7 @@ breg_destroy(bam_region_t *region, int free_bam)
 	}
 }
 
-int
+/*int
 breg_fill(bam_region_t *region, bam_file_t *input_file)
 {
 	int free_slots, i, err;
@@ -67,7 +72,8 @@ breg_fill(bam_region_t *region, bam_file_t *input_file)
 	free_slots = region->max_size - region->size;
 	if(free_slots == 0)
 	{
-		LOG_FATAL("NOT ENOUGH FREE SLOTS, CANT FILL BUFFER. Aborting...\n");
+		LOG_INFO("Not enough free bam1_t slots, cant fill buffer.\n");
+		return WANDER_READ_BUFFER_FULL;
 	}
 	//printf("FREE SLOTS: %d\n", free_slots);
 
@@ -179,7 +185,7 @@ breg_fill(bam_region_t *region, bam_file_t *input_file)
 	region->end_pos = region->reads[region->size - 1]->core.pos;
 
 	return err;
-}
+}*/
 
 //Private compare function
 static int compare_pos(const void *item1, const void *item2) {
@@ -227,7 +233,7 @@ breg_write_n(bam_region_t *region, size_t n, bam_file_t *output_file)
 	}
 }
 
-void
+/*void
 breg_load_window(bam_region_t *region, size_t init_pos, size_t end_pos, uint8_t filters, bam_region_window_t *window)
 {
 	assert(region);
@@ -242,10 +248,75 @@ breg_load_window(bam_region_t *region, size_t init_pos, size_t end_pos, uint8_t 
 	breg_window_filter(window, filters);
 }
 
+void
+breg_load_subwindow(bam_region_window_t *window, size_t init_pos, size_t end_pos, bam_region_window_t *out_window)
+{
+	int i;
+	bam1_t *read;
+	size_t reads_l;
+
+	assert(window);
+	assert(window->region);
+	assert(window->filter_reads);
+	assert(out_window);
+	assert(out_window->filter_reads);
+
+	//Clean filter
+	out_window->size = 0;
+
+	//Setup window
+	out_window->region = window->region;
+	out_window->init_pos = init_pos;
+	out_window->end_pos = end_pos;
+
+	//Iterate reads
+	reads_l = window->size;
+	for(i = 0; i < reads_l; i++)
+	{
+		//Check size
+		if(out_window->size >= BAM_REGION_DEFAULT_SIZE)
+		{
+			LOG_WARN("Window bam1_t buffer is full\n");
+			break;
+		}
+
+		//Get next read
+		read = window->filter_reads[i];
+		if(read == NULL)
+		{
+			printf("ERROR en lectura: %d\n", i);
+			continue;
+		}
+
+		//Check window region
+		if(out_window->region->chrom != EMPTY_CHROM)
+		{
+			//Is before window region?
+			if(	out_window->region->chrom != read->core.tid
+					|| out_window->init_pos > read->core.pos + read->core.l_qseq)
+			{
+				//Before window region
+				continue;
+			}
+
+			//Is after window region?
+			if(out_window->end_pos < read->core.pos)
+			{
+				//After window region so skip (is ordered)
+				break;
+			}
+		}
+
+		//Read is valid and inside region
+		out_window->filter_reads[out_window->size] = read;
+		out_window->size++;
+	}
+}*/
+
 /**
  * WINDOW OPERATIONS
  */
-void
+/*void
 breg_window_init(bam_region_window_t *window)
 {
 	assert(window);
@@ -288,7 +359,7 @@ breg_window_filter(bam_region_window_t *window, uint8_t filters)
 	//Iterate reads
 	region = window->region;
 	reads_l = region->size;
-	for(i = 0; i < reads_l; i++)
+	for(i = reads_l - 1; i >= 0; i--)
 	{
 		//Check size
 		if(window->size >= BAM_REGION_DEFAULT_SIZE)
@@ -306,6 +377,7 @@ breg_window_filter(bam_region_window_t *window, uint8_t filters)
 		}
 
 		//Filter read
+		if(filters != 0)
 		{
 			if(filters & FILTER_ZERO_QUAL)
 			{
@@ -362,4 +434,4 @@ breg_window_clear(bam_region_window_t *window)
 	window->init_pos = 0;
 	window->end_pos = 0;
 	window->region = NULL;
-}
+}*/
