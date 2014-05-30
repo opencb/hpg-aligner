@@ -9,6 +9,7 @@
 #define BAM_REGION_H_
 
 #include <assert.h>
+#include <omp.h>
 
 #include "aux/aux_common.h"
 #include "aux/aux_library.h"
@@ -28,16 +29,18 @@
  *	REGION STRUCT
  */
 typedef struct {
+	//Reads
 	bam1_t **reads;
 	size_t size;
 	size_t max_size;
-	bam1_t *next_read;
-	size_t processed;
 
 	//Locus
 	size_t init_pos;
 	size_t end_pos;
 	int chrom;
+
+	//Lock
+	omp_lock_t lock;
 } bam_region_t;
 
 /**

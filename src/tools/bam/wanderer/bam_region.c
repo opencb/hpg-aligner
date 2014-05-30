@@ -21,10 +21,17 @@ breg_init(bam_region_t *region)
 	memset(region->reads, 0, BAM_REGION_DEFAULT_SIZE * sizeof(bam1_t *));
 	region->max_size = BAM_REGION_DEFAULT_SIZE;
 
+	//Init lock
+	omp_init_lock(&region->lock);
+
+	omp_set_lock(&region->lock);
+
 	//Default values
 	region->chrom = EMPTY_CHROM;
 	region->init_pos = SIZE_MAX;
 	region->end_pos = SIZE_MAX;
+
+	omp_unset_lock(&region->lock);
 }
 
 void
@@ -34,6 +41,8 @@ breg_destroy(bam_region_t *region, int free_bam)
 	bam1_t *read;
 
 	assert(region);
+
+	omp_set_lock(&region->lock);
 
 	//Free reads
 	if(region->reads)
@@ -52,6 +61,11 @@ breg_destroy(bam_region_t *region, int free_bam)
 		free(region->reads);
 		region->reads = NULL;
 	}
+
+	omp_unset_lock(&region->lock);
+
+	//Destroy lock
+	omp_destroy_lock(&region->lock);
 }
 
 /*int
@@ -207,6 +221,7 @@ breg_write_n(bam_region_t *region, size_t n, bam_file_t *output_file)
 	LOG_INFO_F("Writing %d processed reads\n", n);
 
 	//Sort reads
+	omp_set_lock(&region->lock);
 	qsort(region->reads, n, sizeof(void *), compare_pos);
 
 	//Iterate reads
@@ -231,6 +246,8 @@ breg_write_n(bam_region_t *region, size_t n, bam_file_t *output_file)
 		memmove(region->reads, region->reads + n, region->size * sizeof(bam1_t *));
 		memset(region->reads + region->size, 0, (region->max_size - region->size) * sizeof(bam1_t *));
 	}
+
+	omp_unset_lock(&region->lock);
 }
 
 /*void

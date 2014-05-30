@@ -356,22 +356,17 @@ align_launch(char *reference, char *bam, char *output, int threads)
 }
 
 int
-realign_wanderer(bam_wanderer_t *wanderer, bam_region_t *current_region, bam1_t *read)
+realign_wanderer(bam_wanderer_t *wanderer, bam_region_t *region, bam1_t *read)
 {
 	int i, err;
-	int processed = 0;
-	size_t length;
 
 	//Current region
-	int reg_valid = 0;
-	size_t init_pos = SIZE_MAX;
-	size_t end_pos = SIZE_MAX;
 	size_t aux_init_pos;
 	size_t aux_end_pos;
 	size_t read_pos;
 
 	assert(wanderer);
-	assert(current_region);
+	assert(region);
 	assert(read);
 
 	//Filter read
@@ -384,21 +379,12 @@ realign_wanderer(bam_wanderer_t *wanderer, bam_region_t *current_region, bam1_t 
 	//Get read position
 	read_pos = read->core.pos;
 
-	//Has region an init position?
-	/*if(current_region->init_pos == SIZE_MAX)
-	{
-		current_region->chrom = read->core.tid;
-		current_region->init_pos = read_pos;
-	}*/
-
 	//Inside this region?
-	if(current_region->end_pos != SIZE_MAX)
+	if(region->end_pos != SIZE_MAX)
 	{
-		if(	current_region->chrom != read->core.tid
-				|| current_region->end_pos < read->core.pos)
+		if(	region->chrom != read->core.tid
+				|| region->end_pos < read->core.pos)
 		{
-			LOG_INFO_F("READ %d:%d\n",
-					read->core.tid + 1, read->core.pos + 1);
 			//Not in window region
 			return WANDER_REGION_CHANGED;
 		}
@@ -413,23 +399,23 @@ realign_wanderer(bam_wanderer_t *wanderer, bam_region_t *current_region, bam1_t 
 	}
 
 	//This alignment have an interval?
-	if(aux_end_pos != SIZE_MAX)
+	if(aux_init_pos != SIZE_MAX && aux_end_pos != SIZE_MAX)
 	{
 		//Interval found
 
 		//Update region chrom
-		current_region->chrom = read->core.tid;
+		region->chrom = read->core.tid;
 
 		//Update region start position
-		if(current_region->init_pos == SIZE_MAX || current_region->init_pos > aux_init_pos)
+		if(region->init_pos == SIZE_MAX || region->init_pos > aux_init_pos)
 		{
-			current_region->init_pos = aux_init_pos;
+			region->init_pos = aux_init_pos;
 		}
 
 		//Update region end position
-		if(current_region->end_pos == SIZE_MAX || current_region->end_pos < aux_end_pos)
+		if(region->end_pos == SIZE_MAX || region->end_pos < aux_end_pos)
 		{
-			current_region->end_pos = aux_end_pos;
+			region->end_pos = aux_end_pos;
 		}
 	}
 
@@ -444,7 +430,7 @@ realign_processor(bam_wanderer_t *wanderer, bam_region_t *region)
 	assert(wanderer);
 	assert(region);
 
-	LOG_INFO_F("Processing over window %d:%d-%d with %d reads\n", region->chrom + 1, region->init_pos + 1, region->end_pos +1, region->size);
+	LOG_INFO_F("Processing over region %d:%d-%d with %d reads\n", region->chrom + 1, region->init_pos + 1, region->end_pos +1, region->size);
 
 	for(i = 0; i < region->size; i++)
 	{
