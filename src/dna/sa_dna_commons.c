@@ -232,6 +232,201 @@ void filter_cals_by_max_num_mismatches(int min_num_mismatches, array_list_t **li
 }
 
 //--------------------------------------------------------------------
+//--------------------------------------------------------------------
+
+typedef struct sort_cal {
+  int index;
+  seed_cal_t *cal;
+} sort_cal_t;
+
+//--------------------------------------------------------------------
+
+int sort_cal_cmp(const void *a, const void *b) {
+  seed_cal_t *cal_a = ((sort_cal_t*) a)->cal;
+  seed_cal_t *cal_b = ((sort_cal_t*) b)->cal;
+
+  return (cal_b->score - cal_a->score);
+}
+
+//--------------------------------------------------------------------
+
+int sort_cal_cmp2(const void *a, const void *b) {
+  seed_cal_t *cal_a = ((sort_cal_t*) a)->cal;
+  seed_cal_t *cal_b = ((sort_cal_t*) b)->cal;
+
+  int res = cal_b->read_area - cal_a->read_area;
+  if (res == 0) {
+    res = cal_a->num_mismatches - cal_b->num_mismatches;
+  }
+  return res;
+}
+
+//--------------------------------------------------------------------
+
+int compute_num_hits(int threshold, int num_cals, sort_cal_t *sort_cals) {
+  int num_hits = 1;
+  seed_cal_t *best_cal = sort_cals[0].cal;
+  for (int i = 1; i < num_cals; i++) {
+    /*
+    printf("abs(best_cal->score %i - sort_cals[i].cal->score %i) = %i\n",
+	   (int)best_cal->score, (int)sort_cals[i].cal->score, abs((int)best_cal->score - (int)sort_cals[i].cal->score));
+    */
+    if (abs((int)best_cal->score - (int)sort_cals[i].cal->score) < threshold) {
+      num_hits++;
+    }
+  }
+  return num_hits;
+}
+
+//--------------------------------------------------------------------
+
+int compute_mapq(seed_cal_t *best_cal, seed_cal_t *second_cal, int num_hits) {
+  int mapq = 0;
+  int second_score = (second_cal == NULL) ? 18 : second_cal->score;
+
+  if (second_score >= best_cal->score) return 0;
+
+  double identity, tmp;
+  identity = 1. - (double) (best_cal->read_area - best_cal->score) / 5.0 / best_cal->read_area;
+  tmp = best_cal->read_area < 50 ? 1. : 3.9120 / log(best_cal->read_area);
+  tmp *= identity * identity;
+  mapq = (int) (6.02 * (best_cal->score - second_score) * tmp * tmp + .499);
+  //mapq = (int) (4.02 * (best_cal->score - second_score) * tmp * tmp + .499);
+
+  if (num_hits > 1) mapq -= (int)(4.343 * log(num_hits) + .499);
+  
+  if (mapq > 60) mapq = 60;
+  if (mapq < 0) mapq = 0;
+
+  return mapq;
+}
+
+//--------------------------------------------------------------------
+
+void select_best_cals(fastq_read_t *read, array_list_t **cal_list) {
+
+  int mapq, num_hits = 1;
+  int num_cals = array_list_size(*cal_list);
+
+  if (num_cals == 0) return;
+
+  seed_cal_t *cal, *first_cal, *second_cal = NULL;
+  sort_cal_t *sort_cal;
+
+  sort_cal_t sort_cals[num_cals];
+  for (int i = 0; i < num_cals; i++) {
+    cal = array_list_get(i, *cal_list);
+    sort_cals[i].index = i;
+    sort_cals[i].cal = cal;
+  }
+
+  if (num_cals > 1) {
+    /*
+    printf("before sorting...\n");
+    for (int i = 0; i < num_cals; i++) {
+      seed_cal_print(sort_cals[i].cal);
+    }
+    */
+    qsort(sort_cals, num_cals, sizeof(sort_cal_t), sort_cal_cmp);
+    second_cal = sort_cals[1].cal;
+
+    num_hits = compute_num_hits(7, num_cals, sort_cals);
+  }
+  first_cal = sort_cals[0].cal;
+
+  mapq = compute_mapq(first_cal, second_cal, num_hits);
+
+  /*
+  printf("--------------------------------------------------------------------\n");
+  printf("after sorting (num_cals = %i, mapq = %i, num_hits = %i)...\n", 
+	 num_cals, mapq, num_hits);
+  printf("--------------------------------------------------------------------\n");
+  for (int i = 0; i < num_cals; i++) {
+    seed_cal_print(sort_cals[i].cal);
+  }
+*/
+  /*
+  printf("--------------------------------------------------------------------\n");
+  printf("after sorting and trimming (mapq = %i, first score = %0.2f, second score = %0.2f, num_hits = %i) %s ...\n", 
+	 mapq, (first_cal == NULL ? -99999.9f : first_cal->score), (second_cal == NULL ? -99999.9f : second_cal->score), num_hits,
+	 first_cal->read->sequence);
+  printf("--------------------------------------------------------------------\n");
+  printf("first CAL:\n");
+  seed_cal_print(first_cal);
+  if (second_cal) {
+    printf("second CAL:\n");
+    seed_cal_print(second_cal);
+    for (int i = 2; i < num_hits; i++) {
+      seed_cal_print(sort_cals[i].cal);
+      if (i == 9) {
+	if (num_hits - (i + 1) > 0) {
+	  printf("\t...\n\t...and %i more\n", num_hits - (i + 1));
+	}
+	break;
+      }
+    }
+  }
+  */
+  if (num_cals > 1) {
+    if (mapq > 0) num_hits = 1;
+    array_list_t *new_cal_list = array_list_new(num_hits, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
+    for (int i = 0; i < num_hits; i++) {
+      sort_cals[i].cal->mapq = mapq;
+      array_list_insert(sort_cals[i].cal, new_cal_list);	
+      array_list_set(sort_cals[i].index, NULL, *cal_list);
+    }
+    array_list_free(*cal_list, (void *) seed_cal_free);
+    *cal_list = new_cal_list;      
+  } else {
+    sort_cals[0].cal->mapq = mapq;
+  }
+  /*
+  num_cals = array_list_size(*cal_list);
+  for (int i = 0; i < num_cals; i++) {
+    seed_cal_print(array_list_get(i, *cal_list));
+  }
+  */
+}
+  
+//--------------------------------------------------------------------
+
+void select_best_cals2(fastq_read_t *read, array_list_t **cal_list) {
+
+  int max_read_area, min_num_mismatches;
+
+  #ifdef _TIMING
+  gettimeofday(&start, NULL);
+  #endif
+  max_read_area = get_max_read_area(*cal_list);
+  if (max_read_area > read->length) max_read_area = read->length;
+  filter_cals_by_max_read_area(max_read_area, cal_list);
+  #ifdef _TIMING
+  gettimeofday(&stop, NULL);
+  mapping_batch->func_times[FUNC_FILTER_BY_READ_AREA] += 
+    ((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);  
+  #endif
+
+  #ifdef _VERBOSE
+  printf("\t***> max_read_area = %i\n", max_read_area);
+  #endif
+
+  min_num_mismatches = get_min_num_mismatches(*cal_list);
+  #ifdef _VERBOSE
+  printf("\t*** before SW> min_num_mismatches = %i\n", min_num_mismatches);
+  #endif
+      
+  #ifdef _TIMING
+  gettimeofday(&start, NULL);
+  #endif
+  filter_cals_by_max_num_mismatches(min_num_mismatches, cal_list);
+  #ifdef _TIMING
+  gettimeofday(&stop, NULL);
+  mapping_batch->func_times[FUNC_FILTER_BY_NUM_MISMATCHES] += 
+    ((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);  
+  #endif
+}
+
+//--------------------------------------------------------------------
 
 void create_bam_alignments(array_list_t *cal_list, fastq_read_t *read, 
 			   array_list_t *mapping_list) {
@@ -904,6 +1099,21 @@ void complete_pairs(sa_mapping_batch_t *batch) {
 	    //Alig2->template_length 
 	    alig1->template_length = (alig2->position + alig2->map_len) - alig1->position;
 	    alig2->template_length = alig1->position - (alig2->position + alig2->map_len);
+	  }
+
+	  if (num_pairs == 1) {
+	    if (alig1->mapq == 0) {
+	      alig1->mapq = alig2->mapq;
+	    } else if (alig2->mapq == 0) {
+	      alig2->mapq = alig1->mapq;
+	    }
+	    /*
+	  } else if (num_pairs > 1) {
+	    if (best_score != second_score) {
+	      printf("----> %s\t%s num pairs = %i (best score, second)  = (%0.2f, %0.2f)\n\n", 
+		     alig1->query_name, num_pairs, best_score, second_score);
+	    }
+	    */
 	  }
 
 	  if ( (++counter_hits) >= num_hits) {

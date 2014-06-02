@@ -1405,7 +1405,7 @@ array_list_t *create_cals(int num_seeds, fastq_read_t *read,
   //  printf("******** before filtering cals_by_max_read, num_cals = %i (read %s)\n", 
   //	 array_list_size(cal_list), read->id);
 
-
+  /*
   #ifdef _TIMING
   gettimeofday(&start, NULL);
   #endif
@@ -1417,7 +1417,7 @@ array_list_t *create_cals(int num_seeds, fastq_read_t *read,
   mapping_batch->func_times[FUNC_FILTER_BY_READ_AREA] += 
     ((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);  
   #endif
-
+  */
 
   #ifdef _VERBOSE
   printf("\t***> max_read_area = %i\n", max_read_area);
@@ -2543,20 +2543,7 @@ int sa_single_mapper(void *data) {
       //printf("after create_cals: list size = %i\n", array_list_size(cal_list));
       //for (int kk = 0; kk < array_list_size(cal_list); kk++) { seed_cal_print(array_list_get(kk, cal_list)); }
 
-      min_num_mismatches = get_min_num_mismatches(cal_list);
-      #ifdef _VERBOSE
-      printf("\t*** before SW> min_num_mismatches = %i\n", min_num_mismatches);
-      #endif
-      
-      #ifdef _TIMING
-      gettimeofday(&start, NULL);
-      #endif
-      filter_cals_by_max_num_mismatches(min_num_mismatches, &cal_list);
-      #ifdef _TIMING
-      gettimeofday(&stop, NULL);
-      mapping_batch->func_times[FUNC_FILTER_BY_NUM_MISMATCHES] += 
-	((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);  
-      #endif
+      select_best_cals(read, &cal_list);
 
       //printf("before cleaning cals...\n");
       //for (int kk = 0; kk < array_list_size(cal_list); kk++) { seed_cal_print(array_list_get(kk, cal_list)); }
@@ -2715,20 +2702,7 @@ int sa_pair_mapper(void *data) {
       //printf("after create_cals: list size = %i\n", array_list_size(cal_list));
       //for (int kk = 0; kk < array_list_size(cal_list); kk++) { seed_cal_print(array_list_get(kk, cal_list)); }
 
-      min_num_mismatches = get_min_num_mismatches(cal_list);
-      #ifdef _VERBOSE
-      printf("\t*** before SW> min_num_mismatches = %i\n", min_num_mismatches);
-      #endif
-      
-      #ifdef _TIMING
-      gettimeofday(&start, NULL);
-      #endif
-      filter_cals_by_max_num_mismatches(min_num_mismatches, &cal_list);
-      #ifdef _TIMING
-      gettimeofday(&stop, NULL);
-      mapping_batch->func_times[FUNC_FILTER_BY_NUM_MISMATCHES] += 
-	((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);  
-      #endif
+      select_best_cals(read, &cal_list);
 
       //      printf("after filtering min. num mismatches (%i) before cleaning cals...\n", min_num_mismatches);
       //      for (int kk = 0; kk < array_list_size(cal_list); kk++) { seed_cal_print(array_list_get(kk, cal_list)); }

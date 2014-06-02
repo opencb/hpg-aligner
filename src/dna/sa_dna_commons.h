@@ -929,13 +929,19 @@ static inline void seed_cal_update_info(seed_cal_t *cal) {
     num_mismatches += seed->num_mismatches;
     num_open_gaps += seed->num_open_gaps;
     num_extend_gaps += seed->num_extend_gaps;
-    read_area += (seed->read_end - seed->read_start - num_mismatches - (2 * num_open_gaps) - (num_extend_gaps));
+    read_area = (seed->read_end - seed->read_start > seed->genome_end - seed->genome_end ? 
+		 (seed->read_end - seed->read_start + 1) : 
+		 (seed->genome_end - seed->genome_start + 1));
+    //    read_area += (seed->read_end - seed->read_start - num_mismatches - (2 * num_open_gaps) - (num_extend_gaps));
   }
   cal->num_mismatches = num_mismatches;
   cal->num_open_gaps = num_open_gaps;
   cal->num_extend_gaps = num_extend_gaps;
   cal->num_mismatches = num_mismatches;
   cal->read_area = read_area;
+
+  cal->score = read_area - num_mismatches - num_open_gaps - num_extend_gaps - 
+    (num_mismatches * 4) - (num_open_gaps * 6) - (num_extend_gaps);
 }
 
 //--------------------------------------------------------------------
@@ -988,6 +994,8 @@ void filter_cals_by_max_score(float score, array_list_t **list);
 void filter_cals_by_max_num_mismatches(int num_mismatches, array_list_t **list);
 void filter_cals_by_pair_mode(int pair_mode, int pair_min_distance, int pair_max_distance, 
 			      int num_lists, array_list_t **cal_lists);
+
+void select_best_cals(fastq_read_t *read, array_list_t **list);
 
 //--------------------------------------------------------------------
 
