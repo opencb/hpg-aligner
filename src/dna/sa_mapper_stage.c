@@ -98,7 +98,7 @@ void append_seed_linked_list(seed_cal_t *cal,
 	        new |------|
 	                        |-------|
 	  */
-	  //printf("case 1\n");
+	  //	  printf("case 1\n");
 	  linked_list_insert_at(i, new_item, seed_list);
 	  //if (i == 0) cal->start = genome_start;
 	  //return;
@@ -109,7 +109,7 @@ void append_seed_linked_list(seed_cal_t *cal,
 	        new   |-----------|
 	                        |------------|         
 	  */
-	  //printf("case 2\n");
+	  //	  printf("case 2\n");
 	  overlap = read_end - item->read_start + 1;
 	  if (read_end - read_start - overlap > 18) {
 	    seed_rtrim_read(overlap + 2, new_item);
@@ -121,11 +121,14 @@ void append_seed_linked_list(seed_cal_t *cal,
 	  break;
 	  //	  return;
 	} else if (read_end == item->read_end) {
+	  if (genome_end != item->genome_end) {
+	    cal->invalid = 1;
+	  }
 	  /**
 	        new   |--------------------|
 	                      |------------|         
 	  */
-	  //printf("case 3\n");	  
+	  //	  printf("case 3\n");	  
 	  linked_list_insert_at(i, new_item, seed_list);
 	  if (i == 0) cal->start = genome_start;
 	  if (linked_list_size(seed_list) <= i + 1) {
@@ -142,7 +145,7 @@ void append_seed_linked_list(seed_cal_t *cal,
 	        new   |------------------------|
 	                      |--------| |--|        
 	  */
-	  //printf("case 4\n");
+	  //	  printf("case 4\n");
 	  linked_list_insert_at(i, new_item, seed_list);
 	  //if (i == 0) cal->start = genome_start;
 	  if (linked_list_size(seed_list) <= i + 1) {
@@ -157,22 +160,28 @@ void append_seed_linked_list(seed_cal_t *cal,
 	  //	  return;
 	}
       } else if (read_start == item->read_start) {
+	if (genome_start != item->genome_start) {
+	  cal->invalid = 1;
+	}
 	if (read_end < item->read_end) {
 	  /**
 	        new   |-----------|
 	              |----------------|         
 	  */
-	  //printf("case 5\n");
+	  //	  printf("case 5\n");
 	  seed_free(new_item);
 	  process = 1;
 	  break;
 	  //	  return;
 	} else if (read_end == item->read_end) {
+	  if (genome_end != item->genome_end) {
+	    cal->invalid = 1;
+	  }
 	  /**
 	        new   |------------|
 	              |------------|         
 	  */
-	  //printf("case 6\n");
+	  //	  printf("case 6\n");
 	  seed_free(new_item);
 	  process = 1;
 	  break;
@@ -182,7 +191,7 @@ void append_seed_linked_list(seed_cal_t *cal,
 	        new   |--------------------|
 	              |--------|   |--|   |----|         
 	  */
-	  //printf("case 7\n");
+	  //	  printf("case 7\n");
 	  linked_list_insert_at(i, new_item, seed_list);
 	  //if (i == 0) cal->start = genome_start;
 	  //seed_cal_print(cal);
@@ -203,17 +212,20 @@ void append_seed_linked_list(seed_cal_t *cal,
 	        new      |--------|
 	              |----------------|         
 	  */
-	  //printf("case 8\n");
+	  //	  printf("case 8\n");
 	  seed_free(new_item);
 	  process = 1;
 	  break;
 	  //	  return;
 	} else if (read_end == item->read_end) {
+	  if (genome_end != item->genome_end) {
+	    cal->invalid = 1;
+	  }
 	  /**
 	        new      |---------|
 	              |------------|         
 	  */
-	  //printf("case 9\n");
+	  //	  printf("case 9\n");
 	  seed_free(new_item);
 	  process = 1;
 	  break;
@@ -223,7 +235,7 @@ void append_seed_linked_list(seed_cal_t *cal,
 	        new       |-----------------|
 	              |--------|    |--|        |------|        
 	  */
-	  //printf("case 10\n");
+	  //	  printf("case 10\n");
 	  //seed_cal_print(cal);
 	  overlap = item->read_end - read_start + 1;
 	  if (read_end - read_start - overlap > 18) {
