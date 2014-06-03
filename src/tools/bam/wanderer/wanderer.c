@@ -32,15 +32,11 @@ bwander_init(bam_wanderer_t *wanderer)
 	memset(wanderer, 0, sizeof(bam_wanderer_t));
 
 	//Create regions
-	wanderer->regions = (bam_region_t **)malloc(WANDERER_REGIONS_MAX * sizeof(bam_region_t *));
-	/*for(i = 0; i < WANDERER_REGIONS_MAX; i++)
-	{
-		region = wanderer->regions[i];
-		breg_init(region);
-	}*/
+	wanderer->regions_list = linked_list_new(COLLECTION_MODE_ASYNCHRONIZED);
 
 	//Init locks
 	omp_init_lock(&wanderer->regions_lock);
+	omp_init_lock(&wanderer->free_slots);
 	omp_init_lock(&wanderer->output_file_lock);
 }
 
@@ -49,20 +45,28 @@ bwander_destroy(bam_wanderer_t *wanderer)
 {
 	int i;
 	bam_region_t *region;
+	linked_list_t *list;
+	size_t list_l;
 
 	assert(wanderer);
+	assert(wanderer->regions_list);
+
+	//Handle to list
+	list = wanderer->regions_list;
 
 	//Regions exists?
-	if(wanderer->regions)
+	if(wanderer->regions_list)
 	{
-		for(i = 0; i < wanderer->regions_l; i++)
+		//for(i = 0; i < wanderer->regions_l; i++)
+		list_l = linked_list_size(list);
+		for(i = 0; i < list_l; i++)
 		{
 			//Get region
-			region = wanderer->regions[i];
-			breg_destroy(region, 0);
+			region = linked_list_get(i, list);
+			breg_destroy(region, 1);
 			free(region);
 		}
-		free(wanderer->regions);
+		linked_list_free(list, NULL);
 	}
 
 	//Destroy lock
@@ -92,104 +96,229 @@ bwander_configure(bam_wanderer_t *wanderer, bam_file_t *in_file, bam_file_t *out
 	LOG_INFO("Wanderer configured\n");
 }
 
+static INLINE int
+bwander_run_sequential(bam_wanderer_t *wanderer)
+{
+	int i, err;
+	size_t reads;
+	bam_region_t *region;
+
+	err = WANDER_REGION_CHANGED;
+	reads = 0;
+	while(err)
+	{
+		//Create new current region
+		region = (bam_region_t *)malloc(sizeof(bam_region_t));
+		breg_init(region);
+
+		//Fill region
+		err = bwander_obtain_region(wanderer, region);
+		if(err)
+		{
+			if(err == WANDER_REGION_CHANGED || err == WANDER_READ_EOF)
+			{
+				//Add region to wanderer regions
+				bwander_region_insert(wanderer, region);
+
+				//Process region
+				wanderer->processing_f(wanderer, region);
+
+				reads += region->size;
+				printf("Reads processed: %d\r", reads);
+
+				//Write region
+				breg_write_n(region, region->size, wanderer->output_file);
+
+				//Remove region from list
+				linked_list_remove(region, wanderer->regions_list);
+
+				//Free region
+				breg_destroy(region, 1);
+				free(region);
+
+				//End readings
+				if(err == WANDER_READ_EOF)
+					 break;
+			}
+			else
+			{
+				LOG_FATAL_F("Failed to read next region, error code: %d\n", err);
+				break;
+			}
+		}
+		else
+		{
+			//No more regions, end loop
+			LOG_INFO("No more regions to read");
+		}
+	}
+
+	printf("\n");
+	return err;
+}
+
+static INLINE int
+bwander_run_threaded(bam_wanderer_t *wanderer)
+{
+	int err;
+	bam_region_t *region;
+	linked_list_t *regions;
+
+	omp_lock_t end_condition_lock;
+	int end_condition = 1;
+
+	omp_lock_t reads_lock;
+	size_t reads = 0;
+
+	//Init lock
+	omp_init_lock(&end_condition_lock);
+	omp_init_lock(&reads_lock);
+	#pragma omp parallel
+	{
+		#pragma omp single
+		printf("Running in multithreading mode with %d threads\n", omp_get_num_threads());
+
+		#pragma omp sections private(region, regions)
+		{
+			//Region read
+			#pragma omp section
+			{
+				regions = wanderer->regions_list;
+				while(1)
+				{
+					//Create new current region
+					region = (bam_region_t *)malloc(sizeof(bam_region_t));
+					breg_init(region);
+
+					//Fill region
+					err = bwander_obtain_region(wanderer, region);
+					if(err)
+					{
+						if(err == WANDER_REGION_CHANGED || err == WANDER_READ_EOF)
+						{
+							//Until process, this region cant be writed
+							omp_set_lock(&region->write_lock);
+
+							//Add region to wanderer regions
+							bwander_region_insert(wanderer, region);
+
+							#pragma omp task firstprivate(region, wanderer)
+							{
+								//Process region
+								omp_set_lock(&region->lock);
+								wanderer->processing_f(wanderer, region);
+								omp_unset_lock(&region->lock);
+
+								omp_set_lock(&reads_lock);
+								reads += region->size;
+								printf("Reads processed: %d\r", reads);
+								omp_unset_lock(&reads_lock);
+
+								//Set this region as writable
+								omp_unset_lock(&region->write_lock);
+							}
+
+							//End readings
+							if(err == WANDER_READ_EOF)
+								 break;
+						}
+						else
+						{
+							LOG_FATAL_F("Failed to read next region, error code: %d\n", err);
+							break;
+						}
+					}
+					else
+					{
+						//No more regions, end loop
+						LOG_INFO("No more regions to read");
+						break;
+					}
+
+					omp_set_lock(&end_condition_lock);
+					end_condition = 0;
+					omp_unset_lock(&end_condition_lock);
+				}
+			}//End read section
+
+			//Write section
+			#pragma omp section
+			{
+				regions = wanderer->regions_list;
+				omp_set_lock(&end_condition_lock);
+				while(end_condition || linked_list_size(regions) > 0)
+				{
+					omp_unset_lock(&end_condition_lock);
+
+					//Get next region
+					omp_set_lock(&wanderer->regions_lock);
+					region = linked_list_get_first(regions);
+					omp_unset_lock(&wanderer->regions_lock);
+					if(region == NULL)
+						continue;
+
+					//Wait region to be writable
+					omp_set_lock(&region->write_lock);
+
+					//Write region
+					omp_set_lock(&wanderer->output_file_lock);
+					breg_write_n(region, region->size, wanderer->output_file);
+					omp_unset_lock(&wanderer->output_file_lock);
+
+					//Remove from list
+					omp_set_lock(&wanderer->regions_lock);
+					linked_list_remove_first(regions);
+
+					//Signal read section if regions list is full
+					if(linked_list_size(regions) < (WANDERER_REGIONS_MAX / 2) )
+						omp_unset_lock(&wanderer->free_slots);
+
+					omp_unset_lock(&wanderer->regions_lock);
+
+					//Free region
+					breg_destroy(region, 1);
+					free(region);
+
+					omp_set_lock(&end_condition_lock);
+				}
+				omp_unset_lock(&end_condition_lock);
+
+			}//End write section
+
+		}//End sections
+
+	}//End parallel
+
+	//Free
+	omp_destroy_lock(&end_condition_lock);
+
+	return NO_ERROR;
+}
+
 int
 bwander_run(bam_wanderer_t *wanderer)
 {
-	int i, err;
-	bam_region_t *read_region;
-	bam_region_t *process_region;
-	bam_region_t *write_region;
-	size_t total;
-	int bytes;
-	int while_cond = 1;
+	int err;
 
 	bam1_t *read;
 
 	assert(wanderer);
 	assert(wanderer->input_file);
-	assert(wanderer->regions);
+	assert(wanderer->regions_list);
 
 	//Logging
 	LOG_INFO("Wanderer is now running\n");
 
-	#pragma omp parallel //sections
-	{
-		//Region read
-		#pragma omp single
-		{
-			while(1)
-			{
-				//Create new current region
-				read_region = (bam_region_t *)malloc(sizeof(bam_region_t));
-				breg_init(read_region);
+	//Run in sequential mode
+	//err = bwander_run_sequential(wanderer);
 
-				//Fill region
-				err = bwander_obtain_region(wanderer, read_region);
-				if(err)
-				{
-					if(err == WANDER_REGION_CHANGED)
-					{
-						//Add region to wanderer regions
-						bwander_region_insert(wanderer, read_region);
-					}
-					else
-					{
-						LOG_FATAL_F("Failed to read next region, error code: %d\n", err);
-						break;
-					}
-				}
-				else
-				{
-					//No more regions, end loop
-					LOG_INFO("No more regions to read");
-					break;
-				}
-			}
-		}//Read section
-
-		//Region process section
-		/*#pragma omp section
-		{
-			while(wanderer->regions_l < 6)
-			{
-				//Iterate regions
-				for(i = 0; i < wanderer->regions_l; i++)
-				{
-					//Get next region
-					region = wanderer->regions[i];
-
-					//Process region
-					wanderer->processing_f(wanderer, region);
-				}
-			}
-		} //End process section*/
-
-		//Region writing (in region order)
-		/*#pragma omp section
-		{
-			//Iterate regions
-			for(i = 0; i < wanderer->regions_l; i++)
-			{
-				//Get next region
-				region = wanderer->regions[i];
-
-				//This region is processed?
-				//TODO if()
-				{
-					//Write region to disk
-					breg_write_n(region, region->size, wanderer->output_file);
-					wanderer->regions_l--;
-				}
-				//else break;
-			}
-		} //End write section*/
-
-	}//End parallel
+	//Run in multithreaded mode
+	err = bwander_run_threaded(wanderer);
 
 	//Logging
 	LOG_INFO("Wanderer SUCCESS!\n");
 
-	return NO_ERROR;
+	return err;
 }
 
 EXTERNC INLINE int
@@ -231,40 +360,42 @@ filter_read(bam1_t *read, uint8_t filters)
 EXTERNC INLINE int
 bwander_region_insert(bam_wanderer_t *wanderer, bam_region_t *region)
 {
+	linked_list_t *list;
+	size_t list_l;
+
 	assert(wanderer);
 	assert(region);
 
 	omp_set_lock(&wanderer->regions_lock);
 
-	if(wanderer->regions_l >= WANDERER_REGIONS_MAX)
+	//List handle
+	list = wanderer->regions_list;
+	list_l = linked_list_size(list);
+
+	if(list_l >= WANDERER_REGIONS_MAX)
 	{
 		omp_unset_lock(&wanderer->regions_lock);
-		LOG_FATAL("Not enough region slots\n");
+
+		//Wait for free slots
+		omp_set_lock(&wanderer->free_slots);
+
+		//LOG_FATAL_F("Not enough region slots, current: %d\n", list_l);
 	}
 
-	wanderer->regions[wanderer->regions_l] = region;
-	wanderer->regions_l++;
+	//This lock must be always locked until regions buffer have regions free
+	omp_test_lock(&wanderer->free_slots);
+
+	//Add region to list
+	linked_list_insert_last(region, list);
 
 	omp_set_lock(&region->lock);
 	LOG_INFO_F("Inserting region %d:%d-%d with %d reads\n",
 				region->chrom + 1, region->init_pos + 1,
 				region->end_pos + 1, region->size);
-	LOG_INFO_F("Regions to process %d\n", wanderer->regions_l);
+	LOG_INFO_F("Regions to process %d\n", linked_list_size(list));
 	omp_unset_lock(&region->lock);
 
 	omp_unset_lock(&wanderer->regions_lock);
-
-	#pragma omp task
-	{
-		omp_set_lock(&region->lock);
-		wanderer->processing_f(wanderer, region);
-		omp_unset_lock(&region->lock);
-
-		//Write region
-		omp_set_lock(&wanderer->output_file_lock);
-		breg_write_n(region, region->size, wanderer->output_file);
-		omp_unset_lock(&wanderer->output_file_lock);
-	}
 
 	return NO_ERROR;
 }

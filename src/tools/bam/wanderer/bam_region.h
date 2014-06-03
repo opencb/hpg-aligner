@@ -41,6 +41,7 @@ typedef struct {
 
 	//Lock
 	omp_lock_t lock;
+	omp_lock_t write_lock;
 } bam_region_t;
 
 /**

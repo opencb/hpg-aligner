@@ -435,6 +435,7 @@ realign_processor(bam_wanderer_t *wanderer, bam_region_t *region)
 	for(i = 0; i < region->size; i++)
 	{
 		assert(region->reads[i]);
+		usleep(5); //10 us
 	}
 
 	return NO_ERROR;
@@ -485,7 +486,7 @@ wander_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 	}
 
 	LOG_VERBOSE(1);
-	//LOG_LEVEL(LOG_WARN_LEVEL);
+	LOG_LEVEL(LOG_WARN_LEVEL);
 
 	//Init wandering
 	bwander_init(&wanderer);

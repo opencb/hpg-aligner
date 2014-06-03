@@ -11,6 +11,7 @@
 #include <assert.h>
 #include <omp.h>
 
+#include "containers/linked_list.h"
 #include "aux/aux_common.h"
 #include "aux/aux_library.h"
 #include "aux/timestats.h"
@@ -39,8 +40,9 @@ typedef struct {
 
 	//Regions
 	omp_lock_t regions_lock;
-	bam_region_t **regions;
-	size_t regions_l;
+	linked_list_t *regions_list;
+	omp_lock_t free_slots;
+	//size_t regions_l;
 
 	//Function to execute
 	wanderer_function wander_f;

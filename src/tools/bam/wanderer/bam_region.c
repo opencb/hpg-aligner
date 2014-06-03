@@ -23,6 +23,7 @@ breg_init(bam_region_t *region)
 
 	//Init lock
 	omp_init_lock(&region->lock);
+	omp_init_lock(&region->write_lock);
 
 	omp_set_lock(&region->lock);
 
