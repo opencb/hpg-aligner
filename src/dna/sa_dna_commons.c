@@ -338,15 +338,6 @@ void select_best_cals(fastq_read_t *read, array_list_t **cal_list) {
 
   /*
   printf("--------------------------------------------------------------------\n");
-  printf("after sorting (num_cals = %i, mapq = %i, num_hits = %i)...\n", 
-	 num_cals, mapq, num_hits);
-  printf("--------------------------------------------------------------------\n");
-  for (int i = 0; i < num_cals; i++) {
-    seed_cal_print(sort_cals[i].cal);
-  }
-*/
-  /*
-  printf("--------------------------------------------------------------------\n");
   printf("after sorting and trimming (mapq = %i, first score = %0.2f, second score = %0.2f, num_hits = %i) %s ...\n", 
 	 mapq, (first_cal == NULL ? -99999.9f : first_cal->score), (second_cal == NULL ? -99999.9f : second_cal->score), num_hits,
 	 first_cal->read->sequence);
@@ -367,18 +358,32 @@ void select_best_cals(fastq_read_t *read, array_list_t **cal_list) {
     }
   }
   */
-  if (num_cals > 1) {
-    if (mapq > 0) num_hits = 1;
-    array_list_t *new_cal_list = array_list_new(num_hits, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
-    for (int i = 0; i < num_hits; i++) {
-      sort_cals[i].cal->mapq = mapq;
-      array_list_insert(sort_cals[i].cal, new_cal_list);	
-      array_list_set(sort_cals[i].index, NULL, *cal_list);
-    }
-    array_list_free(*cal_list, (void *) seed_cal_free);
-    *cal_list = new_cal_list;      
+  if (first_cal->invalid) {
+    array_list_clear(*cal_list, (void *) seed_cal_free);
   } else {
-    sort_cals[0].cal->mapq = mapq;
+    for (int i = 0; i < num_hits; i++) {
+      cal = sort_cals[i].cal;
+      if ( cal->invalid &&
+	   ((abs(cal->start - first_cal->end) <= (2 * cal->read->length)) ||
+	     (abs(cal->end - first_cal->start) <= (2 * cal->read->length))) ) {
+	array_list_clear(*cal_list, (void *) seed_cal_free);
+	return;
+      }
+    }
+
+    if (num_cals > 1) {
+      if (mapq > 0) num_hits = 1;
+      array_list_t *new_cal_list = array_list_new(num_hits, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
+      for (int i = 0; i < num_hits; i++) {
+	sort_cals[i].cal->mapq = mapq;
+	array_list_insert(sort_cals[i].cal, new_cal_list);	
+	array_list_set(sort_cals[i].index, NULL, *cal_list);
+      }
+      array_list_free(*cal_list, (void *) seed_cal_free);
+      *cal_list = new_cal_list;      
+    } else {
+      sort_cals[0].cal->mapq = mapq;
+    }
   }
   /*
   num_cals = array_list_size(*cal_list);

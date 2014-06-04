@@ -957,11 +957,11 @@ static inline void seed_cal_set_cigar_by_seed(seed_t *seed, seed_cal_t *cal) {
 void print_seed(char *msg, seed_t *s);
 
 static inline void seed_cal_print(seed_cal_t *cal) {
-  printf(" CAL (%c)[%lu:%lu-%lu] (%s, x:%i, og:%i, eg:%i) area = %i score = %0.2f mapq = %i: (read id %s)\n", 
+  printf(" CAL (%c)[%lu:%lu-%lu] (%s, x:%i, og:%i, eg:%i) area = %i score = %0.2f mapq = %i (invalid = %i): (read id %s)\n", 
 	 (cal->strand == 0 ? '+' : '-'), 
 	 cal->chromosome_id, cal->start, cal->end, cigar_to_string(&cal->cigar), cal->num_mismatches,
 	 cal->num_open_gaps, cal->num_extend_gaps, cal->read_area, cal->score, cal->mapq,
-	 cal->read->id);
+	 cal->invalid, cal->read->id);
   printf("\tSEEDS LIST:\n");
   if (cal->seed_list == NULL || cal->seed_list->size == 0) {
     printf("\t\tno seeds\n");
