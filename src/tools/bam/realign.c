@@ -16,8 +16,9 @@
 #include <errno.h>
 
 #include "aux/timestats.h"
-#include "aligner/alig.h"
+#include "aux/aux_common.h"
 #include "wanderer/wanderer.h"
+#include "aligner/alig.h"
 
 int align_launch(char *reference, char *bam, char *output, int threads);
 ERROR_CODE wander_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam);
@@ -176,8 +177,8 @@ align_launch(char *reference, char *bam, char *output, int threads)
 
 	init_log();
 	LOG_FILE("realign.log","w");
-	LOG_LEVEL(LOG_INFO_LEVEL);
-	//LOG_LEVEL(LOG_ERROR_LEVEL);
+	LOG_VERBOSE(1);
+	LOG_LEVEL(LOG_WARN_LEVEL);
 
 	//Set schedule if not defined
 	setenv("OMP_SCHEDULE", "static", 0);
@@ -270,7 +271,7 @@ align_launch(char *reference, char *bam, char *output, int threads)
 	wander_bam_file(bamc, base, dir, output);
 #ifdef D_TIME_DEBUG
 	end_time = omp_get_wtime();
-	time_add_time_slot(D_SLOT_TOTAL, TIME_GLOBAL_STATS, end_time - init_time);
+	time_add_time_slot(D_FWORK_TOTAL, TIME_GLOBAL_STATS, end_time - init_time);
 #endif
 	free(bamc);
 	free(dir);
@@ -283,69 +284,50 @@ align_launch(char *reference, char *bam, char *output, int threads)
 	printf("----------------------------\nTIME STATS: \n");
 
 	printf("\n====== General times ======\n");
-	time_get_mean_slot(D_SLOT_TOTAL, TIME_GLOBAL_STATS, &mean);
-	time_get_min_slot(D_SLOT_TOTAL, TIME_GLOBAL_STATS, &min);
-	time_get_max_slot(D_SLOT_TOTAL, TIME_GLOBAL_STATS, &max);
-	printf("Total time to realign -> %.2f s - min/max = %.2f/%.2f\n",
+	time_get_mean_slot(D_FWORK_TOTAL, TIME_GLOBAL_STATS, &mean);
+	time_get_min_slot(D_FWORK_TOTAL, TIME_GLOBAL_STATS, &min);
+	time_get_max_slot(D_FWORK_TOTAL, TIME_GLOBAL_STATS, &max);
+	printf("Total time to process -> %.2f s - min/max = %.2f/%.2f\n",
 			mean, min, max);
 
-	time_get_mean_slot(D_SLOT_INIT, TIME_GLOBAL_STATS, &mean);
-	time_get_min_slot(D_SLOT_INIT, TIME_GLOBAL_STATS, &min);
-	time_get_max_slot(D_SLOT_INIT, TIME_GLOBAL_STATS, &max);
-	printf("Time used to initialize aligner -> %.2f s - min/max = %.2f/%.2f\n",
+	time_get_mean_slot(D_FWORK_INIT, TIME_GLOBAL_STATS, &mean);
+	time_get_min_slot(D_FWORK_INIT, TIME_GLOBAL_STATS, &min);
+	time_get_max_slot(D_FWORK_INIT, TIME_GLOBAL_STATS, &max);
+	printf("Time used to initialize framework -> %.2f s - min/max = %.2f/%.2f\n",
 			mean, min, max);
 
-	printf("\n====== Times per alignment ======\n");
-	time_get_mean_slot(D_SLOT_NEXT, TIME_GLOBAL_STATS, &mean);
-	time_get_min_slot(D_SLOT_NEXT, TIME_GLOBAL_STATS, &min);
-	time_get_max_slot(D_SLOT_NEXT, TIME_GLOBAL_STATS, &max);
-	printf("Time used for region extraction -> %.2f us - min/max = %.2f/%.2f\n",
+	printf("\n====== Wandering function ======\n");
+	time_get_mean_slot(D_FWORK_WANDER_FUNC, TIME_GLOBAL_STATS, &mean);
+	time_get_min_slot(D_FWORK_WANDER_FUNC, TIME_GLOBAL_STATS, &min);
+	time_get_max_slot(D_FWORK_WANDER_FUNC, TIME_GLOBAL_STATS, &max);
+	printf("Time of wandering function per alignment (inside framework read time) -> %.2f us - min/max = %.2f/%.2f\n",
 				mean*1000000.0, min*1000000.0, max*1000000.0);
 
-	time_get_mean_slot(D_SLOT_HAPLO_GET, TIME_GLOBAL_STATS, &mean);
-	time_get_min_slot(D_SLOT_HAPLO_GET, TIME_GLOBAL_STATS, &min);
-	time_get_max_slot(D_SLOT_HAPLO_GET, TIME_GLOBAL_STATS, &max);
-	printf("Time used for haplotype extraction -> %.2f us - min/max = %.2f/%.2f\n",
+	printf("\n====== Processing function ======\n");
+	time_get_mean_slot(D_FWORK_PROC_FUNC, TIME_GLOBAL_STATS, &mean);
+	time_get_min_slot(D_FWORK_PROC_FUNC, TIME_GLOBAL_STATS, &min);
+	time_get_max_slot(D_FWORK_PROC_FUNC, TIME_GLOBAL_STATS, &max);
+	printf("Time of processing function per alignment (inside framework process time) -> %.2f us - min/max = %.2f/%.2f\n",
 			mean*1000000.0, min*1000000.0, max*1000000.0);
 
-	time_get_mean_slot(D_SLOT_REALIG_PER_HAPLO, TIME_GLOBAL_STATS, &mean);
-	time_get_min_slot(D_SLOT_REALIG_PER_HAPLO, TIME_GLOBAL_STATS, &min);
-	time_get_max_slot(D_SLOT_REALIG_PER_HAPLO, TIME_GLOBAL_STATS, &max);
-	printf("Time used for realign -> %.2f us - min/max = %.2f/%.2f\n",
+	printf("\n====== Framework ======\n");
+
+	time_get_mean_slot(D_FWORK_PROC, TIME_GLOBAL_STATS, &mean);
+	time_get_min_slot(D_FWORK_PROC, TIME_GLOBAL_STATS, &min);
+	time_get_max_slot(D_FWORK_PROC, TIME_GLOBAL_STATS, &max);
+	printf("Time used for process per alignment -> %.2f us - min/max = %.2f/%.2f\n",
 			mean*1000000.0, min*1000000.0, max*1000000.0);
 
-	printf("\n====== Iterations ======\n");
-
-	time_get_mean_slot(D_SLOT_IT_PROCESS, TIME_GLOBAL_STATS, &mean);
-	time_get_min_slot(D_SLOT_IT_PROCESS, TIME_GLOBAL_STATS, &min);
-	time_get_max_slot(D_SLOT_IT_PROCESS, TIME_GLOBAL_STATS, &max);
-	printf("Time used for process -> %.2f us - min/max = %.2f/%.2f\n",
+	time_get_mean_slot(D_FWORK_READ, TIME_GLOBAL_STATS, &mean);
+	time_get_min_slot(D_FWORK_READ, TIME_GLOBAL_STATS, &min);
+	time_get_max_slot(D_FWORK_READ, TIME_GLOBAL_STATS, &max);
+	printf("Time used for read per alignment -> %.2f us - min/max = %.2f/%.2f\n",
 			mean*1000000.0, min*1000000.0, max*1000000.0);
 
-	time_get_mean_slot(D_SLOT_IT_READ, TIME_GLOBAL_STATS, &mean);
-	time_get_min_slot(D_SLOT_IT_READ, TIME_GLOBAL_STATS, &min);
-	time_get_max_slot(D_SLOT_IT_READ, TIME_GLOBAL_STATS, &max);
-	printf("Time used for read -> %.2f us - min/max = %.2f/%.2f\n",
-			mean*1000000.0, min*1000000.0, max*1000000.0);
-
-	time_get_mean_slot(D_SLOT_IT_WRITE, TIME_GLOBAL_STATS, &mean);
-	time_get_min_slot(D_SLOT_IT_WRITE, TIME_GLOBAL_STATS, &min);
-	time_get_max_slot(D_SLOT_IT_WRITE, TIME_GLOBAL_STATS, &max);
-	printf("Time used for write -> %.2f us - min/max = %.2f/%.2f\n",
-			mean*1000000.0, min*1000000.0, max*1000000.0);
-
-
-	printf("\n====== I/O ======\n");
-	time_get_mean_slot(D_SLOT_ALIG_READ, TIME_GLOBAL_STATS, &mean);
-	time_get_min_slot(D_SLOT_ALIG_READ, TIME_GLOBAL_STATS, &min);
-	time_get_max_slot(D_SLOT_ALIG_READ, TIME_GLOBAL_STATS, &max);
-	printf("Time used for read alignment (mean) -> %.2f us - min/max = %.2f/%.2f\n",
-			mean*1000000.0, min*1000000.0, max*1000000.0);
-
-	time_get_mean_slot(D_SLOT_ALIG_WRITE, TIME_GLOBAL_STATS, &mean);
-	time_get_min_slot(D_SLOT_ALIG_WRITE, TIME_GLOBAL_STATS, &min);
-	time_get_max_slot(D_SLOT_ALIG_WRITE, TIME_GLOBAL_STATS, &max);
-	printf("Time used for write alignment (mean) -> %.2f us - min/max = %.2f/%.2f\n",
+	time_get_mean_slot(D_FWORK_WRITE, TIME_GLOBAL_STATS, &mean);
+	time_get_min_slot(D_FWORK_WRITE, TIME_GLOBAL_STATS, &min);
+	time_get_max_slot(D_FWORK_WRITE, TIME_GLOBAL_STATS, &max);
+	printf("Time used for write per alignment -> %.2f us - min/max = %.2f/%.2f\n",
 			mean*1000000.0, min*1000000.0, max*1000000.0);
 
 #endif
@@ -435,8 +417,9 @@ realign_processor(bam_wanderer_t *wanderer, bam_region_t *region)
 	for(i = 0; i < region->size; i++)
 	{
 		assert(region->reads[i]);
-		usleep(5); //10 us
 	}
+
+	//usleep(1 * region->size); //1 us per alignment
 
 	return NO_ERROR;
 }
@@ -450,6 +433,9 @@ wander_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 	genome_t* ref;
 	int bytes;
 
+	//Times
+	double times;
+
 	//Wanderer
 	bam_wanderer_t wanderer;
 
@@ -457,6 +443,10 @@ wander_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 	assert(ref_name);
 	assert(ref_path);
 	assert(outbam);
+
+#ifdef D_TIME_DEBUG
+	times = omp_get_wtime();
+#endif
 
 	//Open bam
 	{
@@ -485,9 +475,6 @@ wander_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 		printf("New BAM initialized!...\n");
 	}
 
-	LOG_VERBOSE(1);
-	LOG_LEVEL(LOG_WARN_LEVEL);
-
 	//Init wandering
 	bwander_init(&wanderer);
 
@@ -495,6 +482,11 @@ wander_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 	bwander_configure(&wanderer, bam_f, out_bam_f,
 			(int (*)(void *, bam_region_t *, bam1_t *))realign_wanderer,
 			(int (*)(void *, bam_region_t *))realign_processor);
+
+#ifdef D_TIME_DEBUG
+	times = omp_get_wtime() - times;
+	time_add_time_slot(D_FWORK_INIT, TIME_GLOBAL_STATS, times);
+#endif
 
 	//Run wander
 	bwander_run(&wanderer);
@@ -518,8 +510,6 @@ wander_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 	printf("Closing \"%s\" BAM file...\n", outbam);
 	bam_fclose(out_bam_f);
 	printf("BAM closed.\n");
-
-	printf("Realignment around indels DONE.\n");
 
 	return NO_ERROR;
 }

@@ -17,7 +17,7 @@
 #include "aux/timestats.h"
 #include "bam_region.h"
 
-#define WANDERER_REGIONS_MAX 2000
+#define WANDERER_REGIONS_MAX 1000
 
 #define WANDERER_SUCCESS 0
 #define WANDERER_IN_PROGRESS 1
@@ -59,15 +59,48 @@ EXTERNC void bwander_configure(bam_wanderer_t *wanderer, bam_file_t *in_file, ba
 
 EXTERNC int bwander_run(bam_wanderer_t *wanderer);
 
+/**
+ * FILTER
+ */
+static int filter_read(bam1_t *read, uint8_t filters);
 
 /**
- * WINDOWS
+ * INLINE FUNCTIONS
  */
-/*EXTERNC int bwander_window_register(bam_wanderer_t *wanderer, bam_region_window_t *window);
-EXTERNC void bwander_window_clear(bam_wanderer_t *wanderer);*/
+static inline int
+filter_read(bam1_t *read, uint8_t filters)
+{
+	assert(read);
 
-int filter_read(bam1_t *read, uint8_t filters);
+	//Filter read
+	if(filters != 0)
+	{
+		if(filters & FILTER_ZERO_QUAL)
+		{
+			if(read->core.qual == 0)
+				return 1;
+		}
 
-int bwander_region_insert(bam_wanderer_t *wanderer, bam_region_t *region);
+		if(filters & FILTER_DIFF_MATE_CHROM)
+		{
+			if(read->core.tid != read->core.mtid)
+				return 1;
+		}
+
+		if(filters & FILTER_NO_CIGAR)
+		{
+			if(read->core.n_cigar == 0)
+				return 1;
+		}
+
+		if(filters & FILTER_DEF_MASK)
+		{
+			if(read->core.flag & BAM_DEF_MASK)
+				return 1;
+		}
+	}
+
+	return NO_ERROR;
+}
 
 #endif /* WANDERER_H_ */

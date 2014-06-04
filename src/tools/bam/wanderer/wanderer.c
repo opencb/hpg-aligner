@@ -17,8 +17,8 @@ static int last_read_bytes = 0;
 /**
  * STATIC FUNCTIONS
  */
-
-static INLINE int bwander_obtain_region(bam_wanderer_t *wanderer, bam_region_t *current_region);
+static int bwander_region_insert(bam_wanderer_t *wanderer, bam_region_t *region);
+static int bwander_obtain_region(bam_wanderer_t *wanderer, bam_region_t *current_region);
 
 void
 bwander_init(bam_wanderer_t *wanderer)
@@ -32,7 +32,7 @@ bwander_init(bam_wanderer_t *wanderer)
 	memset(wanderer, 0, sizeof(bam_wanderer_t));
 
 	//Create regions
-	wanderer->regions_list = linked_list_new(COLLECTION_MODE_ASYNCHRONIZED);
+	wanderer->regions_list = linked_list_new(COLLECTION_MODE_SYNCHRONIZED);
 
 	//Init locks
 	omp_init_lock(&wanderer->regions_lock);
@@ -96,11 +96,12 @@ bwander_configure(bam_wanderer_t *wanderer, bam_file_t *in_file, bam_file_t *out
 	LOG_INFO("Wanderer configured\n");
 }
 
-static INLINE int
+static int
 bwander_run_sequential(bam_wanderer_t *wanderer)
 {
 	int i, err;
-	size_t reads;
+	size_t reads, reads_to_write;
+	double times;
 	bam_region_t *region;
 
 	err = WANDER_REGION_CHANGED;
@@ -112,7 +113,15 @@ bwander_run_sequential(bam_wanderer_t *wanderer)
 		breg_init(region);
 
 		//Fill region
+#ifdef D_TIME_DEBUG
+		times = omp_get_wtime();
+#endif
 		err = bwander_obtain_region(wanderer, region);
+#ifdef D_TIME_DEBUG
+		times = omp_get_wtime() - times;
+		if(region->size != 0)
+			time_add_time_slot(D_FWORK_READ, TIME_GLOBAL_STATS, times / (double)region->size);
+#endif
 		if(err)
 		{
 			if(err == WANDER_REGION_CHANGED || err == WANDER_READ_EOF)
@@ -120,14 +129,27 @@ bwander_run_sequential(bam_wanderer_t *wanderer)
 				//Add region to wanderer regions
 				bwander_region_insert(wanderer, region);
 
+#ifdef D_TIME_DEBUG
+				times = omp_get_wtime();
+#endif
 				//Process region
 				wanderer->processing_f(wanderer, region);
+#ifdef D_TIME_DEBUG
+				times = omp_get_wtime() - times;
+				if(region->size != 0)
+				{
+					time_add_time_slot(D_FWORK_PROC,  TIME_GLOBAL_STATS, times / (double)region->size);
+					time_add_time_slot(D_FWORK_PROC_FUNC, TIME_GLOBAL_STATS, times / (double)region->size);
+				}
+				times = omp_get_wtime();
+#endif
 
-				reads += region->size;
+				reads_to_write = region->size;
+				reads += reads_to_write;
 				printf("Reads processed: %d\r", reads);
 
 				//Write region
-				breg_write_n(region, region->size, wanderer->output_file);
+				breg_write_n(region, reads_to_write, wanderer->output_file);
 
 				//Remove region from list
 				linked_list_remove(region, wanderer->regions_list);
@@ -135,6 +157,12 @@ bwander_run_sequential(bam_wanderer_t *wanderer)
 				//Free region
 				breg_destroy(region, 1);
 				free(region);
+
+#ifdef D_TIME_DEBUG
+				times = omp_get_wtime() - times;
+				if(reads_to_write != 0)
+					time_add_time_slot(D_FWORK_WRITE, TIME_GLOBAL_STATS, times / (double)reads_to_write);
+#endif
 
 				//End readings
 				if(err == WANDER_READ_EOF)
@@ -157,28 +185,34 @@ bwander_run_sequential(bam_wanderer_t *wanderer)
 	return err;
 }
 
-static INLINE int
+static  int
 bwander_run_threaded(bam_wanderer_t *wanderer)
 {
 	int err;
 	bam_region_t *region;
 	linked_list_t *regions;
+	double times;
 
 	omp_lock_t end_condition_lock;
-	int end_condition = 1;
+	int end_condition;
 
 	omp_lock_t reads_lock;
-	size_t reads = 0;
+	size_t reads;
+	size_t reads_to_write;
 
 	//Init lock
 	omp_init_lock(&end_condition_lock);
 	omp_init_lock(&reads_lock);
-	#pragma omp parallel
+	//#pragma omp parallel private(err, region, regions, times, reads_to_write)
 	{
-		#pragma omp single
-		printf("Running in multithreading mode with %d threads\n", omp_get_num_threads());
+		//#pragma omp single
+		{
+			printf("Running in multithreading mode with %d threads\n", omp_get_max_threads());
+			end_condition = 1;
+			reads = 0;
+		}
 
-		#pragma omp sections private(region, regions)
+		#pragma omp parallel sections private(err, region, regions, times, reads_to_write)
 		{
 			//Region read
 			#pragma omp section
@@ -191,28 +225,57 @@ bwander_run_threaded(bam_wanderer_t *wanderer)
 					breg_init(region);
 
 					//Fill region
+#ifdef D_TIME_DEBUG
+					times = omp_get_wtime();
+#endif
 					err = bwander_obtain_region(wanderer, region);
+#ifdef D_TIME_DEBUG
+					times = omp_get_wtime() - times;
+					omp_set_lock(&region->lock);
+					if(region->size != 0)
+						time_add_time_slot(D_FWORK_READ, TIME_GLOBAL_STATS, times / (double)region->size);
+					omp_unset_lock(&region->lock);
+#endif
 					if(err)
 					{
 						if(err == WANDER_REGION_CHANGED || err == WANDER_READ_EOF)
 						{
 							//Until process, this region cant be writed
-							omp_set_lock(&region->write_lock);
+							omp_test_lock(&region->write_lock);
 
 							//Add region to wanderer regions
 							bwander_region_insert(wanderer, region);
 
-							#pragma omp task firstprivate(region, wanderer)
+							#pragma omp task untied firstprivate(region) private(err)
 							{
+								double aux_time;
+
 								//Process region
 								omp_set_lock(&region->lock);
+#ifdef D_TIME_DEBUG
+								times = omp_get_wtime();
+#endif
 								wanderer->processing_f(wanderer, region);
+#ifdef D_TIME_DEBUG
+								times = omp_get_wtime() - times;
+								if(region->size != 0)
+									time_add_time_slot(D_FWORK_PROC_FUNC, TIME_GLOBAL_STATS, times / (double)region->size);
+								aux_time = omp_get_wtime();
+#endif
 								omp_unset_lock(&region->lock);
 
 								omp_set_lock(&reads_lock);
 								reads += region->size;
 								printf("Reads processed: %d\r", reads);
 								omp_unset_lock(&reads_lock);
+
+#ifdef D_TIME_DEBUG
+								aux_time = omp_get_wtime() - aux_time;
+								omp_set_lock(&region->lock);
+								if(region->size != 0)
+									time_add_time_slot(D_FWORK_PROC, TIME_GLOBAL_STATS, (times + aux_time) / (double)region->size);
+								omp_unset_lock(&region->lock);
+#endif
 
 								//Set this region as writable
 								omp_unset_lock(&region->write_lock);
@@ -234,11 +297,12 @@ bwander_run_threaded(bam_wanderer_t *wanderer)
 						LOG_INFO("No more regions to read");
 						break;
 					}
-
-					omp_set_lock(&end_condition_lock);
-					end_condition = 0;
-					omp_unset_lock(&end_condition_lock);
 				}
+
+				omp_set_lock(&end_condition_lock);
+				end_condition = 0;
+				omp_unset_lock(&end_condition_lock);
+				//LOG_WARN("Read thread exit\n");
 			}//End read section
 
 			//Write section
@@ -249,31 +313,49 @@ bwander_run_threaded(bam_wanderer_t *wanderer)
 				while(end_condition || linked_list_size(regions) > 0)
 				{
 					omp_unset_lock(&end_condition_lock);
+#ifdef D_TIME_DEBUG
+					times = omp_get_wtime();
+#endif
 
 					//Get next region
 					omp_set_lock(&wanderer->regions_lock);
 					region = linked_list_get_first(regions);
 					omp_unset_lock(&wanderer->regions_lock);
 					if(region == NULL)
+					{
+						omp_set_lock(&end_condition_lock);
 						continue;
+					}
 
 					//Wait region to be writable
 					omp_set_lock(&region->write_lock);
 
 					//Write region
 					omp_set_lock(&wanderer->output_file_lock);
-					breg_write_n(region, region->size, wanderer->output_file);
+					reads_to_write = region->size;
+					breg_write_n(region, reads_to_write, wanderer->output_file);
 					omp_unset_lock(&wanderer->output_file_lock);
 
 					//Remove from list
 					omp_set_lock(&wanderer->regions_lock);
-					linked_list_remove_first(regions);
+					if(linked_list_size(regions) == 1)	//Possible bug?
+						linked_list_clear(regions, NULL);
+					else
+						linked_list_remove_first(regions);
 
 					//Signal read section if regions list is full
 					if(linked_list_size(regions) < (WANDERER_REGIONS_MAX / 2) )
 						omp_unset_lock(&wanderer->free_slots);
 
 					omp_unset_lock(&wanderer->regions_lock);
+
+#ifdef D_TIME_DEBUG
+					times = omp_get_wtime() - times;
+					omp_set_lock(&region->lock);
+					if(reads_to_write != 0)
+						time_add_time_slot(D_FWORK_WRITE, TIME_GLOBAL_STATS, times / (double)reads_to_write);
+					omp_unset_lock(&region->lock);
+#endif
 
 					//Free region
 					breg_destroy(region, 1);
@@ -283,6 +365,7 @@ bwander_run_threaded(bam_wanderer_t *wanderer)
 				}
 				omp_unset_lock(&end_condition_lock);
 
+				//LOG_WARN("Write thread exit\n");
 			}//End write section
 
 		}//End sections
@@ -299,7 +382,7 @@ int
 bwander_run(bam_wanderer_t *wanderer)
 {
 	int err;
-
+	double times;
 	bam1_t *read;
 
 	assert(wanderer);
@@ -309,11 +392,16 @@ bwander_run(bam_wanderer_t *wanderer)
 	//Logging
 	LOG_INFO("Wanderer is now running\n");
 
-	//Run in sequential mode
-	//err = bwander_run_sequential(wanderer);
-
-	//Run in multithreaded mode
-	err = bwander_run_threaded(wanderer);
+	if(omp_get_max_threads() > 1)
+	{
+		//Run in multithreaded mode
+		err = bwander_run_threaded(wanderer);
+	}
+	else
+	{
+		//Run in sequential mode
+		err = bwander_run_sequential(wanderer);
+	}
 
 	//Logging
 	LOG_INFO("Wanderer SUCCESS!\n");
@@ -321,43 +409,11 @@ bwander_run(bam_wanderer_t *wanderer)
 	return err;
 }
 
-EXTERNC INLINE int
-filter_read(bam1_t *read, uint8_t filters)
-{
-	assert(read);
+/**
+ * STATIC FUNCTIONS
+ */
 
-	//Filter read
-	if(filters != 0)
-	{
-		if(filters & FILTER_ZERO_QUAL)
-		{
-			if(read->core.qual == 0)
-				return 1;
-		}
-
-		if(filters & FILTER_DIFF_MATE_CHROM)
-		{
-			if(read->core.tid != read->core.mtid)
-				return 1;
-		}
-
-		if(filters & FILTER_NO_CIGAR)
-		{
-			if(read->core.n_cigar == 0)
-				return 1;
-		}
-
-		if(filters & FILTER_DEF_MASK)
-		{
-			if(read->core.flag & BAM_DEF_MASK)
-				return 1;
-		}
-	}
-
-	return NO_ERROR;
-}
-
-EXTERNC INLINE int
+static inline int
 bwander_region_insert(bam_wanderer_t *wanderer, bam_region_t *region)
 {
 	linked_list_t *list;
@@ -377,7 +433,14 @@ bwander_region_insert(bam_wanderer_t *wanderer, bam_region_t *region)
 		omp_unset_lock(&wanderer->regions_lock);
 
 		//Wait for free slots
-		omp_set_lock(&wanderer->free_slots);
+		if(!omp_test_lock(&wanderer->free_slots))
+		{
+			if(omp_get_num_threads() == 2)
+			{
+				#pragma omp taskwait	//Force processing
+			}
+			omp_set_lock(&wanderer->free_slots);
+		}
 
 		//LOG_FATAL_F("Not enough region slots, current: %d\n", list_l);
 	}
@@ -400,11 +463,12 @@ bwander_region_insert(bam_wanderer_t *wanderer, bam_region_t *region)
 	return NO_ERROR;
 }
 
-static INLINE int
+static inline int
 bwander_obtain_region(bam_wanderer_t *wanderer, bam_region_t *region)
 {
 	int i, err, bytes;
 	bam1_t *read;
+	double times;
 
 	//Get first read
 	if(last_read != NULL)
@@ -426,7 +490,14 @@ bwander_obtain_region(bam_wanderer_t *wanderer, bam_region_t *region)
 	{
 		//Wander this read
 		omp_set_lock(&region->lock);
+#ifdef D_TIME_DEBUG
+			times = omp_get_wtime();
+#endif
 		err = wanderer->wander_f(wanderer, region, read);
+#ifdef D_TIME_DEBUG
+			times = omp_get_wtime() - times;
+			time_add_time_slot(D_FWORK_WANDER_FUNC, TIME_GLOBAL_STATS, times);
+#endif
 		omp_unset_lock(&region->lock);
 		switch(err)
 		{
@@ -486,69 +557,3 @@ bwander_obtain_region(bam_wanderer_t *wanderer, bam_region_t *region)
 
 	return NO_ERROR;
 }
-
-/**
- * REGISTER WINDOW
- */
-/*int
-bwander_window_register(bam_wanderer_t *wanderer, bam_region_window_t *window)
-{
-	bam_region_window_t *dest_window;
-
-	assert(wanderer);
-	assert(wanderer->current_region);
-	assert(window);
-
-	//Logging
-	LOG_INFO_F("Registering window %d:%d-%d with %d reads\n",
-			window->region->chrom + 1, window->init_pos + 1,
-			window->end_pos + 1, window->size);
-
-	//Slots free?
-	if(wanderer->windows_l >= WANDERER_WINDOWS_MAX)
-	{
-		LOG_WARN("Wanderer bam_region_window_t buffer is full\n");
-		return WANDER_WINDOW_BUFFER_FULL;
-	}
-
-	//Duplicate and register
-	dest_window = &wanderer->windows[wanderer->windows_l];
-	dest_window->init_pos = window->init_pos;
-	dest_window->end_pos = window->end_pos;
-	dest_window->filter_flags = window->filter_flags;
-	dest_window->size = window->size;
-	dest_window->region = window->region;
-	memcpy(dest_window->filter_reads, window->filter_reads, window->size * sizeof(bam1_t *));
-
-	//Increase windows counter
-	wanderer->windows_l++;
-
-	return NO_ERROR;
-}*/
-
-/*void
-bwander_window_clear(bam_wanderer_t *wanderer)
-{
-	int i;
-	bam_region_window_t *window;
-
-	assert(wanderer);
-	assert(wanderer->current_region);
-
-	//Logging
-	LOG_INFO_F("Clearing %d windows\n", wanderer->windows_l);
-
-	//Iterate windows
-	for(i = 0; i < wanderer->windows_l; i++)
-	{
-		//Get next window
-		window = &wanderer->windows[i];
-
-		//Clear window
-		breg_window_clear(window);
-	}
-
-	//Set size to zero
-	wanderer->windows_l = 0;
-}*/
-

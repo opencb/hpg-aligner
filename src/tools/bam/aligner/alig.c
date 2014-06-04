@@ -1024,7 +1024,7 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 							if(err != ALIG_INCOMPLETE_INTERVAL)
 							{
 								LOG_ERROR("Cannot obtain next region\n");
-								printf(stderr, "ERROR: Cannot obtain next region in buffer of size %d, error code = %d\n", err);
+								fprintf(stderr, "ERROR: Cannot obtain next region in buffer of size %d, error code = %d\n", err);
 								fflush(stdout);
 								omp_set_lock(&in_buffer.lock);
 								in_buffer.end_condition = 1;

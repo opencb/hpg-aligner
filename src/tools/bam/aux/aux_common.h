@@ -20,6 +20,8 @@
 
 #include <stdint.h>
 
+#include "aux/timestats.h"
+
 #ifdef __MMX__
 #include <mmintrin.h>
 #endif
@@ -151,5 +153,26 @@ enum ERROR_C {
 	CIGAR_INVALID_INDEL
 };
 typedef enum ERROR_C ERROR_CODE;
+
+/**
+ * Time measures
+ */
+#ifdef D_TIME_DEBUG
+	enum fwork_slots {
+		//GENERAL
+		D_FWORK_TOTAL = 0,
+		D_FWORK_INIT,
+
+		//FRAMEWORK
+		D_FWORK_READ,
+		D_FWORK_PROC,
+		D_FWORK_WRITE,
+
+		//PROCESS
+		D_FWORK_WANDER_FUNC,
+		D_FWORK_PROC_FUNC
+	};
+
+#endif
 
 #endif /* AUX_COMMON_H_ */

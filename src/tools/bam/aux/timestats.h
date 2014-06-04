@@ -23,10 +23,12 @@
 #include <stdint.h>
 #include <pthread.h>
 
-#ifdef __cplusplus
-	#define EXTERNC extern "C"
-#else
-	#define EXTERNC extern
+#ifndef EXTERNC
+	#ifdef __cplusplus
+		#define EXTERNC extern "C"
+	#else
+		#define EXTERNC extern
+	#endif
 #endif
 
 
