@@ -37,6 +37,7 @@ typedef struct {
 	bam_file_t *input_file;
 	bam_file_t *output_file;
 	omp_lock_t output_file_lock;
+	genome_t *reference;
 
 	//Regions
 	omp_lock_t regions_lock;
@@ -55,7 +56,7 @@ typedef struct {
 EXTERNC void bwander_init(bam_wanderer_t *wanderer);
 EXTERNC void bwander_destroy(bam_wanderer_t *wanderer);
 
-EXTERNC void bwander_configure(bam_wanderer_t *wanderer, bam_file_t *in_file, bam_file_t *out_file, wanderer_function wf, processor_function pf);
+EXTERNC void bwander_configure(bam_wanderer_t *wanderer, bam_file_t *in_file, bam_file_t *out_file, genome_t *reference, wanderer_function wf, processor_function pf);
 
 EXTERNC int bwander_run(bam_wanderer_t *wanderer);
 

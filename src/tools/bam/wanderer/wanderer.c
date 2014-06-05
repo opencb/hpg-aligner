@@ -75,7 +75,7 @@ bwander_destroy(bam_wanderer_t *wanderer)
 }
 
 void 
-bwander_configure(bam_wanderer_t *wanderer, bam_file_t *in_file, bam_file_t *out_file, wanderer_function wf, processor_function pf)
+bwander_configure(bam_wanderer_t *wanderer, bam_file_t *in_file, bam_file_t *out_file, genome_t *reference, wanderer_function wf, processor_function pf)
 {
 	assert(wanderer);
 	assert(in_file);
@@ -87,6 +87,7 @@ bwander_configure(bam_wanderer_t *wanderer, bam_file_t *in_file, bam_file_t *out
 	omp_set_lock(&wanderer->output_file_lock);
 	wanderer->output_file = out_file;		
 	omp_unset_lock(&wanderer->output_file_lock);
+	wanderer->reference = reference;
 
 	//Set functions
 	wanderer->wander_f = wf;
