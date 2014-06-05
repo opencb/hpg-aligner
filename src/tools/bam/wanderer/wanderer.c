@@ -38,6 +38,7 @@ bwander_init(bam_wanderer_t *wanderer)
 	omp_init_lock(&wanderer->regions_lock);
 	omp_init_lock(&wanderer->free_slots);
 	omp_init_lock(&wanderer->output_file_lock);
+	omp_init_lock(&wanderer->reference_lock);
 }
 
 void
@@ -72,6 +73,7 @@ bwander_destroy(bam_wanderer_t *wanderer)
 	//Destroy lock
 	omp_destroy_lock(&wanderer->regions_lock);
 	omp_destroy_lock(&wanderer->output_file_lock);
+	omp_destroy_lock(&wanderer->reference_lock);
 }
 
 void 
@@ -87,7 +89,9 @@ bwander_configure(bam_wanderer_t *wanderer, bam_file_t *in_file, bam_file_t *out
 	omp_set_lock(&wanderer->output_file_lock);
 	wanderer->output_file = out_file;		
 	omp_unset_lock(&wanderer->output_file_lock);
+	omp_set_lock(&wanderer->reference_lock);
 	wanderer->reference = reference;
+	omp_set_lock(&wanderer->reference_lock);
 
 	//Set functions
 	wanderer->wander_f = wf;

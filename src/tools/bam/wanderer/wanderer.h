@@ -36,8 +36,9 @@ typedef struct {
 	//I/O
 	bam_file_t *input_file;
 	bam_file_t *output_file;
-	omp_lock_t output_file_lock;
 	genome_t *reference;
+	omp_lock_t output_file_lock;
+	omp_lock_t reference_lock;
 
 	//Regions
 	omp_lock_t regions_lock;
