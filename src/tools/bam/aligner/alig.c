@@ -215,7 +215,7 @@ alig_region_next(bam1_t **v_bams, size_t v_bams_l, int force_incomplete, alig_co
 	size_t interval_read_end;
 
 	//Aux list
-	static array_list_t *aux_list = NULL;
+	array_list_t *aux_list = NULL;
 
 	assert(context);
 
@@ -233,10 +233,7 @@ alig_region_next(bam1_t **v_bams, size_t v_bams_l, int force_incomplete, alig_co
 	memset(&context->region, 0, sizeof(alig_region_t));
 
 	//Init aux list
-	if(!aux_list)
-	{
-		aux_list = array_list_new(ALIG_LIST_NEXT_SIZE, 1.2f, 0);
-	}
+	aux_list = array_list_new(ALIG_LIST_NEXT_SIZE, 1.2f, 0);
 	array_list_clear(aux_list, NULL);
 
 	//Read alignments until interval reached
@@ -313,6 +310,9 @@ alig_region_next(bam1_t **v_bams, size_t v_bams_l, int force_incomplete, alig_co
 			}
 		} //For
 	} //Valid region if
+
+	//Destroy auxiliar list
+	array_list_free(aux_list, NULL);
 
 	return ret;
 }
