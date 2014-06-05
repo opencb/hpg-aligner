@@ -419,13 +419,36 @@ dummy_processor(bam_wanderer_t *wanderer, bam_region_t *region)
 		assert(region->reads[i]);
 	}
 
+	//Update user data
+	size_t *reads;
+	bwander_lock_user_data(wanderer, (void **)&reads);
+	*reads += region->size;
+	bwander_unlock_user_data(wanderer);
+
+	//Get local user data
+	size_t *regions;
+	bwander_local_user_data(wanderer, (void **)&regions);
+	if(regions == NULL)
+	{
+		//Local data is not initialized
+		regions = (size_t *)malloc(sizeof(size_t));
+		*regions = 0;
+		//printf("%d - POP\n", omp_get_thread_num());
+
+		//Set local data
+		bwander_local_user_data_set(wanderer, regions);
+	}
+
+	//Increase local user data
+	*regions += 1;
+
 	//usleep(10 * region->size); //1 us per alignment
 
 	return NO_ERROR;
 }
 
 int
-realign_processor(bam_wanderer_t *wanderer, bam_region_t *region)
+realigner_processor(bam_wanderer_t *wanderer, bam_region_t *region)
 {
 	int err;
 	alig_context_t context;
@@ -482,6 +505,87 @@ realign_processor(bam_wanderer_t *wanderer, bam_region_t *region)
 	return NO_ERROR;
 }
 
+void
+reduce_reads_dummy(void *data, void *dest)
+{
+	size_t *s_data, *s_dest;
+	assert(data);
+	assert(dest);
+
+	//Cast pointers
+	s_data = (size_t *)data;
+	s_dest = (size_t *)dest;
+
+	//Add
+	*s_dest += *s_data;
+}
+
+static inline ERROR_CODE
+wander_bam_file_dummy(bam_wanderer_t *wanderer, bam_file_t *in, bam_file_t *out, genome_t *ref)
+{
+	size_t reads_proc = 0;
+	size_t regions_proc = 0;
+
+	assert(wanderer);
+	assert(in);
+	assert(out);
+	assert(ref);
+
+	//Init wandering
+	bwander_init(wanderer);
+
+	//Configure wanderer
+	bwander_configure(wanderer, in, out, ref,
+			(int (*)(void *, bam_region_t *, bam1_t *))realign_wanderer,
+			(int (*)(void *, bam_region_t *))dummy_processor);
+
+	//Set user data
+	bwander_set_user_data(wanderer, &reads_proc);
+
+	//Run wander
+	bwander_run(wanderer);
+
+	//Print user data
+	printf("\nREDUCED DATA, Reads processed: %d\n", reads_proc);
+
+	//Print reduced local user data
+	bwander_local_user_data_reduce(wanderer, &regions_proc, reduce_reads_dummy);
+	printf("\nREDUCED LOCAL DATA, Regions processed: %d\n", regions_proc);
+
+	//Free local user data
+	bwander_local_user_data_free(wanderer, NULL);
+
+	//Destroy wanderer
+	bwander_destroy(wanderer);
+
+	return NO_ERROR;
+}
+
+static inline ERROR_CODE
+wander_bam_file_realigner(bam_wanderer_t *wanderer, bam_file_t *in, bam_file_t *out, genome_t *ref)
+{
+	assert(wanderer);
+	assert(in);
+	assert(out);
+	assert(ref);
+
+	//Init wandering
+	bwander_init(wanderer);
+
+	//Configure wanderer
+	bwander_configure(wanderer, in, out, ref,
+			(int (*)(void *, bam_region_t *, bam1_t *))realign_wanderer,
+			(int (*)(void *, bam_region_t *))realigner_processor);
+
+	//Run wander
+	bwander_run(wanderer);
+
+	//Destroy wanderer
+	bwander_destroy(wanderer);
+
+	return NO_ERROR;
+}
+
 ERROR_CODE
 wander_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 {
@@ -498,7 +602,7 @@ wander_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 	bam_wanderer_t wanderer;
 
 	//Aligner
-	alig_context_t context;
+	//alig_context_t context;
 
 	assert(bam_path);
 	assert(ref_name);
@@ -536,24 +640,16 @@ wander_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 		printf("New BAM initialized!...\n");
 	}
 
-	//Init wandering
-	bwander_init(&wanderer);
-
-	//Configure wanderer
-	bwander_configure(&wanderer, bam_f, out_bam_f, ref,
-			(int (*)(void *, bam_region_t *, bam1_t *))realign_wanderer,
-			(int (*)(void *, bam_region_t *))realign_processor);
-
 #ifdef D_TIME_DEBUG
 	times = omp_get_wtime() - times;
 	time_add_time_slot(D_FWORK_INIT, TIME_GLOBAL_STATS, times);
 #endif
 
-	//Run wander
-	bwander_run(&wanderer);
+	//Dummy wandering
+	//wander_bam_file_dummy(&wanderer, bam_f, out_bam_f, ref);
 
-	//Destroy wanderer
-	bwander_destroy(&wanderer);
+	//Realigner wandering
+	wander_bam_file_realigner(&wanderer, bam_f, out_bam_f, ref);
 
 	//Free context
 	//printf("\nDestroying context...\n");
