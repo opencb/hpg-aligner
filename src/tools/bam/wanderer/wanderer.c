@@ -23,7 +23,7 @@ static int bwander_obtain_region(bam_wanderer_t *wanderer, bam_region_t *current
 void
 bwander_init(bam_wanderer_t *wanderer)
 {
-	int i;
+	int i, threads;
 	bam_region_t *region;
 
 	assert(wanderer);
@@ -33,6 +33,11 @@ bwander_init(bam_wanderer_t *wanderer)
 
 	//Create regions
 	wanderer->regions_list = linked_list_new(COLLECTION_MODE_SYNCHRONIZED);
+
+	//Create local data
+	threads = omp_get_max_threads();
+	wanderer->local_user_data = (void **)malloc(threads * sizeof(void*));
+	memset(wanderer->local_user_data, 0, threads * sizeof(void*));
 
 	//Init locks
 	omp_init_lock(&wanderer->regions_lock);
@@ -69,6 +74,12 @@ bwander_destroy(bam_wanderer_t *wanderer)
 			free(region);
 		}
 		linked_list_free(list, NULL);
+	}
+
+	//Local data exists?
+	if(wanderer->local_user_data)
+	{
+		free(wanderer->local_user_data);
 	}
 
 	//Destroy lock

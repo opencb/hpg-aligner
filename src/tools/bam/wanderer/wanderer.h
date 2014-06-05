@@ -53,6 +53,7 @@ typedef struct {
 	//User data
 	void *user_data;
 	omp_lock_t user_data_lock;
+	void **local_user_data;
 } bam_wanderer_t;
 
 /**
@@ -71,6 +72,10 @@ EXTERNC int bwander_run(bam_wanderer_t *wanderer);
 EXTERNC int bwander_set_user_data(bam_wanderer_t *wanderer, void *user_data);
 static int bwander_lock_user_data(bam_wanderer_t *wanderer, void **user_data);
 static int bwander_unlock_user_data(bam_wanderer_t *wanderer);
+static int bwander_local_user_data(bam_wanderer_t *wanderer, void **user_data);
+static int bwander_local_user_data_set(bam_wanderer_t *wanderer, void *user_data);
+static int bwander_local_user_data_reduce(bam_wanderer_t *wanderer, void *reduced, void (*cb_reduce)(void *, void *));
+static int bwander_local_user_data_free(bam_wanderer_t *wanderer, void (*cb_free)(void *));
 
 /**
  * FILTER
@@ -107,6 +112,110 @@ bwander_unlock_user_data(bam_wanderer_t *wanderer)
 
 	//Remove the lock
 	omp_unset_lock(&wanderer->user_data_lock);
+
+	return NO_ERROR;
+}
+
+static inline int
+bwander_local_user_data(bam_wanderer_t *wanderer, void **user_data)
+{
+	int thread_id;
+
+	assert(wanderer);
+	assert(user_data);
+
+	//Get thread id
+	thread_id = omp_get_thread_num();
+	assert(thread_id >= 0);
+
+	//Get user data
+	*user_data = wanderer->local_user_data[thread_id];
+
+	return NO_ERROR;
+}
+
+static inline int
+bwander_local_user_data_set(bam_wanderer_t *wanderer, void *user_data)
+{
+	int thread_id;
+
+	assert(wanderer);
+	assert(user_data);
+
+	//Get thread id
+	thread_id = omp_get_thread_num();
+	assert(thread_id >= 0);
+
+	//Get user data
+	wanderer->local_user_data[thread_id] = user_data;
+
+	return NO_ERROR;
+}
+
+static inline int
+bwander_local_user_data_reduce(bam_wanderer_t *wanderer, void *reduced, void (*cb_reduce)(void *, void *))
+{
+	int i, threads;
+	void *data;
+
+	assert(wanderer);
+	assert(reduced);
+	assert(cb_reduce);
+
+	//Get num threads
+	threads = omp_get_max_threads();
+
+	//Iterate data
+	for(i = 0; i < threads; i++)
+	{
+		//Get next data
+		data = wanderer->local_user_data[i];
+
+		//Free if data exists
+		if(data != NULL)
+		{
+			//Callback
+			if(cb_reduce != NULL)
+			{
+				cb_reduce(data, reduced);
+			}
+		}
+	}
+
+	return NO_ERROR;
+}
+
+static inline int
+bwander_local_user_data_free(bam_wanderer_t *wanderer, void (*cb_free)(void *))
+{
+	int i, threads;
+	void *data;
+
+	assert(wanderer);
+
+	//Get num threads
+	threads = omp_get_max_threads();
+
+	//Iterate data
+	for(i = 0; i < threads; i++)
+	{
+		//Get next data
+		data = wanderer->local_user_data[i];
+
+		//Free if data exists
+		if(data != NULL)
+		{
+			//Callback
+			if(cb_free != NULL)
+			{
+				cb_free(data);
+			}
+
+			//Free memory
+			free(data);
+			wanderer->local_user_data[i] = NULL;
+		}
+	}
 
 	return NO_ERROR;
 }
