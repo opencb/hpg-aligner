@@ -91,7 +91,7 @@ bwander_configure(bam_wanderer_t *wanderer, bam_file_t *in_file, bam_file_t *out
 	omp_unset_lock(&wanderer->output_file_lock);
 	omp_set_lock(&wanderer->reference_lock);
 	wanderer->reference = reference;
-	omp_set_lock(&wanderer->reference_lock);
+	omp_unset_lock(&wanderer->reference_lock);
 
 	//Set functions
 	wanderer->wander_f = wf;
