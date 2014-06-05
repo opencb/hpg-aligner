@@ -405,7 +405,7 @@ realign_wanderer(bam_wanderer_t *wanderer, bam_region_t *region, bam1_t *read)
 }
 
 int
-realign_processor(bam_wanderer_t *wanderer, bam_region_t *region)
+dummy_processor(bam_wanderer_t *wanderer, bam_region_t *region)
 {
 	int i;
 
@@ -419,7 +419,65 @@ realign_processor(bam_wanderer_t *wanderer, bam_region_t *region)
 		assert(region->reads[i]);
 	}
 
-	//usleep(1 * region->size); //1 us per alignment
+	//usleep(10 * region->size); //1 us per alignment
+
+	return NO_ERROR;
+}
+
+int
+realign_processor(bam_wanderer_t *wanderer, bam_region_t *region)
+{
+	int err;
+	alig_context_t context;
+	bam1_t **v_reads;
+	size_t v_reads_l;
+
+	//Create contexts
+	omp_set_lock(&wanderer->reference_lock);
+	alig_init(&context, wanderer->reference, ALIG_LEFT_ALIGN | ALIG_REFERENCE_PRIORITY);
+	omp_unset_lock(&wanderer->reference_lock);
+
+	//Load region reads in aligner context
+	v_reads = region->reads;
+	v_reads_l = region->size;
+	err = alig_region_next(v_reads, v_reads_l, 1, &context);
+	if(err && err != ALIG_INCOMPLETE_INTERVAL)
+	{
+		LOG_ERROR_F("Cannot obtain next region in aligner, error code = %d\n", err);
+		return err;
+	}
+
+	//Load reference for this region
+	omp_set_lock(&wanderer->reference_lock);
+	err = alig_region_load_reference(&context);
+	omp_unset_lock(&wanderer->reference_lock);
+	if(err)
+	{
+		LOG_ERROR_F("Loading reference sequence, error code = %d\n", err);
+		return err;
+	}
+
+	//Obtain haplotypes
+	err = alig_region_haplotype_process(&context);
+	if(err)
+	{
+		LOG_ERROR_F("Obtaining haplotypes, error code = %d\n", err);
+		return err;
+	}
+
+	//Realign
+	err = alig_region_indel_realignment(&context);
+	if(err)
+	{
+		LOG_ERROR_F("Realigning, error code = %d\n", err);
+		return err;
+	}
+
+	//Clear context
+	//alig_region_clear(&context);
+
+	//Destroy region
+	alig_destroy(&context);
 
 	return NO_ERROR;
 }
@@ -438,6 +496,9 @@ wander_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 
 	//Wanderer
 	bam_wanderer_t wanderer;
+
+	//Aligner
+	alig_context_t context;
 
 	assert(bam_path);
 	assert(ref_name);
@@ -479,7 +540,7 @@ wander_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 	bwander_init(&wanderer);
 
 	//Configure wanderer
-	bwander_configure(&wanderer, bam_f, out_bam_f,
+	bwander_configure(&wanderer, bam_f, out_bam_f, ref,
 			(int (*)(void *, bam_region_t *, bam1_t *))realign_wanderer,
 			(int (*)(void *, bam_region_t *))realign_processor);
 
