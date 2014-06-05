@@ -39,6 +39,7 @@ bwander_init(bam_wanderer_t *wanderer)
 	omp_init_lock(&wanderer->free_slots);
 	omp_init_lock(&wanderer->output_file_lock);
 	omp_init_lock(&wanderer->reference_lock);
+	omp_init_lock(&wanderer->user_data_lock);
 }
 
 void
@@ -74,6 +75,7 @@ bwander_destroy(bam_wanderer_t *wanderer)
 	omp_destroy_lock(&wanderer->regions_lock);
 	omp_destroy_lock(&wanderer->output_file_lock);
 	omp_destroy_lock(&wanderer->reference_lock);
+	omp_destroy_lock(&wanderer->user_data_lock);
 }
 
 void 
@@ -412,6 +414,21 @@ bwander_run(bam_wanderer_t *wanderer)
 	LOG_INFO("Wanderer SUCCESS!\n");
 
 	return err;
+}
+
+/**
+ * USER DATA
+ */
+int
+bwander_set_user_data(bam_wanderer_t *wanderer, void *user_data)
+{
+	assert(wanderer);
+	assert(user_data);
+
+	//Set user data
+	wanderer->user_data = user_data;
+
+	return NO_ERROR;
 }
 
 /**

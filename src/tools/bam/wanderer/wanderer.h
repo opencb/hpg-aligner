@@ -49,6 +49,10 @@ typedef struct {
 	//Function to execute
 	wanderer_function wander_f;
 	processor_function processing_f;
+
+	//User data
+	void *user_data;
+	omp_lock_t user_data_lock;
 } bam_wanderer_t;
 
 /**
@@ -62,6 +66,13 @@ EXTERNC void bwander_configure(bam_wanderer_t *wanderer, bam_file_t *in_file, ba
 EXTERNC int bwander_run(bam_wanderer_t *wanderer);
 
 /**
+ * USER DATA
+ */
+EXTERNC int bwander_set_user_data(bam_wanderer_t *wanderer, void *user_data);
+static int bwander_lock_user_data(bam_wanderer_t *wanderer, void **user_data);
+static int bwander_unlock_user_data(bam_wanderer_t *wanderer);
+
+/**
  * FILTER
  */
 static int filter_read(bam1_t *read, uint8_t filters);
@@ -69,6 +80,37 @@ static int filter_read(bam1_t *read, uint8_t filters);
 /**
  * INLINE FUNCTIONS
  */
+
+static inline int
+bwander_lock_user_data(bam_wanderer_t *wanderer, void **user_data)
+{
+	assert(wanderer);
+
+	//Take the lock
+	omp_set_lock(&wanderer->user_data_lock);
+
+	//No user data?
+	if(wanderer->user_data == NULL)
+	{
+		LOG_WARN("Getting uninitialized user data\n");
+	}
+
+	//Set return
+	*user_data = wanderer->user_data;
+
+	return NO_ERROR;
+}
+static inline int
+bwander_unlock_user_data(bam_wanderer_t *wanderer)
+{
+	assert(wanderer);
+
+	//Remove the lock
+	omp_unset_lock(&wanderer->user_data_lock);
+
+	return NO_ERROR;
+}
+
 static inline int
 filter_read(bam1_t *read, uint8_t filters)
 {
