@@ -498,9 +498,6 @@ realigner_processor(bam_wanderer_t *wanderer, bam_region_t *region)
 		return err;
 	}
 
-	//Clear context
-	//alig_region_clear(&context);
-
 	//Destroy region
 	alig_destroy(&context);
 
@@ -602,9 +599,6 @@ wander_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 	//Wanderer
 	bam_wanderer_t wanderer;
 
-	//Aligner
-	//alig_context_t context;
-
 	assert(bam_path);
 	assert(ref_name);
 	assert(ref_path);
@@ -651,11 +645,6 @@ wander_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 
 	//Realigner wandering
 	wander_bam_file_realigner(&wanderer, bam_f, out_bam_f, ref);
-
-	//Free context
-	//printf("\nDestroying context...\n");
-	//fflush(stdout);
-	//alig_destroy(&context);
 
 	printf("\nClosing BAM file...\n");
 	bam_fclose(bam_f);
