@@ -217,7 +217,6 @@ breg_write_n(bam_region_t *region, size_t n, bam_file_t *output_file)
 	bam1_t *read;
 
 	assert(region);
-	assert(output_file);
 
 	LOG_INFO_F("Writing %d processed reads\n", n);
 
@@ -233,7 +232,10 @@ breg_write_n(bam_region_t *region, size_t n, bam_file_t *output_file)
 		assert(read);
 
 		//Write to disk
-		bam_write1(output_file->bam_fd, read);
+		if(output_file != NULL)
+		{
+			bam_write1(output_file->bam_fd, read);
+		}
 		bam_destroy1(read);
 		region->reads[i] = NULL;
 	}
