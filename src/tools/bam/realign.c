@@ -28,7 +28,7 @@ int alig_bam(int argc, char **argv)
 
     struct arg_file *refile = arg_file0("r",NULL,"<reference>","reference genome compressed file (dna_compression.bin)");
     struct arg_file *infile = arg_file0("b",NULL,"<input>","input BAM file");
-    struct arg_file *outfile = arg_file0("o",NULL,"<output>","output recalibrated BAM file, default:\"output.bam\"");
+    struct arg_file *outfile = arg_file0("o",NULL,"<output>","output processed BAM file");
     struct arg_lit  *help    = arg_lit0("h","help","print this help and exit");
     struct arg_lit  *version = arg_lit0(NULL,"version","print version information and exit");
     struct arg_end  *end     = arg_end(20);
@@ -48,7 +48,7 @@ int alig_bam(int argc, char **argv)
     }
 
     /* set any command line default values prior to parsing */
-    outfile->filename[0]="output.bam";
+    outfile->filename[0]=NULL;
 
     /* Parse the command line as defined by argtable[] */
     nerrors = arg_parse(argc,argv,argtable);
@@ -154,7 +154,10 @@ int alig_bam(int argc, char **argv)
 
     /* normal case: realignment */
 	{
-		exitcode = align_launch((char *)refile->filename[0], (char *)infile->filename[0], (char *)outfile->filename[0], 1);
+		exitcode = align_launch(	(char *)refile->filename[0],
+												(char *)infile->filename[0],
+												(char *)outfile->filename[0],
+												1);
 	}
 
     exit:
@@ -173,7 +176,6 @@ align_launch(char *reference, char *bam, char *output, int threads)
 
 	assert(reference);
 	assert(bam);
-	assert(output);
 
 	init_log();
 	LOG_FILE("realign.log","w");
@@ -566,7 +568,6 @@ wander_bam_file_realigner(bam_wanderer_t *wanderer, bam_file_t *in, bam_file_t *
 {
 	assert(wanderer);
 	assert(in);
-	assert(out);
 	assert(ref);
 
 	//Init wandering
@@ -590,9 +591,9 @@ ERROR_CODE
 wander_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 {
 	//Files
-	bam_file_t *bam_f;
-	bam_file_t *out_bam_f;
-	genome_t* ref;
+	bam_file_t *bam_f = NULL;
+	bam_file_t *out_bam_f = NULL;
+	genome_t* ref = NULL;
 	int bytes;
 
 	//Times
@@ -607,7 +608,6 @@ wander_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 	assert(bam_path);
 	assert(ref_name);
 	assert(ref_path);
-	assert(outbam);
 
 #ifdef D_TIME_DEBUG
 	times = omp_get_wtime();
@@ -630,6 +630,7 @@ wander_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 	}
 
 	//Create new bam
+	if(outbam != NULL)
 	{
 		printf("Creating new bam file in \"%s\"...\n", outbam);
 		//init_empty_bam_header(orig_bam_f->bam_header_p->n_targets, recal_bam_header);
