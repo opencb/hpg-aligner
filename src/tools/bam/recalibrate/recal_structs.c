@@ -31,12 +31,15 @@
  * Initialize empty recalibration data struct.
  */
 ERROR_CODE
-recal_init_info(const U_CYCLES cycles, recal_info_t **out_data)
+recal_init_info(const U_CYCLES cycles, recal_info_t *out_data)
 {
 	recal_info_t *data;
-	int vector_size = MAX_QUALITY - MIN_QUALITY;
+	int vector_size;
 
-	data = (recal_info_t *)malloc(sizeof(recal_info_t));
+	assert(out_data);
+
+	vector_size = MAX_QUALITY - MIN_QUALITY;
+	data = out_data;
 
 	//Struct initialization
 	data->min_qual = MIN_QUALITY;
@@ -70,8 +73,6 @@ recal_init_info(const U_CYCLES cycles, recal_info_t **out_data)
 	memset(data->qual_cycle_bases, 0, vector_size * cycles * sizeof(U_BASES));
 	memset(data->qual_dinuc_bases, 0, vector_size * NUM_DINUC * sizeof(U_BASES));
 
-	*out_data = data;
-
 	return NO_ERROR;
 }
 
@@ -79,9 +80,9 @@ recal_init_info(const U_CYCLES cycles, recal_info_t **out_data)
  * Free all resources of recalibration.
  */
 ERROR_CODE
-recal_destroy_info(recal_info_t **data)
+recal_destroy_info(recal_info_t *data)
 {
-	recal_info_t *d = *data;
+	recal_info_t *d = data;
 
 	//Free quality vector
 	free(d->qual_miss);
@@ -97,10 +98,6 @@ recal_destroy_info(recal_info_t **data)
 	free(d->qual_dinuc_miss);
 	free(d->qual_dinuc_bases);
 	free(d->qual_dinuc_delta);
-
-	//Free struct
-	free(d);
-	*data = NULL;
 
 	return NO_ERROR;
 }

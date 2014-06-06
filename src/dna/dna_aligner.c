@@ -287,15 +287,16 @@ void dna_aligner(options_t *options) {
     }
 
     recal_info_t *recal_info;
-    recal_init_info(500, &recal_info);
+    recal_info = (recal_info_t *)malloc(sizeof(recal_info_t));
+    recal_init_info(500, recal_info);
     printf("-----------------------------------\nCollecting data for recalibration...\n");
     recal_get_data_from_file(aux, "dna_compression.bin", sa_dirname, recal_info);
     printf("-----------------------------------\n");
     recal_calc_deltas(recal_info);
     printf("-----------------------------------\nRecalibrating...\n");
     recal_recalibrate_bam_file(aux, recal_info, recal_filename);
-    recal_destroy_info(&recal_info);
-
+    recal_destroy_info(recal_info);
+    free(recal_info);
   }
 
 

@@ -294,7 +294,8 @@ recal_get_data_from_bam_batch(const bam_batch_t* batch, const genome_t* ref, rec
 		recal_get_data_init_env(output_data->num_cycles, collect_env);
 
 		//Initialize output data
-		recal_init_info(output_data->num_cycles, &data);
+		data = (recal_info_t *)malloc(sizeof(recal_info_t));
+		recal_init_info(output_data->num_cycles, data);
 
 		//Current is general batch
 		current_batch = (bam_batch_t *)batch;
@@ -361,7 +362,8 @@ recal_get_data_from_bam_batch(const bam_batch_t* batch, const genome_t* ref, rec
 		}
 
 		//Free data memory
-		recal_destroy_info(&data);
+		recal_destroy_info(data);
+		free(data);
 
 		//Destroy environment
 		recal_get_data_destroy_env(collect_env);

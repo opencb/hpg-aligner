@@ -107,7 +107,7 @@ typedef enum DINUC
  * \param cycles Number of maximum cycles to stat.
  * \param out_info Previously allocated info struct to initialize.
  */
-EXTERNC ERROR_CODE recal_init_info(const U_CYCLES cycles, recal_info_t **out_data);
+EXTERNC ERROR_CODE recal_init_info(const U_CYCLES cycles, recal_info_t *out_data);
 
 /**
  * \brief Free all resources of recalibration.
@@ -116,7 +116,7 @@ EXTERNC ERROR_CODE recal_init_info(const U_CYCLES cycles, recal_info_t **out_dat
  *
  * \param data Data struct to free
  */
-EXTERNC ERROR_CODE recal_destroy_info(recal_info_t **data);
+EXTERNC ERROR_CODE recal_destroy_info(recal_info_t *data);
 
 /**
  * \brief Reduce data.
