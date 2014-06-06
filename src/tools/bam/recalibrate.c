@@ -24,8 +24,15 @@
 #include <sys/stat.h>
 #include "aux/aux_library.h"
 #include "aux/timestats.h"
+#include "wanderer/wanderer.h"
 #include "recalibrate/recal_config.h"
+#include "recalibrate/recal_structs.h"
 #include "recalibrate/bam_recal_library.h"
+
+#define RECALIBRATE_COLLECT 			0x01
+#define RECALIBRATE_RECALIBRATE 	0x02
+
+ERROR_CODE wander_bam_file_(uint8_t flags, char *bam_path, char *ref_name, char *ref_path, char *data_file, char *info_file, char *outbam, int cycles);
 
 int mymain(	int full,
 			int p1,
@@ -45,7 +52,6 @@ int mymain(	int full,
 			const char *compfile,
 			int compcount)
 {	
-	recal_info_t *data;
 	char *dir, *base, *inputc, *outputc, *infofilec, *datafilec;
 	char *sched;
 	char cwd[1024];
@@ -198,48 +204,44 @@ int mymain(	int full,
 	init_log();
 
 	//Set num of threads
-	omp_set_num_threads(threads);
-	printf("Threading with %d threads and %s schedule\n", threads, sched);
+	//omp_set_num_threads(threads);
+	printf("Threading with %d threads and %s schedule\n", omp_get_max_threads(), sched);
 
 	//Execute phase 1
 	if (p1)
 	{
 		printf("\n===================\nExecuting phase 1.\n===================\n\n");
-
-		//Create new data
-		printf("cycles: %d\n",cycles);
-		recal_init_info(cycles, &data);
 		
 		//Obtain reference filename and dirpath from full path
 		dir = strdup(reference);
 		dir = dirname(dir);
 		base = strrchr(reference, '/');
 		
+		//Print data
+		infofilec = NULL;
+		if(infocount > 0)
+		{
+			infofilec = strdup(infofile);
+		}
+		
+		//Save data file
+		datafilec = NULL;
+		if(datacount > 0)
+		{
+			datafilec = strdup(datafile);
+		}
+
 		//Obtain data from bam
 		inputc = strdup(input);
 		printf("Reference dir: %s\n", dir);
 		printf("Reference name: %s\n", base);
-		recal_get_data_from_file(inputc, base, dir, data);
+		//recal_get_data_from_file(inputc, base, dir, data);
+		wander_bam_file_(RECALIBRATE_COLLECT, inputc,base, dir, datafilec, infofilec, NULL, cycles);
 		free(inputc);
-		
-		//Delta processing
-		recal_calc_deltas(data);
-		
-		//Print data
-		if(infocount > 0)
-		{
-			infofilec = strdup(infofile);
-			recal_fprint_info(data, infofilec);
-			free(infofilec);
-		}
-		
-		//Save data file
-		if(datacount > 0)
-		{
-			datafilec = strdup(datafile);
-			recal_save_recal_info(data, datafilec);
+		if(datafilec)
 			free(datafilec);
-		}
+		if(infofilec)
+			free(infofilec);
 	}
 	
 	//Execute phase 2
@@ -247,23 +249,27 @@ int mymain(	int full,
 	{
 		printf("\n===================\nExecuting phase 2.\n===================\n\n");
 		
-		if (!p1)
+		//Get datafile name
+		datafilec = NULL;
+		if(datacount > 0)
 		{
-			//New data
-			recal_init_info(cycles, &data);
-			
-			//Load data
-			recal_load_recal_info(datafile, data);
+			datafilec = strdup(datafile);
 		}
-		
 
 		inputc = strdup(input);
-		outputc = strdup(output);
+		outputc = NULL;
+		if(output)
+			outputc = strdup(output);
 
 		//Recalibrate bam
-		recal_recalibrate_bam_file(inputc, data, outputc);
+		//recal_recalibrate_bam_file(inputc, data, outputc);
+		wander_bam_file_(RECALIBRATE_RECALIBRATE, inputc, NULL, NULL, datafilec, NULL, outputc, cycles);
+
 		free(inputc);
-		free(outputc);
+		if(outputc)
+			free(outputc);
+		if(datafilec)
+			free(datafilec);
 	}
 	
 	
@@ -384,9 +390,6 @@ int mymain(	int full,
 			compare_bams_qual(input, compfile, 76);
 		}
 	}
-	
-	//Free data memory	
-	recal_destroy_info(&data);
 	
 	stop_log();
 
@@ -529,4 +532,296 @@ int recalibrate_bam(int argc, char **argv)
     arg_freetable(argtable,sizeof(argtable)/sizeof(argtable[0]));
 
     return exitcode;
+}
+
+int
+recalibrate_wanderer(bam_wanderer_t *wanderer, bam_region_t *region, bam1_t *read)
+{
+	assert(wanderer);
+	assert(region);
+	assert(read);
+
+	//Filter read
+	if(filter_read(read, FILTER_ZERO_QUAL | FILTER_DIFF_MATE_CHROM | FILTER_NO_CIGAR | FILTER_DEF_MASK))
+	{
+		//Read is not valid for process
+		return WANDER_READ_FILTERED;
+	}
+
+	//Update region bounds
+	if(region->init_pos > read->core.pos)
+	{
+		region->init_pos = read->core.pos;
+		region->chrom = read->core.tid;
+	}
+	if(region->end_pos < read->core.pos)
+	{
+		region->end_pos = read->core.pos;
+	}
+
+	return NO_ERROR;
+}
+
+int
+recalibrate_collect_processor(bam_wanderer_t *wanderer, bam_region_t *region)
+{
+	int err, i;
+	recal_info_t *data;
+	recal_data_collect_env_t *collect_env;
+	bam1_t *read;
+	size_t *cycles;
+
+	//Get data
+	bwander_local_user_data(wanderer, (void **)&data);
+	if(data == NULL)
+	{
+		//Local data is not initialized
+		data = (recal_info_t *)malloc(sizeof(recal_info_t));
+
+		//Lock cycles
+		bwander_lock_user_data(wanderer, (void **)&cycles);
+		recal_init_info(*cycles, data);
+		bwander_unlock_user_data(wanderer);
+
+		//Set local data
+		bwander_local_user_data_set(wanderer, data);
+	}
+
+	//Initialize get data environment
+	collect_env = (recal_data_collect_env_t *) malloc(sizeof(recal_data_collect_env_t));
+	recal_get_data_init_env(data->num_cycles, collect_env);
+
+	//Obtain data from all reads in region
+	for(i = 0; i < region->size; i++)
+	{
+		//Get next read
+		read = region->reads[i];
+		assert(read);
+
+		//Get data
+		omp_set_lock(&wanderer->reference_lock);
+		recal_get_data_from_bam_alignment(read, wanderer->reference, data, collect_env);
+		omp_unset_lock(&wanderer->reference_lock);
+	}
+
+	//Destroy environment
+	recal_get_data_destroy_env(collect_env);
+
+	return NO_ERROR;
+}
+
+void
+reduce_data(void *data, void *dest)
+{
+	recal_info_t *data_ptr, *dest_ptr;
+	assert(data);
+	assert(dest);
+
+	//Cast pointers
+	data_ptr = (recal_info_t *)data;
+	dest_ptr = (recal_info_t *)dest;
+
+	//Combine
+	recal_reduce_info(dest_ptr, data_ptr);
+}
+
+void
+destroy_data(void *data)
+{
+	recal_info_t *aux;
+
+	assert(data);
+
+	aux = (recal_info_t *)data;
+	recal_destroy_info(aux);
+}
+
+static inline ERROR_CODE
+wander_bam_file_recalibrate(bam_wanderer_t *wanderer, bam_file_t *in_bam, bam_file_t *out_bam, genome_t *ref, const char *in_data_f, const char *out_data_f, const char *out_info_f, int cycles)
+{
+	//Data
+	recal_info_t *data;
+	U_CYCLES aux_cycles;
+
+	assert(wanderer);
+	assert(in_bam);
+	assert(ref);
+	assert(cycles != 0);
+
+	//Init wandering
+	bwander_init(wanderer);
+
+	//Configure wanderer
+	bwander_configure(wanderer, in_bam, out_bam, ref,
+			(int (*)(void *, bam_region_t *, bam1_t *))recalibrate_wanderer,
+			(int (*)(void *, bam_region_t *))recalibrate_collect_processor);
+
+
+	printf("Cycles: %d\n",cycles);
+
+	//Load data file
+	if(in_data_f)
+	{
+		recal_load_recal_info(in_data_f, data);
+	}
+	else
+	{
+		//Create new data
+		aux_cycles = cycles;
+		data = (recal_info_t *)malloc(sizeof(recal_info_t));
+		recal_init_info(aux_cycles, data);
+	}
+
+	//Set user data
+	int cycles_param = cycles;
+	bwander_set_user_data(wanderer, &cycles_param);
+
+	//Run wander
+	bwander_run(wanderer);
+
+	//Reduce data
+	bwander_local_user_data_reduce(wanderer, data, reduce_data);
+	bwander_local_user_data_free(wanderer, destroy_data);
+
+	//Delta processing
+	recal_calc_deltas(data);
+
+	//Save data file
+	if(out_data_f)
+	{
+		recal_save_recal_info(data, out_data_f);
+	}
+
+	//Save info file
+	if(out_info_f)
+	{
+		recal_fprint_info(data, out_info_f);
+	}
+
+	//Free data memory
+	recal_destroy_info(data);
+	free(data);
+
+	//Destroy wanderer
+	bwander_destroy(wanderer);
+
+	return NO_ERROR;
+}
+
+ERROR_CODE
+wander_bam_file_(uint8_t flags, char *bam_path, char *ref_name, char *ref_path, char *data_file, char *info_file, char *outbam, int cycles)
+{
+	//Files
+	char *in_data_f = NULL;
+	char *out_data_f = NULL;
+	bam_file_t *bam_f = NULL;
+	bam_file_t *out_bam_f = NULL;
+	genome_t* ref = NULL;
+	int bytes;
+
+	//Data
+	recal_info_t data;
+
+	//Times
+	double times;
+
+	//Wanderer
+	bam_wanderer_t wanderer;
+
+	assert(bam_path);
+	assert(ref_name);
+	assert(ref_path);
+
+#ifdef D_TIME_DEBUG
+	times = omp_get_wtime();
+#endif
+
+	//Get phases
+	if((flags & RECALIBRATE_RECALIBRATE) && !(flags & RECALIBRATE_COLLECT))
+	{
+		//Second phase only, needs data file
+		assert(data_file);
+	}
+
+	//Open bam
+	{
+		printf("Opening BAM from \"%s\" ...\n", bam_path);
+		bam_f = bam_fopen(bam_path);
+		assert(bam_f);
+		printf("BAM opened!...\n");
+	}
+
+	//Open reference genome, if collect phase is present
+	if(flags & RECALIBRATE_COLLECT)
+	{
+		printf("Opening reference genome from \"%s%s\" ...\n", ref_path, ref_name);
+		ref = genome_new(ref_name, ref_path);
+		assert(ref);
+		printf("Reference opened!...\n");
+	}
+
+	//Create new bam
+	if(outbam != NULL && (flags & RECALIBRATE_RECALIBRATE))
+	{
+		printf("Creating new bam file in \"%s\"...\n", outbam);
+		//init_empty_bam_header(orig_bam_f->bam_header_p->n_targets, recal_bam_header);
+		out_bam_f = bam_fopen_mode(outbam, bam_f->bam_header_p, "w");
+		assert(out_bam_f);
+		bam_fwrite_header(out_bam_f->bam_header_p, out_bam_f);
+		out_bam_f->bam_header_p = NULL;
+		printf("New BAM initialized!...\n");
+	}
+
+#ifdef D_TIME_DEBUG
+	times = omp_get_wtime() - times;
+	time_add_time_slot(D_FWORK_INIT, TIME_GLOBAL_STATS, times);
+#endif
+
+	//Setup data file pointers
+	if(data_file != NULL)
+	{
+		//If recalibrate data file
+		if((flags & RECALIBRATE_RECALIBRATE) && (flags & RECALIBRATE_COLLECT))
+		{
+			//Full recalibration
+			in_data_f = data_file;
+			out_data_f = data_file;
+		}
+		else
+		{
+			if(flags & RECALIBRATE_COLLECT)
+			{
+				//Only collect
+				out_data_f = data_file;
+			}
+			else
+			{
+				//Only recalibrate
+				in_data_f = data_file;
+			}
+		}
+	}
+
+	//Recalibrate wandering
+	wander_bam_file_recalibrate(&wanderer, bam_f, out_bam_f, ref, in_data_f, out_data_f, info_file, cycles);
+
+	printf("\nClosing BAM file...\n");
+	bam_fclose(bam_f);
+	printf("BAM closed.\n");
+
+	if(ref != NULL)
+	{
+		printf("\nClosing reference file...\n");
+		genome_free(ref);
+		printf("Reference closed.\n");
+	}
+
+	if(outbam != NULL)
+	{
+		printf("Closing \"%s\" BAM file...\n", outbam);
+		bam_fclose(out_bam_f);
+		printf("BAM closed.\n");
+	}
+
+	return NO_ERROR;
 }
