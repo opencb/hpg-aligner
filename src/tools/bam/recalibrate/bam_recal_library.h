@@ -24,6 +24,8 @@
 #include <aligners/bwt/genome.h>
 #include "aux/aux_common.h"
 
+#define RECAL_REFERENCE_CORRECTION_OFFSET 4
+
 /**
  * \brief Recalibration data storage.
  *

@@ -76,12 +76,6 @@ bwander_destroy(bam_wanderer_t *wanderer)
 		linked_list_free(list, NULL);
 	}
 
-	//Local data exists?
-	if(wanderer->local_user_data)
-	{
-		free(wanderer->local_user_data);
-	}
-
 	//Destroy lock
 	omp_destroy_lock(&wanderer->regions_lock);
 	omp_destroy_lock(&wanderer->output_file_lock);

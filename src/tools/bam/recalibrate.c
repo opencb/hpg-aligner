@@ -32,7 +32,7 @@
 #define RECALIBRATE_COLLECT 			0x01
 #define RECALIBRATE_RECALIBRATE 	0x02
 
-ERROR_CODE wander_bam_file_(uint8_t flags, char *bam_path, char *ref_name, char *ref_path, char *data_file, char *info_file, char *outbam, int cycles);
+ERROR_CODE wander_bam_file_recalibrate(uint8_t flags, char *bam_path, char *ref_name, char *ref_path, char *data_file, char *info_file, char *outbam, int cycles);
 
 int mymain(	int full,
 			int p1,
@@ -244,7 +244,7 @@ int mymain(	int full,
 		printf("Reference dir: %s\n", dir);
 		printf("Reference name: %s\n", base);
 		//recal_get_data_from_file(inputc, base, dir, data);
-		wander_bam_file_(RECALIBRATE_COLLECT, inputc,base, dir, datafilec, infofilec, NULL, cycles);
+		wander_bam_file_recalibrate(RECALIBRATE_COLLECT, inputc,base, dir, datafilec, infofilec, NULL, cycles);
 		free(inputc);
 		if(datafilec)
 			free(datafilec);
@@ -270,8 +270,7 @@ int mymain(	int full,
 			outputc = strdup(output);
 
 		//Recalibrate bam
-		//recal_recalibrate_bam_file(inputc, data, outputc);
-		wander_bam_file_(RECALIBRATE_RECALIBRATE, inputc, NULL, NULL, datafilec, NULL, outputc, cycles);
+		wander_bam_file_recalibrate(RECALIBRATE_RECALIBRATE, inputc, NULL, NULL, datafilec, NULL, outputc, cycles);
 
 		free(inputc);
 		if(outputc)
@@ -590,8 +589,17 @@ recalibrate_recalibrate_processor(bam_wanderer_t *wanderer, bam_region_t *region
 
 		//Lock data
 		bwander_lock_user_data(wanderer, (void **)&gdata);
+
+		//Init struct
 		recal_init_info(gdata->num_cycles, data);
-		recal_reduce_info(data, gdata);	//Copy data into local
+
+		//Clone global data
+		if(recal_reduce_info(data, gdata))	//Copy data into local
+		{
+			LOG_FATAL_F("In local recalibration data copy\nLOCAL: Cycles: %d, Min Q: %d, Num Q: %d, Dinuc: %d\nGLOBAL: Cycles: %d, Min Q: %d, Num Q: %d, Dinuc: %d\n",
+					data->num_cycles, data->min_qual, data->num_quals, data->num_dinuc, gdata->num_cycles, gdata->min_qual, gdata->num_quals, gdata->num_dinuc);
+		}
+
 		bwander_unlock_user_data(wanderer);
 
 		//Set local data
@@ -645,135 +653,8 @@ destroy_data(void *data)
 	recal_destroy_info(aux);
 }
 
-static inline ERROR_CODE
-wander_bam_file_recalibrate(bam_wanderer_t *wanderer, uint8_t flags, bam_file_t *in_bam, bam_file_t *out_bam, genome_t *ref, const char *in_data_f, const char *out_data_f, const char *out_info_f, int cycles)
-{
-	//Data
-	recal_info_t *data = NULL;
-	U_CYCLES aux_cycles;
-	char aux_in_bam[1024];
-
-	assert(wanderer);
-	assert(in_bam);
-	assert(cycles != 0);
-	assert(flags != 0);
-
-	//Collection is needed?
-	if(flags & RECALIBRATE_COLLECT)
-	{
-		assert(ref);
-
-		//Init wandering
-		bwander_init(wanderer);
-
-		//Configure wanderer for data collection
-		bwander_configure(wanderer, in_bam, NULL, ref,
-				(int (*)(void *, bam_region_t *, bam1_t *))recalibrate_wanderer,
-				(int (*)(void *, bam_region_t *))recalibrate_collect_processor);
-
-		printf("Cycles: %d\n",cycles);
-
-		//Create new data
-		aux_cycles = cycles;
-		data = (recal_info_t *)malloc(sizeof(recal_info_t));
-		recal_init_info(aux_cycles, data);
-
-		//Set user data
-		int cycles_param = cycles;
-		bwander_set_user_data(wanderer, &cycles_param);
-
-		//Run wander
-		bwander_run(wanderer);
-
-		//Reduce data
-		bwander_local_user_data_reduce(wanderer, data, reduce_data);
-		bwander_local_user_data_free(wanderer, destroy_data);
-
-		//Delta processing
-		recal_calc_deltas(data);
-
-		//Save data file
-		if(out_data_f)
-		{
-			recal_save_recal_info(data, out_data_f);
-		}
-
-		//Save info file
-		if(out_info_f)
-		{
-			recal_fprint_info(data, out_info_f);
-		}
-
-		//Destroy wanderer
-		bwander_destroy(wanderer);
-	}
-
-	//Recalibration is needed?
-	if(flags & RECALIBRATE_RECALIBRATE)
-	{
-		//Previous collect?
-		if(data == NULL)
-		{
-			//No previous collect, load data file
-			if(in_data_f)
-			{
-				//Allocate data
-				aux_cycles = cycles;
-				data = (recal_info_t *)malloc(sizeof(recal_info_t));
-				recal_init_info(aux_cycles, data);
-
-				//Load data from disk
-				recal_load_recal_info(in_data_f, data);
-			}
-			else
-			{
-				//If only recalibrate input data must be present
-				LOG_FATAL("Only recalibration phase 2 requested but no input data specified\n");
-			}
-		}
-		else
-		{
-			//Previous collect, so reopen input bam
-			strcpy(aux_in_bam, in_bam->filename);
-			in_bam = bam_fopen(aux_in_bam);
-			assert(in_bam);
-		}
-
-		recal_calc_deltas(data);
-
-		//Init wandering
-		bwander_init(wanderer);
-
-		//Configure wanderer for recalibration
-		bwander_configure(wanderer, in_bam, out_bam, ref,
-				(int (*)(void *, bam_region_t *, bam1_t *))recalibrate_wanderer,
-				(int (*)(void *, bam_region_t *))recalibrate_recalibrate_processor);
-
-		//Set user data
-		bwander_set_user_data(wanderer, &data);
-
-		//Run wander
-		bwander_run(wanderer);
-
-		//Free local data
-		bwander_local_user_data_free(wanderer, destroy_data);
-
-		//Destroy wanderer
-		bwander_destroy(wanderer);
-
-		//Close aux bam
-		bam_fclose(in_bam);
-	}
-
-	//Free data memory
-	recal_destroy_info(data);
-	free(data);
-
-	return NO_ERROR;
-}
-
 ERROR_CODE
-wander_bam_file_(uint8_t flags, char *bam_path, char *ref_name, char *ref_path, char *data_file, char *info_file, char *outbam, int cycles)
+wander_bam_file_recalibrate(uint8_t flags, char *bam_path, char *ref_name, char *ref_path, char *data_file, char *info_file, char *outbam, int cycles)
 {
 	//Files
 	bam_file_t *bam_f = NULL;
@@ -782,7 +663,9 @@ wander_bam_file_(uint8_t flags, char *bam_path, char *ref_name, char *ref_path, 
 	int bytes;
 
 	//Data
-	recal_info_t data;
+	recal_info_t info;
+	U_CYCLES aux_cycles;
+	int cycles_param;
 
 	//Times
 	double times;
@@ -839,11 +722,108 @@ wander_bam_file_(uint8_t flags, char *bam_path, char *ref_name, char *ref_path, 
 	time_add_time_slot(D_FWORK_INIT, TIME_GLOBAL_STATS, times);
 #endif
 
-	//Recalibrate wandering
-	wander_bam_file_recalibrate(&wanderer, flags, bam_f, out_bam_f, ref, data_file, data_file, info_file, cycles);
+	//Create new data
+	aux_cycles = cycles;
+	recal_init_info(aux_cycles, &info);
+
+	//Collection is needed?
+	if(flags & RECALIBRATE_COLLECT)
+	{
+		assert(ref);
+
+		//Init wandering
+		bwander_init(&wanderer);
+
+		//Configure wanderer for data collection
+		bwander_configure(&wanderer, bam_f, NULL, ref,
+				(int (*)(void *, bam_region_t *, bam1_t *))recalibrate_wanderer,
+				(int (*)(void *, bam_region_t *))recalibrate_collect_processor);
+
+		printf("Cycles: %d\n",cycles);
+
+		//Set user data
+		cycles_param = cycles;
+		bwander_set_user_data(&wanderer, &cycles_param);
+
+		//Run wander
+		bwander_run(&wanderer);
+
+		//Reduce data
+		bwander_local_user_data_reduce(&wanderer, &info, reduce_data);
+		bwander_local_user_data_free(&wanderer, destroy_data);
+
+		//Delta processing
+		recal_calc_deltas(&info);
+
+		//Save data file
+		if(data_file)
+		{
+			recal_save_recal_info(&info, data_file);
+		}
+
+		//Save info file
+		if(info_file)
+		{
+			recal_fprint_info(&info, info_file);
+		}
+
+		//Destroy wanderer
+		bwander_destroy(&wanderer);
+	}
+
+	//Reopen bam from beginning
+	printf("Reopening input BAM\n");
+	bam_fclose(bam_f);
+	bam_f = bam_fopen(bam_path);
+	assert(bam_f);
+
+	//Recalibration is needed?
+	if(flags & RECALIBRATE_RECALIBRATE)
+	{
+		//Previous collect?
+		if(!(flags & RECALIBRATE_COLLECT))
+		{
+			//No previous collect, load data file
+			if(data_file)
+			{
+				//Load data from disk
+				recal_load_recal_info(data_file, &info);
+			}
+			else
+			{
+				//If only recalibrate input data must be present
+				LOG_FATAL("Only recalibration phase 2 requested but no input data specified\n");
+			}
+		}
+
+		recal_calc_deltas(&info);
+
+		//Init wandering
+		bwander_init(&wanderer);
+
+		//Configure wanderer for recalibration
+		bwander_configure(&wanderer, bam_f, out_bam_f, NULL,
+				(int (*)(void *, bam_region_t *, bam1_t *))recalibrate_wanderer,
+				(int (*)(void *, bam_region_t *))recalibrate_recalibrate_processor);
+
+		//Set user data
+		bwander_set_user_data(&wanderer, &info);
+
+		//Run wander
+		bwander_run(&wanderer);
+
+		//Free local data
+		bwander_local_user_data_free(&wanderer, destroy_data);
+
+		//Destroy wanderer
+		bwander_destroy(&wanderer);
+	}
+
+	//Free data memory
+	recal_destroy_info(&info);
 
 	printf("\nClosing BAM file...\n");
-	//bam_fclose(bam_f);
+	bam_fclose(bam_f);
 	printf("BAM closed.\n");
 
 	if(ref != NULL)

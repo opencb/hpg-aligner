@@ -382,6 +382,7 @@ recal_get_data_from_bam_alignment(const bam1_t* alig, const genome_t* ref, recal
 	char *ref_seq;
 	char aux_comp[16];
 	size_t init_pos, end_pos;
+	size_t init_pos_ref, end_pos_ref;
 	char *comp_res;
 	char *dinucs;
 	uint32_t flag;
@@ -471,8 +472,10 @@ recal_get_data_from_bam_alignment(const bam1_t* alig, const genome_t* ref, recal
 	//Get cycles and positions
 	//cycles = alig->core.l_qseq;
 	bam_seq_l = aux_res_seq_l;
-	init_pos = alig->core.pos + 1;
+	init_pos = alig->core.pos;
 	end_pos = alig->core.pos + bam_seq_l;
+	init_pos_ref = init_pos + RECAL_REFERENCE_CORRECTION_OFFSET;
+	end_pos_ref = end_pos + RECAL_REFERENCE_CORRECTION_OFFSET;
 
 	//Duplicates check
 	#ifdef CHECK_DUPLICATES
@@ -503,7 +506,7 @@ recal_get_data_from_bam_alignment(const bam1_t* alig, const genome_t* ref, recal
 	//Obtain reference for this 100 nucleotides
 	flag = (uint32_t) alig->core.flag;
 
-	genome_read_sequence_by_chr_index(ref_seq, (flag & BAM_FREVERSE) ? 1 : 0, (unsigned int)alig->core.tid, &init_pos, &end_pos, (genome_t *)ref);
+	genome_read_sequence_by_chr_index(ref_seq, (flag & BAM_FREVERSE) ? 1 : 0, (unsigned int)alig->core.tid, &init_pos_ref, &end_pos_ref, (genome_t *)ref);
 
 	//Iterates nucleotides in this read
 	for(i = 0; i < bam_seq_l; i++)
@@ -541,7 +544,8 @@ recal_get_data_from_bam_alignment(const bam1_t* alig, const genome_t* ref, recal
 			}
 		}
 	}
-
+	printf("HOSTIA\n%s\n%s\n", ref_seq, bam_seq);
+	getchar();
 	//Dinucs
 	for(i = 0; i < bam_seq_l; i++)
 	{
