@@ -390,6 +390,9 @@ bwander_run_threaded(bam_wanderer_t *wanderer)
 
 	}//End parallel
 
+	//Lineskip
+	printf("\n");
+
 	//Free
 	omp_destroy_lock(&end_condition_lock);
 

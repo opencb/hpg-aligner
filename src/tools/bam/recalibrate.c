@@ -202,10 +202,18 @@ int mymain(	int full,
 	#endif
 
 	init_log();
+	LOG_FILE("recal.log","w");
+	LOG_VERBOSE(1);
+	LOG_LEVEL(LOG_WARN_LEVEL);
 
 	//Set num of threads
 	//omp_set_num_threads(threads);
 	printf("Threading with %d threads and %s schedule\n", omp_get_max_threads(), sched);
+
+	#ifdef D_TIME_DEBUG
+		double init_time, end_time;
+		init_time = omp_get_wtime();
+	#endif
 
 	//Execute phase 1
 	if (p1)
@@ -272,114 +280,68 @@ int mymain(	int full,
 			free(datafilec);
 	}
 	
-	
+	#ifdef D_TIME_DEBUG
+		end_time = omp_get_wtime();
+		time_add_time_slot(D_FWORK_TOTAL, TIME_GLOBAL_STATS, end_time - init_time);
+	#endif
+
 	//Print times
 	#ifdef D_TIME_DEBUG
 		double min, max, mean;
 
 		//Print time stats
 		printf("----------------------------\nTIME STATS: \n");
-			
-		//Times from phase 1
-		if (p1)
-		{	
-			printf("\n-------\n");
-			printf("PHASE 1\n");
-			printf("-------\n");
 
-			printf("\n====== Total time to collect ======\n");
-			time_get_min_slot(D_SLOT_PH1_COLLECT_BAM, TIME_GLOBAL_STATS, &min);
-			printf("TIME USED FOR BAM COLLECTION -> %.2f s\n", min);
+		printf("\n====== General times ======\n");
+		time_get_mean_slot(D_FWORK_TOTAL, TIME_GLOBAL_STATS, &mean);
+		time_get_min_slot(D_FWORK_TOTAL, TIME_GLOBAL_STATS, &min);
+		time_get_max_slot(D_FWORK_TOTAL, TIME_GLOBAL_STATS, &max);
+		printf("Total time to process -> %.2f s - min/max = %.2f/%.2f\n",
+				mean, min, max);
 
-			printf("\n====== Deltas proccess ======\n");
-			time_get_min_slot(D_SLOT_PROCCESS_DELTAS, TIME_GLOBAL_STATS, &min);
-			printf("Time used for deltas proccess -> %.2f ms\n", min*1000.0);
+		time_get_mean_slot(D_FWORK_INIT, TIME_GLOBAL_STATS, &mean);
+		time_get_min_slot(D_FWORK_INIT, TIME_GLOBAL_STATS, &min);
+		time_get_max_slot(D_FWORK_INIT, TIME_GLOBAL_STATS, &max);
+		printf("Time used to initialize framework -> %.2f s - min/max = %.2f/%.2f\n",
+				mean, min, max);
 
-			printf("\n====== Batch iteration ======\n");
-			time_get_mean_slot(D_SLOT_PH1_ITERATION, TIME_GLOBAL_STATS, &mean);
-			time_get_min_slot(D_SLOT_PH1_ITERATION, TIME_GLOBAL_STATS, &min);
-			time_get_max_slot(D_SLOT_PH1_ITERATION, TIME_GLOBAL_STATS, &max);
-			printf("Time used for iteration (mean) -> %.2f ms - min/max = %.2f/%.2f\n",
-					mean*1000.0, min*1000.0, max*1000.0);
-
-			printf("\n====== Inside iteration ======\n");
-			time_get_mean_slot(D_SLOT_PH1_READ_BATCH, TIME_GLOBAL_STATS, &mean);
-			time_get_min_slot(D_SLOT_PH1_READ_BATCH, TIME_GLOBAL_STATS, &min);
-			time_get_max_slot(D_SLOT_PH1_READ_BATCH, TIME_GLOBAL_STATS, &max);
-			printf("(P) Time used for batch read (mean) -> %.2f ms - min/max = %.2f/%.2f\n",
-					mean*1000.0, min*1000.0, max*1000.0);
-
-			time_get_mean_slot(D_SLOT_PH1_COLLECT_BATCH, TIME_GLOBAL_STATS, &mean);
-			time_get_min_slot(D_SLOT_PH1_COLLECT_BATCH, TIME_GLOBAL_STATS, &min);
-			time_get_max_slot(D_SLOT_PH1_COLLECT_BATCH, TIME_GLOBAL_STATS, &max);
-			printf("(P) Time used for batch collect (mean) -> %.2f ms - min/max = %.2f/%.2f\n",
-					mean*1000.0, min*1000.0, max*1000.0);
-
-			time_get_mean_slot(D_SLOT_PH1_COLLECT_REDUCE_DATA, TIME_GLOBAL_STATS, &mean);
-			time_get_min_slot(D_SLOT_PH1_COLLECT_REDUCE_DATA, TIME_GLOBAL_STATS, &min);
-			time_get_max_slot(D_SLOT_PH1_COLLECT_REDUCE_DATA, TIME_GLOBAL_STATS, &max);
-			printf("Time used for reduce data (mean) -> %.2f micros - min/max = %.2f/%.2f\n",
+		printf("\n====== Wandering function ======\n");
+		time_get_mean_slot(D_FWORK_WANDER_FUNC, TIME_GLOBAL_STATS, &mean);
+		time_get_min_slot(D_FWORK_WANDER_FUNC, TIME_GLOBAL_STATS, &min);
+		time_get_max_slot(D_FWORK_WANDER_FUNC, TIME_GLOBAL_STATS, &max);
+		printf("Time of wandering function per alignment (inside framework read time) -> %.2f us - min/max = %.2f/%.2f\n",
 					mean*1000000.0, min*1000000.0, max*1000000.0);
 
-			printf("\n====== Alignment ======\n");
-			time_get_mean_slot(D_SLOT_PH1_COLLECT_ALIG, TIME_GLOBAL_STATS, &mean);
-			time_get_min_slot(D_SLOT_PH1_COLLECT_ALIG, TIME_GLOBAL_STATS, &min);
-			time_get_max_slot(D_SLOT_PH1_COLLECT_ALIG, TIME_GLOBAL_STATS, &max);
-			printf("Time used for alig collect (mean) -> %.2f micros - min/max = %.2f/%.2f\n",
-					mean*1000000.0, min*1000000.0, max*1000000.0);
-		}	
-		
-		if (p2)
-		{
-			printf("\n-------\n");
-			printf("PHASE 2\n");
-			printf("-------\n");
+		printf("\n====== Processing function ======\n");
+		time_get_mean_slot(D_FWORK_PROC_FUNC, TIME_GLOBAL_STATS, &mean);
+		time_get_min_slot(D_FWORK_PROC_FUNC, TIME_GLOBAL_STATS, &min);
+		time_get_max_slot(D_FWORK_PROC_FUNC, TIME_GLOBAL_STATS, &max);
+		printf("Time of processing function per alignment (inside framework process time) -> %.2f us - min/max = %.2f/%.2f\n",
+				mean*1000000.0, min*1000000.0, max*1000000.0);
 
-			printf("\n====== Total time to recalibrate ======\n");
-			time_get_min_slot(D_SLOT_PH2_RECALIBRATE, TIME_GLOBAL_STATS, &min);
-			printf("TIME USED FOR BAM RECALIBRATION -> %.2f s\n", min);
+		printf("\n====== Framework ======\n");
 
-			printf("\n====== Batch iteration ======\n");
-			time_get_mean_slot(D_SLOT_PH2_ITERATION, TIME_GLOBAL_STATS, &mean);
-			time_get_min_slot(D_SLOT_PH2_ITERATION, TIME_GLOBAL_STATS, &min);
-			time_get_max_slot(D_SLOT_PH2_ITERATION, TIME_GLOBAL_STATS, &max);
-			printf("Time used for iteration (mean) -> %.2f ms - min/max = %.2f/%.2f\n",
-					mean*1000.0, min*1000.0, max*1000.0);
+		time_get_mean_slot(D_FWORK_PROC, TIME_GLOBAL_STATS, &mean);
+		time_get_min_slot(D_FWORK_PROC, TIME_GLOBAL_STATS, &min);
+		time_get_max_slot(D_FWORK_PROC, TIME_GLOBAL_STATS, &max);
+		printf("Time used for process per alignment -> %.2f us - min/max = %.2f/%.2f\n",
+				mean*1000000.0, min*1000000.0, max*1000000.0);
 
-			printf("\n====== Inside iteration ======\n");
-			time_get_mean_slot(D_SLOT_PH2_READ_BATCH, TIME_GLOBAL_STATS, &mean);
-			time_get_min_slot(D_SLOT_PH2_READ_BATCH, TIME_GLOBAL_STATS, &min);
-			time_get_max_slot(D_SLOT_PH2_READ_BATCH, TIME_GLOBAL_STATS, &max);
-			printf("(P) Time used for batch read (mean) -> %.2f ms - min/max = %.2f/%.2f\n",
-								mean*1000.0, min*1000.0, max*1000.0);
+		time_get_mean_slot(D_FWORK_READ, TIME_GLOBAL_STATS, &mean);
+		time_get_min_slot(D_FWORK_READ, TIME_GLOBAL_STATS, &min);
+		time_get_max_slot(D_FWORK_READ, TIME_GLOBAL_STATS, &max);
+		printf("Time used for read per alignment -> %.2f us - min/max = %.2f/%.2f\n",
+				mean*1000000.0, min*1000000.0, max*1000000.0);
 
-			time_get_mean_slot(D_SLOT_PH2_PROCCESS_BATCH, TIME_GLOBAL_STATS, &mean);
-			time_get_min_slot(D_SLOT_PH2_PROCCESS_BATCH, TIME_GLOBAL_STATS, &min);
-			time_get_max_slot(D_SLOT_PH2_PROCCESS_BATCH, TIME_GLOBAL_STATS, &max);
-			printf("(P) Time used for batch proccess (mean) -> %.2f ms - min/max = %.2f/%.2f\n",
-								mean*1000.0, min*1000.0, max*1000.0);
-
-			time_get_mean_slot(D_SLOT_PH2_WRITE_BATCH, TIME_GLOBAL_STATS, &mean);
-			time_get_min_slot(D_SLOT_PH2_WRITE_BATCH, TIME_GLOBAL_STATS, &min);
-			time_get_max_slot(D_SLOT_PH2_WRITE_BATCH, TIME_GLOBAL_STATS, &max);
-			printf("(P) Time used for batch write (mean) -> %.2f ms - min/max = %.2f/%.2f\n",
-								mean*1000.0, min*1000.0, max*1000.0);
-
-			printf("\n====== Alignment proccess ======\n");
-			//Print recalibrate stats
-			time_get_mean_slot(D_SLOT_PH2_RECAL_ALIG, TIME_GLOBAL_STATS, &mean);
-			time_get_min_slot(D_SLOT_PH2_RECAL_ALIG, TIME_GLOBAL_STATS, &min);
-			time_get_max_slot(D_SLOT_PH2_RECAL_ALIG, TIME_GLOBAL_STATS, &max);
-			printf("Time used for alig recalibration (mean) -> %.2f micros - min/max = %.2f/%.2f\n",
-					mean*1000000.0, min*1000000.0, max*1000000.0);
-		}
-			
-		//Free memory from stats
-		//time_destroy_stats(&TIME_GLOBAL_STATS);
+		time_get_mean_slot(D_FWORK_WRITE, TIME_GLOBAL_STATS, &mean);
+		time_get_min_slot(D_FWORK_WRITE, TIME_GLOBAL_STATS, &min);
+		time_get_max_slot(D_FWORK_WRITE, TIME_GLOBAL_STATS, &max);
+		printf("Time used for write per alignment -> %.2f us - min/max = %.2f/%.2f\n",
+				mean*1000000.0, min*1000000.0, max*1000000.0);
 	#endif
 	
 	//Compare
-	if(compcount)
+	/*if(compcount)
 	{
 		if(p1 || p2)
 		{
@@ -389,7 +351,7 @@ int mymain(	int full,
 		{
 			compare_bams_qual(input, compfile, 76);
 		}
-	}
+	}*/
 	
 	stop_log();
 
@@ -438,7 +400,7 @@ int recalibrate_bam(int argc, char **argv)
     }
     
     /* set any command line default values prior to parsing */
-    outfile->filename[0]="output.bam";
+    outfile->filename[0]=NULL;
     
     /* Parse the command line as defined by argtable[] */
     nerrors = arg_parse(argc,argv,argtable);
@@ -610,6 +572,53 @@ recalibrate_collect_processor(bam_wanderer_t *wanderer, bam_region_t *region)
 	return NO_ERROR;
 }
 
+int
+recalibrate_recalibrate_processor(bam_wanderer_t *wanderer, bam_region_t *region)
+{
+	int err, i;
+	recal_info_t *gdata;
+	recal_info_t *data;
+	recal_recalibration_env_t *recal_env;
+	bam1_t *read;
+
+	//Get data
+	bwander_local_user_data(wanderer, (void **)&data);
+	if(data == NULL)
+	{
+		//Local data is not initialized
+		data = (recal_info_t *)malloc(sizeof(recal_info_t));
+
+		//Lock data
+		bwander_lock_user_data(wanderer, (void **)&gdata);
+		recal_init_info(gdata->num_cycles, data);
+		recal_reduce_info(data, gdata);	//Copy data into local
+		bwander_unlock_user_data(wanderer);
+
+		//Set local data
+		bwander_local_user_data_set(wanderer, data);
+	}
+
+	//Initialize get data environment
+	recal_env = (recal_recalibration_env_t *) malloc(sizeof(recal_recalibration_env_t));
+	recal_recalibration_init_env(data->num_cycles, recal_env);
+
+	//Recalibrate region
+	for(i = 0; i < region->size; i++)
+	{
+		//Get next read
+		read = region->reads[i];
+		assert(read);
+
+		//Recalibrate read
+		recal_recalibrate_alignment(read, data, recal_env);
+	}
+
+	//Destroy environment
+	recal_recalibration_destroy_env(recal_env);
+
+	return NO_ERROR;
+}
+
 void
 reduce_data(void *data, void *dest)
 {
@@ -637,73 +646,128 @@ destroy_data(void *data)
 }
 
 static inline ERROR_CODE
-wander_bam_file_recalibrate(bam_wanderer_t *wanderer, bam_file_t *in_bam, bam_file_t *out_bam, genome_t *ref, const char *in_data_f, const char *out_data_f, const char *out_info_f, int cycles)
+wander_bam_file_recalibrate(bam_wanderer_t *wanderer, uint8_t flags, bam_file_t *in_bam, bam_file_t *out_bam, genome_t *ref, const char *in_data_f, const char *out_data_f, const char *out_info_f, int cycles)
 {
 	//Data
-	recal_info_t *data;
+	recal_info_t *data = NULL;
 	U_CYCLES aux_cycles;
+	char aux_in_bam[1024];
 
 	assert(wanderer);
 	assert(in_bam);
-	assert(ref);
 	assert(cycles != 0);
+	assert(flags != 0);
 
-	//Init wandering
-	bwander_init(wanderer);
-
-	//Configure wanderer
-	bwander_configure(wanderer, in_bam, out_bam, ref,
-			(int (*)(void *, bam_region_t *, bam1_t *))recalibrate_wanderer,
-			(int (*)(void *, bam_region_t *))recalibrate_collect_processor);
-
-
-	printf("Cycles: %d\n",cycles);
-
-	//Load data file
-	if(in_data_f)
+	//Collection is needed?
+	if(flags & RECALIBRATE_COLLECT)
 	{
-		recal_load_recal_info(in_data_f, data);
-	}
-	else
-	{
+		assert(ref);
+
+		//Init wandering
+		bwander_init(wanderer);
+
+		//Configure wanderer for data collection
+		bwander_configure(wanderer, in_bam, NULL, ref,
+				(int (*)(void *, bam_region_t *, bam1_t *))recalibrate_wanderer,
+				(int (*)(void *, bam_region_t *))recalibrate_collect_processor);
+
+		printf("Cycles: %d\n",cycles);
+
 		//Create new data
 		aux_cycles = cycles;
 		data = (recal_info_t *)malloc(sizeof(recal_info_t));
 		recal_init_info(aux_cycles, data);
+
+		//Set user data
+		int cycles_param = cycles;
+		bwander_set_user_data(wanderer, &cycles_param);
+
+		//Run wander
+		bwander_run(wanderer);
+
+		//Reduce data
+		bwander_local_user_data_reduce(wanderer, data, reduce_data);
+		bwander_local_user_data_free(wanderer, destroy_data);
+
+		//Delta processing
+		recal_calc_deltas(data);
+
+		//Save data file
+		if(out_data_f)
+		{
+			recal_save_recal_info(data, out_data_f);
+		}
+
+		//Save info file
+		if(out_info_f)
+		{
+			recal_fprint_info(data, out_info_f);
+		}
+
+		//Destroy wanderer
+		bwander_destroy(wanderer);
 	}
 
-	//Set user data
-	int cycles_param = cycles;
-	bwander_set_user_data(wanderer, &cycles_param);
-
-	//Run wander
-	bwander_run(wanderer);
-
-	//Reduce data
-	bwander_local_user_data_reduce(wanderer, data, reduce_data);
-	bwander_local_user_data_free(wanderer, destroy_data);
-
-	//Delta processing
-	recal_calc_deltas(data);
-
-	//Save data file
-	if(out_data_f)
+	//Recalibration is needed?
+	if(flags & RECALIBRATE_RECALIBRATE)
 	{
-		recal_save_recal_info(data, out_data_f);
-	}
+		//Previous collect?
+		if(data == NULL)
+		{
+			//No previous collect, load data file
+			if(in_data_f)
+			{
+				//Allocate data
+				aux_cycles = cycles;
+				data = (recal_info_t *)malloc(sizeof(recal_info_t));
+				recal_init_info(aux_cycles, data);
 
-	//Save info file
-	if(out_info_f)
-	{
-		recal_fprint_info(data, out_info_f);
+				//Load data from disk
+				recal_load_recal_info(in_data_f, data);
+			}
+			else
+			{
+				//If only recalibrate input data must be present
+				LOG_FATAL("Only recalibration phase 2 requested but no input data specified\n");
+			}
+		}
+		else
+		{
+			//Previous collect, so reopen input bam
+			strcpy(aux_in_bam, in_bam->filename);
+			in_bam = bam_fopen(aux_in_bam);
+			assert(in_bam);
+		}
+
+		recal_calc_deltas(data);
+
+		//Init wandering
+		bwander_init(wanderer);
+
+		//Configure wanderer for recalibration
+		bwander_configure(wanderer, in_bam, out_bam, ref,
+				(int (*)(void *, bam_region_t *, bam1_t *))recalibrate_wanderer,
+				(int (*)(void *, bam_region_t *))recalibrate_recalibrate_processor);
+
+		//Set user data
+		bwander_set_user_data(wanderer, &data);
+
+		//Run wander
+		bwander_run(wanderer);
+
+		//Free local data
+		bwander_local_user_data_free(wanderer, destroy_data);
+
+		//Destroy wanderer
+		bwander_destroy(wanderer);
+
+		//Close aux bam
+		bam_fclose(in_bam);
 	}
 
 	//Free data memory
 	recal_destroy_info(data);
 	free(data);
-
-	//Destroy wanderer
-	bwander_destroy(wanderer);
 
 	return NO_ERROR;
 }
@@ -712,8 +776,6 @@ ERROR_CODE
 wander_bam_file_(uint8_t flags, char *bam_path, char *ref_name, char *ref_path, char *data_file, char *info_file, char *outbam, int cycles)
 {
 	//Files
-	char *in_data_f = NULL;
-	char *out_data_f = NULL;
 	bam_file_t *bam_f = NULL;
 	bam_file_t *out_bam_f = NULL;
 	genome_t* ref = NULL;
@@ -729,8 +791,6 @@ wander_bam_file_(uint8_t flags, char *bam_path, char *ref_name, char *ref_path, 
 	bam_wanderer_t wanderer;
 
 	assert(bam_path);
-	assert(ref_name);
-	assert(ref_path);
 
 #ifdef D_TIME_DEBUG
 	times = omp_get_wtime();
@@ -754,6 +814,8 @@ wander_bam_file_(uint8_t flags, char *bam_path, char *ref_name, char *ref_path, 
 	//Open reference genome, if collect phase is present
 	if(flags & RECALIBRATE_COLLECT)
 	{
+		assert(ref_name);
+		assert(ref_path);
 		printf("Opening reference genome from \"%s%s\" ...\n", ref_path, ref_name);
 		ref = genome_new(ref_name, ref_path);
 		assert(ref);
@@ -777,36 +839,11 @@ wander_bam_file_(uint8_t flags, char *bam_path, char *ref_name, char *ref_path, 
 	time_add_time_slot(D_FWORK_INIT, TIME_GLOBAL_STATS, times);
 #endif
 
-	//Setup data file pointers
-	if(data_file != NULL)
-	{
-		//If recalibrate data file
-		if((flags & RECALIBRATE_RECALIBRATE) && (flags & RECALIBRATE_COLLECT))
-		{
-			//Full recalibration
-			in_data_f = data_file;
-			out_data_f = data_file;
-		}
-		else
-		{
-			if(flags & RECALIBRATE_COLLECT)
-			{
-				//Only collect
-				out_data_f = data_file;
-			}
-			else
-			{
-				//Only recalibrate
-				in_data_f = data_file;
-			}
-		}
-	}
-
 	//Recalibrate wandering
-	wander_bam_file_recalibrate(&wanderer, bam_f, out_bam_f, ref, in_data_f, out_data_f, info_file, cycles);
+	wander_bam_file_recalibrate(&wanderer, flags, bam_f, out_bam_f, ref, data_file, data_file, info_file, cycles);
 
 	printf("\nClosing BAM file...\n");
-	bam_fclose(bam_f);
+	//bam_fclose(bam_f);
 	printf("BAM closed.\n");
 
 	if(ref != NULL)
