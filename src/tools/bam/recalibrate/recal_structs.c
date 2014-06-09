@@ -717,10 +717,10 @@ recal_load_recal_info(const char *path, recal_info_t *data)
 
 	fp = fopen(path, "r");
 
-	fwrite(data, sizeof(U_QUALS), 1, fp);	//min_qual
-	fwrite(data, sizeof(U_QUALS), 1, fp);	//num_quals
-	fwrite(data, sizeof(U_CYCLES), 1, fp);	//num_cycles
-	fwrite(data, sizeof(U_DINUC), 1, fp);	//num_dinuc
+	fread(data, sizeof(U_QUALS), 1, fp);	//min_qual
+	fread(data, sizeof(U_QUALS), 1, fp);	//num_quals
+	fread(data, sizeof(U_CYCLES), 1, fp);	//num_cycles
+	fread(data, sizeof(U_DINUC), 1, fp);	//num_dinuc
 
 	//Read total counters
 	fread(&data->total_miss, sizeof(double), 1, fp);
