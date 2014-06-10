@@ -24,7 +24,7 @@
 #include <aligners/bwt/genome.h>
 #include "aux/aux_common.h"
 
-#define RECAL_REFERENCE_CORRECTION_OFFSET 4
+#define RECAL_REFERENCE_CORRECTION_OFFSET 1
 
 /**
  * \brief Recalibration data storage.
@@ -173,7 +173,7 @@ EXTERNC ERROR_CODE recal_recalibration_destroy_env(recal_recalibration_env_t *re
  * \param dinuc Dinucleotide to add.
  * \param match Indicate if match(!=0) or not (0)
  */
-EXTERNC ERROR_CODE recal_add_base(recal_info_t *data, const char qual, const U_CYCLES cycle, const char dinuc, const double match) __ATTR_HOT;
+EXTERNC ERROR_CODE recal_add_base(recal_info_t *data, const char qual, const U_CYCLES cycle, const char dinuc, const char match) __ATTR_HOT;
 
 /**
  * \brief Add recalibration data from vector of bases.
@@ -188,7 +188,7 @@ EXTERNC ERROR_CODE recal_add_base(recal_info_t *data, const char qual, const U_C
  * \param dinuc Vector of dinucleotides to add.
  * \param matches Vector of match(!=0) or not (0)
  */
-EXTERNC ERROR_CODE recal_add_base_v(recal_info_t *data, const char *seq, const char *quals, const U_CYCLES init_cycle, const U_CYCLES num_cycles, const char *dinuc, const char *matches) __ATTR_HOT;
+EXTERNC ERROR_CODE recal_add_base_v(recal_info_t *data, const char *seq, const char *quals, const U_CYCLES init_cycle, const U_CYCLES num_cycles, const char *dinuc, const char *matches, const char *mask) __ATTR_HOT;
 
 /**
  * \brief Compute deltas from bases and misses.

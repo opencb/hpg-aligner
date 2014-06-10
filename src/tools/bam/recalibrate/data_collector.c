@@ -377,13 +377,14 @@ recal_get_data_from_bam_batch(const bam_batch_t* batch, const genome_t* ref, rec
  * Get recalibration data from alignment.
  */
 ERROR_CODE
-recal_get_data_from_bam_alignment(const bam1_t* alig, const genome_t* ref, recal_info_t* output_data, recal_data_collect_env_t *collect_env)
+recal_get_data_from_bam_alignment(const bam1_t* read, const genome_t* ref, recal_info_t* output_data, recal_data_collect_env_t *collect_env)
 {
 	char *ref_seq;
 	char aux_comp[16];
 	size_t init_pos, end_pos;
 	size_t init_pos_ref, end_pos_ref;
 	char *comp_res;
+	char *comp_mask;
 	char *dinucs;
 	uint32_t flag;
 
@@ -393,8 +394,15 @@ recal_get_data_from_bam_alignment(const bam1_t* alig, const genome_t* ref, recal
 	U_CYCLES bam_seq_l;
 	char *aux_res_seq;
 	char *aux_res_qual;
-	U_CYCLES aux_res_seq_l;
-	U_CYCLES bam_seq_max_l;
+	//U_CYCLES aux_res_seq_l;
+	//U_CYCLES bam_seq_max_l;
+	uint32_t *read_left_cigar;
+	uint32_t *read_cigar;
+	size_t read_disp_clip;
+	char *read_seq_ref;
+	size_t read_seq_ref_l;
+	uint32_t misses;
+	size_t read_l;
 
 	//SSE
 	#ifdef __SSE2__
@@ -406,7 +414,7 @@ recal_get_data_from_bam_alignment(const bam1_t* alig, const genome_t* ref, recal
 	//CHECK ARGUMENTS (Assuming this function is called always from recal_get_data_from_bam_batch)
 	{
 		//Check nulls
-		if(!alig)
+		if(!read)
 			return INVALID_INPUT_PARAMS_NULL;
 	}
 
@@ -414,7 +422,7 @@ recal_get_data_from_bam_alignment(const bam1_t* alig, const genome_t* ref, recal
 	{
 		//Map quality is zero
 		#ifdef NOT_MAPPING_QUAL_ZERO
-		if(alig->core.qual == 0)
+		if(read->core.qual == 0)
 		{
 			mapzero++;
 			return NO_ERROR;
@@ -423,7 +431,7 @@ recal_get_data_from_bam_alignment(const bam1_t* alig, const genome_t* ref, recal
 
 		//Not primary
 		#ifdef NOT_PRIMARY_ALIGNMENT
-		if(alig->core.flag & 256)	//Not primary alignment flag
+		if(read->core.flag & 256)	//Not primary alignment flag
 		{
 			notprimary++;
 			return NO_ERROR;
@@ -431,7 +439,7 @@ recal_get_data_from_bam_alignment(const bam1_t* alig, const genome_t* ref, recal
 		#endif
 
 		//Unmapped readings
-		if(alig->core.tid < 0)
+		if(read->core.tid < 0)
 		{
 			unmapped++;
 			return NO_ERROR;
@@ -445,35 +453,36 @@ recal_get_data_from_bam_alignment(const bam1_t* alig, const genome_t* ref, recal
 		bam_seq_l = 0;
 		aux_res_seq = collect_env->aux_res_seq;
 		aux_res_qual = collect_env->aux_res_qual;
-		aux_res_seq_l = 0;
-		bam_seq_max_l = collect_env->bam_seq_max_l;
+		//aux_res_seq_l = 0;
+		//bam_seq_max_l = collect_env->bam_seq_max_l;
 	}
 
 	//Get sequence
-	new_sequence_from_bam_ref((bam1_t *)alig, bam_seq, bam_seq_max_l);
+	new_sequence_from_bam_ref((bam1_t *)read, bam_seq, read->core.l_qseq + 1);
 
 	//Get quals
-	new_quality_from_bam_ref((bam1_t *)alig, 0, bam_quals, bam_seq_max_l);
+	new_quality_from_bam_ref((bam1_t *)read, 0, bam_quals, read->core.l_qseq + 1);
 
 	//Indel suppression
- 	supress_indels_from_32_cigar(bam_seq, bam_quals, alig->core.l_qseq, bam1_cigar(alig), alig->core.n_cigar,
- 			aux_res_seq, aux_res_qual, &aux_res_seq_l, bam_seq_max_l);
+ 	//supress_indels_from_32_cigar(bam_seq, bam_quals, read->core.l_qseq, bam1_cigar(read), read->core.n_cigar,
+ 	//		aux_res_seq, aux_res_qual, &aux_res_seq_l, bam_seq_max_l);
 
 	//Check if sequence length is valid
-	if(aux_res_seq_l == 0)
+	/*if(aux_res_seq_l == 0)
 	{
 		return INVALID_SEQ_LENGTH;
-	}
+	}*/
 
 	//Save sequence to primary array
-	memcpy(bam_seq, aux_res_seq, aux_res_seq_l * sizeof(char));
-	memcpy(bam_quals, aux_res_qual, aux_res_seq_l * sizeof(char));
+	//memcpy(bam_seq, aux_res_seq, aux_res_seq_l * sizeof(char));
+	//memcpy(bam_quals, aux_res_qual, aux_res_seq_l * sizeof(char));
 
 	//Get cycles and positions
 	//cycles = alig->core.l_qseq;
-	bam_seq_l = aux_res_seq_l;
-	init_pos = alig->core.pos;
-	end_pos = alig->core.pos + bam_seq_l;
+	//bam_seq_l = aux_res_seq_l;
+	bam_seq_l = read->core.l_qseq;
+	init_pos = read->core.pos;
+	end_pos = read->core.pos + (bam_seq_l  * 2);
 	init_pos_ref = init_pos + RECAL_REFERENCE_CORRECTION_OFFSET;
 	end_pos_ref = end_pos + RECAL_REFERENCE_CORRECTION_OFFSET;
 
@@ -493,59 +502,59 @@ recal_get_data_from_bam_alignment(const bam1_t* alig, const genome_t* ref, recal
 	#endif
 
 	//Allocations
-#ifdef __SSE2__
-	ref_seq = (char *)_mm_malloc((bam_seq_l + 1) * sizeof(char), MEM_ALIG_SSE_SIZE);
-	comp_res = (char *)_mm_malloc(bam_seq_l * sizeof(char), MEM_ALIG_SSE_SIZE);
-	dinucs = (char *)_mm_malloc(bam_seq_l * sizeof(char), MEM_ALIG_SSE_SIZE);
-#else
-	ref_seq = (char *)malloc((bam_seq_l + 1) * sizeof(char));
-	comp_res = (char *)malloc(bam_seq_l * sizeof(char));
-	dinucs = (char *)malloc(bam_seq_l * sizeof(char));
-#endif
+/*#ifdef __SSE2__
+	ref_seq = (char *)_mm_malloc((read->core.l_qseq + 1) * sizeof(char), MEM_ALIG_SSE_SIZE);
+	comp_res = (char *)_mm_malloc((read->core.l_qseq + 1) * sizeof(char), MEM_ALIG_SSE_SIZE);
+	dinucs = (char *)_mm_malloc((read->core.l_qseq + 1) * sizeof(char), MEM_ALIG_SSE_SIZE);
+#else*/
+	ref_seq = (char *)malloc(((end_pos - init_pos) + 2) * sizeof(char));
+	comp_res = (char *)malloc((read->core.l_qseq + 1) * sizeof(char));
+	comp_mask = (char *)malloc((read->core.l_qseq + 1) * sizeof(char));
+	dinucs = (char *)malloc((read->core.l_qseq + 1) * sizeof(char));
+	memset(comp_res, 0, (read->core.l_qseq + 1) * sizeof(char));
+	memset(comp_mask, 0, (read->core.l_qseq + 1) * sizeof(char));
+//#endif
 
 	//Obtain reference for this 100 nucleotides
-	flag = (uint32_t) alig->core.flag;
+	flag = (uint32_t) read->core.flag;
 
-	genome_read_sequence_by_chr_index(ref_seq, (flag & BAM_FREVERSE) ? 1 : 0, (unsigned int)alig->core.tid, &init_pos_ref, &end_pos_ref, (genome_t *)ref);
+	genome_read_sequence_by_chr_index(ref_seq, (flag & BAM_FREVERSE) ? 1 : 0, (unsigned int)read->core.tid, &init_pos_ref, &end_pos_ref, (genome_t *)ref);
 
-	//Iterates nucleotides in this read
+	//Get initial clip displacement
+	//cigar32_count_clip_displacement(read_cigar, read->core.n_cigar, &read_disp_clip);
+	cigar32_count_nucleotides_not_clip(bam1_cigar(read), read->core.n_cigar, &read_l);
+
+	//Create sequence to compare with reference
+	read_seq_ref = (char *) malloc((read->core.l_qseq + 1) * sizeof(char));
+	cigar32_create_ref(bam1_cigar(read), read->core.n_cigar,
+			ref_seq, (end_pos_ref - init_pos_ref),
+			bam_seq, read->core.l_qseq,
+			read_seq_ref, &read_seq_ref_l, comp_mask);
+
+	//Correct comparation?
+	if(read_seq_ref_l != read->core.l_qseq)
+	{
+		LOG_WARN_F("Read-Ref: %d, Read: %d, Not enough reference sequence length\n", read_seq_ref_l, read->core.l_qseq);
+	}
+
+	//Get raw score with reference
+	nucleotide_compare(read_seq_ref, bam_seq, read_seq_ref_l, comp_res, &misses);
+	//comp_res[bam_seq_l] = '\0';
+	/*char cigarro[MAX_CIGAR_LENGTH];
+	cigar32_to_string(bam1_cigar(read), read->core.n_cigar, cigarro);
+	printf("LONG %d, SEQ_L %d, CIGAR %s, MISS %d\n%s\n%s\n", bam_seq_l, read_seq_ref_l, cigarro, misses, read_seq_ref, bam_seq, comp_res);
 	for(i = 0; i < bam_seq_l; i++)
 	{
-#ifdef __SSE2__
-		//#ifdef __SSE2__ //SSE Block
-		if( (i + 16) < bam_seq_l)
+		if(comp_mask[i] == 0)
 		{
-			//Use SSE
-			//_mm_prefetch(&ref_seq[i + 16], _MM_HINT_T0);
-			//_mm_prefetch(&bam_seq[i + 16], _MM_HINT_T0);
-
-			//Pack sequences
-			v_ref = _mm_load_si128(&ref_seq[i]);
-			v_seq = _mm_load_si128(&bam_seq[i]);
-
-			//Compare sequences
-			v_comp = _mm_cmpeq_epi8(v_ref, v_seq);
-
-			//Store comparation values
-			_mm_store_si128(&comp_res[i], v_comp);
-
-			i += 15;
+			printf("-");
 		}
 		else
-#endif //SSE Block
 		{
-			if(ref_seq[i] != bam_seq[i])
-			{
-				comp_res[i] = 0x00;	//Diff
-			}
-			else
-			{
-				comp_res[i] = 0xFF;	//Equals
-			}
+			printf("#");
 		}
 	}
-	printf("HOSTIA\n%s\n%s\n", ref_seq, bam_seq);
-	getchar();
+	getchar();*/
 	//Dinucs
 	for(i = 0; i < bam_seq_l; i++)
 	{
@@ -560,7 +569,7 @@ recal_get_data_from_bam_alignment(const bam1_t* alig, const genome_t* ref, recal
 	}
 
 	//Add data
-	recal_add_base_v(output_data, bam_seq, bam_quals, 0, bam_seq_l, dinucs, comp_res);
+	recal_add_base_v(output_data, bam_seq, bam_quals, 0, bam_seq_l, dinucs, comp_res, comp_mask);
 
 	//Set last sequence for duplicates
 	#ifdef CHECK_DUPLICATES
@@ -573,15 +582,17 @@ recal_get_data_from_bam_alignment(const bam1_t* alig, const genome_t* ref, recal
 
 	//Free resources
 	{
-#ifdef __SSE2__
+/*#ifdef __SSE2__
 		_mm_free(ref_seq);
 		_mm_free(comp_res);
 		_mm_free(dinucs);
-#else
+#else*/
 		free(ref_seq);
 		free(comp_res);
+		free(comp_mask);
 		free(dinucs);
-#endif
+		free(read_seq_ref);
+//#endif
 	}
 
 	return NO_ERROR;

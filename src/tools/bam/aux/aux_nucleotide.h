@@ -145,7 +145,7 @@ nucleotide_compare(const char *ref_seq, const char *bam_seq, size_t bam_seq_l, c
 	count = 0;
 	for(i = 0; i < bam_seq_l; i++)
 	{
-		//0x00 Equals, 0x01 Diff
+		//0 Equals, 1 Diff
 		if(ref_seq[i] != bam_seq[i])
 		{
 			comp_res[i] = 1;
@@ -291,7 +291,7 @@ nucleotide_miss_qual_sum(const char *ref_seq, const char *bam_seq, const char *b
 	sum = 0;
 	for(i = 0; i < bam_seq_l; i++)
 	{
-		//0x00 Equals, 0x01 Diff
+		//0 Equals, 1 Diff
 		if(ref_seq[i] != bam_seq[i])
 		{
 			comp_res[i] = 1;

@@ -242,7 +242,7 @@ recal_recalibration_destroy_env(recal_recalibration_env_t *recalibration_env)
  * Add recalibration data from one base.
  */
 ERROR_CODE
-recal_add_base(recal_info_t *data, const char qual, const U_CYCLES cycle, const char dinuc, const double match)
+recal_add_base(recal_info_t *data, const char qual, const U_CYCLES cycle, const char dinuc, const char miss)
 {
 	int qual_index = qual - data->min_qual;
 	int qual_cycle_index = qual_index * data->num_cycles + cycle;
@@ -254,7 +254,7 @@ recal_add_base(recal_info_t *data, const char qual, const U_CYCLES cycle, const 
 	//Error check
 	if(qual_index >= MAX_QUALITY - MIN_QUALITY || qual_index < 0)
 	{
-		printf("add_base: ERROR, qual must be positive and minor than MAX_QUALITY - MIN_QUALITY ==> Qual = %d, Cycle = %d, Dinuc = %d, %s\n", qual, cycle, dinuc, match ? "Miss" : "");
+		printf("add_base: ERROR, qual must be positive and minor than MAX_QUALITY - MIN_QUALITY ==> Qual = %d, Cycle = %d, Dinuc = %d, %s\n", qual, cycle, dinuc, miss ? "Miss" : "");
 		return INVALID_INPUT_QUAL;
 	}
 	if(cycle < 0 || cycle > data->num_cycles - 1)
@@ -269,30 +269,30 @@ recal_add_base(recal_info_t *data, const char qual, const U_CYCLES cycle, const 
 	}
 
 	//Increase total counters
-	if(!match)
+	if(miss)
 	data->total_miss++;
 	data->total_bases++;
 
 	//Increase quality vector
-	if(!match)
+	if(miss)
 	data->qual_miss[qual_index]++;
 	data->qual_bases[qual_index]++;
 
 	//Increase quality-cycle matrix
-	if(!match)
+	if(miss)
 	data->qual_cycle_miss[qual_cycle_index]++;
 	data->qual_cycle_bases[qual_cycle_index]++;
 
 	//Increase quality-dinuc matrix (if not dinuc != -1)
 	if(dinuc >= 0)
 	{
-		if(!match)
+		if(miss)
 		data->qual_dinuc_miss[qual_dinuc_index]++;
 		data->qual_dinuc_bases[qual_dinuc_index]++;
 	}
 	else
 	{
-		printf("ERROR: unrecognized dinuc Q: %d, C: %d, D: %d, Match: %d\n", qual, cycle, dinuc, match);
+		printf("ERROR: unrecognized dinuc Q: %d, C: %d, D: %d, Miss: %d\n", qual, cycle, dinuc, miss);
 		return INVALID_INPUT_DINUC;
 	}
 
@@ -303,7 +303,7 @@ recal_add_base(recal_info_t *data, const char qual, const U_CYCLES cycle, const 
  * Add recalibration data from vector of bases
  */
 ERROR_CODE
-recal_add_base_v(recal_info_t *data, const char *seq, const char *quals, const U_CYCLES init_cycle, const U_CYCLES num_cycles, const char *dinuc, const char *matches)
+recal_add_base_v(recal_info_t *data, const char *seq, const char *quals, const U_CYCLES init_cycle, const U_CYCLES num_cycles, const char *dinuc, const char *misses, const char *mask)
 {
 	U_CYCLES i;
 	U_CYCLES cycles;
@@ -315,36 +315,40 @@ recal_add_base_v(recal_info_t *data, const char *seq, const char *quals, const U
 	//for(i = init_cycle; i <= end_cycle; i++)
 	for(i = 0; i < cycles; i++)
 	{
-		switch(seq[i])
+		//Check if count this nucleotide
+		if(mask[i])
 		{
-		case 'A':
-		case 'C':
-		case 'G':
-		case 'T':
-		#ifndef NOT_COUNT_NUCLEOTIDE_N
-		case 'N':
-		#endif
-			err = recal_add_base(data, quals[i], i + init_cycle, dinuc[i], (double)matches[i]);
-			if(err)
+			switch(seq[i])
 			{
-				switch(err)
+			case 'A':
+			case 'C':
+			case 'G':
+			case 'T':
+			#ifndef NOT_COUNT_NUCLEOTIDE_N
+			case 'N':
+			#endif
+				err = recal_add_base(data, quals[i], i + init_cycle, dinuc[i], misses[i]);
+				if(err)
 				{
-				case INVALID_INPUT_QUAL:
-					printf("Error INVALID_INPUT_QUAL Base: %c\n", seq[i]);
-					break;
-				case INVALID_INPUT_DINUC:
-					printf("Error INVALID_INPUT_DINUC Base: %c\n", seq[i]);
-					break;
-				default:
-					printf("Error UNKNOWN Base: %c\n", seq[i]);
-					break;
+					switch(err)
+					{
+					case INVALID_INPUT_QUAL:
+						printf("Error INVALID_INPUT_QUAL Base: %c\n", seq[i]);
+						break;
+					case INVALID_INPUT_DINUC:
+						printf("Error INVALID_INPUT_DINUC Base: %c\n", seq[i]);
+						break;
+					default:
+						printf("Error UNKNOWN Base: %c\n", seq[i]);
+						break;
+					}
 				}
-			}
-			break;
+				break;
 
-		default:
-			//printf("ERROR: Corrupted nucleotide read = %c\n", seq[i]);
-			break;
+			default:
+				//printf("ERROR: Corrupted nucleotide read = %c\n", seq[i]);
+				break;
+			}
 		}
 	}
 
