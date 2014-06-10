@@ -1518,7 +1518,7 @@ alig_get_scores_from_read(bam1_t *read, alig_context_t *context, uint32_t *v_sco
 	cigar32_create_ref(aux_cigar, aux_cigar_l,
 			ref_seq + read_disp_ref, context->reference.length - read_disp_ref,
 			read_seq, read->core.l_qseq,
-			read_seq_ref, &read_seq_ref_l);
+			read_seq_ref, &read_seq_ref_l, NULL);
 
 	//Get raw score with reference
 	nucleotide_miss_qual_sum(read_seq_ref, read_seq, quals_seq, read_l, comp_seq, &misses, &misses_sum);
@@ -1597,7 +1597,7 @@ alig_get_scores_from_read(bam1_t *read, alig_context_t *context, uint32_t *v_sco
 					cigar32_create_ref(aux_cigar, aux_cigar_l,
 							ref_seq + read_disp_ref, context->reference.length - read_disp_ref,
 							read_seq, read->core.l_qseq,
-							read_seq_ref, &read_seq_ref_l);
+							read_seq_ref, &read_seq_ref_l, NULL);
 
 					if(read_seq_ref_l != read->core.l_qseq)
 					{
@@ -1879,7 +1879,7 @@ alig_indel_realign_from_haplo(alig_context_t *context, size_t alt_haplo_index)
 			read_disp_ref = read->core.pos - context->reference.position;
 
 			//Get haplotype reference transform
-			cigar32_create_ref(bam1_cigar(read), read->core.n_cigar, ref_seq + read_disp_ref, ref_length - read_disp_ref, read_seq, read->core.l_qseq, read_seq_ref, &read_seq_ref_l);
+			cigar32_create_ref(bam1_cigar(read), read->core.n_cigar, ref_seq + read_disp_ref, ref_length - read_disp_ref, read_seq, read->core.l_qseq, read_seq_ref, &read_seq_ref_l, NULL);
 			assert(read_seq_ref_l == read->core.l_qseq);
 
 			//Compare and miss with haplotype
