@@ -18,6 +18,7 @@
 #include "bam_region.h"
 
 #define WANDERER_REGIONS_MAX 1000
+#define WANDERER_PROC_FUNC_MAX 	16
 
 #define WANDERER_SUCCESS 0
 #define WANDERER_IN_PROGRESS 1
@@ -48,7 +49,8 @@ typedef struct {
 
 	//Function to execute
 	wanderer_function wander_f;
-	processor_function processing_f;
+	processor_function processing_f[WANDERER_PROC_FUNC_MAX];
+	size_t processing_f_l;
 
 	//User data
 	void *user_data;
@@ -62,7 +64,8 @@ typedef struct {
 EXTERNC void bwander_init(bam_wanderer_t *wanderer);
 EXTERNC void bwander_destroy(bam_wanderer_t *wanderer);
 
-EXTERNC void bwander_configure(bam_wanderer_t *wanderer, bam_file_t *in_file, bam_file_t *out_file, genome_t *reference, wanderer_function wf, processor_function pf);
+EXTERNC int bwander_configure(bam_wanderer_t *wanderer, bam_file_t *in_file, bam_file_t *out_file, genome_t *reference, wanderer_function wf, processor_function pf);
+EXTERNC int bwander_add_proc(bam_wanderer_t *wanderer, processor_function pf);
 
 EXTERNC int bwander_run(bam_wanderer_t *wanderer);
 

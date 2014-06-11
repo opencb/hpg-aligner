@@ -316,7 +316,7 @@ recal_add_base_v(recal_info_t *data, const char *seq, const char *quals, const U
 	for(i = 0; i < cycles; i++)
 	{
 		//Check if count this nucleotide
-		if(mask[i])
+		if(mask == NULL || mask[i])
 		{
 			switch(seq[i])
 			{
@@ -376,8 +376,6 @@ recal_calc_deltas(recal_info_t* data)
 		time_init_slot(D_SLOT_PROCCESS_DELTAS, TIME_GLOBAL_STATS);
 	#endif
 
-	printf("Processing deltas...\n");
-
 	//Estimated Q
 	recal_get_estimated_Q(data->qual_bases, data->num_quals, (U_QUALS)0, &estimated_Q);
 
@@ -387,7 +385,6 @@ recal_calc_deltas(recal_info_t* data)
 	//Calc global delta
 	data->total_estimated_Q = estimated_Q;
 	data->total_delta = emp_Q - estimated_Q;
-	printf("Estimated %.2f \tEmpirical %.2f \t TotalDelta %.2f\n", estimated_Q, emp_Q, data->total_delta);
 
 	//Delta R
 	for(i = 0; i < data->num_quals; i++)
@@ -456,8 +453,6 @@ recal_calc_deltas(recal_info_t* data)
 			}
 		}
 	}
-
-	printf("Deltas processed.\n");
 
 	#ifdef D_TIME_DEBUG
 		time_set_slot(D_SLOT_PROCCESS_DELTAS, TIME_GLOBAL_STATS);
@@ -676,7 +671,8 @@ recal_save_recal_info(const recal_info_t *data, const char *path)
 
 	printf("\n----------------\nSaving recalibration data to \"%s\"\n----------------\n", path);
 
-	fp = fopen(path, "w+");
+	fp = fopen(path, "w");
+	if(!fp) LOG_FATAL_F("Cant create \"%s\" file\n", path);
 
 	fwrite(data, sizeof(U_QUALS), 1, fp);	//min_qual
 	fwrite(data, sizeof(U_QUALS), 1, fp);	//num_quals
@@ -720,11 +716,12 @@ recal_load_recal_info(const char *path, recal_info_t *data)
 	printf("\n----------------\nLoading recalibration data \"%s\"\n----------------\n", path);
 
 	fp = fopen(path, "r");
+	if(!fp) LOG_FATAL_F("Cant open \"%s\" file\n", path);
 
 	fread(data, sizeof(U_QUALS), 1, fp);	//min_qual
-	fread(data, sizeof(U_QUALS), 1, fp);	//num_quals
-	fread(data, sizeof(U_CYCLES), 1, fp);	//num_cycles
-	fread(data, sizeof(U_DINUC), 1, fp);	//num_dinuc
+	fread(data + sizeof(U_QUALS), sizeof(U_QUALS), 1, fp);	//num_quals
+	fread(data + (sizeof(U_QUALS) * 2), sizeof(U_CYCLES), 1, fp);	//num_cycles
+	fread(data + (sizeof(U_QUALS) * 2) + sizeof(U_CYCLES), sizeof(U_DINUC), 1, fp);	//num_dinuc
 
 	//Read total counters
 	fread(&data->total_miss, sizeof(double), 1, fp);

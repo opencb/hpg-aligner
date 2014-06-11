@@ -202,7 +202,7 @@ int mymain(	int full,
 	#endif
 
 	init_log();
-	LOG_FILE("recal.log","w");
+	LOG_FILE("recalibration.log","w");
 	LOG_VERBOSE(1);
 	LOG_LEVEL(LOG_WARN_LEVEL);
 
@@ -215,69 +215,53 @@ int mymain(	int full,
 		init_time = omp_get_wtime();
 	#endif
 
-	//Execute phase 1
-	if (p1)
-	{
-		printf("\n===================\nExecuting phase 1.\n===================\n\n");
-		
-		//Obtain reference filename and dirpath from full path
-		dir = strdup(reference);
-		dir = dirname(dir);
-		base = strrchr(reference, '/');
-		
-		//Print data
-		infofilec = NULL;
-		if(infocount > 0)
-		{
-			infofilec = strdup(infofile);
-		}
-		
-		//Save data file
-		datafilec = NULL;
-		if(datacount > 0)
-		{
-			datafilec = strdup(datafile);
-		}
+	//Obtain reference filename and dirpath from full path
+	dir = strdup(reference);
+	dir = dirname(dir);
+	base = strrchr(reference, '/');
+	printf("Reference dir: %s\n", dir);
+	printf("Reference name: %s\n", base);
 
-		//Obtain data from bam
-		inputc = strdup(input);
-		printf("Reference dir: %s\n", dir);
-		printf("Reference name: %s\n", base);
-		//recal_get_data_from_file(inputc, base, dir, data);
-		wander_bam_file_recalibrate(RECALIBRATE_COLLECT, inputc,base, dir, datafilec, infofilec, NULL, cycles);
-		free(inputc);
-		if(datafilec)
-			free(datafilec);
-		if(infofilec)
-			free(infofilec);
-	}
+	//Print data
+	infofilec = NULL;
+	if(infocount > 0)
+		infofilec = strdup(infofile);
 	
-	//Execute phase 2
-	if (p2)
+	//Save data file
+	datafilec = NULL;
+	if(datacount > 0)
+		datafilec = strdup(datafile);
+
+	//Obtain data from bam
+	inputc = strdup(input);
+	outputc = NULL;
+	if(output)
+		outputc = strdup(output);
+	if(p1 && p2)
 	{
-		printf("\n===================\nExecuting phase 2.\n===================\n\n");
-		
-		//Get datafile name
-		datafilec = NULL;
-		if(datacount > 0)
-		{
-			datafilec = strdup(datafile);
-		}
-
-		inputc = strdup(input);
-		outputc = NULL;
-		if(output)
-			outputc = strdup(output);
-
-		//Recalibrate bam
-		wander_bam_file_recalibrate(RECALIBRATE_RECALIBRATE, inputc, NULL, NULL, datafilec, NULL, outputc, cycles);
-
-		free(inputc);
-		if(outputc)
-			free(outputc);
-		if(datafilec)
-			free(datafilec);
+		printf("Full recalibration\n");
+		wander_bam_file_recalibrate(RECALIBRATE_COLLECT | RECALIBRATE_RECALIBRATE, inputc,base, dir, datafilec, infofilec, outputc, cycles);
 	}
+	else
+	{
+		if(p1)
+		{
+			printf("Phase 1 recalibration\n");
+			wander_bam_file_recalibrate(RECALIBRATE_COLLECT, inputc,base, dir, datafilec, infofilec, outputc, cycles);
+		}
+		else
+		{
+			printf("Phase 2 recalibration\n");
+			wander_bam_file_recalibrate(RECALIBRATE_RECALIBRATE, inputc,base, dir, datafilec, infofilec, outputc, cycles);
+		}
+	}
+	free(inputc);
+	if(outputc)
+		free(outputc);
+	if(datafilec)
+		free(datafilec);
+	if(infofilec)
+		free(infofilec);
 	
 	#ifdef D_TIME_DEBUG
 		end_time = omp_get_wtime();
@@ -338,19 +322,6 @@ int mymain(	int full,
 		printf("Time used for write per alignment -> %.2f us - min/max = %.2f/%.2f\n",
 				mean*1000000.0, min*1000000.0, max*1000000.0);
 	#endif
-	
-	//Compare
-	/*if(compcount)
-	{
-		if(p1 || p2)
-		{
-			compare_bams_qual(output, compfile, 76);
-		}
-		else
-		{
-			compare_bams_qual(input, compfile, 76);
-		}
-	}*/
 	
 	stop_log();
 
@@ -600,6 +571,9 @@ recalibrate_recalibrate_processor(bam_wanderer_t *wanderer, bam_region_t *region
 					data->num_cycles, data->min_qual, data->num_quals, data->num_dinuc, gdata->num_cycles, gdata->min_qual, gdata->num_quals, gdata->num_dinuc);
 		}
 
+		//Recalculate deltas (reduce only merge bases and misses)
+		recal_calc_deltas(data);
+
 		bwander_unlock_user_data(wanderer);
 
 		//Set local data
@@ -754,6 +728,7 @@ wander_bam_file_recalibrate(uint8_t flags, char *bam_path, char *ref_name, char 
 
 		//Delta processing
 		recal_calc_deltas(&info);
+		printf("Estimated %.2f \tEmpirical %.2f \t TotalDelta %.2f\n", info.total_estimated_Q, info.total_delta + info.total_estimated_Q, info.total_delta);
 
 		//Save data file
 		if(data_file)
@@ -769,13 +744,16 @@ wander_bam_file_recalibrate(uint8_t flags, char *bam_path, char *ref_name, char 
 
 		//Destroy wanderer
 		bwander_destroy(&wanderer);
-	}
 
-	//Reopen bam from beginning
-	printf("Reopening input BAM\n");
-	bam_fclose(bam_f);
-	bam_f = bam_fopen(bam_path);
-	assert(bam_f);
+		if(flags & RECALIBRATE_RECALIBRATE)
+		{
+			//Reopen bam from beginning
+			printf("Reopening input BAM\n");
+			bam_fclose(bam_f);
+			bam_f = bam_fopen(bam_path);
+			assert(bam_f);
+		}
+	}
 
 	//Recalibration is needed?
 	if(flags & RECALIBRATE_RECALIBRATE)
@@ -795,8 +773,6 @@ wander_bam_file_recalibrate(uint8_t flags, char *bam_path, char *ref_name, char 
 				LOG_FATAL("Only recalibration phase 2 requested but no input data specified\n");
 			}
 		}
-
-		recal_calc_deltas(&info);
 
 		//Init wandering
 		bwander_init(&wanderer);

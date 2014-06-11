@@ -539,22 +539,7 @@ recal_get_data_from_bam_alignment(const bam1_t* read, const genome_t* ref, recal
 
 	//Get raw score with reference
 	nucleotide_compare(read_seq_ref, bam_seq, read_seq_ref_l, comp_res, &misses);
-	//comp_res[bam_seq_l] = '\0';
-	/*char cigarro[MAX_CIGAR_LENGTH];
-	cigar32_to_string(bam1_cigar(read), read->core.n_cigar, cigarro);
-	printf("LONG %d, SEQ_L %d, CIGAR %s, MISS %d\n%s\n%s\n", bam_seq_l, read_seq_ref_l, cigarro, misses, read_seq_ref, bam_seq, comp_res);
-	for(i = 0; i < bam_seq_l; i++)
-	{
-		if(comp_mask[i] == 0)
-		{
-			printf("-");
-		}
-		else
-		{
-			printf("#");
-		}
-	}
-	getchar();*/
+
 	//Dinucs
 	for(i = 0; i < bam_seq_l; i++)
 	{

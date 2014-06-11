@@ -83,7 +83,7 @@ bwander_destroy(bam_wanderer_t *wanderer)
 	omp_destroy_lock(&wanderer->user_data_lock);
 }
 
-void 
+int
 bwander_configure(bam_wanderer_t *wanderer, bam_file_t *in_file, bam_file_t *out_file, genome_t *reference, wanderer_function wf, processor_function pf)
 {
 	assert(wanderer);
@@ -102,10 +102,36 @@ bwander_configure(bam_wanderer_t *wanderer, bam_file_t *in_file, bam_file_t *out
 
 	//Set functions
 	wanderer->wander_f = wf;
-	wanderer->processing_f = pf;
+	wanderer->processing_f[0] = pf;
+	wanderer->processing_f_l = 1;
 
 	//Logging
 	LOG_INFO("Wanderer configured\n");
+
+	return NO_ERROR;
+}
+
+int
+bwander_add_proc(bam_wanderer_t *wanderer, processor_function pf)
+{
+	assert(wanderer);
+	assert(pf);
+
+	//Check max functions
+	if(wanderer->processing_f_l >= WANDERER_PROC_FUNC_MAX)
+	{
+		LOG_ERROR("Trying to add processor function, maximun number of processor functions reached\n");
+		return WANDER_PROC_FUNC_FULL;
+	}
+
+	//Add function to list
+	wanderer->processing_f[wanderer->processing_f_l] = pf;
+	wanderer->processing_f_l++;
+
+	//Logging
+	LOG_INFO("Added processor function\n");
+
+	return NO_ERROR;
 }
 
 static int
@@ -116,8 +142,12 @@ bwander_run_sequential(bam_wanderer_t *wanderer)
 	double times;
 	bam_region_t *region;
 
+	//Processing functions
+	size_t pf_l;
+
 	err = WANDER_REGION_CHANGED;
 	reads = 0;
+	pf_l = wanderer->processing_f_l;
 	while(err)
 	{
 		//Create new current region
@@ -145,7 +175,10 @@ bwander_run_sequential(bam_wanderer_t *wanderer)
 				times = omp_get_wtime();
 #endif
 				//Process region
-				wanderer->processing_f(wanderer, region);
+				for(i = 0; i < pf_l; i++)
+				{
+					wanderer->processing_f[i](wanderer, region);
+				}
 #ifdef D_TIME_DEBUG
 				times = omp_get_wtime() - times;
 				if(region->size != 0)
@@ -260,6 +293,8 @@ bwander_run_threaded(bam_wanderer_t *wanderer)
 
 							#pragma omp task untied firstprivate(region) private(err)
 							{
+								int i;
+								size_t pf_l;
 								double aux_time;
 
 								//Process region
@@ -267,7 +302,12 @@ bwander_run_threaded(bam_wanderer_t *wanderer)
 #ifdef D_TIME_DEBUG
 								times = omp_get_wtime();
 #endif
-								wanderer->processing_f(wanderer, region);
+								//Process region
+								pf_l = wanderer->processing_f_l;
+								for(i = 0; i < pf_l; i++)
+								{
+									wanderer->processing_f[i](wanderer, region);
+								}
 #ifdef D_TIME_DEBUG
 								times = omp_get_wtime() - times;
 								if(region->size != 0)
