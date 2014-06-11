@@ -184,6 +184,10 @@ void load_intron_file(genome_t *genome, char* intron_filename, avls_list_t *avls
 //--------------------------------------------------------------------------------
 
 void splice_end_type_new(char type_sp, char *splice_nt, splice_end_t *splice_end) {
+
+  splice_end->splice_nt = strdup(splice_nt);
+
+  /*
   switch(type_sp) {
   case UNKNOWN_SPLICE:
     splice_end->splice_nt = strdup(splice_nt);
@@ -210,6 +214,7 @@ void splice_end_type_new(char type_sp, char *splice_nt, splice_end_t *splice_end
     splice_end->splice_nt = strdup("NONE");
     break;
   }
+  */
 }
 
 splice_end_t *splice_end_new(size_t end, size_t end_extend, unsigned char type_orig, char type_sp, char *splice_nt) {

@@ -1764,13 +1764,14 @@ void rna_aligner(options_t *options) {
       //     time_timer1 / (double)1000000, time_timer2 / (double)1000000, time_timer3 / (double)1000000);
 
 
+
       start_timer(time_s2);
       rewind(f_sa);
       workflow_run_with(options->num_cpu_threads, wf_input, wf_last);      
       stop_timer(time_s2, time_e2, time_total_2);
 
-      //Extrae_fini();
 
+      //Extrae_fini();
       //printf("===== W2 %f(s) =====\n", time_total_2 / (double)1000000);
       //printf("Total Reads           : %i\n", total_reads);
       //printf("Total Reads Mapped    : %i (%f)\n", total_reads - reads_no_map, (double)((total_reads - reads_no_map) * 100) / (double)(total_reads) );

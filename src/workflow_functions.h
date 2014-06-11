@@ -6,7 +6,7 @@
 #include "commons/log.h"
 #include "commons/file_utils.h"
 
-#include "commons/workflow_scheduler.h"
+//#include "commons/workflow_scheduler.h"
 
 #include "bioformats/fastq/fastq_batch_reader.h"
 #include "bioformats/bam/bam_file.h"

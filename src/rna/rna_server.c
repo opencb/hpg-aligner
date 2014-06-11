@@ -424,6 +424,7 @@ cigar_code_t *generate_cigar_sw_output(char *seq_sw,
 	if (found != NOT_SPLICE) {
 	  if (end_splice - start_splice + 1 >= min_intron_size) {
 	    //printf("SP:=>%i:%lu-%lu\n", chromosome, start_splice, end_splice);
+	    /*
 	    allocate_start_node(chromosome - 1,
 				strand,
 				start_splice,
@@ -436,6 +437,7 @@ cigar_code_t *generate_cigar_sw_output(char *seq_sw,
 				node_avl_start,
 				node_avl_end, 
 				avls_list);
+	    */
 	  } else {
 	    array_list_clear(cigar_code->ops, (void *)cigar_op_free);
 	    cigar_code_free(cigar_code); 
@@ -2193,7 +2195,7 @@ void meta_alignment_fill_gaps(int meta_type,
 	    if (nt) {
 	      cigar_code->distance = distance_aux;
 	      int sp_strand = (sp_type == CT_AC_SPLICE ? 1 : 0);
-
+	      /*
 	      allocate_start_node(cal->chromosome_id - 1,
 				  sp_strand,
 				  sp_start,
@@ -2219,7 +2221,7 @@ void meta_alignment_fill_gaps(int meta_type,
 			      node_avl_end->position, seed_next->genome_end, 40,
 			      METAEXON_LEFT_END, node_avl_end,
 			      metaexons);
-	      
+	      */
 	      closed = 1;
 	      sp_found = 1;
 	      //TODO: ADD DISTANCE
@@ -2502,7 +2504,8 @@ void sw_depth_process(sw_optarg_t *sw_optarg, sw_multi_output_t *output,
 	  cigar_code = NULL;
 	}
 	info_sp_free(info_sp);
-	if (cigar_code) {
+	/*
+	if (cigar_code) {	  
 	  int err_l = 0, err_r = 0;
 	  if (node_avl_start && node_avl_end) {
 	    
@@ -2524,7 +2527,7 @@ void sw_depth_process(sw_optarg_t *sw_optarg, sw_multi_output_t *output,
 	    exit(-1);
 	  }
 	}
-
+	*/
 	meta_alignment_insert_cigar(cigar_code, CIGAR_SW_MIDDLE, sw_item->cal_id, sw_item->meta_alignment);	  		
       }
       free(output->query_map_p[i]);
@@ -3735,7 +3738,7 @@ cigar_code_t *search_left_single_anchor(int gap_close,
 	  type = UNKNOWN_SPLICE;
 	  sprintf(str_sp_type, "%c%c-%c%c\0", nt_start[0], nt_start[1], nt_end[0], nt_end[1]);
 	}
-	
+	/*
 	allocate_start_node(cal->chromosome_id - 1,
 			    splice_strand,
 			    start_sp,
@@ -3748,6 +3751,7 @@ cigar_code_t *search_left_single_anchor(int gap_close,
 			    &avl_node_start,
 			    &avl_node_end, 
 			    avls_list);	
+	*/
       }
 
       //printf("\tADD %i%c\n", op->number, op->name);
@@ -4157,7 +4161,7 @@ cigar_code_t *search_right_single_anchor(int gap_close,
 	  sprintf(str_sp_type, "%c%c-%c%c\0", nt_start[0], nt_start[1], nt_end[0], nt_end[1]);
 	}
 
-	
+	/*
 	allocate_start_node(cal->chromosome_id - 1,
 			    splice_strand,
 			    start_sp,
@@ -4170,6 +4174,7 @@ cigar_code_t *search_right_single_anchor(int gap_close,
 			    &avl_node_start,
 			    &avl_node_end, 
 			    avls_list);
+	*/
       }
       //printf("\tADD %i%c\n", op->number, op->name);
       cigar_code_insert_first_op(op, cigar_code);
@@ -4583,7 +4588,7 @@ cigar_code_t *search_double_anchors_cal(char *query_map,
 	  type = UNKNOWN_SPLICE;
 	  sprintf(str_sp_type, "%c%c-%c%c\0", nt_start[0], nt_start[1], nt_end[0], nt_end[1]);
 	}
-
+	/*
 	allocate_start_node(first_cal->chromosome_id - 1,
 			    splice_strand,
 			    start_sp,
@@ -4596,7 +4601,7 @@ cigar_code_t *search_double_anchors_cal(char *query_map,
 			    &avl_node_start,
 			    &avl_node_end, 
 			    avls_list);
-
+	*/
 	break; //If found break loop	
       } else {
 	LOG_DEBUG_F("@@@PROBLEM CALCULATING SPLICE JUNCTION id = %s\n", fq_read->id);
@@ -5194,6 +5199,7 @@ int apply_sw_rna(sw_server_input_t* input_p, batch_t *batch) {
   //pthread_mutex_unlock(&mutex_sp);
 
 
+  //printf("W1 Reads %i\n", num_reads);
 
   for (i = 0; i < num_reads; i++) {        
     cals_list = mapping_batch->mapping_lists[i];
@@ -5434,7 +5440,7 @@ int apply_sw_rna(sw_server_input_t* input_p, batch_t *batch) {
 		  //assert(s_prev_aux->genome_start < sp_start);
 		  //assert(node_avl_end->position + 1 < s_next_aux->genome_end);
 		  int sp_strand = (sp_type == CT_AC_SPLICE ? 1 : 0);
-
+		  /*
 		  allocate_start_node(first_cal->chromosome_id - 1,
 				      sp_strand,
 				      sp_start,
@@ -5461,7 +5467,7 @@ int apply_sw_rna(sw_server_input_t* input_p, batch_t *batch) {
 					  min_intron_size,
 					  METAEXON_LEFT_END, node_avl_end,
 					  metaexons);
-		  
+		  */
 		  meta_alignment_insert_cigar(cigar_code, CIGAR_SIMPLE_MIDDLE, c - 1, meta_alignment);
 
 		} else { 			  
@@ -5793,7 +5799,7 @@ int apply_sw_rna(sw_server_input_t* input_p, batch_t *batch) {
 		int err_l, err_r;
 
 		int sp_strand = (sp_type == CT_AC_SPLICE ? 1 : 0);
-
+		/*
 		allocate_start_node(first_cal->chromosome_id - 1,
 				    sp_strand,
 				    sp_start,
@@ -5819,7 +5825,7 @@ int apply_sw_rna(sw_server_input_t* input_p, batch_t *batch) {
 					node_avl_end->position + 1, s_next_aux->genome_end, min_intron_size,
 					METAEXON_LEFT_END, node_avl_end,
 					metaexons);
-		
+		*/
 		meta_alignment_insert_cigar(cigar_code, CIGAR_SIMPLE_MIDDLE, c - 1, meta_alignment);
 		
 	      } else { 
@@ -6478,6 +6484,8 @@ int apply_rna_last(sw_server_input_t* input_p, batch_t *batch) {
   //  exit(-1);
   //1st - MAP THE EASY READS  
 
+  //printf("W2 Reads %i\n", num_reads);
+
   for (i = 0; i < num_reads; i++) {
     meta_alignments_list[i] = array_list_new(20, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
     fq_read = array_list_get(i, mapping_batch->fq_batch);
@@ -6826,7 +6834,7 @@ int apply_rna_last(sw_server_input_t* input_p, batch_t *batch) {
 		  seed_region_t *s_next_aux = linked_list_get_first(last_cal->sr_list);
 
 		  int sp_strand = (sp_type == CT_AC_SPLICE ? 1 : 0);
-
+		  /*
 		  allocate_start_node(first_cal->chromosome_id - 1,
 				      sp_strand,
 				      sp_start,
@@ -6852,7 +6860,7 @@ int apply_rna_last(sw_server_input_t* input_p, batch_t *batch) {
 				  node_avl_end->position, s_next_aux->genome_end, 40,
 				  METAEXON_LEFT_END, node_avl_end,
 				  metaexons);
-		  
+		  */
 		  meta_alignment_insert_cigar(cigar_code, CIGAR_SIMPLE_MIDDLE, c - 1, meta_alignment);
 		
 		} else {
@@ -7665,6 +7673,8 @@ int apply_rna_last_hc(sw_server_input_t* input_p, batch_t *batch) {
   //extern size_t tot_reads_in;
   //tot_reads_in += num_reads;
   //pthread_mutex_unlock(&mutex_sp);
+
+  //printf("W3 Reads %i\n", num_reads);
   
   //Convert CALs in META_ALIGNMENTS 
   for (int i = 0; i < num_reads; i++) {

@@ -1659,6 +1659,7 @@ int metaexon_insert(unsigned int strand, unsigned int chromosome,
     time_insert += time;
     pthread_mutex_unlock(&(mutex_calls));
     */
+
     return db_type;
 
 }

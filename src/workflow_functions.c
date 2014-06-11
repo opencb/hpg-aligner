@@ -93,7 +93,8 @@ void *fastq_reader(void *input) {
      }
 
      //if (time_on) { stop_timer(start, end, time); timing_add(time, FASTQ_READER, timing); }
-
+     //printf("Read batch %i\n", num_reads);
+     
      return new_batch;
 }
 

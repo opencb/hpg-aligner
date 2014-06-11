@@ -883,6 +883,8 @@ int apply_caling_rna(cal_seeker_input_t* input, batch_t *batch) {
   //TOTAL_READS_SEEDING += num_targets;
   //pthread_mutex_unlock(&mutex_sp);
 
+  //printf("Num targets = %i\n", num_targets);
+  
   for (size_t i = 0; i < num_targets; i++) {
     read = array_list_get(mapping_batch->targets[i], mapping_batch->fq_batch); 
     
@@ -1029,7 +1031,9 @@ int apply_caling_rna(cal_seeker_input_t* input, batch_t *batch) {
     /*   cal_print(cal_aux); */
     /* } */
     /* printf("<<<<<===== CAL SERVER END =====>>>>>\n"); */
-       
+   
+    printf("Total CALs %i\n", num_cals);
+
   }
 
   mapping_batch->num_targets = target_pos;
@@ -1040,6 +1044,7 @@ int apply_caling_rna(cal_seeker_input_t* input, batch_t *batch) {
 
   LOG_DEBUG("========= APPLY CALING RNA END =========\n");
 
+  
   //  return RNA_STAGE;
   if (batch->mapping_mode == RNA_MODE) {
     return RNA_STAGE;
