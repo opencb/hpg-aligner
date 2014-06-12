@@ -18,6 +18,7 @@
 #include "bam_region.h"
 
 #define WANDERER_REGIONS_MAX 1000
+#define WANDERER_CONTEXT_MAX 	16
 #define WANDERER_PROC_FUNC_MAX 	16
 
 #define WANDERER_SUCCESS 0
@@ -64,8 +65,12 @@ typedef struct {
 	omp_lock_t free_slots;
 	//size_t regions_l;
 
-	//Wandering context
+	//Current wandering context
 	bwander_context_t *context;
+
+	//Contexts
+	bwander_context_t *v_context[WANDERER_CONTEXT_MAX];
+	size_t v_context_l;
 } bam_wanderer_t;
 
 /**

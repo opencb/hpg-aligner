@@ -95,6 +95,10 @@ bwander_configure(bam_wanderer_t *wanderer, bam_file_t *in_file, bam_file_t *out
 	//Set context
 	wanderer->context = context;
 
+	//Add to context list
+	wanderer->v_context[0] = context;
+	wanderer->v_context_l = 1;
+
 	//Logging
 	LOG_INFO("Wanderer configured\n");
 
