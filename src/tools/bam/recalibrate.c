@@ -24,7 +24,7 @@
 #include <sys/stat.h>
 #include "aux/aux_library.h"
 #include "aux/timestats.h"
-#include "wanderer/wanderer.h"
+#include "bfwork/bfwork.h"
 #include "recalibrate/recal_config.h"
 #include "recalibrate/recal_structs.h"
 #include "recalibrate/bam_recal_library.h"
@@ -357,9 +357,9 @@ int recalibrate_bam(int argc, char **argv)
 }
 
 int
-recalibrate_wanderer(bam_wanderer_t *wanderer, bam_region_t *region, bam1_t *read)
+recalibrate_wanderer(bam_fwork_t *fwork, bam_region_t *region, bam1_t *read)
 {
-	assert(wanderer);
+	assert(fwork);
 	assert(region);
 	assert(read);
 
@@ -385,7 +385,7 @@ recalibrate_wanderer(bam_wanderer_t *wanderer, bam_region_t *region, bam1_t *rea
 }
 
 int
-recalibrate_collect_processor(bam_wanderer_t *wanderer, bam_region_t *region)
+recalibrate_collect_processor(bam_fwork_t *fwork, bam_region_t *region)
 {
 	int err, i;
 	recal_info_t *data;
@@ -394,19 +394,19 @@ recalibrate_collect_processor(bam_wanderer_t *wanderer, bam_region_t *region)
 	size_t *cycles;
 
 	//Get data
-	bwander_local_user_data(wanderer, (void **)&data);
+	bfwork_local_user_data(fwork, (void **)&data);
 	if(data == NULL)
 	{
 		//Local data is not initialized
 		data = (recal_info_t *)malloc(sizeof(recal_info_t));
 
 		//Lock cycles
-		bwander_lock_user_data(wanderer, (void **)&cycles);
+		bfwork_lock_user_data(fwork, (void **)&cycles);
 		recal_init_info(*cycles, data);
-		bwander_unlock_user_data(wanderer);
+		bfwork_unlock_user_data(fwork);
 
 		//Set local data
-		bwander_local_user_data_set(wanderer, data);
+		bfwork_local_user_data_set(fwork, data);
 	}
 
 	//Initialize get data environment
@@ -421,9 +421,9 @@ recalibrate_collect_processor(bam_wanderer_t *wanderer, bam_region_t *region)
 		assert(read);
 
 		//Get data
-		omp_set_lock(&wanderer->reference_lock);
-		recal_get_data_from_bam_alignment(read, wanderer->reference, data, collect_env);
-		omp_unset_lock(&wanderer->reference_lock);
+		omp_set_lock(&fwork->reference_lock);
+		recal_get_data_from_bam_alignment(read, fwork->reference, data, collect_env);
+		omp_unset_lock(&fwork->reference_lock);
 	}
 
 	//Destroy environment
@@ -433,7 +433,7 @@ recalibrate_collect_processor(bam_wanderer_t *wanderer, bam_region_t *region)
 }
 
 int
-recalibrate_recalibrate_processor(bam_wanderer_t *wanderer, bam_region_t *region)
+recalibrate_recalibrate_processor(bam_fwork_t *fwork, bam_region_t *region)
 {
 	int err, i;
 	recal_info_t *gdata;
@@ -442,14 +442,14 @@ recalibrate_recalibrate_processor(bam_wanderer_t *wanderer, bam_region_t *region
 	bam1_t *read;
 
 	//Get data
-	bwander_local_user_data(wanderer, (void **)&data);
+	bfwork_local_user_data(fwork, (void **)&data);
 	if(data == NULL)
 	{
 		//Local data is not initialized
 		data = (recal_info_t *)malloc(sizeof(recal_info_t));
 
 		//Lock data
-		bwander_lock_user_data(wanderer, (void **)&gdata);
+		bfwork_lock_user_data(fwork, (void **)&gdata);
 
 		//Init struct
 		recal_init_info(gdata->num_cycles, data);
@@ -464,10 +464,10 @@ recalibrate_recalibrate_processor(bam_wanderer_t *wanderer, bam_region_t *region
 		//Recalculate deltas (reduce only merge bases and misses)
 		recal_calc_deltas(data);
 
-		bwander_unlock_user_data(wanderer);
+		bfwork_unlock_user_data(fwork);
 
 		//Set local data
-		bwander_local_user_data_set(wanderer, data);
+		bfwork_local_user_data_set(fwork, data);
 	}
 
 	//Initialize get data environment
@@ -531,8 +531,8 @@ wander_bam_file_recalibrate(uint8_t flags, char *bam_path, char *ref, char *data
 	double times;
 
 	//Wanderer
-	bam_wanderer_t wanderer;
-	bwander_context_t context;
+	bam_fwork_t fwork;
+	bfwork_context_t context;
 
 	assert(bam_path);
 
@@ -553,33 +553,33 @@ wander_bam_file_recalibrate(uint8_t flags, char *bam_path, char *ref, char *data
 		assert(ref);
 
 		//Init wandering
-		bwander_init(&wanderer);
+		bfwork_init(&fwork);
 
 #ifdef D_TIME_DEBUG
 		//Init timing
-		bwander_init_timing(&wanderer, "collect");
+		bfwork_init_timing(&fwork, "collect");
 #endif
 
 		//Create data collection context
-		bwander_context_init(&context,
+		bfwork_context_init(&context,
 				(int (*)(void *, bam_region_t *, bam1_t *))recalibrate_wanderer,
 				(int (*)(void *, bam_region_t *))recalibrate_collect_processor);
 
 		//Set user data
 		cycles_param = cycles;
-		bwander_context_set_user_data(&context, &cycles_param);
+		bfwork_context_set_user_data(&context, &cycles_param);
 
 		//Configure wanderer for data collection
-		bwander_configure(&wanderer, bam_path, NULL, ref, &context);
+		bfwork_configure(&fwork, bam_path, NULL, ref, &context);
 
 		printf("Cycles: %d\n",cycles);
 
 		//Run wander
-		bwander_run(&wanderer);
+		bfwork_run(&fwork);
 
 		//Reduce data
-		bwander_context_local_user_data_reduce(&context, &info, reduce_data);
-		bwander_context_local_user_data_free(&context, destroy_data);
+		bfwork_context_local_user_data_reduce(&context, &info, reduce_data);
+		bfwork_context_local_user_data_free(&context, destroy_data);
 
 		//Delta processing
 		recal_calc_deltas(&info);
@@ -599,17 +599,17 @@ wander_bam_file_recalibrate(uint8_t flags, char *bam_path, char *ref, char *data
 
 #ifdef D_TIME_DEBUG
 		//Print times
-		bwander_print_times(&wanderer);
+		bfwork_print_times(&fwork);
 
 		//Destroy wanderer time
-		bwander_destroy_timing(&wanderer);
+		bfwork_destroy_timing(&fwork);
 #endif
 
 		//Destroy wanderer
-		bwander_destroy(&wanderer);
+		bfwork_destroy(&fwork);
 
 		//Destroy context
-		bwander_context_destroy(&context);
+		bfwork_context_destroy(&context);
 	}
 
 	//Recalibration is needed?
@@ -632,43 +632,43 @@ wander_bam_file_recalibrate(uint8_t flags, char *bam_path, char *ref, char *data
 		}
 
 		//Init wandering
-		bwander_init(&wanderer);
+		bfwork_init(&fwork);
 
 #ifdef D_TIME_DEBUG
 		//Init timing
-		bwander_init_timing(&wanderer, "recalibrate");
+		bfwork_init_timing(&fwork, "recalibrate");
 #endif
 
 		//Create recalibration context
-		bwander_context_init(&context,
+		bfwork_context_init(&context,
 						(int (*)(void *, bam_region_t *, bam1_t *))recalibrate_wanderer,
 						(int (*)(void *, bam_region_t *))recalibrate_recalibrate_processor);
 
 		//Set context user data
-		bwander_context_set_user_data(&context, &info);
+		bfwork_context_set_user_data(&context, &info);
 
 		//Configure wanderer for recalibration
-		bwander_configure(&wanderer, bam_path, outbam, NULL, &context);
+		bfwork_configure(&fwork, bam_path, outbam, NULL, &context);
 
 		//Run wander
-		bwander_run(&wanderer);
+		bfwork_run(&fwork);
 
 		//Free local data
-		bwander_context_local_user_data_free(&context, destroy_data);
+		bfwork_context_local_user_data_free(&context, destroy_data);
 
 #ifdef D_TIME_DEBUG
 		//Print times
-		bwander_print_times(&wanderer);
+		bfwork_print_times(&fwork);
 
 		//Destroy wanderer time
-		bwander_destroy_timing(&wanderer);
+		bfwork_destroy_timing(&fwork);
 #endif
 
 		//Destroy wanderer
-		bwander_destroy(&wanderer);
+		bfwork_destroy(&fwork);
 
 		//Destroy context
-		bwander_context_destroy(&context);
+		bfwork_context_destroy(&context);
 	}
 
 	//Free data memory

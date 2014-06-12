@@ -5,8 +5,8 @@
  *      Author: rmoreno
  */
 
-#ifndef WANDERER_H_
-#define WANDERER_H_
+#ifndef BFWORK_H_
+#define BFWORK_H_
 
 #include <assert.h>
 #include <omp.h>
@@ -18,13 +18,16 @@
 #include "aux/timestats.h"
 #include "bam_region.h"
 
-#define WANDERER_REGIONS_MAX 1000
-#define WANDERER_CONTEXT_MAX 	16
-#define WANDERER_PROC_FUNC_MAX 	16
+//VERSION
+#define FWORK_VER_CURRENT		"1"
+#define FWORK_VER_REVISION		"0"
+#define FWORK_VER_AGE			"0"
+#define FWORK_VER 			FWORK_VER_CURRENT"."FWORK_VER_REVISION"."FWORK_VER_AGE
 
-#define WANDERER_SUCCESS 0
-#define WANDERER_IN_PROGRESS 1
-#define WANDERER_ERROR -1
+//FIXED SIZES
+#define FWORK_REGIONS_MAX 1000
+#define FWORK_CONTEXT_MAX 	16
+#define FWORK_PROC_FUNC_MAX 	16
 
 /**
  * WANDERING FUNCTION DEFINITION
@@ -40,14 +43,14 @@ typedef struct {
 	wanderer_function wander_f;
 
 	//Processing functions
-	processor_function processing_f[WANDERER_PROC_FUNC_MAX];
+	processor_function processing_f[FWORK_PROC_FUNC_MAX];
 	size_t processing_f_l;
 
 	//User data
 	void *user_data;
 	omp_lock_t user_data_lock;
 	void **local_user_data;
-} bwander_context_t;
+} bfwork_context_t;
 
 /**
  * BAM WANDERER STRUCT
@@ -70,53 +73,53 @@ typedef struct {
 	//size_t regions_l;
 
 	//Current wandering context
-	bwander_context_t *context;
+	bfwork_context_t *context;
 
 	//Contexts
-	bwander_context_t *v_context[WANDERER_CONTEXT_MAX];
+	bfwork_context_t *v_context[FWORK_CONTEXT_MAX];
 	size_t v_context_l;
 
 	//Timing
 	p_timestats time_stats;
-} bam_wanderer_t;
+} bam_fwork_t;
 
 /**
  * BAM WANDERER OPERATIONS
  */
-EXTERNC void bwander_init(bam_wanderer_t *wanderer);
-EXTERNC void bwander_destroy(bam_wanderer_t *wanderer);
+EXTERNC void bfwork_init(bam_fwork_t *fwork);
+EXTERNC void bfwork_destroy(bam_fwork_t *fwork);
 
-EXTERNC int bwander_configure(bam_wanderer_t *wanderer, const char *in_file, const char *out_file, const char *reference, bwander_context_t *context);
+EXTERNC int bfwork_configure(bam_fwork_t *fwork, const char *in_file, const char *out_file, const char *reference, bfwork_context_t *context);
 
-EXTERNC int bwander_run(bam_wanderer_t *wanderer);
+EXTERNC int bfwork_run(bam_fwork_t *fwork);
 
 /**
  * WANDERING CONTEXT OPERATIONS
  */
-EXTERNC void bwander_context_init(bwander_context_t *context, wanderer_function wf, processor_function pf);
-EXTERNC void bwander_context_destroy(bwander_context_t *context);
+EXTERNC void bfwork_context_init(bfwork_context_t *context, wanderer_function wf, processor_function pf);
+EXTERNC void bfwork_context_destroy(bfwork_context_t *context);
 
-EXTERNC int bwander_context_add_proc(bwander_context_t *context, processor_function pf);
+EXTERNC int bfwork_context_add_proc(bfwork_context_t *context, processor_function pf);
 
 /**
  * USER DATA
  */
-EXTERNC int bwander_context_set_user_data(bwander_context_t *context, void *user_data);
+EXTERNC int bfwork_context_set_user_data(bfwork_context_t *context, void *user_data);
 
-static int bwander_lock_user_data(bam_wanderer_t *wanderer, void **user_data);
-static int bwander_unlock_user_data(bam_wanderer_t *wanderer);
-static int bwander_local_user_data(bam_wanderer_t *wanderer, void **user_data);
-static int bwander_local_user_data_set(bam_wanderer_t *wanderer, void *user_data);
+static int bfwork_lock_user_data(bam_fwork_t *fwork, void **user_data);
+static int bfwork_unlock_user_data(bam_fwork_t *fwork);
+static int bfwork_local_user_data(bam_fwork_t *fwork, void **user_data);
+static int bfwork_local_user_data_set(bam_fwork_t *fwork, void *user_data);
 
-static int bwander_context_local_user_data_reduce(bwander_context_t *context, void *reduced, void (*cb_reduce)(void *, void *));
-static int bwander_context_local_user_data_free(bwander_context_t *context, void (*cb_free)(void *));
+static int bfwork_context_local_user_data_reduce(bfwork_context_t *context, void *reduced, void (*cb_reduce)(void *, void *));
+static int bfwork_context_local_user_data_free(bfwork_context_t *context, void (*cb_free)(void *));
 
 /**
  * TIMING
  */
-EXTERNC int bwander_init_timing(bam_wanderer_t *wanderer, const char *tag);
-EXTERNC void bwander_destroy_timing(bam_wanderer_t *wanderer);
-EXTERNC int bwander_print_times(bam_wanderer_t *wanderer);
+EXTERNC int bfwork_init_timing(bam_fwork_t *fwork, const char *tag);
+EXTERNC void bfwork_destroy_timing(bam_fwork_t *fwork);
+EXTERNC int bfwork_print_times(bam_fwork_t *fwork);
 
 /**
  * FILTER
@@ -128,41 +131,41 @@ static int filter_read(bam1_t *read, uint8_t filters);
  */
 
 static inline int
-bwander_lock_user_data(bam_wanderer_t *wanderer, void **user_data)
+bfwork_lock_user_data(bam_fwork_t *fwork, void **user_data)
 {
-	assert(wanderer);
+	assert(fwork);
 
 	//Take the lock
-	omp_set_lock(&wanderer->context->user_data_lock);
+	omp_set_lock(&fwork->context->user_data_lock);
 
 	//No user data?
-	if(wanderer->context->user_data == NULL)
+	if(fwork->context->user_data == NULL)
 	{
 		LOG_WARN("Getting uninitialized user data\n");
 	}
 
 	//Set return
-	*user_data = wanderer->context->user_data;
+	*user_data = fwork->context->user_data;
 
 	return NO_ERROR;
 }
 static inline int
-bwander_unlock_user_data(bam_wanderer_t *wanderer)
+bfwork_unlock_user_data(bam_fwork_t *fwork)
 {
-	assert(wanderer);
+	assert(fwork);
 
 	//Remove the lock
-	omp_unset_lock(&wanderer->context->user_data_lock);
+	omp_unset_lock(&fwork->context->user_data_lock);
 
 	return NO_ERROR;
 }
 
 static inline int
-bwander_local_user_data(bam_wanderer_t *wanderer, void **user_data)
+bfwork_local_user_data(bam_fwork_t *fwork, void **user_data)
 {
 	int thread_id;
 
-	assert(wanderer);
+	assert(fwork);
 	assert(user_data);
 
 	//Get thread id
@@ -170,17 +173,17 @@ bwander_local_user_data(bam_wanderer_t *wanderer, void **user_data)
 	assert(thread_id >= 0);
 
 	//Get user data
-	*user_data = wanderer->context->local_user_data[thread_id];
+	*user_data = fwork->context->local_user_data[thread_id];
 
 	return NO_ERROR;
 }
 
 static inline int
-bwander_local_user_data_set(bam_wanderer_t *wanderer, void *user_data)
+bfwork_local_user_data_set(bam_fwork_t *fwork, void *user_data)
 {
 	int thread_id;
 
-	assert(wanderer);
+	assert(fwork);
 	assert(user_data);
 
 	//Get thread id
@@ -188,13 +191,13 @@ bwander_local_user_data_set(bam_wanderer_t *wanderer, void *user_data)
 	assert(thread_id >= 0);
 
 	//Get user data
-	wanderer->context->local_user_data[thread_id] = user_data;
+	fwork->context->local_user_data[thread_id] = user_data;
 
 	return NO_ERROR;
 }
 
 static inline int
-bwander_context_local_user_data_reduce(bwander_context_t *context, void *reduced, void (*cb_reduce)(void *, void *))
+bfwork_context_local_user_data_reduce(bfwork_context_t *context, void *reduced, void (*cb_reduce)(void *, void *))
 {
 	int i, threads;
 	void *data;
@@ -227,7 +230,7 @@ bwander_context_local_user_data_reduce(bwander_context_t *context, void *reduced
 }
 
 static inline int
-bwander_context_local_user_data_free(bwander_context_t *context, void (*cb_free)(void *))
+bfwork_context_local_user_data_free(bfwork_context_t *context, void (*cb_free)(void *))
 {
 	int i, threads;
 	void *data;
@@ -297,4 +300,4 @@ filter_read(bam1_t *read, uint8_t filters)
 	return NO_ERROR;
 }
 
-#endif /* WANDERER_H_ */
+#endif /* BFWORK_H_ */

@@ -17,7 +17,7 @@
 
 #include "aux/timestats.h"
 #include "aux/aux_common.h"
-#include "wanderer/wanderer.h"
+#include "bfwork/bfwork.h"
 #include "aligner/alig.h"
 
 int align_launch(char *reference, char *bam, char *output);
@@ -223,7 +223,7 @@ align_launch(char *reference, char *bam, char *output)
 }
 
 int
-realign_wanderer(bam_wanderer_t *wanderer, bam_region_t *region, bam1_t *read)
+realign_wanderer(bam_fwork_t *fwork, bam_region_t *region, bam1_t *read)
 {
 	int i, err;
 
@@ -232,7 +232,7 @@ realign_wanderer(bam_wanderer_t *wanderer, bam_region_t *region, bam1_t *read)
 	size_t aux_end_pos;
 	size_t read_pos;
 
-	assert(wanderer);
+	assert(fwork);
 	assert(region);
 	assert(read);
 
@@ -290,11 +290,11 @@ realign_wanderer(bam_wanderer_t *wanderer, bam_region_t *region, bam1_t *read)
 }
 
 int
-dummy_processor(bam_wanderer_t *wanderer, bam_region_t *region)
+dummy_processor(bam_fwork_t *fwork, bam_region_t *region)
 {
 	int i;
 
-	assert(wanderer);
+	assert(fwork);
 	assert(region);
 
 	LOG_INFO_F("Processing over region %d:%d-%d with %d reads\n", region->chrom + 1, region->init_pos + 1, region->end_pos +1, region->size);
@@ -306,13 +306,13 @@ dummy_processor(bam_wanderer_t *wanderer, bam_region_t *region)
 
 	//Update user data
 	size_t *reads;
-	bwander_lock_user_data(wanderer, (void **)&reads);
+	bfwork_lock_user_data(fwork, (void **)&reads);
 	*reads += region->size;
-	bwander_unlock_user_data(wanderer);
+	bfwork_unlock_user_data(fwork);
 
 	//Get local user data
 	size_t *regions;
-	bwander_local_user_data(wanderer, (void **)&regions);
+	bfwork_local_user_data(fwork, (void **)&regions);
 	if(regions == NULL)
 	{
 		//Local data is not initialized
@@ -321,7 +321,7 @@ dummy_processor(bam_wanderer_t *wanderer, bam_region_t *region)
 		//printf("%d - POP\n", omp_get_thread_num());
 
 		//Set local data
-		bwander_local_user_data_set(wanderer, regions);
+		bfwork_local_user_data_set(fwork, regions);
 	}
 
 	//Increase local user data
@@ -333,7 +333,7 @@ dummy_processor(bam_wanderer_t *wanderer, bam_region_t *region)
 }
 
 int
-realigner_processor(bam_wanderer_t *wanderer, bam_region_t *region)
+realigner_processor(bam_fwork_t *fwork, bam_region_t *region)
 {
 	int err;
 	alig_context_t context;
@@ -341,9 +341,9 @@ realigner_processor(bam_wanderer_t *wanderer, bam_region_t *region)
 	size_t v_reads_l;
 
 	//Create contexts
-	omp_set_lock(&wanderer->reference_lock);
-	alig_init(&context, wanderer->reference, ALIG_LEFT_ALIGN | ALIG_REFERENCE_PRIORITY);
-	omp_unset_lock(&wanderer->reference_lock);
+	omp_set_lock(&fwork->reference_lock);
+	alig_init(&context, fwork->reference, ALIG_LEFT_ALIGN | ALIG_REFERENCE_PRIORITY);
+	omp_unset_lock(&fwork->reference_lock);
 
 	//Load region reads in aligner context
 	v_reads = region->reads;
@@ -356,9 +356,9 @@ realigner_processor(bam_wanderer_t *wanderer, bam_region_t *region)
 	}
 
 	//Load reference for this region
-	omp_set_lock(&wanderer->reference_lock);
+	omp_set_lock(&fwork->reference_lock);
 	err = alig_region_load_reference(&context);
-	omp_unset_lock(&wanderer->reference_lock);
+	omp_unset_lock(&fwork->reference_lock);
 	if(err)
 	{
 		LOG_ERROR_F("Loading reference sequence, error code = %d\n", err);
@@ -403,107 +403,107 @@ reduce_reads_dummy(void *data, void *dest)
 }
 
 static inline ERROR_CODE
-wander_bam_file_dummy(bam_wanderer_t *wanderer, const char *in, const char *out, const char *ref)
+wander_bam_file_dummy(bam_fwork_t *fwork, const char *in, const char *out, const char *ref)
 {
-	bwander_context_t context;
+	bfwork_context_t context;
 	size_t reads_proc = 0;
 	size_t regions_proc = 0;
 
-	assert(wanderer);
+	assert(fwork);
 	assert(in);
 	assert(out);
 	assert(ref);
 
 	//Init wandering
-	bwander_init(wanderer);
+	bfwork_init(fwork);
 
 #ifdef D_TIME_DEBUG
 	//Init timing
-	bwander_init_timing(wanderer, "dummy");
+	bfwork_init_timing(fwork, "dummy");
 #endif
 
 	//Create realigner context
-	bwander_context_init(&context,
+	bfwork_context_init(&context,
 			(int (*)(void *, bam_region_t *, bam1_t *))realign_wanderer,
 			(int (*)(void *, bam_region_t *))dummy_processor);
 
 	//Set context user data
-	bwander_context_set_user_data(&context, &reads_proc);
+	bfwork_context_set_user_data(&context, &reads_proc);
 
 	//Configure wanderer
-	bwander_configure(wanderer, in, out, ref, &context);
+	bfwork_configure(fwork, in, out, ref, &context);
 
 	//Run wander
-	bwander_run(wanderer);
+	bfwork_run(fwork);
 
 	//Print user data
 	printf("\nREDUCED DATA, Reads processed: %d\n", reads_proc);
 
 	//Print reduced local user data
-	bwander_context_local_user_data_reduce(&context, &regions_proc, reduce_reads_dummy);
+	bfwork_context_local_user_data_reduce(&context, &regions_proc, reduce_reads_dummy);
 	printf("\nREDUCED LOCAL DATA, Regions processed: %d\n", regions_proc);
 
 	//Free local user data
-	bwander_context_local_user_data_free(&context, NULL);
+	bfwork_context_local_user_data_free(&context, NULL);
 
 #ifdef D_TIME_DEBUG
 	//Print times
-	bwander_print_times(wanderer);
+	bfwork_print_times(fwork);
 
 	//Destroy wanderer time
-	bwander_destroy_timing(wanderer);
+	bfwork_destroy_timing(fwork);
 #endif
 
 	//Destroy wanderer
-	bwander_destroy(wanderer);
+	bfwork_destroy(fwork);
 
 	//Destroy context
-	bwander_context_destroy(&context);
+	bfwork_context_destroy(&context);
 
 	return NO_ERROR;
 }
 
 static inline ERROR_CODE
-wander_bam_file_realigner(bam_wanderer_t *wanderer, const char *in, const char *out, const char *ref)
+wander_bam_file_realigner(bam_fwork_t *fwork, const char *in, const char *out, const char *ref)
 {
-	bwander_context_t context;
+	bfwork_context_t context;
 
-	assert(wanderer);
+	assert(fwork);
 	assert(in);
 	assert(ref);
 
 	//Init wandering
-	bwander_init(wanderer);
+	bfwork_init(fwork);
 
 #ifdef D_TIME_DEBUG
 	//Init timing
-	bwander_init_timing(wanderer, "realigner");
+	bfwork_init_timing(fwork, "realigner");
 #endif
 
 	//Create realigner context
-	bwander_context_init(&context,
+	bfwork_context_init(&context,
 			(int (*)(void *, bam_region_t *, bam1_t *))realign_wanderer,
 			(int (*)(void *, bam_region_t *))realigner_processor);
 
 	//Configure wanderer
-	bwander_configure(wanderer, in, out, ref, &context);
+	bfwork_configure(fwork, in, out, ref, &context);
 
 	//Run wander
-	bwander_run(wanderer);
+	bfwork_run(fwork);
 
 #ifdef D_TIME_DEBUG
 	//Print times
-	bwander_print_times(wanderer);
+	bfwork_print_times(fwork);
 
 	//Destroy wanderer time
-	bwander_destroy_timing(wanderer);
+	bfwork_destroy_timing(fwork);
 #endif
 
 	//Destroy wanderer
-	bwander_destroy(wanderer);
+	bfwork_destroy(fwork);
 
 	//Destroy context
-	bwander_context_destroy(&context);
+	bfwork_context_destroy(&context);
 
 	return NO_ERROR;
 }
@@ -515,16 +515,16 @@ wander_bam_file(char *bam_path, char *ref_path, char *outbam)
 	double times;
 
 	//Wanderer
-	bam_wanderer_t wanderer;
+	bam_fwork_t fwork;
 
 	assert(bam_path);
 	assert(ref_path);
 
 	//Dummy wandering
-	//wander_bam_file_dummy(&wanderer, bam_path, outbam, ref_path);
+	//wander_bam_file_dummy(&fwork, bam_path, outbam, ref_path);
 
 	//Realigner wandering
-	wander_bam_file_realigner(&wanderer, bam_path, outbam, ref_path);
+	wander_bam_file_realigner(&fwork, bam_path, outbam, ref_path);
 
 	return NO_ERROR;
 }

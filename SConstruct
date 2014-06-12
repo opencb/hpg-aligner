@@ -47,7 +47,7 @@ envprogram['CFLAGS'] += ' -DNODEBUG -mssse3 -DD_TIME_DEBUG'
 bams = envprogram.Program('#bin/hpg-bam',
              source = [Glob('src/tools/bam/*.c'), 
 	     	       Glob('src/tools/bam/aux/*.c'),
-	     	       Glob('src/tools/bam/wanderer/*.c'),
+	     	       Glob('src/tools/bam/bfwork/*.c'),
 	     	       Glob('src/tools/bam/recalibrate/*.c'),
 	     	       Glob('src/tools/bam/aligner/*.c'),
                        "%s/libbioinfo.a" % bioinfo_path,
