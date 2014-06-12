@@ -173,7 +173,7 @@ typedef enum ERROR_C ERROR_CODE;
 		D_FWORK_WANDER_FUNC,
 		D_FWORK_PROC_FUNC
 	};
-
 #endif
+
 
 #endif /* AUX_COMMON_H_ */

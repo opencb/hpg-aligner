@@ -32,7 +32,7 @@
 #define RECALIBRATE_COLLECT 			0x01
 #define RECALIBRATE_RECALIBRATE 	0x02
 
-ERROR_CODE wander_bam_file_recalibrate(uint8_t flags, char *bam_path, char *ref_name, char *ref_path, char *data_file, char *info_file, char *outbam, int cycles);
+ERROR_CODE wander_bam_file_recalibrate(uint8_t flags, char *bam_path, char *ref, char *data_file, char *info_file, char *outbam, int cycles);
 
 int mymain(	int full,
 			int p1,
@@ -52,7 +52,7 @@ int mymain(	int full,
 			const char *compfile,
 			int compcount)
 {	
-	char *dir, *base, *inputc, *outputc, *infofilec, *datafilec;
+	char *refc, *inputc, *outputc, *infofilec, *datafilec;
 	char *sched;
 	char cwd[1024];
 	
@@ -133,58 +133,6 @@ int mymain(	int full,
 	//Set schedule if not defined
 	setenv("OMP_SCHEDULE", "static", 0);
 	sched = getenv("OMP_SCHEDULE");
-
-	//Time measures
-	#ifdef D_TIME_DEBUG
-
-	char filename[100];
-	char intaux[20];
-
-		//Initialize stats
-		if(time_new_stats(20, &TIME_GLOBAL_STATS))
-		{
-			printf("ERROR: FAILED TO INITIALIZE TIME STATS\n");
-		}
-
-
-		if (getcwd(cwd, sizeof(cwd)) != NULL)
-		{
-			printf("Current working dir: %s\n", cwd);
-		}
-		else
-		{
-			perror("WARNING: getcwd() dont work\n");
-		}
-
-		strcpy(filename, cwd);
-		strcat(filename,"/stats/");
-		if(sched)
-			strcat(filename,sched);
-		else
-		{
-			printf("ERROR: Obtaining OMP_SCHEDULE environment value\n");
-		}
-
-		//Create stats directory
-		mkdir(filename, S_IRWXU);
-
-		strcat(filename,"_");
-		sprintf(intaux, "%d", MAX_BATCH_SIZE);
-		strcat(filename, intaux);
-		strcat(filename, "_");
-		sprintf(intaux, "%d", threads);
-		strcat(filename, intaux);
-		strcat(filename, "_.stats");
-
-		//Initialize stats file output
-		if(time_set_output_file(filename, TIME_GLOBAL_STATS))
-		{
-			printf("ERROR: FAILED TO INITIALIZE TIME STATS FILE OUTPUT\n");
-		}
-
-		printf("STATISTICS ACTIVATED, output file: %s\n\n", filename);
-
-	#endif
 	
 	//Printf proc caps
 	printf_proc_features();
@@ -210,17 +158,10 @@ int mymain(	int full,
 	//omp_set_num_threads(threads);
 	printf("Threading with %d threads and %s schedule\n", omp_get_max_threads(), sched);
 
-	#ifdef D_TIME_DEBUG
-		double init_time, end_time;
-		init_time = omp_get_wtime();
-	#endif
-
 	//Obtain reference filename and dirpath from full path
-	dir = strdup(reference);
-	dir = dirname(dir);
-	base = strrchr(reference, '/');
-	printf("Reference dir: %s\n", dir);
-	printf("Reference name: %s\n", base);
+	refc = NULL;
+	if(refcount > 0)
+		refc = strdup(reference);
 
 	//Print data
 	infofilec = NULL;
@@ -232,96 +173,45 @@ int mymain(	int full,
 	if(datacount > 0)
 		datafilec = strdup(datafile);
 
-	//Obtain data from bam
-	inputc = strdup(input);
+	//Input BAM
+	inputc = NULL;
+	if(incount > 0)
+		inputc = strdup(input);
+
+	//Output BAM
 	outputc = NULL;
 	if(output)
 		outputc = strdup(output);
+
+	//Recalibrate
 	if(p1 && p2)
 	{
 		printf("Full recalibration\n");
-		wander_bam_file_recalibrate(RECALIBRATE_COLLECT | RECALIBRATE_RECALIBRATE, inputc,base, dir, datafilec, infofilec, outputc, cycles);
+		wander_bam_file_recalibrate(RECALIBRATE_COLLECT | RECALIBRATE_RECALIBRATE, inputc, refc, datafilec, infofilec, outputc, cycles);
 	}
 	else
 	{
 		if(p1)
 		{
 			printf("Phase 1 recalibration\n");
-			wander_bam_file_recalibrate(RECALIBRATE_COLLECT, inputc,base, dir, datafilec, infofilec, outputc, cycles);
+			wander_bam_file_recalibrate(RECALIBRATE_COLLECT, inputc, refc, datafilec, infofilec, outputc, cycles);
 		}
 		else
 		{
 			printf("Phase 2 recalibration\n");
-			wander_bam_file_recalibrate(RECALIBRATE_RECALIBRATE, inputc,base, dir, datafilec, infofilec, outputc, cycles);
+			wander_bam_file_recalibrate(RECALIBRATE_RECALIBRATE, inputc, refc, datafilec, infofilec, outputc, cycles);
 		}
 	}
-	free(inputc);
+	if(inputc)
+		free(inputc);
 	if(outputc)
 		free(outputc);
+	if(refc)
+		free(refc);
 	if(datafilec)
 		free(datafilec);
 	if(infofilec)
 		free(infofilec);
-	
-	#ifdef D_TIME_DEBUG
-		end_time = omp_get_wtime();
-		time_add_time_slot(D_FWORK_TOTAL, TIME_GLOBAL_STATS, end_time - init_time);
-	#endif
-
-	//Print times
-	#ifdef D_TIME_DEBUG
-		double min, max, mean;
-
-		//Print time stats
-		printf("----------------------------\nTIME STATS: \n");
-
-		printf("\n====== General times ======\n");
-		time_get_mean_slot(D_FWORK_TOTAL, TIME_GLOBAL_STATS, &mean);
-		time_get_min_slot(D_FWORK_TOTAL, TIME_GLOBAL_STATS, &min);
-		time_get_max_slot(D_FWORK_TOTAL, TIME_GLOBAL_STATS, &max);
-		printf("Total time to process -> %.2f s - min/max = %.2f/%.2f\n",
-				mean, min, max);
-
-		time_get_mean_slot(D_FWORK_INIT, TIME_GLOBAL_STATS, &mean);
-		time_get_min_slot(D_FWORK_INIT, TIME_GLOBAL_STATS, &min);
-		time_get_max_slot(D_FWORK_INIT, TIME_GLOBAL_STATS, &max);
-		printf("Time used to initialize framework -> %.2f s - min/max = %.2f/%.2f\n",
-				mean, min, max);
-
-		printf("\n====== Wandering function ======\n");
-		time_get_mean_slot(D_FWORK_WANDER_FUNC, TIME_GLOBAL_STATS, &mean);
-		time_get_min_slot(D_FWORK_WANDER_FUNC, TIME_GLOBAL_STATS, &min);
-		time_get_max_slot(D_FWORK_WANDER_FUNC, TIME_GLOBAL_STATS, &max);
-		printf("Time of wandering function per alignment (inside framework read time) -> %.2f us - min/max = %.2f/%.2f\n",
-					mean*1000000.0, min*1000000.0, max*1000000.0);
-
-		printf("\n====== Processing function ======\n");
-		time_get_mean_slot(D_FWORK_PROC_FUNC, TIME_GLOBAL_STATS, &mean);
-		time_get_min_slot(D_FWORK_PROC_FUNC, TIME_GLOBAL_STATS, &min);
-		time_get_max_slot(D_FWORK_PROC_FUNC, TIME_GLOBAL_STATS, &max);
-		printf("Time of processing function per alignment (inside framework process time) -> %.2f us - min/max = %.2f/%.2f\n",
-				mean*1000000.0, min*1000000.0, max*1000000.0);
-
-		printf("\n====== Framework ======\n");
-
-		time_get_mean_slot(D_FWORK_PROC, TIME_GLOBAL_STATS, &mean);
-		time_get_min_slot(D_FWORK_PROC, TIME_GLOBAL_STATS, &min);
-		time_get_max_slot(D_FWORK_PROC, TIME_GLOBAL_STATS, &max);
-		printf("Time used for process per alignment -> %.2f us - min/max = %.2f/%.2f\n",
-				mean*1000000.0, min*1000000.0, max*1000000.0);
-
-		time_get_mean_slot(D_FWORK_READ, TIME_GLOBAL_STATS, &mean);
-		time_get_min_slot(D_FWORK_READ, TIME_GLOBAL_STATS, &min);
-		time_get_max_slot(D_FWORK_READ, TIME_GLOBAL_STATS, &max);
-		printf("Time used for read per alignment -> %.2f us - min/max = %.2f/%.2f\n",
-				mean*1000000.0, min*1000000.0, max*1000000.0);
-
-		time_get_mean_slot(D_FWORK_WRITE, TIME_GLOBAL_STATS, &mean);
-		time_get_min_slot(D_FWORK_WRITE, TIME_GLOBAL_STATS, &min);
-		time_get_max_slot(D_FWORK_WRITE, TIME_GLOBAL_STATS, &max);
-		printf("Time used for write per alignment -> %.2f us - min/max = %.2f/%.2f\n",
-				mean*1000000.0, min*1000000.0, max*1000000.0);
-	#endif
 	
 	stop_log();
 
@@ -628,12 +518,8 @@ destroy_data(void *data)
 }
 
 ERROR_CODE
-wander_bam_file_recalibrate(uint8_t flags, char *bam_path, char *ref_name, char *ref_path, char *data_file, char *info_file, char *outbam, int cycles)
+wander_bam_file_recalibrate(uint8_t flags, char *bam_path, char *ref, char *data_file, char *info_file, char *outbam, int cycles)
 {
-	//Files
-	bam_file_t *bam_f = NULL;
-	bam_file_t *out_bam_f = NULL;
-	genome_t* ref = NULL;
 	int bytes;
 
 	//Data
@@ -650,52 +536,12 @@ wander_bam_file_recalibrate(uint8_t flags, char *bam_path, char *ref_name, char 
 
 	assert(bam_path);
 
-#ifdef D_TIME_DEBUG
-	times = omp_get_wtime();
-#endif
-
 	//Get phases
 	if((flags & RECALIBRATE_RECALIBRATE) && !(flags & RECALIBRATE_COLLECT))
 	{
 		//Second phase only, needs data file
 		assert(data_file);
 	}
-
-	//Open bam
-	{
-		printf("Opening BAM from \"%s\" ...\n", bam_path);
-		bam_f = bam_fopen(bam_path);
-		assert(bam_f);
-		printf("BAM opened!...\n");
-	}
-
-	//Open reference genome, if collect phase is present
-	if(flags & RECALIBRATE_COLLECT)
-	{
-		assert(ref_name);
-		assert(ref_path);
-		printf("Opening reference genome from \"%s%s\" ...\n", ref_path, ref_name);
-		ref = genome_new(ref_name, ref_path);
-		assert(ref);
-		printf("Reference opened!...\n");
-	}
-
-	//Create new bam
-	if(outbam != NULL && (flags & RECALIBRATE_RECALIBRATE))
-	{
-		printf("Creating new bam file in \"%s\"...\n", outbam);
-		//init_empty_bam_header(orig_bam_f->bam_header_p->n_targets, recal_bam_header);
-		out_bam_f = bam_fopen_mode(outbam, bam_f->bam_header_p, "w");
-		assert(out_bam_f);
-		bam_fwrite_header(out_bam_f->bam_header_p, out_bam_f);
-		out_bam_f->bam_header_p = NULL;
-		printf("New BAM initialized!...\n");
-	}
-
-#ifdef D_TIME_DEBUG
-	times = omp_get_wtime() - times;
-	time_add_time_slot(D_FWORK_INIT, TIME_GLOBAL_STATS, times);
-#endif
 
 	//Create new data
 	aux_cycles = cycles;
@@ -709,6 +555,11 @@ wander_bam_file_recalibrate(uint8_t flags, char *bam_path, char *ref_name, char 
 		//Init wandering
 		bwander_init(&wanderer);
 
+#ifdef D_TIME_DEBUG
+		//Init timing
+		bwander_init_timing(&wanderer, "collect");
+#endif
+
 		//Create data collection context
 		bwander_context_init(&context,
 				(int (*)(void *, bam_region_t *, bam1_t *))recalibrate_wanderer,
@@ -719,7 +570,7 @@ wander_bam_file_recalibrate(uint8_t flags, char *bam_path, char *ref_name, char 
 		bwander_context_set_user_data(&context, &cycles_param);
 
 		//Configure wanderer for data collection
-		bwander_configure(&wanderer, bam_f, NULL, ref, &context);
+		bwander_configure(&wanderer, bam_path, NULL, ref, &context);
 
 		printf("Cycles: %d\n",cycles);
 
@@ -746,20 +597,19 @@ wander_bam_file_recalibrate(uint8_t flags, char *bam_path, char *ref_name, char 
 			recal_fprint_info(&info, info_file);
 		}
 
+#ifdef D_TIME_DEBUG
+		//Print times
+		bwander_print_times(&wanderer);
+
+		//Destroy wanderer time
+		bwander_destroy_timing(&wanderer);
+#endif
+
 		//Destroy wanderer
 		bwander_destroy(&wanderer);
 
 		//Destroy context
 		bwander_context_destroy(&context);
-
-		if(flags & RECALIBRATE_RECALIBRATE)
-		{
-			//Reopen bam from beginning
-			printf("Reopening input BAM\n");
-			bam_fclose(bam_f);
-			bam_f = bam_fopen(bam_path);
-			assert(bam_f);
-		}
 	}
 
 	//Recalibration is needed?
@@ -784,6 +634,11 @@ wander_bam_file_recalibrate(uint8_t flags, char *bam_path, char *ref_name, char 
 		//Init wandering
 		bwander_init(&wanderer);
 
+#ifdef D_TIME_DEBUG
+		//Init timing
+		bwander_init_timing(&wanderer, "recalibrate");
+#endif
+
 		//Create recalibration context
 		bwander_context_init(&context,
 						(int (*)(void *, bam_region_t *, bam1_t *))recalibrate_wanderer,
@@ -793,13 +648,21 @@ wander_bam_file_recalibrate(uint8_t flags, char *bam_path, char *ref_name, char 
 		bwander_context_set_user_data(&context, &info);
 
 		//Configure wanderer for recalibration
-		bwander_configure(&wanderer, bam_f, out_bam_f, NULL, &context);
+		bwander_configure(&wanderer, bam_path, outbam, NULL, &context);
 
 		//Run wander
 		bwander_run(&wanderer);
 
 		//Free local data
 		bwander_context_local_user_data_free(&context, destroy_data);
+
+#ifdef D_TIME_DEBUG
+		//Print times
+		bwander_print_times(&wanderer);
+
+		//Destroy wanderer time
+		bwander_destroy_timing(&wanderer);
+#endif
 
 		//Destroy wanderer
 		bwander_destroy(&wanderer);
@@ -810,24 +673,6 @@ wander_bam_file_recalibrate(uint8_t flags, char *bam_path, char *ref_name, char 
 
 	//Free data memory
 	recal_destroy_info(&info);
-
-	printf("\nClosing BAM file...\n");
-	bam_fclose(bam_f);
-	printf("BAM closed.\n");
-
-	if(ref != NULL)
-	{
-		printf("\nClosing reference file...\n");
-		genome_free(ref);
-		printf("Reference closed.\n");
-	}
-
-	if(outbam != NULL)
-	{
-		printf("Closing \"%s\" BAM file...\n", outbam);
-		bam_fclose(out_bam_f);
-		printf("BAM closed.\n");
-	}
 
 	return NO_ERROR;
 }

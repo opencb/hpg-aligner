@@ -20,11 +20,12 @@
 #include "wanderer/wanderer.h"
 #include "aligner/alig.h"
 
-int align_launch(char *reference, char *bam, char *output, int threads);
-ERROR_CODE wander_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam);
+int align_launch(char *reference, char *bam, char *output);
+ERROR_CODE wander_bam_file(char *bam_path, char *ref_path, char *outbam);
 
 int alig_bam(int argc, char **argv)
 {
+	char *refc, *bamc, *outputc;
 
     struct arg_file *refile = arg_file0("r",NULL,"<reference>","reference genome compressed file (dna_compression.bin)");
     struct arg_file *infile = arg_file0("b",NULL,"<input>","input BAM file");
@@ -152,13 +153,29 @@ int alig_bam(int argc, char **argv)
 		}
 	}
 
+	bamc = NULL;
+	if(infile->count > 0)
+		bamc = strdup(infile->filename[0]);
+
+	outputc = NULL;
+	if(outfile->count > 0)
+		outputc = strdup(outfile->filename[0]);
+
+	refc = NULL;
+	if(refile->count > 0)
+		refc = strdup(refile->filename[0]);
+
     /* normal case: realignment */
 	{
-		exitcode = align_launch(	(char *)refile->filename[0],
-												(char *)infile->filename[0],
-												(char *)outfile->filename[0],
-												1);
+		exitcode = align_launch(	refc, bamc, outputc);
 	}
+
+	if(bamc)
+		free(bamc);
+	if(outputc)
+		free(outputc);
+	if(refc)
+		free(refc);
 
     exit:
     /* deallocate each non-null entry in argtable[] */
@@ -168,10 +185,10 @@ int alig_bam(int argc, char **argv)
 }
 
 int
-align_launch(char *reference, char *bam, char *output, int threads)
+align_launch(char *reference, char *bam, char *output)
 {
-	char *dir, *base, *bamc, *outputc, *infofilec, *datafilec, *sched;
-	int err;
+	int err, threads;
+	char *sched;
 	double init_time, end_time;
 
 	assert(reference);
@@ -185,66 +202,7 @@ align_launch(char *reference, char *bam, char *output, int threads)
 	//Set schedule if not defined
 	setenv("OMP_SCHEDULE", "static", 0);
 	sched = getenv("OMP_SCHEDULE");
-
-	//Time measures
-#ifdef D_TIME_DEBUG
-
-	char filename[100];
-	char intaux[20];
-	char cwd[1024];
-
-	//Initialize stats
-	if(time_new_stats(20, &TIME_GLOBAL_STATS))
-	{
-		printf("ERROR: FAILED TO INITIALIZE TIME STATS\n");
-	}
-
-
-	if (getcwd(cwd, sizeof(cwd)) != NULL)
-	{
-		printf("Current working dir: %s\n", cwd);
-	}
-	else
-	{
-		perror("WARNING: getcwd() dont work");
-	}
-
-	strcpy(filename, cwd);
-	strcat(filename,"/stats/");
-	/*if(sched)
-		strcat(filename,sched);
-	else
-	{
-		printf("ERROR: Obtaining OMP_SCHEDULE environment value\n");
-	}*/
-
-	//Create stats directory
-	printf("Creating stats directory: %s\n", filename);
-	err = mkdir(filename, S_IRWXU);
-	if(err != 0 && errno != EEXIST)
-	{
-		perror("WARNING: failed to create stats directory");
-	}
-	else
-	{
-		//strcat(filename,"_");
-		//sprintf(intaux, "%d", MAX_BATCH_SIZE);
-		//strcat(filename, intaux);
-		strcat(filename, "_");
-		sprintf(intaux, "%d", threads);
-		strcat(filename, intaux);
-		strcat(filename, "_.stats");
-
-		//Initialize stats file output
-		if(time_set_output_file(filename, TIME_GLOBAL_STATS))
-		{
-			printf("ERROR: FAILED TO INITIALIZE TIME STATS FILE OUTPUT\n");
-		}
-
-		printf("STATISTICS ACTIVATED, output file: %s\n\n", filename);
-	}
-
-#endif
+	threads = omp_get_max_threads();
 
 	//System info
 	printf("------------\n");
@@ -257,82 +215,7 @@ align_launch(char *reference, char *bam, char *output, int threads)
 #endif
 	printf("------------\n");
 
-	//Obtain reference filename and dirpath from full path
-	dir = strdup(reference);
-	dir = dirname(dir);
-	base = strrchr(reference, '/');
-
-	//Obtain data from bam
-	bamc = strdup(bam);
-	printf("Reference dir: %s\n", dir);
-	printf("Reference name: %s\n", base);
-#ifdef D_TIME_DEBUG
-	init_time = omp_get_wtime();
-#endif
-	//alig_bam_file(bamc, base, dir, output);
-	wander_bam_file(bamc, base, dir, output);
-#ifdef D_TIME_DEBUG
-	end_time = omp_get_wtime();
-	time_add_time_slot(D_FWORK_TOTAL, TIME_GLOBAL_STATS, end_time - init_time);
-#endif
-	free(bamc);
-	free(dir);
-
-	//Print times
-#ifdef D_TIME_DEBUG
-	double min, max, mean;
-
-	//Print time stats
-	printf("----------------------------\nTIME STATS: \n");
-
-	printf("\n====== General times ======\n");
-	time_get_mean_slot(D_FWORK_TOTAL, TIME_GLOBAL_STATS, &mean);
-	time_get_min_slot(D_FWORK_TOTAL, TIME_GLOBAL_STATS, &min);
-	time_get_max_slot(D_FWORK_TOTAL, TIME_GLOBAL_STATS, &max);
-	printf("Total time to process -> %.2f s - min/max = %.2f/%.2f\n",
-			mean, min, max);
-
-	time_get_mean_slot(D_FWORK_INIT, TIME_GLOBAL_STATS, &mean);
-	time_get_min_slot(D_FWORK_INIT, TIME_GLOBAL_STATS, &min);
-	time_get_max_slot(D_FWORK_INIT, TIME_GLOBAL_STATS, &max);
-	printf("Time used to initialize framework -> %.2f s - min/max = %.2f/%.2f\n",
-			mean, min, max);
-
-	printf("\n====== Wandering function ======\n");
-	time_get_mean_slot(D_FWORK_WANDER_FUNC, TIME_GLOBAL_STATS, &mean);
-	time_get_min_slot(D_FWORK_WANDER_FUNC, TIME_GLOBAL_STATS, &min);
-	time_get_max_slot(D_FWORK_WANDER_FUNC, TIME_GLOBAL_STATS, &max);
-	printf("Time of wandering function per alignment (inside framework read time) -> %.2f us - min/max = %.2f/%.2f\n",
-				mean*1000000.0, min*1000000.0, max*1000000.0);
-
-	printf("\n====== Processing function ======\n");
-	time_get_mean_slot(D_FWORK_PROC_FUNC, TIME_GLOBAL_STATS, &mean);
-	time_get_min_slot(D_FWORK_PROC_FUNC, TIME_GLOBAL_STATS, &min);
-	time_get_max_slot(D_FWORK_PROC_FUNC, TIME_GLOBAL_STATS, &max);
-	printf("Time of processing function per alignment (inside framework process time) -> %.2f us - min/max = %.2f/%.2f\n",
-			mean*1000000.0, min*1000000.0, max*1000000.0);
-
-	printf("\n====== Framework ======\n");
-
-	time_get_mean_slot(D_FWORK_PROC, TIME_GLOBAL_STATS, &mean);
-	time_get_min_slot(D_FWORK_PROC, TIME_GLOBAL_STATS, &min);
-	time_get_max_slot(D_FWORK_PROC, TIME_GLOBAL_STATS, &max);
-	printf("Time used for process per alignment -> %.2f us - min/max = %.2f/%.2f\n",
-			mean*1000000.0, min*1000000.0, max*1000000.0);
-
-	time_get_mean_slot(D_FWORK_READ, TIME_GLOBAL_STATS, &mean);
-	time_get_min_slot(D_FWORK_READ, TIME_GLOBAL_STATS, &min);
-	time_get_max_slot(D_FWORK_READ, TIME_GLOBAL_STATS, &max);
-	printf("Time used for read per alignment -> %.2f us - min/max = %.2f/%.2f\n",
-			mean*1000000.0, min*1000000.0, max*1000000.0);
-
-	time_get_mean_slot(D_FWORK_WRITE, TIME_GLOBAL_STATS, &mean);
-	time_get_min_slot(D_FWORK_WRITE, TIME_GLOBAL_STATS, &min);
-	time_get_max_slot(D_FWORK_WRITE, TIME_GLOBAL_STATS, &max);
-	printf("Time used for write per alignment -> %.2f us - min/max = %.2f/%.2f\n",
-			mean*1000000.0, min*1000000.0, max*1000000.0);
-
-#endif
+	wander_bam_file(bam, reference, output);
 
 	stop_log();
 
@@ -520,7 +403,7 @@ reduce_reads_dummy(void *data, void *dest)
 }
 
 static inline ERROR_CODE
-wander_bam_file_dummy(bam_wanderer_t *wanderer, bam_file_t *in, bam_file_t *out, genome_t *ref)
+wander_bam_file_dummy(bam_wanderer_t *wanderer, const char *in, const char *out, const char *ref)
 {
 	bwander_context_t context;
 	size_t reads_proc = 0;
@@ -533,6 +416,11 @@ wander_bam_file_dummy(bam_wanderer_t *wanderer, bam_file_t *in, bam_file_t *out,
 
 	//Init wandering
 	bwander_init(wanderer);
+
+#ifdef D_TIME_DEBUG
+	//Init timing
+	bwander_init_timing(wanderer, "dummy");
+#endif
 
 	//Create realigner context
 	bwander_context_init(&context,
@@ -558,6 +446,14 @@ wander_bam_file_dummy(bam_wanderer_t *wanderer, bam_file_t *in, bam_file_t *out,
 	//Free local user data
 	bwander_context_local_user_data_free(&context, NULL);
 
+#ifdef D_TIME_DEBUG
+	//Print times
+	bwander_print_times(wanderer);
+
+	//Destroy wanderer time
+	bwander_destroy_timing(wanderer);
+#endif
+
 	//Destroy wanderer
 	bwander_destroy(wanderer);
 
@@ -568,7 +464,7 @@ wander_bam_file_dummy(bam_wanderer_t *wanderer, bam_file_t *in, bam_file_t *out,
 }
 
 static inline ERROR_CODE
-wander_bam_file_realigner(bam_wanderer_t *wanderer, bam_file_t *in, bam_file_t *out, genome_t *ref)
+wander_bam_file_realigner(bam_wanderer_t *wanderer, const char *in, const char *out, const char *ref)
 {
 	bwander_context_t context;
 
@@ -578,6 +474,11 @@ wander_bam_file_realigner(bam_wanderer_t *wanderer, bam_file_t *in, bam_file_t *
 
 	//Init wandering
 	bwander_init(wanderer);
+
+#ifdef D_TIME_DEBUG
+	//Init timing
+	bwander_init_timing(wanderer, "realigner");
+#endif
 
 	//Create realigner context
 	bwander_context_init(&context,
@@ -590,6 +491,14 @@ wander_bam_file_realigner(bam_wanderer_t *wanderer, bam_file_t *in, bam_file_t *
 	//Run wander
 	bwander_run(wanderer);
 
+#ifdef D_TIME_DEBUG
+	//Print times
+	bwander_print_times(wanderer);
+
+	//Destroy wanderer time
+	bwander_destroy_timing(wanderer);
+#endif
+
 	//Destroy wanderer
 	bwander_destroy(wanderer);
 
@@ -600,14 +509,8 @@ wander_bam_file_realigner(bam_wanderer_t *wanderer, bam_file_t *in, bam_file_t *
 }
 
 ERROR_CODE
-wander_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
+wander_bam_file(char *bam_path, char *ref_path, char *outbam)
 {
-	//Files
-	bam_file_t *bam_f = NULL;
-	bam_file_t *out_bam_f = NULL;
-	genome_t* ref = NULL;
-	int bytes;
-
 	//Times
 	double times;
 
@@ -615,63 +518,13 @@ wander_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 	bam_wanderer_t wanderer;
 
 	assert(bam_path);
-	assert(ref_name);
 	assert(ref_path);
 
-#ifdef D_TIME_DEBUG
-	times = omp_get_wtime();
-#endif
-
-	//Open bam
-	{
-		printf("Opening BAM from \"%s\" ...\n", bam_path);
-		bam_f = bam_fopen(bam_path);
-		assert(bam_f);
-		printf("BAM opened!...\n");
-	}
-
-	//Open reference genome
-	{
-		printf("Opening reference genome from \"%s%s\" ...\n", ref_path, ref_name);
-		ref = genome_new(ref_name, ref_path);
-		assert(ref);
-		printf("Reference opened!...\n");
-	}
-
-	//Create new bam
-	if(outbam != NULL)
-	{
-		printf("Creating new bam file in \"%s\"...\n", outbam);
-		//init_empty_bam_header(orig_bam_f->bam_header_p->n_targets, recal_bam_header);
-		out_bam_f = bam_fopen_mode(outbam, bam_f->bam_header_p, "w");
-		assert(out_bam_f);
-		bam_fwrite_header(out_bam_f->bam_header_p, out_bam_f);
-		out_bam_f->bam_header_p = NULL;
-		printf("New BAM initialized!...\n");
-	}
-
-#ifdef D_TIME_DEBUG
-	times = omp_get_wtime() - times;
-	time_add_time_slot(D_FWORK_INIT, TIME_GLOBAL_STATS, times);
-#endif
-
 	//Dummy wandering
-	//wander_bam_file_dummy(&wanderer, bam_f, out_bam_f, ref);
+	//wander_bam_file_dummy(&wanderer, bam_path, outbam, ref_path);
 
 	//Realigner wandering
-	wander_bam_file_realigner(&wanderer, bam_f, out_bam_f, ref);
-
-	printf("\nClosing BAM file...\n");
-	bam_fclose(bam_f);
-	printf("BAM closed.\n");
-
-	printf("\nClosing reference file...\n");
-	genome_free(ref);
-	printf("Reference closed.\n");
-
-	printf("Closing \"%s\" BAM file...\n", outbam);
-	bam_fclose(out_bam_f);
-	printf("BAM closed.\n");
+	wander_bam_file_realigner(&wanderer, bam_path, outbam, ref_path);
 
 	return NO_ERROR;
 }

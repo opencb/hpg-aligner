@@ -10,6 +10,7 @@
 
 #include <assert.h>
 #include <omp.h>
+#include <libgen.h>
 
 #include "containers/linked_list.h"
 #include "aux/aux_common.h"
@@ -53,6 +54,9 @@ typedef struct {
  */
 typedef struct {
 	//I/O
+	char *input_file_str;
+	char *output_file_str;
+	char *reference_str;
 	bam_file_t *input_file;
 	bam_file_t *output_file;
 	genome_t *reference;
@@ -71,6 +75,9 @@ typedef struct {
 	//Contexts
 	bwander_context_t *v_context[WANDERER_CONTEXT_MAX];
 	size_t v_context_l;
+
+	//Timing
+	p_timestats time_stats;
 } bam_wanderer_t;
 
 /**
@@ -79,7 +86,7 @@ typedef struct {
 EXTERNC void bwander_init(bam_wanderer_t *wanderer);
 EXTERNC void bwander_destroy(bam_wanderer_t *wanderer);
 
-EXTERNC int bwander_configure(bam_wanderer_t *wanderer, bam_file_t *in_file, bam_file_t *out_file, genome_t *reference, bwander_context_t *context);
+EXTERNC int bwander_configure(bam_wanderer_t *wanderer, const char *in_file, const char *out_file, const char *reference, bwander_context_t *context);
 
 EXTERNC int bwander_run(bam_wanderer_t *wanderer);
 
@@ -103,6 +110,13 @@ static int bwander_local_user_data_set(bam_wanderer_t *wanderer, void *user_data
 
 static int bwander_context_local_user_data_reduce(bwander_context_t *context, void *reduced, void (*cb_reduce)(void *, void *));
 static int bwander_context_local_user_data_free(bwander_context_t *context, void (*cb_free)(void *));
+
+/**
+ * TIMING
+ */
+EXTERNC int bwander_init_timing(bam_wanderer_t *wanderer, const char *tag);
+EXTERNC void bwander_destroy_timing(bam_wanderer_t *wanderer);
+EXTERNC int bwander_print_times(bam_wanderer_t *wanderer);
 
 /**
  * FILTER

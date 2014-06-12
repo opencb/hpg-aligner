@@ -77,19 +77,19 @@ bwander_destroy(bam_wanderer_t *wanderer)
 }
 
 int
-bwander_configure(bam_wanderer_t *wanderer, bam_file_t *in_file, bam_file_t *out_file, genome_t *reference, bwander_context_t *context)
+bwander_configure(bam_wanderer_t *wanderer, const char *in_file, const char *out_file, const char *reference, bwander_context_t *context)
 {
 	assert(wanderer);
 	assert(in_file);
 	assert(context);
 
 	//Set I/O
-	wanderer->input_file = in_file;
+	wanderer->input_file_str = (char *)in_file;
 	omp_set_lock(&wanderer->output_file_lock);
-	wanderer->output_file = out_file;		
+	wanderer->output_file_str = (char *)out_file;
 	omp_unset_lock(&wanderer->output_file_lock);
 	omp_set_lock(&wanderer->reference_lock);
-	wanderer->reference = reference;
+	wanderer->reference_str = (char *)reference;
 	omp_unset_lock(&wanderer->reference_lock);
 
 	//Set context
@@ -135,7 +135,7 @@ bwander_run_sequential(bam_wanderer_t *wanderer)
 #ifdef D_TIME_DEBUG
 		times = omp_get_wtime() - times;
 		if(region->size != 0)
-			time_add_time_slot(D_FWORK_READ, TIME_GLOBAL_STATS, times / (double)region->size);
+			time_add_time_slot(D_FWORK_READ, wanderer->time_stats, times / (double)region->size);
 #endif
 		if(err)
 		{
@@ -156,8 +156,8 @@ bwander_run_sequential(bam_wanderer_t *wanderer)
 				times = omp_get_wtime() - times;
 				if(region->size != 0)
 				{
-					time_add_time_slot(D_FWORK_PROC,  TIME_GLOBAL_STATS, times / (double)region->size);
-					time_add_time_slot(D_FWORK_PROC_FUNC, TIME_GLOBAL_STATS, times / (double)region->size);
+					time_add_time_slot(D_FWORK_PROC,  wanderer->time_stats, times / (double)region->size);
+					time_add_time_slot(D_FWORK_PROC_FUNC, wanderer->time_stats, times / (double)region->size);
 				}
 				times = omp_get_wtime();
 #endif
@@ -179,7 +179,7 @@ bwander_run_sequential(bam_wanderer_t *wanderer)
 #ifdef D_TIME_DEBUG
 				times = omp_get_wtime() - times;
 				if(reads_to_write != 0)
-					time_add_time_slot(D_FWORK_WRITE, TIME_GLOBAL_STATS, times / (double)reads_to_write);
+					time_add_time_slot(D_FWORK_WRITE, wanderer->time_stats, times / (double)reads_to_write);
 #endif
 
 				//End readings
@@ -251,7 +251,7 @@ bwander_run_threaded(bam_wanderer_t *wanderer)
 					times = omp_get_wtime() - times;
 					omp_set_lock(&region->lock);
 					if(region->size != 0)
-						time_add_time_slot(D_FWORK_READ, TIME_GLOBAL_STATS, times / (double)region->size);
+						time_add_time_slot(D_FWORK_READ, wanderer->time_stats, times / (double)region->size);
 					omp_unset_lock(&region->lock);
 #endif
 					if(err)
@@ -284,7 +284,7 @@ bwander_run_threaded(bam_wanderer_t *wanderer)
 #ifdef D_TIME_DEBUG
 								times = omp_get_wtime() - times;
 								if(region->size != 0)
-									time_add_time_slot(D_FWORK_PROC_FUNC, TIME_GLOBAL_STATS, times / (double)region->size);
+									time_add_time_slot(D_FWORK_PROC_FUNC, wanderer->time_stats, times / (double)region->size);
 								aux_time = omp_get_wtime();
 #endif
 								omp_unset_lock(&region->lock);
@@ -298,7 +298,7 @@ bwander_run_threaded(bam_wanderer_t *wanderer)
 								aux_time = omp_get_wtime() - aux_time;
 								omp_set_lock(&region->lock);
 								if(region->size != 0)
-									time_add_time_slot(D_FWORK_PROC, TIME_GLOBAL_STATS, (times + aux_time) / (double)region->size);
+									time_add_time_slot(D_FWORK_PROC, wanderer->time_stats, (times + aux_time) / (double)region->size);
 								omp_unset_lock(&region->lock);
 #endif
 
@@ -378,7 +378,7 @@ bwander_run_threaded(bam_wanderer_t *wanderer)
 					times = omp_get_wtime() - times;
 					omp_set_lock(&region->lock);
 					if(reads_to_write != 0)
-						time_add_time_slot(D_FWORK_WRITE, TIME_GLOBAL_STATS, times / (double)reads_to_write);
+						time_add_time_slot(D_FWORK_WRITE, wanderer->time_stats, times / (double)reads_to_write);
 					omp_unset_lock(&region->lock);
 #endif
 
@@ -413,12 +413,69 @@ bwander_run(bam_wanderer_t *wanderer)
 	double times;
 	bam1_t *read;
 
+	//Reference
+	char *ref_path;
+	char *ref_name;
+
 	assert(wanderer);
-	assert(wanderer->input_file);
+	assert(wanderer->input_file_str);
 	assert(wanderer->regions_list);
+
+	printf("============== BEGIN RUN  ==============\n");
+
+	//Logging
+	LOG_INFO("Wanderer is initializing\n");
+
+#ifdef D_TIME_DEBUG
+	times = omp_get_wtime();
+#endif
+
+	//Open input bam
+	{
+		printf("Opening BAM from \"%s\" ...\n", wanderer->input_file_str);
+		wanderer->input_file = bam_fopen(wanderer->input_file_str);
+		assert(wanderer->input_file);
+		printf("BAM opened!...\n");
+	}
+
+	//Open reference
+	if(wanderer->reference_str)
+	{
+		//Obtain reference filename and dirpath from full path
+		ref_path = strdup(wanderer->reference_str);
+		ref_path = dirname(ref_path);
+		ref_name = strrchr(wanderer->reference_str, '/');
+		printf("Reference path: %s\n", ref_path);
+		printf("Reference name: %s\n", ref_name);
+		printf("Opening reference genome from \"%s%s\" ...\n", ref_path, ref_name);
+		wanderer->reference = genome_new(ref_name, ref_path);
+		assert(wanderer->reference);
+		printf("Reference opened!...\n");
+	}
+
+	//Create new bam
+	if(wanderer->output_file_str)
+	{
+		printf("Creating new bam file in \"%s\"...\n", wanderer->output_file_str);
+		//init_empty_bam_header(orig_bam_f->bam_header_p->n_targets, recal_bam_header);
+		wanderer->output_file = bam_fopen_mode(wanderer->output_file_str, wanderer->input_file->bam_header_p, "w");
+		assert(wanderer->output_file);
+		bam_fwrite_header(wanderer->output_file->bam_header_p, wanderer->output_file);
+		wanderer->output_file->bam_header_p = NULL;
+		printf("New BAM initialized!...\n");
+	}
+
+#ifdef D_TIME_DEBUG
+	times = omp_get_wtime() - times;
+	time_add_time_slot(D_FWORK_INIT, wanderer->time_stats, times);
+#endif
 
 	//Logging
 	LOG_INFO("Wanderer is now running\n");
+
+#ifdef D_TIME_DEBUG
+	times = omp_get_wtime();
+#endif
 
 	if(omp_get_max_threads() > 1)
 	{
@@ -431,8 +488,36 @@ bwander_run(bam_wanderer_t *wanderer)
 		err = bwander_run_sequential(wanderer);
 	}
 
+#ifdef D_TIME_DEBUG
+	times = omp_get_wtime() - times;
+	time_add_time_slot(D_FWORK_TOTAL, wanderer->time_stats, times);
+#endif
+
+	//Close input BAM
+	printf("\nClosing BAM file...\n");
+	bam_fclose(wanderer->input_file);
+	printf("BAM closed.\n");
+
+	//Close reference
+	if(wanderer->reference != NULL)
+	{
+		printf("\nClosing reference file...\n");
+		genome_free(wanderer->reference);
+		printf("Reference closed.\n");
+	}
+
+	//Close output file
+	if(wanderer->output_file != NULL)
+	{
+		printf("Closing \"%s\" BAM file...\n", wanderer->output_file_str);
+		bam_fclose(wanderer->output_file);
+		printf("BAM closed.\n");
+	}
+
 	//Logging
 	LOG_INFO("Wanderer SUCCESS!\n");
+
+	printf("============== END RUN  ==============\n\n");
 
 	return err;
 }
@@ -510,6 +595,155 @@ bwander_context_set_user_data(bwander_context_t *context, void *user_data)
 
 	//Set user data
 	context->user_data = user_data;
+
+	return NO_ERROR;
+}
+
+/**
+ * TIMING
+ */
+
+int
+bwander_init_timing(bam_wanderer_t *wanderer, const char *tag)
+{
+	char *sched;
+	char filename[100];
+	char intaux[20];
+	char cwd[1024];
+
+	assert(wanderer);
+
+	//Create timing
+	if(time_new_stats(20, &wanderer->time_stats))
+	{
+		LOG_ERROR("Failed to initialize time stats\n");
+	}
+
+	//Get OMP schedule
+	sched = getenv("OMP_SCHEDULE");
+
+	//Get working dir
+	if (getcwd(cwd, sizeof(cwd)) != NULL)
+	{
+		printf("Current working dir: %s\n", cwd);
+	}
+	else
+	{
+		perror("WARNING: getcwd() dont work\n");
+	}
+
+	strcpy(filename, cwd);
+	strcat(filename,"/stats/");
+
+	//Create stats directory
+	mkdir(filename, S_IRWXU);
+
+	if(tag)
+	{
+		strcat(filename,tag);
+	}
+	if(sched)
+	{
+		strcat(filename,"_");
+		strcat(filename,sched);
+	}
+	else
+	{
+		printf("ERROR: Obtaining OMP_SCHEDULE environment value\n");
+	}
+
+	//strcat(filename,"_");
+	//sprintf(intaux, "%d", MAX_BATCH_SIZE);
+	//strcat(filename, intaux);
+	strcat(filename, "_");
+	sprintf(intaux, "%d", omp_get_max_threads());
+	strcat(filename, intaux);
+	strcat(filename, ".stats");
+
+	//Set output file
+	if(time_set_output_file(filename, wanderer->time_stats))
+	{
+		LOG_ERROR_F("Failed to set timing file output to \"%s\"\n", filename);
+	}
+	else
+	{
+		printf("STATISTICS ACTIVATED, output file: %s\n\n", filename);
+	}
+
+	return NO_ERROR;
+}
+
+void
+bwander_destroy_timing(bam_wanderer_t *wanderer)
+{
+	assert(wanderer);
+
+	//Destroy time stats
+	if(wanderer->time_stats)
+	{
+		time_destroy_stats(&wanderer->time_stats);
+	}
+}
+
+int
+bwander_print_times(bam_wanderer_t *wanderer)
+{
+	//Print times
+	double min, max, mean;
+
+#ifdef D_TIME_DEBUG
+	//Print time stats
+	printf("----------------------------\nTIME STATS: \n");
+
+	printf("\n====== General times ======\n");
+	time_get_mean_slot(D_FWORK_TOTAL, wanderer->time_stats, &mean);
+	time_get_min_slot(D_FWORK_TOTAL, wanderer->time_stats, &min);
+	time_get_max_slot(D_FWORK_TOTAL, wanderer->time_stats, &max);
+	printf("Total time to process -> %.2f s - min/max = %.2f/%.2f\n",
+			mean, min, max);
+
+	time_get_mean_slot(D_FWORK_INIT, wanderer->time_stats, &mean);
+	time_get_min_slot(D_FWORK_INIT, wanderer->time_stats, &min);
+	time_get_max_slot(D_FWORK_INIT, wanderer->time_stats, &max);
+	printf("Time used to initialize framework -> %.2f s - min/max = %.2f/%.2f\n",
+			mean, min, max);
+
+	printf("\n====== Wandering function ======\n");
+	time_get_mean_slot(D_FWORK_WANDER_FUNC, wanderer->time_stats, &mean);
+	time_get_min_slot(D_FWORK_WANDER_FUNC, wanderer->time_stats, &min);
+	time_get_max_slot(D_FWORK_WANDER_FUNC, wanderer->time_stats, &max);
+	printf("Time of wandering function per alignment (inside framework read time) -> %.2f us - min/max = %.2f/%.2f\n",
+				mean*1000000.0, min*1000000.0, max*1000000.0);
+
+	printf("\n====== Processing function ======\n");
+	time_get_mean_slot(D_FWORK_PROC_FUNC, wanderer->time_stats, &mean);
+	time_get_min_slot(D_FWORK_PROC_FUNC, wanderer->time_stats, &min);
+	time_get_max_slot(D_FWORK_PROC_FUNC, wanderer->time_stats, &max);
+	printf("Time of processing function per alignment (inside framework process time) -> %.2f us - min/max = %.2f/%.2f\n",
+			mean*1000000.0, min*1000000.0, max*1000000.0);
+
+	printf("\n====== Framework ======\n");
+
+	time_get_mean_slot(D_FWORK_PROC, wanderer->time_stats, &mean);
+	time_get_min_slot(D_FWORK_PROC, wanderer->time_stats, &min);
+	time_get_max_slot(D_FWORK_PROC, wanderer->time_stats, &max);
+	printf("Time used for process per alignment -> %.2f us - min/max = %.2f/%.2f\n",
+			mean*1000000.0, min*1000000.0, max*1000000.0);
+
+	time_get_mean_slot(D_FWORK_READ, wanderer->time_stats, &mean);
+	time_get_min_slot(D_FWORK_READ, wanderer->time_stats, &min);
+	time_get_max_slot(D_FWORK_READ, wanderer->time_stats, &max);
+	printf("Time used for read per alignment -> %.2f us - min/max = %.2f/%.2f\n",
+			mean*1000000.0, min*1000000.0, max*1000000.0);
+
+	time_get_mean_slot(D_FWORK_WRITE, wanderer->time_stats, &mean);
+	time_get_min_slot(D_FWORK_WRITE, wanderer->time_stats, &min);
+	time_get_max_slot(D_FWORK_WRITE, wanderer->time_stats, &max);
+	printf("Time used for write per alignment -> %.2f us - min/max = %.2f/%.2f\n",
+			mean*1000000.0, min*1000000.0, max*1000000.0);
+
+	printf("-------------\n\n");
+#endif
 
 	return NO_ERROR;
 }
@@ -601,7 +835,7 @@ bwander_obtain_region(bam_wanderer_t *wanderer, bam_region_t *region)
 		err = wanderer->context->wander_f(wanderer, region, read);
 #ifdef D_TIME_DEBUG
 			times = omp_get_wtime() - times;
-			time_add_time_slot(D_FWORK_WANDER_FUNC, TIME_GLOBAL_STATS, times);
+			time_add_time_slot(D_FWORK_WANDER_FUNC, wanderer->time_stats, times);
 #endif
 		omp_unset_lock(&region->lock);
 		switch(err)

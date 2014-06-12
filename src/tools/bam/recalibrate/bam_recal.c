@@ -417,6 +417,7 @@ recal_recalibrate_alignment_priv(const bam1_t* alig, const recal_info_t *bam_inf
 
 	//Allocate for result
 	res_quals = (char *)malloc(bam_seq_l * sizeof(char));
+	memcpy(res_quals, bam_quals, bam_seq_l * sizeof(char));
 
 	//Iterates nucleotides in this read
 	dinuc = 0;
@@ -454,10 +455,10 @@ recal_recalibrate_alignment_priv(const bam1_t* alig, const recal_info_t *bam_inf
 				double res = bam_info->total_estimated_Q + bam_info->total_delta + delta_r + delta_rc + delta_rd;
 				res_quals[i] = (char)res;
 			}
-			else
+			/*else
 			{
 				res_quals[i] = (char)calidad;
-			}
+			}*/
 		}
 	}
 
