@@ -522,6 +522,7 @@ reduce_reads_dummy(void *data, void *dest)
 static inline ERROR_CODE
 wander_bam_file_dummy(bam_wanderer_t *wanderer, bam_file_t *in, bam_file_t *out, genome_t *ref)
 {
+	bwander_context_t context;
 	size_t reads_proc = 0;
 	size_t regions_proc = 0;
 
@@ -533,13 +534,16 @@ wander_bam_file_dummy(bam_wanderer_t *wanderer, bam_file_t *in, bam_file_t *out,
 	//Init wandering
 	bwander_init(wanderer);
 
-	//Configure wanderer
-	bwander_configure(wanderer, in, out, ref,
+	//Create realigner context
+	bwander_context_init(&context,
 			(int (*)(void *, bam_region_t *, bam1_t *))realign_wanderer,
 			(int (*)(void *, bam_region_t *))dummy_processor);
 
-	//Set user data
-	bwander_set_user_data(wanderer, &reads_proc);
+	//Set context user data
+	bwander_context_set_user_data(&context, &reads_proc);
+
+	//Configure wanderer
+	bwander_configure(wanderer, in, out, ref, &context);
 
 	//Run wander
 	bwander_run(wanderer);
@@ -548,14 +552,17 @@ wander_bam_file_dummy(bam_wanderer_t *wanderer, bam_file_t *in, bam_file_t *out,
 	printf("\nREDUCED DATA, Reads processed: %d\n", reads_proc);
 
 	//Print reduced local user data
-	bwander_local_user_data_reduce(wanderer, &regions_proc, reduce_reads_dummy);
+	bwander_context_local_user_data_reduce(&context, &regions_proc, reduce_reads_dummy);
 	printf("\nREDUCED LOCAL DATA, Regions processed: %d\n", regions_proc);
 
 	//Free local user data
-	bwander_local_user_data_free(wanderer, NULL);
+	bwander_context_local_user_data_free(&context, NULL);
 
 	//Destroy wanderer
 	bwander_destroy(wanderer);
+
+	//Destroy context
+	bwander_context_destroy(&context);
 
 	return NO_ERROR;
 }
@@ -563,6 +570,8 @@ wander_bam_file_dummy(bam_wanderer_t *wanderer, bam_file_t *in, bam_file_t *out,
 static inline ERROR_CODE
 wander_bam_file_realigner(bam_wanderer_t *wanderer, bam_file_t *in, bam_file_t *out, genome_t *ref)
 {
+	bwander_context_t context;
+
 	assert(wanderer);
 	assert(in);
 	assert(ref);
@@ -570,16 +579,22 @@ wander_bam_file_realigner(bam_wanderer_t *wanderer, bam_file_t *in, bam_file_t *
 	//Init wandering
 	bwander_init(wanderer);
 
-	//Configure wanderer
-	bwander_configure(wanderer, in, out, ref,
+	//Create realigner context
+	bwander_context_init(&context,
 			(int (*)(void *, bam_region_t *, bam1_t *))realign_wanderer,
 			(int (*)(void *, bam_region_t *))realigner_processor);
+
+	//Configure wanderer
+	bwander_configure(wanderer, in, out, ref, &context);
 
 	//Run wander
 	bwander_run(wanderer);
 
 	//Destroy wanderer
 	bwander_destroy(wanderer);
+
+	//Destroy context
+	bwander_context_destroy(&context);
 
 	return NO_ERROR;
 }

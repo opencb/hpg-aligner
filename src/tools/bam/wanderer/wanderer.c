@@ -34,17 +34,11 @@ bwander_init(bam_wanderer_t *wanderer)
 	//Create regions
 	wanderer->regions_list = linked_list_new(COLLECTION_MODE_SYNCHRONIZED);
 
-	//Create local data
-	threads = omp_get_max_threads();
-	wanderer->local_user_data = (void **)malloc(threads * sizeof(void*));
-	memset(wanderer->local_user_data, 0, threads * sizeof(void*));
-
 	//Init locks
 	omp_init_lock(&wanderer->regions_lock);
 	omp_init_lock(&wanderer->free_slots);
 	omp_init_lock(&wanderer->output_file_lock);
 	omp_init_lock(&wanderer->reference_lock);
-	omp_init_lock(&wanderer->user_data_lock);
 }
 
 void
@@ -80,16 +74,14 @@ bwander_destroy(bam_wanderer_t *wanderer)
 	omp_destroy_lock(&wanderer->regions_lock);
 	omp_destroy_lock(&wanderer->output_file_lock);
 	omp_destroy_lock(&wanderer->reference_lock);
-	omp_destroy_lock(&wanderer->user_data_lock);
 }
 
 int
-bwander_configure(bam_wanderer_t *wanderer, bam_file_t *in_file, bam_file_t *out_file, genome_t *reference, wanderer_function wf, processor_function pf)
+bwander_configure(bam_wanderer_t *wanderer, bam_file_t *in_file, bam_file_t *out_file, genome_t *reference, bwander_context_t *context)
 {
 	assert(wanderer);
 	assert(in_file);
-	assert(wf);
-	assert(pf);
+	assert(context);
 
 	//Set I/O
 	wanderer->input_file = in_file;
@@ -100,36 +92,11 @@ bwander_configure(bam_wanderer_t *wanderer, bam_file_t *in_file, bam_file_t *out
 	wanderer->reference = reference;
 	omp_unset_lock(&wanderer->reference_lock);
 
-	//Set functions
-	wanderer->wander_f = wf;
-	wanderer->processing_f[0] = pf;
-	wanderer->processing_f_l = 1;
+	//Set context
+	wanderer->context = context;
 
 	//Logging
 	LOG_INFO("Wanderer configured\n");
-
-	return NO_ERROR;
-}
-
-int
-bwander_add_proc(bam_wanderer_t *wanderer, processor_function pf)
-{
-	assert(wanderer);
-	assert(pf);
-
-	//Check max functions
-	if(wanderer->processing_f_l >= WANDERER_PROC_FUNC_MAX)
-	{
-		LOG_ERROR("Trying to add processor function, maximun number of processor functions reached\n");
-		return WANDER_PROC_FUNC_FULL;
-	}
-
-	//Add function to list
-	wanderer->processing_f[wanderer->processing_f_l] = pf;
-	wanderer->processing_f_l++;
-
-	//Logging
-	LOG_INFO("Added processor function\n");
 
 	return NO_ERROR;
 }
@@ -142,12 +109,14 @@ bwander_run_sequential(bam_wanderer_t *wanderer)
 	double times;
 	bam_region_t *region;
 
-	//Processing functions
+	//Context
+	bwander_context_t *context;
 	size_t pf_l;
 
 	err = WANDER_REGION_CHANGED;
 	reads = 0;
-	pf_l = wanderer->processing_f_l;
+	context = wanderer->context;
+	pf_l = context->processing_f_l;
 	while(err)
 	{
 		//Create new current region
@@ -177,7 +146,7 @@ bwander_run_sequential(bam_wanderer_t *wanderer)
 				//Process region
 				for(i = 0; i < pf_l; i++)
 				{
-					wanderer->processing_f[i](wanderer, region);
+					context->processing_f[i](wanderer, region);
 				}
 #ifdef D_TIME_DEBUG
 				times = omp_get_wtime() - times;
@@ -303,10 +272,10 @@ bwander_run_threaded(bam_wanderer_t *wanderer)
 								times = omp_get_wtime();
 #endif
 								//Process region
-								pf_l = wanderer->processing_f_l;
+								pf_l = wanderer->context->processing_f_l;
 								for(i = 0; i < pf_l; i++)
 								{
-									wanderer->processing_f[i](wanderer, region);
+									wanderer->context->processing_f[i](wanderer, region);
 								}
 #ifdef D_TIME_DEBUG
 								times = omp_get_wtime() - times;
@@ -465,16 +434,78 @@ bwander_run(bam_wanderer_t *wanderer)
 }
 
 /**
+ * WANDERING CONTEXT OPERATIONS
+ */
+void
+bwander_context_init(bwander_context_t *context, wanderer_function wf, processor_function pf)
+{
+	int threads;
+
+	assert(context);
+	assert(wf);
+	assert(pf);
+
+	//Set context to zeros
+	memset(context, 0, sizeof(bwander_context_t));
+
+	//Create local data
+	threads = omp_get_max_threads();
+	context->local_user_data = (void **)malloc(threads * sizeof(void*));
+	memset(context->local_user_data, 0, threads * sizeof(void*));
+
+	//Assign functions
+	context->wander_f = wf;
+	context->processing_f[0] = pf;
+	context->processing_f_l = 1;
+
+	//Init locks
+	omp_init_lock(&context->user_data_lock);
+}
+
+void
+bwander_context_destroy(bwander_context_t *context)
+{
+	assert(context);
+
+	//Destroy locks
+	omp_destroy_lock(&context->user_data_lock);
+}
+
+int
+bwander_context_add_proc(bwander_context_t *context, processor_function pf)
+{
+	assert(context);
+	assert(pf);
+
+	//Check max functions
+	if(context->processing_f_l >= WANDERER_PROC_FUNC_MAX)
+	{
+		LOG_ERROR("Trying to add processor function, maximun number of processor functions reached\n");
+		return WANDER_PROC_FUNC_FULL;
+	}
+
+	//Add function to list
+	context->processing_f[context->processing_f_l] = pf;
+	context->processing_f_l++;
+
+	//Logging
+	LOG_INFO("Added processor function\n");
+
+	return NO_ERROR;
+}
+
+
+/**
  * USER DATA
  */
 int
-bwander_set_user_data(bam_wanderer_t *wanderer, void *user_data)
+bwander_context_set_user_data(bwander_context_t *context, void *user_data)
 {
-	assert(wanderer);
+	assert(context);
 	assert(user_data);
 
 	//Set user data
-	wanderer->user_data = user_data;
+	context->user_data = user_data;
 
 	return NO_ERROR;
 }
@@ -563,7 +594,7 @@ bwander_obtain_region(bam_wanderer_t *wanderer, bam_region_t *region)
 #ifdef D_TIME_DEBUG
 			times = omp_get_wtime();
 #endif
-		err = wanderer->wander_f(wanderer, region, read);
+		err = wanderer->context->wander_f(wanderer, region, read);
 #ifdef D_TIME_DEBUG
 			times = omp_get_wtime() - times;
 			time_add_time_slot(D_FWORK_WANDER_FUNC, TIME_GLOBAL_STATS, times);

@@ -31,6 +31,23 @@ typedef int (*wanderer_function)(void *, bam_region_t *, bam1_t *) ;
 typedef int (*processor_function)(void *, bam_region_t *) ;
 
 /**
+ * WANDERING CONTEXT
+ */
+typedef struct {
+	//Wandering function
+	wanderer_function wander_f;
+
+	//Processing functions
+	processor_function processing_f[WANDERER_PROC_FUNC_MAX];
+	size_t processing_f_l;
+
+	//User data
+	void *user_data;
+	omp_lock_t user_data_lock;
+	void **local_user_data;
+} bwander_context_t;
+
+/**
  * BAM WANDERER STRUCT
  */
 typedef struct {
@@ -47,15 +64,8 @@ typedef struct {
 	omp_lock_t free_slots;
 	//size_t regions_l;
 
-	//Function to execute
-	wanderer_function wander_f;
-	processor_function processing_f[WANDERER_PROC_FUNC_MAX];
-	size_t processing_f_l;
-
-	//User data
-	void *user_data;
-	omp_lock_t user_data_lock;
-	void **local_user_data;
+	//Wandering context
+	bwander_context_t *context;
 } bam_wanderer_t;
 
 /**
@@ -64,21 +74,30 @@ typedef struct {
 EXTERNC void bwander_init(bam_wanderer_t *wanderer);
 EXTERNC void bwander_destroy(bam_wanderer_t *wanderer);
 
-EXTERNC int bwander_configure(bam_wanderer_t *wanderer, bam_file_t *in_file, bam_file_t *out_file, genome_t *reference, wanderer_function wf, processor_function pf);
-EXTERNC int bwander_add_proc(bam_wanderer_t *wanderer, processor_function pf);
+EXTERNC int bwander_configure(bam_wanderer_t *wanderer, bam_file_t *in_file, bam_file_t *out_file, genome_t *reference, bwander_context_t *context);
 
 EXTERNC int bwander_run(bam_wanderer_t *wanderer);
 
 /**
+ * WANDERING CONTEXT OPERATIONS
+ */
+EXTERNC void bwander_context_init(bwander_context_t *context, wanderer_function wf, processor_function pf);
+EXTERNC void bwander_context_destroy(bwander_context_t *context);
+
+EXTERNC int bwander_context_add_proc(bwander_context_t *context, processor_function pf);
+
+/**
  * USER DATA
  */
-EXTERNC int bwander_set_user_data(bam_wanderer_t *wanderer, void *user_data);
+EXTERNC int bwander_context_set_user_data(bwander_context_t *context, void *user_data);
+
 static int bwander_lock_user_data(bam_wanderer_t *wanderer, void **user_data);
 static int bwander_unlock_user_data(bam_wanderer_t *wanderer);
 static int bwander_local_user_data(bam_wanderer_t *wanderer, void **user_data);
 static int bwander_local_user_data_set(bam_wanderer_t *wanderer, void *user_data);
-static int bwander_local_user_data_reduce(bam_wanderer_t *wanderer, void *reduced, void (*cb_reduce)(void *, void *));
-static int bwander_local_user_data_free(bam_wanderer_t *wanderer, void (*cb_free)(void *));
+
+static int bwander_context_local_user_data_reduce(bwander_context_t *context, void *reduced, void (*cb_reduce)(void *, void *));
+static int bwander_context_local_user_data_free(bwander_context_t *context, void (*cb_free)(void *));
 
 /**
  * FILTER
@@ -95,16 +114,16 @@ bwander_lock_user_data(bam_wanderer_t *wanderer, void **user_data)
 	assert(wanderer);
 
 	//Take the lock
-	omp_set_lock(&wanderer->user_data_lock);
+	omp_set_lock(&wanderer->context->user_data_lock);
 
 	//No user data?
-	if(wanderer->user_data == NULL)
+	if(wanderer->context->user_data == NULL)
 	{
 		LOG_WARN("Getting uninitialized user data\n");
 	}
 
 	//Set return
-	*user_data = wanderer->user_data;
+	*user_data = wanderer->context->user_data;
 
 	return NO_ERROR;
 }
@@ -114,7 +133,7 @@ bwander_unlock_user_data(bam_wanderer_t *wanderer)
 	assert(wanderer);
 
 	//Remove the lock
-	omp_unset_lock(&wanderer->user_data_lock);
+	omp_unset_lock(&wanderer->context->user_data_lock);
 
 	return NO_ERROR;
 }
@@ -132,7 +151,7 @@ bwander_local_user_data(bam_wanderer_t *wanderer, void **user_data)
 	assert(thread_id >= 0);
 
 	//Get user data
-	*user_data = wanderer->local_user_data[thread_id];
+	*user_data = wanderer->context->local_user_data[thread_id];
 
 	return NO_ERROR;
 }
@@ -150,18 +169,18 @@ bwander_local_user_data_set(bam_wanderer_t *wanderer, void *user_data)
 	assert(thread_id >= 0);
 
 	//Get user data
-	wanderer->local_user_data[thread_id] = user_data;
+	wanderer->context->local_user_data[thread_id] = user_data;
 
 	return NO_ERROR;
 }
 
 static inline int
-bwander_local_user_data_reduce(bam_wanderer_t *wanderer, void *reduced, void (*cb_reduce)(void *, void *))
+bwander_context_local_user_data_reduce(bwander_context_t *context, void *reduced, void (*cb_reduce)(void *, void *))
 {
 	int i, threads;
 	void *data;
 
-	assert(wanderer);
+	assert(context);
 	assert(reduced);
 	assert(cb_reduce);
 
@@ -172,7 +191,7 @@ bwander_local_user_data_reduce(bam_wanderer_t *wanderer, void *reduced, void (*c
 	for(i = 0; i < threads; i++)
 	{
 		//Get next data
-		data = wanderer->local_user_data[i];
+		data = context->local_user_data[i];
 
 		//Free if data exists
 		if(data != NULL)
@@ -189,12 +208,12 @@ bwander_local_user_data_reduce(bam_wanderer_t *wanderer, void *reduced, void (*c
 }
 
 static inline int
-bwander_local_user_data_free(bam_wanderer_t *wanderer, void (*cb_free)(void *))
+bwander_context_local_user_data_free(bwander_context_t *context, void (*cb_free)(void *))
 {
 	int i, threads;
 	void *data;
 
-	assert(wanderer);
+	assert(context);
 
 	//Get num threads
 	threads = omp_get_max_threads();
@@ -203,7 +222,7 @@ bwander_local_user_data_free(bam_wanderer_t *wanderer, void (*cb_free)(void *))
 	for(i = 0; i < threads; i++)
 	{
 		//Get next data
-		data = wanderer->local_user_data[i];
+		data = context->local_user_data[i];
 
 		//Free if data exists
 		if(data != NULL)
@@ -216,7 +235,7 @@ bwander_local_user_data_free(bam_wanderer_t *wanderer, void (*cb_free)(void *))
 
 			//Free memory
 			free(data);
-			wanderer->local_user_data[i] = NULL;
+			context->local_user_data[i] = NULL;
 		}
 	}
 

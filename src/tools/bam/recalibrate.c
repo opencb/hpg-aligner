@@ -646,6 +646,7 @@ wander_bam_file_recalibrate(uint8_t flags, char *bam_path, char *ref_name, char 
 
 	//Wanderer
 	bam_wanderer_t wanderer;
+	bwander_context_t context;
 
 	assert(bam_path);
 
@@ -708,23 +709,26 @@ wander_bam_file_recalibrate(uint8_t flags, char *bam_path, char *ref_name, char 
 		//Init wandering
 		bwander_init(&wanderer);
 
-		//Configure wanderer for data collection
-		bwander_configure(&wanderer, bam_f, NULL, ref,
+		//Create data collection context
+		bwander_context_init(&context,
 				(int (*)(void *, bam_region_t *, bam1_t *))recalibrate_wanderer,
 				(int (*)(void *, bam_region_t *))recalibrate_collect_processor);
 
-		printf("Cycles: %d\n",cycles);
-
 		//Set user data
 		cycles_param = cycles;
-		bwander_set_user_data(&wanderer, &cycles_param);
+		bwander_context_set_user_data(&context, &cycles_param);
+
+		//Configure wanderer for data collection
+		bwander_configure(&wanderer, bam_f, NULL, ref, &context);
+
+		printf("Cycles: %d\n",cycles);
 
 		//Run wander
 		bwander_run(&wanderer);
 
 		//Reduce data
-		bwander_local_user_data_reduce(&wanderer, &info, reduce_data);
-		bwander_local_user_data_free(&wanderer, destroy_data);
+		bwander_context_local_user_data_reduce(&context, &info, reduce_data);
+		bwander_context_local_user_data_free(&context, destroy_data);
 
 		//Delta processing
 		recal_calc_deltas(&info);
@@ -744,6 +748,9 @@ wander_bam_file_recalibrate(uint8_t flags, char *bam_path, char *ref_name, char 
 
 		//Destroy wanderer
 		bwander_destroy(&wanderer);
+
+		//Destroy context
+		bwander_context_destroy(&context);
 
 		if(flags & RECALIBRATE_RECALIBRATE)
 		{
@@ -777,22 +784,28 @@ wander_bam_file_recalibrate(uint8_t flags, char *bam_path, char *ref_name, char 
 		//Init wandering
 		bwander_init(&wanderer);
 
-		//Configure wanderer for recalibration
-		bwander_configure(&wanderer, bam_f, out_bam_f, NULL,
-				(int (*)(void *, bam_region_t *, bam1_t *))recalibrate_wanderer,
-				(int (*)(void *, bam_region_t *))recalibrate_recalibrate_processor);
+		//Create recalibration context
+		bwander_context_init(&context,
+						(int (*)(void *, bam_region_t *, bam1_t *))recalibrate_wanderer,
+						(int (*)(void *, bam_region_t *))recalibrate_recalibrate_processor);
 
-		//Set user data
-		bwander_set_user_data(&wanderer, &info);
+		//Set context user data
+		bwander_context_set_user_data(&context, &info);
+
+		//Configure wanderer for recalibration
+		bwander_configure(&wanderer, bam_f, out_bam_f, NULL, &context);
 
 		//Run wander
 		bwander_run(&wanderer);
 
 		//Free local data
-		bwander_local_user_data_free(&wanderer, destroy_data);
+		bwander_context_local_user_data_free(&context, destroy_data);
 
 		//Destroy wanderer
 		bwander_destroy(&wanderer);
+
+		//Destroy context
+		bwander_context_destroy(&context);
 	}
 
 	//Free data memory
