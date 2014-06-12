@@ -93,6 +93,7 @@ typedef uint8_t U_DINUC;
 #define __ATTR_HOT __attribute__((hot))
 #define __ATTR_COLD __attribute__((cold))
 #define __ATTR_INLINE __attribute__((always_inline));
+#define __ATTR_DEPRECATED __attribute__ ((deprecated));
 
 /**
  * ASSERTIONS
