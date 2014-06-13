@@ -371,11 +371,6 @@ recal_calc_deltas(recal_info_t* data)
 	double emp_Q;
 	double delta;
 
-	//Time measures
-	#ifdef D_TIME_DEBUG
-		time_init_slot(D_SLOT_PROCCESS_DELTAS, TIME_GLOBAL_STATS);
-	#endif
-
 	//Estimated Q
 	recal_get_estimated_Q(data->qual_bases, data->num_quals, (U_QUALS)0, &estimated_Q);
 
@@ -453,10 +448,6 @@ recal_calc_deltas(recal_info_t* data)
 			}
 		}
 	}
-
-	#ifdef D_TIME_DEBUG
-		time_set_slot(D_SLOT_PROCCESS_DELTAS, TIME_GLOBAL_STATS);
-	#endif
 
 	return NO_ERROR;
 }

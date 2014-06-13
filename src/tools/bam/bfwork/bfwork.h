@@ -50,6 +50,10 @@ typedef struct {
 	void *user_data;
 	omp_lock_t user_data_lock;
 	void **local_user_data;
+
+	//Timing
+	p_timestats time_stats;
+	char *tag;
 } bfwork_context_t;
 
 /**
@@ -78,9 +82,6 @@ typedef struct {
 	//Contexts
 	bfwork_context_t *v_context[FWORK_CONTEXT_MAX];
 	size_t v_context_l;
-
-	//Timing
-	p_timestats time_stats;
 } bam_fwork_t;
 
 /**
@@ -117,9 +118,9 @@ static int bfwork_context_local_user_data_free(bfwork_context_t *context, void (
 /**
  * TIMING
  */
-EXTERNC int bfwork_init_timing(bam_fwork_t *fwork, const char *tag);
-EXTERNC void bfwork_destroy_timing(bam_fwork_t *fwork);
-EXTERNC int bfwork_print_times(bam_fwork_t *fwork);
+EXTERNC int bfwork_context_init_timing(bfwork_context_t *context, const char *tag);
+EXTERNC void bfwork_context_destroy_timing(bfwork_context_t *context);
+EXTERNC int bfwork_context_print_times(bfwork_context_t *context);
 
 /**
  * FILTER

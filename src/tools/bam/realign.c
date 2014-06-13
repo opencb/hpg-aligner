@@ -417,15 +417,15 @@ wander_bam_file_dummy(bam_fwork_t *fwork, const char *in, const char *out, const
 	//Init wandering
 	bfwork_init(fwork);
 
-#ifdef D_TIME_DEBUG
-	//Init timing
-	bfwork_init_timing(fwork, "dummy");
-#endif
-
 	//Create realigner context
 	bfwork_context_init(&context,
 			(int (*)(void *, bam_region_t *, bam1_t *))realign_wanderer,
 			(int (*)(void *, bam_region_t *))dummy_processor);
+
+#ifdef D_TIME_DEBUG
+	//Init timing
+	bfwork_context_init_timing(&context, "dummy");
+#endif
 
 	//Set context user data
 	bfwork_context_set_user_data(&context, &reads_proc);
@@ -448,10 +448,10 @@ wander_bam_file_dummy(bam_fwork_t *fwork, const char *in, const char *out, const
 
 #ifdef D_TIME_DEBUG
 	//Print times
-	bfwork_print_times(fwork);
+	bfwork_context_print_times(&context);
 
 	//Destroy wanderer time
-	bfwork_destroy_timing(fwork);
+	bfwork_context_destroy_timing(&context);
 #endif
 
 	//Destroy wanderer
@@ -475,15 +475,15 @@ wander_bam_file_realigner(bam_fwork_t *fwork, const char *in, const char *out, c
 	//Init wandering
 	bfwork_init(fwork);
 
-#ifdef D_TIME_DEBUG
-	//Init timing
-	bfwork_init_timing(fwork, "realigner");
-#endif
-
 	//Create realigner context
 	bfwork_context_init(&context,
 			(int (*)(void *, bam_region_t *, bam1_t *))realign_wanderer,
 			(int (*)(void *, bam_region_t *))realigner_processor);
+
+#ifdef D_TIME_DEBUG
+	//Init timing
+	bfwork_context_init_timing(&context, "realigner");
+#endif
 
 	//Configure wanderer
 	bfwork_configure(fwork, in, out, ref, &context);
@@ -493,10 +493,10 @@ wander_bam_file_realigner(bam_fwork_t *fwork, const char *in, const char *out, c
 
 #ifdef D_TIME_DEBUG
 	//Print times
-	bfwork_print_times(fwork);
+	bfwork_context_print_times(&context);
 
 	//Destroy wanderer time
-	bfwork_destroy_timing(fwork);
+	bfwork_context_destroy_timing(&context);
 #endif
 
 	//Destroy wanderer

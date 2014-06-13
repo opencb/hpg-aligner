@@ -555,15 +555,15 @@ wander_bam_file_recalibrate(uint8_t flags, char *bam_path, char *ref, char *data
 		//Init wandering
 		bfwork_init(&fwork);
 
-#ifdef D_TIME_DEBUG
-		//Init timing
-		bfwork_init_timing(&fwork, "collect");
-#endif
-
 		//Create data collection context
 		bfwork_context_init(&context,
 				(int (*)(void *, bam_region_t *, bam1_t *))recalibrate_wanderer,
 				(int (*)(void *, bam_region_t *))recalibrate_collect_processor);
+
+#ifdef D_TIME_DEBUG
+		//Init timing
+		bfwork_context_init_timing(&context, "collect");
+#endif
 
 		//Set user data
 		cycles_param = cycles;
@@ -599,10 +599,10 @@ wander_bam_file_recalibrate(uint8_t flags, char *bam_path, char *ref, char *data
 
 #ifdef D_TIME_DEBUG
 		//Print times
-		bfwork_print_times(&fwork);
+		bfwork_context_print_times(&context);
 
 		//Destroy wanderer time
-		bfwork_destroy_timing(&fwork);
+		bfwork_context_destroy_timing(&context);
 #endif
 
 		//Destroy wanderer
@@ -634,15 +634,15 @@ wander_bam_file_recalibrate(uint8_t flags, char *bam_path, char *ref, char *data
 		//Init wandering
 		bfwork_init(&fwork);
 
-#ifdef D_TIME_DEBUG
-		//Init timing
-		bfwork_init_timing(&fwork, "recalibrate");
-#endif
-
 		//Create recalibration context
 		bfwork_context_init(&context,
 						(int (*)(void *, bam_region_t *, bam1_t *))recalibrate_wanderer,
 						(int (*)(void *, bam_region_t *))recalibrate_recalibrate_processor);
+
+#ifdef D_TIME_DEBUG
+		//Init timing
+		bfwork_context_init_timing(&context, "recalibrate");
+#endif
 
 		//Set context user data
 		bfwork_context_set_user_data(&context, &info);
@@ -658,10 +658,10 @@ wander_bam_file_recalibrate(uint8_t flags, char *bam_path, char *ref, char *data
 
 #ifdef D_TIME_DEBUG
 		//Print times
-		bfwork_print_times(&fwork);
+		bfwork_context_print_times(&context);
 
 		//Destroy wanderer time
-		bfwork_destroy_timing(&fwork);
+		bfwork_context_destroy_timing(&context);
 #endif
 
 		//Destroy wanderer

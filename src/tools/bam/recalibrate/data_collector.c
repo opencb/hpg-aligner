@@ -43,13 +43,7 @@ recal_get_data_from_file(const char *bam_path, const char *ref_name, const char 
 	printf("Reference opened!...\n");
 
 	//Fill data
-	#ifdef D_TIME_DEBUG
-		time_init_slot(D_SLOT_PH1_COLLECT_BAM, TIME_GLOBAL_STATS);
-	#endif
 	recal_get_data_from_bam(bam_f, ref, out_info);
-	#ifdef D_TIME_DEBUG
-		time_set_slot(D_SLOT_PH1_COLLECT_BAM, TIME_GLOBAL_STATS);
-	#endif
 
 	//Memory free
 	printf("\nClosing BAM file...\n");
@@ -75,11 +69,6 @@ recal_get_data_from_bam(const bam_file_t *bam, const genome_t* ref, recal_info_t
 	U_CYCLES l_last_seq;
 	U_CYCLES pos_last_seq;
 	bam1_t *last_alig;
-
-	//Time measure
-	double init_read = 0.0, init_collect = 0.0;
-	double end_read = 0.0, end_collect = 0.0;
-	double init_it = 0.0, end_it = 0.0;
 
 	//Number alignment readed
 	int count = 0;
@@ -126,10 +115,6 @@ recal_get_data_from_bam(const bam_file_t *bam, const genome_t* ref, recal_info_t
 
 		do
 		{
-			#ifdef D_TIME_DEBUG
-				#pragma omp single
-				init_it = omp_get_wtime();
-			#endif
 
 			#pragma omp sections
 			{
@@ -139,14 +124,8 @@ recal_get_data_from_bam(const bam_file_t *bam, const genome_t* ref, recal_info_t
 					read_batch = bam_batch_new(MAX_BATCH_SIZE, SINGLE_CHROM_BATCH);
 
 					//Read batch
-					#ifdef D_TIME_DEBUG
-						init_read = omp_get_wtime();
-					#endif
 					//bam_fread_max_size(batch, MAX_BATCH_SIZE, 1, bam);
 					bam_fread_max_size_no_duplicates(read_batch, MAX_BATCH_SIZE, 0, (bam_file_t *)bam, last_seq, &l_last_seq, &pos_last_seq);
-					#ifdef D_TIME_DEBUG
-						end_read = omp_get_wtime();
-					#endif
 				}
 
 				//Collect batch
@@ -155,13 +134,7 @@ recal_get_data_from_bam(const bam_file_t *bam, const genome_t* ref, recal_info_t
 					if(collect_batch->num_alignments != 0)
 					{
 						//Process batch
-						#ifdef D_TIME_DEBUG
-							init_collect = omp_get_wtime();
-						#endif
 						err = recal_get_data_from_bam_batch(collect_batch, ref, output_data);
-						#ifdef D_TIME_DEBUG
-							end_collect = omp_get_wtime();
-						#endif
 
 						if(err)
 							printf("ERROR (recal_get_data_from_bam_batch): %d\n", err);
@@ -195,30 +168,6 @@ recal_get_data_from_bam(const bam_file_t *bam, const genome_t* ref, recal_info_t
 
 			#pragma omp single
 			{
-				#ifdef D_TIME_DEBUG
-					#ifdef D_TIME_OPENMP_VERBOSE
-						fflush(stdout);
-						printf("Times:\n");
-						printf("Read %.2f ms\n", (end_read - init_read) * 1000.0);
-						printf("Collect %.2f ms\n", (end_collect - init_collect) * 1000.0);
-						printf("NEW ITERATION\n");
-						fflush(stdout);
-					#endif
-
-					end_it = omp_get_wtime();
-
-					//Add times
-					if(end_read != 0.0) time_add_time_slot(D_SLOT_PH1_READ_BATCH, TIME_GLOBAL_STATS, end_read - init_read);
-					if(end_collect != 0.0) time_add_time_slot(D_SLOT_PH1_COLLECT_BATCH, TIME_GLOBAL_STATS, end_collect - init_collect);
-					time_add_time_slot(D_SLOT_PH1_ITERATION, TIME_GLOBAL_STATS, end_it - init_it);
-
-					//Reset counters to avoid resample
-					init_read = 0.0;
-					end_read = 0.0;
-					init_collect = 0.0;
-					end_collect = 0.0;
-				#endif
-
 				//Setup next iteration
 				collect_batch = read_batch;
 				read_batch = NULL;
@@ -324,16 +273,8 @@ recal_get_data_from_bam_batch(const bam_batch_t* batch, const genome_t* ref, rec
 				#pragma omp for schedule(runtime)
 				for(i = 0; i < current_batch->num_alignments; i++)
 				{
-					#ifdef D_TIME_DEBUG
-					init_time = omp_get_wtime();
-					#endif
 					//Recollection
 					recal_get_data_from_bam_alignment(current_batch->alignments_p[i], ref, data, collect_env);
-					#ifdef D_TIME_DEBUG
-						end_time = omp_get_wtime();
-						#pragma omp critical
-							time_add_time_slot(D_SLOT_PH1_COLLECT_ALIG, TIME_GLOBAL_STATS, end_time - init_time);
-					#endif
 				}
 
 		#ifdef SPLIT_BATCHS_BY_CHROM
@@ -346,19 +287,10 @@ recal_get_data_from_bam_batch(const bam_batch_t* batch, const genome_t* ref, rec
 		//Reduce data
 		#pragma omp critical
 		{
-			#ifdef D_TIME_DEBUG
-				init_time = omp_get_wtime();
-			#endif
-
 			err = recal_reduce_info(output_data, data);
 
 			if(err)
 				printf("ERROR: Failed to reduce collection data!, error code: %d\n", err);
-
-			#ifdef D_TIME_DEBUG
-				end_time = omp_get_wtime();
-				time_add_time_slot(D_SLOT_PH1_COLLECT_REDUCE_DATA, TIME_GLOBAL_STATS, end_time - init_time);
-			#endif
 		}
 
 		//Free data memory
