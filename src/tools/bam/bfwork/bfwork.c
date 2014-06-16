@@ -17,9 +17,26 @@ static int last_read_bytes = 0;
 /**
  * STATIC FUNCTIONS
  */
+
+/**
+ * \brief PRIVATE. Insert a region in a context.
+ *
+ * \param[in] fwork Target framework.
+ * \param[in] region Region to insert.
+ */
 static int bfwork_region_insert(bam_fwork_t *fwork, bam_region_t *region);
+
+/**
+ * \brief PRIVATE. Wander for a region.
+ *
+ * \param[in] fwork Target framework.
+ * \param[out] region Region to fill using current context wandering function.
+ */
 static int bfwork_obtain_region(bam_fwork_t *fwork, bam_region_t *current_region);
 
+/**
+ * Initialize empty BAM framework data structure.
+ */
 void
 bfwork_init(bam_fwork_t *fwork)
 {
@@ -41,6 +58,9 @@ bfwork_init(bam_fwork_t *fwork)
 	omp_init_lock(&fwork->reference_lock);
 }
 
+/**
+ * Destroy BAM framework data structure.
+ */
 void
 bfwork_destroy(bam_fwork_t *fwork)
 {
@@ -76,6 +96,9 @@ bfwork_destroy(bam_fwork_t *fwork)
 	omp_destroy_lock(&fwork->reference_lock);
 }
 
+/**
+ * Configure BAM framework data structure for wandering.
+ */
 int
 bfwork_configure(bam_fwork_t *fwork, const char *in_file, const char *out_file, const char *reference, bfwork_context_t *context)
 {
@@ -406,6 +429,9 @@ bfwork_run_threaded(bam_fwork_t *fwork)
 	return NO_ERROR;
 }
 
+/**
+ * Run framework contexts.
+ */
 int
 bfwork_run(bam_fwork_t *fwork)
 {
@@ -525,6 +551,10 @@ bfwork_run(bam_fwork_t *fwork)
 /**
  * WANDERING CONTEXT OPERATIONS
  */
+
+/**
+ * Initialize empty BAM context data structure.
+ */
 void
 bfwork_context_init(bfwork_context_t *context, wanderer_function wf, processor_function pf)
 {
@@ -551,6 +581,9 @@ bfwork_context_init(bfwork_context_t *context, wanderer_function wf, processor_f
 	omp_init_lock(&context->user_data_lock);
 }
 
+/**
+ * Destroy BAM context data structure.
+ */
 void
 bfwork_context_destroy(bfwork_context_t *context)
 {
@@ -560,6 +593,9 @@ bfwork_context_destroy(bfwork_context_t *context)
 	omp_destroy_lock(&context->user_data_lock);
 }
 
+/**
+ * Add additional processing function to this context.
+ */
 int
 bfwork_context_add_proc(bfwork_context_t *context, processor_function pf)
 {
@@ -587,6 +623,10 @@ bfwork_context_add_proc(bfwork_context_t *context, processor_function pf)
 /**
  * USER DATA
  */
+
+/**
+ * Set a pointer to be shared as a global user data among all threads in a context.
+ */
 int
 bfwork_context_set_user_data(bfwork_context_t *context, void *user_data)
 {
@@ -603,6 +643,9 @@ bfwork_context_set_user_data(bfwork_context_t *context, void *user_data)
  * TIMING
  */
 
+/**
+ * Initialize and activate timing of a context.
+ */
 int
 bfwork_context_init_timing(bfwork_context_t *context, const char *tag)
 {
@@ -676,6 +719,9 @@ bfwork_context_init_timing(bfwork_context_t *context, const char *tag)
 	return NO_ERROR;
 }
 
+/**
+ * Destroy timing of a context.
+ */
 void
 bfwork_context_destroy_timing(bfwork_context_t *context)
 {
@@ -688,6 +734,9 @@ bfwork_context_destroy_timing(bfwork_context_t *context)
 	}
 }
 
+/**
+ * Output timings in standard output.
+ */
 int
 bfwork_context_print_times(bfwork_context_t *context)
 {
@@ -755,6 +804,9 @@ bfwork_context_print_times(bfwork_context_t *context)
  * STATIC FUNCTIONS
  */
 
+/**
+ * PRIVATE. Insert a region in a context.
+ */
 static inline int
 bfwork_region_insert(bam_fwork_t *fwork, bam_region_t *region)
 {
@@ -805,6 +857,9 @@ bfwork_region_insert(bam_fwork_t *fwork, bam_region_t *region)
 	return NO_ERROR;
 }
 
+/**
+ * PRIVATE. Wander for a region.
+ */
 static inline int
 bfwork_obtain_region(bam_fwork_t *fwork, bam_region_t *region)
 {

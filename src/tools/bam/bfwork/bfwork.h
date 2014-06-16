@@ -29,6 +29,12 @@
 #define FWORK_CONTEXT_MAX 	16
 #define FWORK_PROC_FUNC_MAX 	16
 
+//ALIGNMENTS FILTERS
+#define FILTER_ZERO_QUAL 1
+#define FILTER_DIFF_MATE_CHROM 2
+#define FILTER_NO_CIGAR 4
+#define FILTER_DEF_MASK 8
+
 /**
  * WANDERING FUNCTION DEFINITION
  */
@@ -87,43 +93,173 @@ typedef struct {
 /**
  * BAM WANDERER OPERATIONS
  */
+
+/**
+ * \brief Initialize empty BAM framework data structure.
+ *
+ * \param[in] fwork Framework to initialize.
+ */
 EXTERNC void bfwork_init(bam_fwork_t *fwork);
+
+/**
+ * \brief Destroy BAM framework data structure.
+ *
+ * \param[in] fwork Framework to destroy.
+ */
 EXTERNC void bfwork_destroy(bam_fwork_t *fwork);
 
+/**
+ * \brief Configure BAM framework data structure for wandering.
+ *
+ * \param[in] fwork Framework to configure.
+ * \param[in] in_file Path to input BAM file.
+ * \param[in] out_file Path to output BAM file. OPTIONAL, set NULL for no output.
+ * \param[in] reference Path to reference file 'dna_compression.bin'.
+ * \param[in] context Initial framework context to use.
+ */
 EXTERNC int bfwork_configure(bam_fwork_t *fwork, const char *in_file, const char *out_file, const char *reference, bfwork_context_t *context);
 
+/**
+ * \brief Run framework contexts.
+ *
+ * \param[in] fwork Framework to run.
+ */
 EXTERNC int bfwork_run(bam_fwork_t *fwork);
 
 /**
  * WANDERING CONTEXT OPERATIONS
  */
+
+/**
+ * \brief Initialize empty BAM context data structure.
+ *
+ * \param[in] context Context to configure.
+ * \param[in] wf Wandering function to use with this context.
+ * \param[in] pf Processing function to use with this context.
+ */
 EXTERNC void bfwork_context_init(bfwork_context_t *context, wanderer_function wf, processor_function pf);
+
+/**
+ * \brief Destroy BAM context data structure.
+ *
+ * \param[in] context Context to destroy.
+ */
 EXTERNC void bfwork_context_destroy(bfwork_context_t *context);
 
+/**
+ * \brief Add additional processing function to this context.
+ *
+ * \param[in] context Target context.
+ * \param[in] pf Processing function to add.
+ */
 EXTERNC int bfwork_context_add_proc(bfwork_context_t *context, processor_function pf);
 
 /**
  * USER DATA
  */
+
+/**
+ * \brief Set a pointer to be shared as a global user data among all threads in a context.
+ *
+ * \param[in] context Target context.
+ * \param[in] user_data Pointer to be shared.
+ */
 EXTERNC int bfwork_context_set_user_data(bfwork_context_t *context, void *user_data);
 
+/**
+ * \brief Lock global user data to be used in current context of the framework.
+ * This data is in mutual exclusion so unlock must be used with this function to avoid deadlocks.
+ * This function must be only used in processing functions.
+ *
+ * \param[in] fwork Target framework which contains current context.
+ * \param[out] user_data Global user data returned.
+ */
 static int bfwork_lock_user_data(bam_fwork_t *fwork, void **user_data);
+
+/**
+ * \brief Unlock global user data previously locked by 'bfwork_lock_user_data'.
+ * This function must be only used in processing functions.
+ *
+ * \param[in] fwork Target framework which contains current context.
+ */
 static int bfwork_unlock_user_data(bam_fwork_t *fwork);
+
+/**
+ * \brief Get local user data to be used in current context of the framework.
+ * This data is only visible for owner thread so must not be used to share data among threads.
+ * A thread can get its local data using this function only inside processing function.
+ *
+ * \param[in] fwork Target framework which contains current context.
+ * \param[out] user_data Local user data returned.
+ */
 static int bfwork_local_user_data(bam_fwork_t *fwork, void **user_data);
+
+/**
+ * \brief Set local user data to be used in current context of the framework.
+ * This data is only visible for owner thread so must not be used to share data among threads.
+ * A thread can set its local data using this function only inside processing function.
+ *
+ * \param[in] fwork Target framework which contains current context.
+ * \param[in] user_data Local user data saved to context.
+ */
 static int bfwork_local_user_data_set(bam_fwork_t *fwork, void *user_data);
 
+/**
+ * \brief Reduce all local data pointers of every threads of a context using custom function.
+ * 'cb_reduce' must take as a first argument the destination data and as a second the local data of a thread.
+ *
+ * \param[in] context Target context to reduce its threads local data.
+ * \param[out] reduced Destination data where reduction must be done.
+ * \param[in] cb_reduce Reduction function.
+ */
 static int bfwork_context_local_user_data_reduce(bfwork_context_t *context, void *reduced, void (*cb_reduce)(void *, void *));
+
+/**
+ * \brief Free all threads local data using custom function.
+ * 'cb_free' must take as argument a thread local data that must be free.
+ *
+ * \param[in] context Target context to destroy its threads local data.
+ * \param[in] cb_free Callback free function. OPTIONAL, set NULL to only use default free.
+ */
 static int bfwork_context_local_user_data_free(bfwork_context_t *context, void (*cb_free)(void *));
 
 /**
  * TIMING
  */
+
+/**
+ * \brief Initialize and activate timing of a context.
+ * If tag is set, will be used to prepend in output file names.
+ *
+ * \param[in] context Target context to activate timing.
+ * \param[in] tag Tag to be used in output file. OPTIONAL.
+ */
 EXTERNC int bfwork_context_init_timing(bfwork_context_t *context, const char *tag);
+
+/**
+ * \brief Destroy timing of a context.
+ *
+ * \param[in] context Target context to destroy timing.
+ */
 EXTERNC void bfwork_context_destroy_timing(bfwork_context_t *context);
+
+/**
+ * \brief Output timings in standard output.
+ *
+ * \param[in] context Target context to output timing.
+ */
 EXTERNC int bfwork_context_print_times(bfwork_context_t *context);
 
 /**
  * FILTER
+ */
+
+/**
+ * \brief Filter a read using input filters.
+ *
+ * \param[in] read Alignment to be filtered.
+ * \param[in] filters Filters flags.
+ * \return 0 if pass the filters, if not, returns the filter that fails.
  */
 static int filter_read(bam1_t *read, uint8_t filters);
 
@@ -131,6 +267,9 @@ static int filter_read(bam1_t *read, uint8_t filters);
  * INLINE FUNCTIONS
  */
 
+/**
+ * Lock global user data to be used in current context of the framework.
+ */
 static inline int
 bfwork_lock_user_data(bam_fwork_t *fwork, void **user_data)
 {
@@ -150,6 +289,10 @@ bfwork_lock_user_data(bam_fwork_t *fwork, void **user_data)
 
 	return NO_ERROR;
 }
+
+/**
+ * Unlock global user data previously locked by 'bfwork_lock_user_data'.
+ */
 static inline int
 bfwork_unlock_user_data(bam_fwork_t *fwork)
 {
@@ -161,6 +304,9 @@ bfwork_unlock_user_data(bam_fwork_t *fwork)
 	return NO_ERROR;
 }
 
+/**
+ * Get local user data to be used in current context of the framework.
+ */
 static inline int
 bfwork_local_user_data(bam_fwork_t *fwork, void **user_data)
 {
@@ -179,6 +325,9 @@ bfwork_local_user_data(bam_fwork_t *fwork, void **user_data)
 	return NO_ERROR;
 }
 
+/**
+ * Set local user data to be used in current context of the framework.
+ */
 static inline int
 bfwork_local_user_data_set(bam_fwork_t *fwork, void *user_data)
 {
@@ -197,6 +346,9 @@ bfwork_local_user_data_set(bam_fwork_t *fwork, void *user_data)
 	return NO_ERROR;
 }
 
+/**
+ * Reduce all local data pointers of every threads of a context using custom function.
+ */
 static inline int
 bfwork_context_local_user_data_reduce(bfwork_context_t *context, void *reduced, void (*cb_reduce)(void *, void *))
 {
@@ -230,6 +382,9 @@ bfwork_context_local_user_data_reduce(bfwork_context_t *context, void *reduced, 
 	return NO_ERROR;
 }
 
+/**
+ * Free all threads local data using custom function.
+ */
 static inline int
 bfwork_context_local_user_data_free(bfwork_context_t *context, void (*cb_free)(void *))
 {
@@ -265,6 +420,9 @@ bfwork_context_local_user_data_free(bfwork_context_t *context, void (*cb_free)(v
 	return NO_ERROR;
 }
 
+/**
+ * Filter a read using input filters.
+ */
 static inline int
 filter_read(bam1_t *read, uint8_t filters)
 {
@@ -276,25 +434,25 @@ filter_read(bam1_t *read, uint8_t filters)
 		if(filters & FILTER_ZERO_QUAL)
 		{
 			if(read->core.qual == 0)
-				return 1;
+				return FILTER_ZERO_QUAL;
 		}
 
 		if(filters & FILTER_DIFF_MATE_CHROM)
 		{
 			if(read->core.tid != read->core.mtid)
-				return 1;
+				return FILTER_DIFF_MATE_CHROM;
 		}
 
 		if(filters & FILTER_NO_CIGAR)
 		{
 			if(read->core.n_cigar == 0)
-				return 1;
+				return FILTER_NO_CIGAR;
 		}
 
 		if(filters & FILTER_DEF_MASK)
 		{
 			if(read->core.flag & BAM_DEF_MASK)
-				return 1;
+				return FILTER_DEF_MASK;
 		}
 	}
 
