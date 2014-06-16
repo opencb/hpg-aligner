@@ -77,7 +77,7 @@ cigar32_leftmost(char *ref, size_t ref_l, char *read, size_t read_l, uint32_t *c
 			//Get reference for original CIGAR
 			orig_ref = (char *)malloc(sizeof(char) * (read_l + 1));
 			aux_ref = (char *)malloc(sizeof(char) * (read_l + 1));
-			cigar32_create_ref(cigar, cigar_l, ref, ref_l, read, read_l, orig_ref, &orig_ref_l);
+			cigar32_create_ref(cigar, cigar_l, ref, ref_l, read, read_l, orig_ref, &orig_ref_l, NULL);
 
 			//Shift left CIGAR
 			cigar32_shift_left_indel(unclip_cigar, unclip_cigar_l, indel_index, aux_cigar, &aux_cigar_l);
@@ -86,7 +86,7 @@ cigar32_leftmost(char *ref, size_t ref_l, char *read, size_t read_l, uint32_t *c
 			cigar32_reclip(cigar, cigar_l, aux_cigar, aux_cigar_l, reclip_cigar, &reclip_cigar_l);
 
 			//Get new CIGAR ref
-			cigar32_create_ref(reclip_cigar, reclip_cigar_l, ref, ref_l, read, read_l, aux_ref, &aux_ref_l);
+			cigar32_create_ref(reclip_cigar, reclip_cigar_l, ref, ref_l, read, read_l, aux_ref, &aux_ref_l, NULL);
 
 			//Is a valid ref?
 			if(!memcmp(aux_ref, orig_ref, orig_ref_l * sizeof(char)))
@@ -133,7 +133,7 @@ cigar32_leftmost(char *ref, size_t ref_l, char *read, size_t read_l, uint32_t *c
 				cigar32_reclip(cigar, cigar_l, aux_cigar, aux_cigar_l, reclip_cigar, &reclip_cigar_l);
 
 				//Get new CIGAR ref
-				cigar32_create_ref(reclip_cigar, reclip_cigar_l, ref, ref_l, read, read_l, aux_ref, &aux_ref_l);
+				cigar32_create_ref(reclip_cigar, reclip_cigar_l, ref, ref_l, read, read_l, aux_ref, &aux_ref_l, NULL);
 
 				//Is a valid ref?
 				if(!memcmp(aux_ref, orig_ref, orig_ref_l * sizeof(char)))
@@ -679,7 +679,7 @@ cigar32_to_string(uint32_t *cigar, size_t cigar_l, char* str_cigar)
 }
 
 ERROR_CODE
-cigar32_create_ref(uint32_t *cigar, size_t cigar_l, char *ref, size_t ref_l, char *read, size_t read_l, char *new_ref, size_t *new_ref_l)
+cigar32_create_ref(uint32_t *cigar, size_t cigar_l, char *ref, size_t ref_l, char *read, size_t read_l, char *new_ref, size_t *new_ref_l, char *mask)
 {
 	int i, elem, type, extra;
 	char *aux_str;
@@ -702,6 +702,10 @@ cigar32_create_ref(uint32_t *cigar, size_t cigar_l, char *ref, size_t ref_l, cha
 
 	//Allocate output
 	aux_str = (char *)malloc(sizeof(char) * (read_l + 1));
+
+	//Reset mask
+	if(mask)
+		memset(mask, 0, read_l * sizeof(char));
 
 	//Iterate CIGAR
 	for(i = 0; i < cigar_l; i++)
@@ -738,10 +742,16 @@ cigar32_create_ref(uint32_t *cigar, size_t cigar_l, char *ref, size_t ref_l, cha
 				elem = read_l - index_read;
 			//Copy reference as it is
 			memcpy(aux_str + index_aux, ref + index_ref, elem);
+
+			//Set mask
+			if(mask)
+				memset(mask + index_aux, 0xFF, elem);
+
 			//printf("M:%d-%d-%d\n", index_read, index_ref, index_aux);
 			index_ref += elem;
 			index_read += elem;
 			index_aux += elem;
+
 			break;
 
 		/*case BAM_CSOFT_CLIP:

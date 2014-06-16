@@ -27,16 +27,20 @@ typedef struct {
 	omp_lock_t writer;
 	omp_lock_t reader;
 	int end_condition;
-} circular_buffer_t;
+} circular_buffer_t __ATTR_DEPRECATED;
 
 uint64_t cigar_changed = 0;
 
 char log_msg[1024];
 char aux_msg[512];
 
-static inline ERROR_CODE alig_aux_write_to_disk(array_list_t *write_buffer, bam_file_t *output_bam_f, uint8_t force) __ATTR_HOT;
-static inline ERROR_CODE alig_aux_read_from_disk(circular_buffer_t *read_buffer, bam_file_t *input_bam_f) __ATTR_HOT;
+/**
+ * PRIVATE INLINE FUNCTIONS
+ */
 static inline ERROR_CODE alig_region_filter_read(bam1_t *read, array_list_t *list, alig_context_t *context) __ATTR_HOT __ATTR_INLINE;
+
+static inline ERROR_CODE alig_aux_write_to_disk(array_list_t *write_buffer, bam_file_t *output_bam_f, uint8_t force) __ATTR_DEPRECATED;
+static inline ERROR_CODE alig_aux_read_from_disk(circular_buffer_t *read_buffer, bam_file_t *input_bam_f) __ATTR_DEPRECATED;
 
 /**
  * CONTEXT
@@ -215,7 +219,7 @@ alig_region_next(bam1_t **v_bams, size_t v_bams_l, int force_incomplete, alig_co
 	size_t interval_read_end;
 
 	//Aux list
-	static array_list_t *aux_list = NULL;
+	array_list_t *aux_list = NULL;
 
 	assert(context);
 
@@ -233,10 +237,7 @@ alig_region_next(bam1_t **v_bams, size_t v_bams_l, int force_incomplete, alig_co
 	memset(&context->region, 0, sizeof(alig_region_t));
 
 	//Init aux list
-	if(!aux_list)
-	{
-		aux_list = array_list_new(ALIG_LIST_NEXT_SIZE, 1.2f, 0);
-	}
+	aux_list = array_list_new(ALIG_LIST_NEXT_SIZE, 1.2f, 0);
 	array_list_clear(aux_list, NULL);
 
 	//Read alignments until interval reached
@@ -313,6 +314,9 @@ alig_region_next(bam1_t **v_bams, size_t v_bams_l, int force_incomplete, alig_co
 			}
 		} //For
 	} //Valid region if
+
+	//Destroy auxiliar list
+	array_list_free(aux_list, NULL);
 
 	return ret;
 }
@@ -833,14 +837,6 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 	ERROR_CODE err;
 	//	unsigned char outbam[30] = "output.bam";
 	int i, it;
-	int single_threaded = 0;
-
-	//Times
-	double init_time, end_time;
-	double init_time_p, end_time_p;
-	double init_time_p2, end_time_p2;
-	double init_time_it, end_time_it;
-	double aux_time, aux_time2;
 
 	//Files
 	bam_file_t *bam_f;
@@ -878,9 +874,6 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 	//Multhread info
 	printf("Using %d threads\n", omp_get_max_threads());
 
-#ifdef D_TIME_DEBUG
-    init_time = omp_get_wtime();
-#endif
 	//Open bam
 	{
 		printf("Opening BAM from \"%s\" ...\n", bam_path);
@@ -907,11 +900,6 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 		out_bam_f->bam_header_p = NULL;
 		printf("New BAM initialized!...\n");
 	}
-
-#ifdef D_TIME_DEBUG
-	end_time = omp_get_wtime();
-	time_add_time_slot(D_SLOT_INIT, TIME_GLOBAL_STATS, end_time - init_time);
-#endif
 
 	//Flush
 	fflush(stdout);
@@ -948,27 +936,18 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 
 	//Init vars
 	it = 0;
-	init_time_it = omp_get_wtime();
-
-	//Timing
-#ifdef D_TIME_DEBUG
-	init_time_it = 0;
-#endif
 
 	//Init multithreading
 	omp_set_dynamic(1);
 	omp_set_nested(1);
-	if(omp_get_max_threads() < 2)
+	if(omp_get_max_threads() < 3)
 	{
 		//Only 1 available thread
-		//printf("Minimum threads required is 2, setting number of threads to 2\n");
-		//omp_set_num_threads(2);
-		single_threaded = 1;
+		//printf("Minimum threads required is 3, setting number of threads to 3\n");
+		omp_set_num_threads(3);
 	}
-	#pragma omp parallel private(i, bytes, read, v_reads, v_reads_l, list_l, filled, err, aux_time)
+	#pragma omp parallel private(i, bytes, read, v_reads, v_reads_l, list_l, filled, err)
 	{
-		while(in_buffer.end_condition == 0 || in_buffer.readed > 0)
-		{
 			#pragma omp  sections
 			{
 				//Read section
@@ -976,17 +955,9 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 				{
 					do
 					{
-#ifdef D_TIME_DEBUG
-						aux_time = omp_get_wtime();
-						aux_time2 = aux_time;
-	#endif
 						//Fill in_list
 						alig_aux_read_from_disk(&in_buffer, bam_f);
 
-#ifdef D_TIME_DEBUG
-						aux_time2 = omp_get_wtime() - aux_time2;
-						time_add_time_slot(D_SLOT_IT_READ, TIME_GLOBAL_STATS, aux_time2);
-#endif
 						//Clear context
 						alig_region_clear(&context);
 
@@ -1016,9 +987,6 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 							}
 						}
 
-#ifdef D_TIME_DEBUG
-						aux_time2 = omp_get_wtime();
-#endif
 						//Load next region
 						v_reads = (bam1_t **)read_buffer->items;
 						v_reads_l = read_buffer->size;
@@ -1028,7 +996,7 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 							if(err != ALIG_INCOMPLETE_INTERVAL)
 							{
 								LOG_ERROR("Cannot obtain next region\n");
-								printf(stderr, "ERROR: Cannot obtain next region in buffer of size %d, error code = %d\n", err);
+								fprintf(stderr, "ERROR: Cannot obtain next region in buffer of size %d, error code = %d\n", err);
 								fflush(stdout);
 								omp_set_lock(&in_buffer.lock);
 								in_buffer.end_condition = 1;
@@ -1046,52 +1014,21 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 								}
 							}
 						}
-#ifdef D_TIME_DEBUG
-						aux_time2 = omp_get_wtime() - aux_time2;
-						if(context.last_readed_count > 0)
-							time_add_time_slot(D_SLOT_NEXT, TIME_GLOBAL_STATS, aux_time2 / (double)context.last_readed_count);
-#endif
 
 						while(context.last_readed_count != 0)
 						{
 							//printf("Realigning %d\n", context.last_readed_count);
 							//Load reference
-#ifdef D_TIME_DEBUG
-							init_time_p = omp_get_wtime();
-#endif
 							err = alig_region_load_reference(&context);
 							if(!err)
 							{
-#ifdef D_TIME_DEBUG
-								end_time_p = omp_get_wtime();
-								time_add_time_slot(D_SLOT_REFERENCE_LOAD, TIME_GLOBAL_STATS, (double)(end_time_p - init_time_p)/(double)context.last_readed_count);
-#endif
-
 								//Generate haplotype list
-#ifdef D_TIME_DEBUG
-								init_time_p = omp_get_wtime();
-#endif
 								err = alig_region_haplotype_process(&context);
 								if(!err)
 								{
-#ifdef D_TIME_DEBUG
-									end_time_p = omp_get_wtime();
-									time_add_time_slot(D_SLOT_HAPLO_GET, TIME_GLOBAL_STATS, (double)(end_time_p - init_time_p)/(double)context.last_readed_count);
-#endif
 									//Realign
-#ifdef D_TIME_DEBUG
-									init_time_p = omp_get_wtime();
-#endif
 									err = alig_region_indel_realignment(&context);
-									if(!err)
-									{
-#ifdef D_TIME_DEBUG
-										end_time_p = omp_get_wtime();
-										if(context.last_readed_count > 0)
-												time_add_time_slot(D_SLOT_REALIG_PER_HAPLO, TIME_GLOBAL_STATS, (double)(end_time_p - init_time_p)/(double)context.last_readed_count);
-#endif
-									}
-									else
+									if(err)
 									{
 										fprintf(stderr, "ERROR: Cannot align region, error code = %d\n", err);
 										fflush(stdout);
@@ -1119,9 +1056,6 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 							//Clear context
 							alig_region_clear(&context);
 
-#ifdef D_TIME_DEBUG
-							aux_time2 = omp_get_wtime();
-#endif
 							//Get next region
 							err = alig_region_next(v_reads, v_reads_l, chrom_changed || in_buffer.end_condition, &context);
 							if(err)
@@ -1137,11 +1071,6 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 									break;
 								}
 							}
-#ifdef D_TIME_DEBUG
-							aux_time2 = omp_get_wtime() - aux_time2;
-							if(context.last_readed_count > 0)
-								time_add_time_slot(D_SLOT_NEXT, TIME_GLOBAL_STATS, aux_time2 / (double)context.last_readed_count);
-#endif
 						}//last_readed != 0 while
 
 						//Get processed number
@@ -1172,16 +1101,12 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 							in_buffer.processed = 0;
 						} //Fill write buffer
 
-#ifdef D_TIME_DEBUG
-						aux_time = omp_get_wtime() - aux_time;
-						time_add_time_slot(D_SLOT_IT_PROCESS, TIME_GLOBAL_STATS, aux_time);
-#endif
 						omp_set_lock(&in_buffer.reader);
 						swap_buffer_ptr = write_buffer;
 						write_buffer = proc_buffer;
 						proc_buffer = swap_buffer_ptr;
 						omp_unset_lock(&in_buffer.writer);
-					} while(single_threaded == 0 && (in_buffer.end_condition == 0 || in_buffer.readed > 0));
+					} while(in_buffer.end_condition == 0 || in_buffer.readed > 0);
 				}//Read section
 
 				//Write section
@@ -1190,9 +1115,6 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 					do
 					{
 						omp_set_lock(&in_buffer.writer);
-#ifdef D_TIME_DEBUG
-						aux_time = omp_get_wtime();
-#endif
 						alig_aux_write_to_disk(write_buffer, out_bam_f, 1);
 
 						//Print progress
@@ -1203,17 +1125,13 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 							fflush(stdout);
 						}
 						it++;
-#ifdef D_TIME_DEBUG
-						aux_time = omp_get_wtime() - aux_time;
-						time_add_time_slot(D_SLOT_IT_WRITE, TIME_GLOBAL_STATS, aux_time);
-#endif
+
 						//Accept more
 						omp_unset_lock(&in_buffer.reader);
-					}while(single_threaded == 0 && (in_buffer.end_condition == 0 || in_buffer.readed > 0));//Write section
+					}while(in_buffer.end_condition == 0 || in_buffer.readed > 0);//Write section
 				}
 
 			}//OMP SECTIONS
-		} //While
 
 	}//OMP PARALLEL
 
@@ -1267,7 +1185,7 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 /**
  * PRIVATE FUNCTION. Obtain score tables from present region.
  */
-/*static*/ ERROR_CODE
+static ERROR_CODE
 alig_get_scores(alig_context_t *context)
 {
 	ERROR_CODE err;
@@ -1424,7 +1342,10 @@ alig_get_scores(alig_context_t *context)
 	return NO_ERROR;
 }
 
-/*static*/ ERROR_CODE
+/**
+ * PRIVATE FUNCTION.Obtain score tables from read.
+ */
+static ERROR_CODE
 alig_get_scores_from_read(bam1_t *read, alig_context_t *context, uint32_t *v_scores, size_t *v_positions)
 {
 	int i, err;
@@ -1523,7 +1444,7 @@ alig_get_scores_from_read(bam1_t *read, alig_context_t *context, uint32_t *v_sco
 	cigar32_create_ref(aux_cigar, aux_cigar_l,
 			ref_seq + read_disp_ref, context->reference.length - read_disp_ref,
 			read_seq, read->core.l_qseq,
-			read_seq_ref, &read_seq_ref_l);
+			read_seq_ref, &read_seq_ref_l, NULL);
 
 	//Get raw score with reference
 	nucleotide_miss_qual_sum(read_seq_ref, read_seq, quals_seq, read_l, comp_seq, &misses, &misses_sum);
@@ -1602,7 +1523,7 @@ alig_get_scores_from_read(bam1_t *read, alig_context_t *context, uint32_t *v_sco
 					cigar32_create_ref(aux_cigar, aux_cigar_l,
 							ref_seq + read_disp_ref, context->reference.length - read_disp_ref,
 							read_seq, read->core.l_qseq,
-							read_seq_ref, &read_seq_ref_l);
+							read_seq_ref, &read_seq_ref_l, NULL);
 
 					if(read_seq_ref_l != read->core.l_qseq)
 					{
@@ -1884,7 +1805,7 @@ alig_indel_realign_from_haplo(alig_context_t *context, size_t alt_haplo_index)
 			read_disp_ref = read->core.pos - context->reference.position;
 
 			//Get haplotype reference transform
-			cigar32_create_ref(bam1_cigar(read), read->core.n_cigar, ref_seq + read_disp_ref, ref_length - read_disp_ref, read_seq, read->core.l_qseq, read_seq_ref, &read_seq_ref_l);
+			cigar32_create_ref(bam1_cigar(read), read->core.n_cigar, ref_seq + read_disp_ref, ref_length - read_disp_ref, read_seq, read->core.l_qseq, read_seq_ref, &read_seq_ref_l, NULL);
 			assert(read_seq_ref_l == read->core.l_qseq);
 
 			//Compare and miss with haplotype
@@ -1978,6 +1899,9 @@ alig_indel_realign_from_haplo(alig_context_t *context, size_t alt_haplo_index)
 	return NO_ERROR;
 }
 
+/**
+ * PRIVATE INLINE FUNCTIONS
+ */
 static inline ERROR_CODE
 alig_aux_write_to_disk(array_list_t *write_buffer, bam_file_t *output_bam_f, uint8_t force)
 {
@@ -1999,9 +1923,6 @@ alig_aux_write_to_disk(array_list_t *write_buffer, bam_file_t *output_bam_f, uin
 	//Is empty?
 	if(force || write_buffer_l > ALIG_LIST_COUNT_THRESHOLD_TO_WRITE)
 	{
-#ifdef D_TIME_DEBUG
-		time_w = omp_get_wtime();
-#endif
 		//Sort buffer
 		array_list_qsort(write_buffer, compare_pos);
 
@@ -2022,11 +1943,6 @@ alig_aux_write_to_disk(array_list_t *write_buffer, bam_file_t *output_bam_f, uin
 		//Clear buffer
 		array_list_clear(write_buffer, NULL);
 		last_index = 0;
-
-#ifdef D_TIME_DEBUG
-		time_w = omp_get_wtime() - time_w;
-		time_add_time_slot(D_SLOT_ALIG_WRITE, TIME_GLOBAL_STATS, time_w/(double)write_buffer_l);
-#endif
 	} //If write_buffer_l > 0
 
 	return NO_ERROR;
@@ -2043,10 +1959,6 @@ alig_aux_read_from_disk(circular_buffer_t *read_buffer, bam_file_t *input_bam_f)
 
 	//Timing
 	double time_r;
-
-#ifdef D_TIME_DEBUG
-	time_r = omp_get_wtime();
-#endif
 
 	//More reads?
 	omp_set_lock(&read_buffer->lock);
@@ -2094,13 +2006,6 @@ alig_aux_read_from_disk(circular_buffer_t *read_buffer, bam_file_t *input_bam_f)
 			break;
 		}
 	}
-
-#ifdef D_TIME_DEBUG
-	time_r = omp_get_wtime() - time_r;
-	if(filled > 0)
-		time_add_time_slot(D_SLOT_ALIG_READ, TIME_GLOBAL_STATS, time_r/(double)filled);
-	//printf("RD:%f\n", (double)(end_time_r - init_time_r) * 1000000);
-#endif
 
 	return NO_ERROR;
 }

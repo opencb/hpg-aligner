@@ -52,40 +52,10 @@
 
 #define ALIG_IMPROVEMENT_THREHOLD 0.0
 
-//FLAGS
+//REALIGNER FLAGS
 #define ALIG_LEFT_ALIGN 0x01	//Left align cigars?
 #define ALIG_REFERENCE_PRIORITY 0x02	//Reference haplotype have priority over alternative? (if equals case)
 #define ALIG_ORIGINAL_PRIORITY 0x04	//Original cigar have preference over realigned one? (if equals case)
-
-/**
- * Time measures
- */
-//#define D_TIME_DEBUG
-#ifdef D_TIME_DEBUG
-	enum alig_slots {
-		//GENERAL
-		D_SLOT_TOTAL,
-		D_SLOT_INIT,
-
-		//ITERATION
-		D_SLOT_IT_PROCESS,
-		D_SLOT_IT_READ,
-		D_SLOT_IT_WRITE,
-
-		//BAM I/0
-		D_SLOT_ALIG_READ,
-		D_SLOT_ALIG_WRITE,
-
-		//REALIGN
-		D_SLOT_NEXT,
-		D_SLOT_REFERENCE_LOAD,
-		D_SLOT_HAPLO_GET,
-		D_SLOT_REALIG_PER_HAPLO,
-		D_SLOT_NUCLEO_CMP
-	};
-
-#endif
-
 
 /**
  * REALIGNMENT REFERENCE SEQUENCE
@@ -228,27 +198,35 @@ EXTERNC ERROR_CODE alig_region_indel_realignment(alig_context_t *context);
 EXTERNC ERROR_CODE alig_region_clear(alig_context_t *context);
 
 /**
- * \brief Indel realign one file.
+ * \brief Indel realign one file. DEPRECATED
  *
  * \param[in] bam_path Path to the input BAM file.
  * \param[in] ref_name Reference file name (not including path).
  * \param[in] ref_path Path to reference file (not including name).
  * \param[in] outbam Path to output BAM file.
  */
-EXTERNC ERROR_CODE alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam);
-
+EXTERNC ERROR_CODE alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam) __ATTR_DEPRECATED;
 
 /**
  * PRIVATE FUNCTIONS
  */
 
 /**
- * \brief PRIVATE FUNCTION. Obtain score tables from present region.
+ * \brief PRIVATE FUNCTION.Obtain score tables from present region.
  *
  * \param[in] context Context to process.
  */
-/*static*/ ERROR_CODE alig_get_scores(alig_context_t *context);
-/*static*/ ERROR_CODE alig_get_scores_from_read(bam1_t *read, alig_context_t *context, uint32_t *v_scores, size_t *v_positions);
+static ERROR_CODE alig_get_scores(alig_context_t *context) __ATTR_HOT;
+
+/**
+ * \brief PRIVATE FUNCTION.Obtain score tables from read.
+ *
+ *	\param[in] read Read to process.
+ * \param[in] context Context to process.
+ * \param[out] v_scores Best score vector for every haplotype (index).
+ * \param[out] v_positions Best score position vector for every haplotype (index).
+ */
+static ERROR_CODE alig_get_scores_from_read(bam1_t *read, alig_context_t *context, uint32_t *v_scores, size_t *v_positions) __ATTR_HOT;
 
 /**
  * \brief PRIVATE FUNCTION. Obtain alternative haplotype from generated score tables.

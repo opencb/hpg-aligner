@@ -61,31 +61,6 @@
 #define P_SANGER_MIN 0
 
 /**
- * Time measures
- */
-//#define D_TIME_DEBUG
-#ifdef D_TIME_DEBUG
-	//DELTAS
-	#define D_SLOT_PROCCESS_DELTAS 0
-
-	//PHASE 1
-	#define D_SLOT_PH1_COLLECT_BAM 1
-	#define D_SLOT_PH1_READ_BATCH 2
-	#define D_SLOT_PH1_COLLECT_BATCH 3
-	#define D_SLOT_PH1_COLLECT_ALIG 4
-	#define D_SLOT_PH1_COLLECT_REDUCE_DATA 10
-	#define D_SLOT_PH1_ITERATION 11
-
-	//PHASE 2
-	#define D_SLOT_PH2_READ_BATCH 5
-	#define D_SLOT_PH2_PROCCESS_BATCH 6
-	#define D_SLOT_PH2_WRITE_BATCH 7
-	#define D_SLOT_PH2_RECAL_ALIG 8
-	#define D_SLOT_PH2_RECALIBRATE 9
-	#define D_SLOT_PH2_ITERATION 12
-#endif
-
-/**
  * OpenMP
  */
 //#define D_TIME_OPENMP_VERBOSE

@@ -155,7 +155,7 @@ EXTERNC ERROR_CODE cigar32_to_string(uint32_t *cigar, size_t cigar_l, char* str_
  * \param[out] new_ref Output processed sequence. 
  * \param[out] new_ref_l Output processed sequence length. 
  */
-EXTERNC ERROR_CODE cigar32_create_ref(uint32_t *cigar, size_t cigar_l, char *ref, size_t ref_l, char *read, size_t read_l, char *new_ref, size_t *new_ref_l);
+EXTERNC ERROR_CODE cigar32_create_ref(uint32_t *cigar, size_t cigar_l, char *ref, size_t ref_l, char *read, size_t read_l, char *new_ref, size_t *new_ref_l, char *mask);
 
 /**
  * Get an array of aux_indel_t representing indels present on a cigar32.  

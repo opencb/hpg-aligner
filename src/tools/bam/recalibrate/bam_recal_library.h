@@ -24,6 +24,8 @@
 #include <aligners/bwt/genome.h>
 #include "aux/aux_common.h"
 
+#define RECAL_REFERENCE_CORRECTION_OFFSET 1
+
 /**
  * \brief Recalibration data storage.
  *
@@ -107,7 +109,7 @@ typedef enum DINUC
  * \param cycles Number of maximum cycles to stat.
  * \param out_info Previously allocated info struct to initialize.
  */
-EXTERNC ERROR_CODE recal_init_info(const U_CYCLES cycles, recal_info_t **out_data);
+EXTERNC ERROR_CODE recal_init_info(const U_CYCLES cycles, recal_info_t *out_data);
 
 /**
  * \brief Free all resources of recalibration.
@@ -116,7 +118,7 @@ EXTERNC ERROR_CODE recal_init_info(const U_CYCLES cycles, recal_info_t **out_dat
  *
  * \param data Data struct to free
  */
-EXTERNC ERROR_CODE recal_destroy_info(recal_info_t **data);
+EXTERNC ERROR_CODE recal_destroy_info(recal_info_t *data);
 
 /**
  * \brief Reduce data.
@@ -171,7 +173,7 @@ EXTERNC ERROR_CODE recal_recalibration_destroy_env(recal_recalibration_env_t *re
  * \param dinuc Dinucleotide to add.
  * \param match Indicate if match(!=0) or not (0)
  */
-EXTERNC ERROR_CODE recal_add_base(recal_info_t *data, const char qual, const U_CYCLES cycle, const char dinuc, const double match) __ATTR_HOT;
+EXTERNC ERROR_CODE recal_add_base(recal_info_t *data, const char qual, const U_CYCLES cycle, const char dinuc, const char miss) __ATTR_HOT;
 
 /**
  * \brief Add recalibration data from vector of bases.
@@ -186,7 +188,7 @@ EXTERNC ERROR_CODE recal_add_base(recal_info_t *data, const char qual, const U_C
  * \param dinuc Vector of dinucleotides to add.
  * \param matches Vector of match(!=0) or not (0)
  */
-EXTERNC ERROR_CODE recal_add_base_v(recal_info_t *data, const char *seq, const char *quals, const U_CYCLES init_cycle, const U_CYCLES num_cycles, const char *dinuc, const char *matches) __ATTR_HOT;
+EXTERNC ERROR_CODE recal_add_base_v(recal_info_t *data, const char *seq, const char *quals, const U_CYCLES init_cycle, const U_CYCLES num_cycles, const char *dinuc, const char *misses, const char *mask) __ATTR_HOT;
 
 /**
  * \brief Compute deltas from bases and misses.
