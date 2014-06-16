@@ -127,7 +127,6 @@ void *sa_fq_reader_rna(void *input) {
 }
 
 int sa_bam_writer_rna(void *data) {
-
   //=======================
   sa_wf_batch_t *wf_batch = (sa_wf_batch_t *) data;  
   sa_batch_t *mapping_batch = (sa_batch_t *) wf_batch->mapping_batch;  
@@ -213,8 +212,8 @@ int sa_sam_writer_rna(void *data) {
 
   extern pthread_mutex_t mutex_sp;
 
-  struct timeval time_free_s, time_free_e;
-  extern double time_free_alig, time_free_list, time_free_batch;
+  //struct timeval time_free_s, time_free_e;
+  //extern double time_free_alig, time_free_list, time_free_batch;
 
   pthread_mutex_lock(&mutex_sp);
   total_reads += num_reads;
@@ -266,9 +265,9 @@ int sa_sam_writer_rna(void *data) {
 		optional_flags
 		);
 
-	start_timer(time_free_s);
+	//start_timer(time_free_s);
 	alignment_free(alig);
-	stop_timer(time_free_s, time_free_e, time_free_alig);
+	//stop_timer(time_free_s, time_free_e, time_free_alig);
 
       }
     } else {
@@ -283,16 +282,16 @@ int sa_sam_writer_rna(void *data) {
 	      );
       
     }
-    start_timer(time_free_s);
+    //start_timer(time_free_s);
     array_list_free(mapping_list, (void *) NULL);
-    stop_timer(time_free_s, time_free_e, time_free_list);
+    //stop_timer(time_free_s, time_free_e, time_free_list);
   }
 
   // free memory
-  start_timer(time_free_s);
+  //start_timer(time_free_s);
   sa_batch_free(mapping_batch);
   if (wf_batch) sa_wf_batch_free(wf_batch);
-  stop_timer(time_free_s, time_free_e, time_free_batch);
+  //stop_timer(time_free_s, time_free_e, time_free_batch);
 
   return 0;
 
@@ -1820,19 +1819,23 @@ void cal_fill_gaps_2(cal_t *cal,
 	}*/
     //}
 
+
+
+
 void convert_batch_to_str(sa_wf_batch_t *wf_batch) {
   wf_batch->data = NULL;
   wf_batch->data_size = 0;
   
   sa_batch_t *sa_batch = wf_batch->mapping_batch;  
+  int bam_format = wf_batch->writer_input->bam_format;
   size_t num_reads, num_mappings;
   num_reads = sa_batch->num_reads;
   if (!num_reads) { return; }
-
+  
   int flag, pnext = 0, tlen = 0;
   char rnext[4] = "*\0";
   char optional_flags[512] = "\0";
-
+  
   fastq_read_t *read;
   array_list_t *read_list = sa_batch->fq_reads;
   alignment_t *alig;
@@ -1847,92 +1850,116 @@ void convert_batch_to_str(sa_wf_batch_t *wf_batch) {
   struct timeval time_free_s, time_free_e;
   extern double time_free_alig, time_free_list, time_free_batch;
 
+  
   read = (fastq_read_t *) array_list_get(0, read_list);
 
-  //                 (read id len) + (flags) + (cigar) + (sequence + quality) + optional_flags;
-  //printf("id (%i) : %s, length = %i\n", strlen(read->id), read->id, read->length);
-  int read_size   = ((strlen(read->id) + 50) + ((read->length + 50)*2) + (500));
-  int buffer_max_size = read_size * (num_reads * MAX_ALIG);
-  int buffer_size = 0;
+  if (!bam_format) {
+    int read_size   = ((strlen(read->id) + 50) + ((read->length + 50)*2) + (500));
+    int buffer_max_size = read_size * (num_reads * MAX_ALIG);
+    int buffer_size = 0;
 
-  //Malloc Buffer
-  char *buffer = (char *)malloc(sizeof(char)*buffer_max_size);
-  buffer[0] = '\0';
+    //Malloc Buffer
+    char *buffer = (char *)malloc(sizeof(char)*buffer_max_size);
+    buffer[0] = '\0';
 
-  for (size_t i = 0; i < num_reads; i++) {
-    read = (fastq_read_t *) array_list_get(i, read_list);
-    mapping_list = sa_batch->mapping_lists[i];
-    num_mappings = array_list_size(mapping_list);
-    //printf("%i.Read %s (num_mappings %i)\n", i, read->id, num_mappings);    
-    if (num_mappings > 0) {
-      for (size_t j = 0; j < num_mappings; j++) {
-	alig = (alignment_t *) array_list_get(j, mapping_list);
-	flag = (alig->seq_strand ? 16 : 0);
+    for (size_t i = 0; i < num_reads; i++) {
+      read = (fastq_read_t *) array_list_get(i, read_list);
+      mapping_list = sa_batch->mapping_lists[i];
+      num_mappings = array_list_size(mapping_list);
+      //printf("%i.Read %s (num_mappings %i)\n", i, read->id, num_mappings);    
+      if (num_mappings > 0) {
+	for (size_t j = 0; j < num_mappings; j++) {
+	  alig = (alignment_t *) array_list_get(j, mapping_list);
+	  flag = (alig->seq_strand ? 16 : 0);
 
-	int score = ((read->length * 0.5 - alig->map_quality*0.4)*100) / (read->length * 0.5);
+	  int score = ((read->length * 0.5 - alig->map_quality*0.4)*100) / (read->length * 0.5);
 	
-	sprintf(optional_flags, "AS:%i NM:%i NH:%i", score, alig->map_quality, num_mappings);
+	  sprintf(optional_flags, "AS:%i NM:%i NH:%i", score, alig->map_quality, num_mappings);
 	
+	  char alig_str[read_size];
+	  alig_str[0] = '\0';
+	
+	  sprintf(alig_str, "%s\t%i\t%s\t%lu\t%i\t%s\t%s\t%i\t%i\t%s\t%s\t%s\n\0", 
+		  alig->query_name,
+		  flag,
+		  genome->chrom_names[alig->chromosome - 1],
+		  alig->position + 1,
+		  255,
+		  alig->cigar,
+		  rnext,
+		  pnext,
+		  tlen,
+		  alig->seq_strand ? read->revcomp : read->sequence,
+		  //alig->sequence,
+		  alig->quality,
+		  optional_flags
+		  );
+	
+
+	  assert(buffer_size < buffer_max_size);
+	  strcpy(&buffer[buffer_size], alig_str);
+	  buffer_size += strlen(alig_str);
+
+	  //start_timer(time_free_s);
+	  alignment_free(alig);
+	  //stop_timer(time_free_s, time_free_e, time_free_alig);
+
+	}
+      } else {
 	char alig_str[read_size];
 	alig_str[0] = '\0';
-	
-	sprintf(alig_str, "%s\t%i\t%s\t%lu\t%i\t%s\t%s\t%i\t%i\t%s\t%s\t%s\n\0", 
-		alig->query_name,
-		flag,
-		genome->chrom_names[alig->chromosome - 1],
-		alig->position + 1,
-		255,
-		alig->cigar,
-		rnext,
-		pnext,
-		tlen,
-		alig->seq_strand ? read->revcomp : read->sequence,
-		//alig->sequence,
-		alig->quality,
-		optional_flags
+      
+	sprintf(alig_str, "%s\t4\t*\t0\t0\t*\t*\t0\t0\t%s\t%s\n\0", 
+		read->id,
+		read->sequence,
+		read->quality
 		);
-	
-
+      
 	assert(buffer_size < buffer_max_size);
 	strcpy(&buffer[buffer_size], alig_str);
-	buffer_size += strlen(alig_str);
-
-	//start_timer(time_free_s);
-	alignment_free(alig);
-	//stop_timer(time_free_s, time_free_e, time_free_alig);
-
+	buffer_size += strlen(alig_str);            
       }
-    } else {
-      char alig_str[read_size];
-      alig_str[0] = '\0';
+
+      array_list_free(mapping_list, (void *) NULL);
+  
+    }
+    
+    wf_batch->data = buffer;
+    wf_batch->data_size = buffer_size;
+
+    // free memory
+    sa_batch_free(sa_batch);  
+
+  } else {    
+    for (size_t i = 0; i < num_reads; i++) {
+      read = (fastq_read_t *) array_list_get(i, read_list);
+      mapping_list = sa_batch->mapping_lists[i];
+      num_mappings = array_list_size(mapping_list);
       
-      sprintf(alig_str, "%s\t4\t*\t0\t0\t*\t*\t0\t0\t%s\t%s\n\0", 
-	      read->id,
-	      read->sequence,
-	      read->quality
-	      );
-      
-      assert(buffer_size < buffer_max_size);
-      strcpy(&buffer[buffer_size], alig_str);
-      buffer_size += strlen(alig_str);            
+      alignment_t *alig;
+      bam1_t *bam1;
+      for (size_t j = 0; j < num_mappings; j++) {
+	alig = (alignment_t *) array_list_get(j, mapping_list);	
+	if (alig != NULL) {
+	  bam1 = convert_to_bam(alig, 33);	
+	  alignment_free(alig);	  
+	  array_list_replace_at(j, bam1, mapping_list);
+	} else {
+	  LOG_FATAL_F("alig is NULL, num_items = %lu\n", num_mappings);
+	}	
+      }
+      fastq_read_free(read);
     }
 
-    //start_timer(time_free_s);
-    array_list_free(mapping_list, (void *) NULL);
-    //stop_timer(time_free_s, time_free_e, time_free_list);
+    if (sa_batch->fq_reads) { 
+      array_list_free(sa_batch->fq_reads, (void *) NULL);
+    }
+    
+    wf_batch->data = sa_batch->mapping_lists; 
+    wf_batch->data_size = num_reads;
+    free(sa_batch);
 
   }
-
-  // free memory
-  //start_timer(time_free_s);
-  sa_batch_free(sa_batch);  
-  //stop_timer(time_free_s, time_free_e, time_free_batch);
-  
-  wf_batch->data = buffer;
-  wf_batch->data_size = buffer_size;
-
-  //printf("%s", (char *)wf_batch->data);
-  //exit(-1);
 
   return;
 
@@ -1942,32 +1969,43 @@ int write_to_file(void *data) {
   sa_wf_batch_t *wf_batch = (sa_wf_batch_t *) data;
   if (!wf_batch->data_size) { return 0; }
 
-  FILE *out_file = (FILE *) wf_batch->writer_input->bam_file;
+  extern pthread_mutex_t mutex_sp;
+  struct timeval time_free_s, time_free_e;
+  extern double time_write, time_free;
 
-  //convert_batch_to_str(wf_batch);
+  int bam_format = wf_batch->writer_input->bam_format;
 
-  fwrite((char *)wf_batch->data, sizeof(char), wf_batch->data_size, out_file);
-  
-  free(wf_batch->data);
+  if (!bam_format) {
+    FILE *out_file = (FILE *) wf_batch->writer_input->bam_file;
+    fwrite((char *)wf_batch->data, sizeof(char), wf_batch->data_size, out_file);    
+    free(wf_batch->data);
+  } else {
+    bam_file_t *out_file = (bam_file_t *) wf_batch->writer_input->bam_file;
+    bam1_t *bam1;
+    int num_reads = wf_batch->data_size;
+    array_list_t **mapping_lists = wf_batch->data;
+    array_list_t *mapping_list;
+    size_t num_mappings;
+    for (size_t i = 0; i < num_reads; i++) {
+      mapping_list = mapping_lists[i];
+      num_mappings = array_list_size(mapping_list);    
+      for (size_t j = 0; j < num_mappings; j++) {
+	bam1 = array_list_get(j, mapping_list);
+	//start_timer(time_free_s);
+	bam_fwrite(bam1, out_file);
+	//stop_timer(time_free_s, time_free_e, time_write);
+	//start_timer(time_free_s);
+	bam_destroy1(bam1);
+	//stop_timer(time_free_s, time_free_e, time_free);
+      }      
+      array_list_free(mapping_list, (void *)NULL);      
+    }
+    free(mapping_lists);
+  }
 
   if (wf_batch) sa_wf_batch_free(wf_batch);
 
   return 0;
-
-}
-
-extern inline void fastq_read_revcomp(fastq_read_t *read) {
-  extern char convert_ASCII[128];
-
-  read->revcomp = (char *)malloc((read->length + 1)*sizeof(char));
-
-  register int i, j;
-
-  for (i = read->length - 1, j = 0; i >= 0; i--, j++) {
-    read->revcomp[j] = convert_ASCII[read->sequence[i]];
-  }
-  
-  read->revcomp[j] = '\0';
 
 }
 
@@ -2067,9 +2105,9 @@ extern inline void parse_alignment_data(array_list_t *list, fastq_read_t *fq_rea
 
 
 
-void cigar_code_find_and_report_sj(size_t start_map, cigar_code_t *cigar_code, 
-				   int chromosome, int strand, avls_list_t *avls_list,
-				   metaexons_t *metaexons, genome_t *genome, fastq_read_t *read) {
+char *cigar_code_find_and_report_sj(size_t start_map, cigar_code_t *cigar_code, 
+				    int chromosome, int strand, avls_list_t *avls_list,
+				    metaexons_t *metaexons, genome_t *genome, fastq_read_t *read) {
   size_t sj_start, sj_end;
   size_t offset = start_map;
   size_t exon_start = offset;
@@ -2081,11 +2119,15 @@ void cigar_code_find_and_report_sj(size_t start_map, cigar_code_t *cigar_code,
   int pos = 0;
 
   avl_node_t *node_avl_start, *node_avl_end;
+
+  char cigar_str[2048] = "\0";
     
   //printf("Start %lu\n", start_map);
 
   for (int i = 0; i < array_list_size(cigar_code->ops); i++) {
-    cigar_op_t *op = array_list_get(i, cigar_code->ops);    
+    cigar_op_t *op = array_list_get(i, cigar_code->ops);
+    sprintf(cigar_str, "%s%i%c", cigar_str, op->number, op->name);
+
     if (op->name == 'D' || op->name == 'M') {
       offset += op->number;
     }
@@ -2201,6 +2243,8 @@ void cigar_code_find_and_report_sj(size_t start_map, cigar_code_t *cigar_code,
  
   }
   
+  return strdup(cigar_str);
+
 }
 
 
@@ -2303,6 +2347,7 @@ int sa_rna_mapper(void *data) {
     
     //Rev-comp
     fastq_read_revcomp(read);
+
     //printf("seq: %s\nrev: %s\n", read->sequence, read->revcomp);
     
     seq = read->sequence;
@@ -3034,17 +3079,16 @@ int sa_rna_mapper(void *data) {
 	//Cigar generator
 	//printf("Data: \n");
 	//printf("\trl = %i - num_ops = %i\n", read->length, sa_alignment->c_final->ops->size );
-	char cigar_str[2048] = "\0";
-	for (int k = 0; k < sa_alignment->c_final->ops->size; k++) {
-	  cigar_op_t *op = array_list_get(k, sa_alignment->c_final->ops);	      
-	  sprintf(cigar_str, "%s%i%c", cigar_str, op->number, op->name);
-	  //cigar_op_free(op);
-	}
+	//char cigar_str[2048] = "\0";
+	//for (int k = 0; k < sa_alignment->c_final->ops->size; k++) {
+	//cigar_op_t *op = array_list_get(k, sa_alignment->c_final->ops);	      
+	//sprintf(cigar_str, "%s%i%c", cigar_str, op->number, op->name);
+	//}
 	  
 	//Report Aligment
 	cal = array_list_get(0, merge_cals);	      
-	cigar_code_find_and_report_sj(cal->start - 1, sa_alignment->c_final, cal->chromosome_id, 
-				      cal->strand, avls_list, metaexons, genome, read);	
+	char *cigar_str = cigar_code_find_and_report_sj(cal->start - 1, sa_alignment->c_final, cal->chromosome_id, 
+							cal->strand, avls_list, metaexons, genome, read);	
 
 	alignment_t *alignment = alignment_new();
 	alignment_init_single_end(strdup(read->id), 
@@ -3053,7 +3097,7 @@ int sa_rna_mapper(void *data) {
 				  cal->strand, 
 				  cal->chromosome_id,
 				  cal->start - 1,        
-				  strdup(cigar_str), 
+				  cigar_str, 
 				  sa_alignment->c_final->ops->size, 
 				  sa_alignment->c_final->distance, 1, 0,
 				  0, 0, alignment);
@@ -3095,16 +3139,16 @@ int sa_rna_mapper(void *data) {
 	  }
 
 	  if (cigar_code_validate_(read, sa_alignment->c_final)) {	     
-	    char cigar_str[2048] = "\0";
-	    for (int k = 0; k < sa_alignment->c_final->ops->size; k++) {
-	      cigar_op_t *op = array_list_get(k, sa_alignment->c_final->ops);	      
-	      sprintf(cigar_str, "%s%i%c", cigar_str, op->number, op->name);
-	    }
+	    //char cigar_str[2048] = "\0";
+	    //for (int k = 0; k < sa_alignment->c_final->ops->size; k++) {
+	    //cigar_op_t *op = array_list_get(k, sa_alignment->c_final->ops);	      
+	    //sprintf(cigar_str, "%s%i%c", cigar_str, op->number, op->name);
+	    //}
 
 	    //printf("XXXX-XXXXX-Cigar (%s): %s\n", read->id, cigar_str);
 
-	    cigar_code_find_and_report_sj(cal->start - 1, sa_alignment->c_final, cal->chromosome_id, 
-					  cal->strand, avls_list, metaexons, genome, read);	
+	    char *cigar_str = cigar_code_find_and_report_sj(cal->start - 1, sa_alignment->c_final, cal->chromosome_id, 
+							    cal->strand, avls_list, metaexons, genome, read);	
 
 	    alignment_t *alignment = alignment_new();
 	    alignment_init_single_end(strdup(read->id), 
@@ -3113,14 +3157,13 @@ int sa_rna_mapper(void *data) {
 				      cal->strand, 
 				      cal->chromosome_id,
 				      cal->start - 1,
-				      strdup(cigar_str),				      
+				      cigar_str,				      
 				      sa_alignment->c_final->ops->size, 
 				      sa_alignment->c_final->distance, 
 				      1, 0,
 				      0, 0, alignment);
 	    
 	    //Report SJ
-
 	    array_list_insert(alignment, alignments_list);	  
 	  }
 	}
@@ -3566,13 +3609,13 @@ int sa_rna_mapper_last(void *data) {
 	//Cigar generator, generate score
 	//printf("Data: \n");
 	//printf("\trl = %i - num_ops = %i\n", read->length, sa_alignment->c_final->ops->size );
-	char cigar_str[2048] = "\0";
-	for (int k = 0; k < sa_alignment->c_final->ops->size; k++) {
-	  cigar_op_t *op = array_list_get(k, sa_alignment->c_final->ops);	      
-	  if (op->name == 'H') { op->name = 'S'; }
-	  sprintf(cigar_str, "%s%i%c", cigar_str, op->number, op->name);
-	  //cigar_op_free(op);
-	}
+	//char cigar_str[2048] = "\0";
+	//for (int k = 0; k < sa_alignment->c_final->ops->size; k++) {
+	//cigar_op_t *op = array_list_get(k, sa_alignment->c_final->ops);	      
+
+	//sprintf(cigar_str, "%s%i%c", cigar_str, op->number, op->name);
+	//cigar_op_free(op);
+	//}
 	  
 	//printf("Cigar: %s\n", cigar_str);
 
@@ -3582,9 +3625,15 @@ int sa_rna_mapper_last(void *data) {
 	//printf("***************** FINAL CIGAR %s(%i) (%i:%lu)*****************\n ", cigar_str, sa_alignment->c_final->distance, cal->chromosome_id, cal->start); 
 	//exit(-1);
 	//}
+	
+	cigar_op_t *op = array_list_get(0, sa_alignment->c_final->ops);
+	if (op && op->name == 'H') { op->name = 'S'; }
 
-	cigar_code_find_and_report_sj(cal->start - 1, sa_alignment->c_final, cal->chromosome_id, 
-				      cal->strand, avls_list, metaexons, genome, read);	
+	op = array_list_get(array_list_size(sa_alignment->c_final->ops) - 1, sa_alignment->c_final->ops);
+	if (op && op->name == 'H') { op->name = 'S'; }
+
+	char *cigar_str = cigar_code_find_and_report_sj(cal->start - 1, sa_alignment->c_final, cal->chromosome_id, 
+							cal->strand, avls_list, metaexons, genome, read);	
 
 	alignment_t *alignment = alignment_new();
 	alignment_init_single_end(strdup(read->id), 
@@ -3593,7 +3642,7 @@ int sa_rna_mapper_last(void *data) {
 				  cal->strand, 
 				  cal->chromosome_id,
 				  cal->start - 1,
-				  strdup(cigar_str), 
+				  cigar_str, 
 				  sa_alignment->c_final->ops->size, 
 				  sa_alignment->c_final->distance, 1, 0,
 				  0, 0, alignment);
@@ -3687,17 +3736,22 @@ int sa_rna_mapper_last(void *data) {
 	    
 	    //printf("=========::======= %s ==========::=======\n", new_cigar_code_string(cc_aux));
 	    if (cigar_code_validate_(read, cc_aux)) {	    
-	      char cigar_str[2048] = "\0";
-	      for (int k = 0; k < cc_aux->ops->size; k++) {
-		cigar_op_t *op = array_list_get(k, cc_aux->ops);	      
-		if (op->name == 'H') { op->name = 'S'; }
-		sprintf(cigar_str, "%s%i%c", cigar_str, op->number, op->name);
-		//cigar_op_free(op);
-	      }
+	      //char cigar_str[2048] = "\0";
+	      //for (int k = 0; k < cc_aux->ops->size; k++) {
+	      //cigar_op_t *op = array_list_get(k, cc_aux->ops);	      
+	      //if (op->name == 'H') { op->name = 'S'; }
+	      //sprintf(cigar_str, "%s%i%c", cigar_str, op->number, op->name);
+	      //cigar_op_free(op);
+	      //}
 
+	      cigar_op_t *op = array_list_get(0, cc_aux->ops);
+	      if (op && op->name == 'H') { op->name = 'S'; }
+	      
+	      op = array_list_get(array_list_size(cc_aux->ops) - 1, cc_aux->ops);
+	      if (op && op->name == 'H') { op->name = 'S'; }
 
-	      cigar_code_find_and_report_sj(cal_tmp->start, cc_aux, cal_tmp->chromosome_id, 
-					    cal_tmp->strand, avls_list, metaexons, genome, read);	
+	      char *cigar_str = cigar_code_find_and_report_sj(cal_tmp->start, cc_aux, cal_tmp->chromosome_id, 
+							      cal_tmp->strand, avls_list, metaexons, genome, read);	
 
 	      alignment_t *alignment = alignment_new();
 	      alignment_init_single_end(strdup(read->id), 
@@ -3706,14 +3760,13 @@ int sa_rna_mapper_last(void *data) {
 					cal_tmp->strand, 
 					cal_tmp->chromosome_id,
 					cal_tmp->start,
-					strdup(cigar_str),//new_cigar_code_string(cc_aux),//strdup("100M"),
+					cigar_str,
 					cc_aux->ops->size, 
 					cc_aux->distance,
 					1, 0,
 					0, 0, alignment);
 	      
-	      //Report SJ
-	      
+	      //Report SJ	      
 	      array_list_insert(alignment, alignments_list_aux); 
 
 	    }
@@ -3752,21 +3805,27 @@ int sa_rna_mapper_last(void *data) {
 	    else { array_list_insert(cigar_op_new(suffix_len_n, 'M'), cc_aux->ops); }
 
 	    if (cigar_code_validate_(read, cc_aux)) {	
-	      char cigar_str[2048] = "\0";
-	      for (int k = 0; k < cc_aux->ops->size; k++) {
-		cigar_op_t *op = array_list_get(k, cc_aux->ops);	      
-		if (op->name == 'H') { op->name = 'S'; }
-		sprintf(cigar_str, "%s%i%c", cigar_str, op->number, op->name);
-		//cigar_op_free(op);
-	      }
+	      //char cigar_str[2048] = "\0";
+	      //for (int k = 0; k < cc_aux->ops->size; k++) {
+	      //cigar_op_t *op = array_list_get(k, cc_aux->ops);	      
+	      //if (op->name == 'H') { op->name = 'S'; }
+	      //sprintf(cigar_str, "%s%i%c", cigar_str, op->number, op->name);
+	      //cigar_op_free(op);
+	      //}
     
 	      //if (cal_tmp->chromosome_id == 0) {
 	      //printf("***************** FINAL CIGAR %s (%i)*****************\n ", cigar_str); 
 	      //exit(-1);
 	      //}
 
-	      cigar_code_find_and_report_sj(cal_tmp->start, cc_aux, cal_tmp->chromosome_id, 
-					    cal_tmp->strand, avls_list, metaexons, genome, read);	
+	      cigar_op_t *op = array_list_get(0, cc_aux->ops);
+	      if (op && op->name == 'H') { op->name = 'S'; }
+	      
+	      op = array_list_get(array_list_size(cc_aux->ops) - 1, cc_aux->ops);
+	      if (op && op->name == 'H') { op->name = 'S'; }
+	      
+	      char *cigar_str = cigar_code_find_and_report_sj(cal_tmp->start, cc_aux, cal_tmp->chromosome_id, 
+							      cal_tmp->strand, avls_list, metaexons, genome, read);	
 
 	      alignment_t *alignment = alignment_new();
 	      alignment_init_single_end(strdup(read->id), 
@@ -3775,7 +3834,7 @@ int sa_rna_mapper_last(void *data) {
 					cal_tmp->strand, 
 					cal_tmp->chromosome_id,
 					cal_tmp->start,
-					strdup(cigar_str),//new_cigar_code_string(cc_aux),
+					cigar_str,
 					cc_aux->ops->size, 
 					cc_aux->distance, 
 					1, 0,
@@ -4350,17 +4409,22 @@ int sa_rna_mapper_last(void *data) {
 	//printf("¡¡¡¡¡¡¡¡¡ALIGNMENT FOUND: %lu: %s (%i)!!!!!!!!!!\n", cal_prev->start, new_cigar_code_string(sa_alignment->c_final), sa_alignment->c_final->distance);
 	
 	if (cigar_code_validate_(read, sa_alignment->c_final)) {	
-	  char cigar_str[2048] = "\0";
-	  for (int k = 0; k < sa_alignment->c_final->ops->size; k++) {
-	    cigar_op_t *op = array_list_get(k, sa_alignment->c_final->ops);	      
-	    if (op->name == 'H') { op->name = 'S'; }
-	    sprintf(cigar_str, "%s%i%c", cigar_str, op->number, op->name);
-	    //cigar_op_free(op);
-	  }
+	  //char cigar_str[2048] = "\0";
+	  //for (int k = 0; k < sa_alignment->c_final->ops->size; k++) {
+	  //cigar_op_t *op = array_list_get(k, sa_alignment->c_final->ops);	      
+	  //if (op->name == 'H') { op->name = 'S'; }
+	  //sprintf(cigar_str, "%s%i%c", cigar_str, op->number, op->name);
+	  //cigar_op_free(op);
+	  //}
 
+	  cigar_op_t *op = array_list_get(0, sa_alignment->c_final->ops);
+	  if (op && op->name == 'H') { op->name = 'S'; }
+	  
+	  op = array_list_get(array_list_size(sa_alignment->c_final->ops) - 1, sa_alignment->c_final->ops);
+	  if (op && op->name == 'H') { op->name = 'S'; }
 
-	  cigar_code_find_and_report_sj(cal_prev->start - 1, sa_alignment->c_final, cal_prev->chromosome_id, 
-					cal_prev->strand, avls_list, metaexons, genome, read);	
+	  char *cigar_str = cigar_code_find_and_report_sj(cal_prev->start - 1, sa_alignment->c_final, cal_prev->chromosome_id, 
+							  cal_prev->strand, avls_list, metaexons, genome, read);	
 
 	  alignment_t *alignment = alignment_new();
 	  alignment_init_single_end(strdup(read->id), 
@@ -4369,7 +4433,7 @@ int sa_rna_mapper_last(void *data) {
 				    cal_prev->strand,
 				    cal_prev->chromosome_id,
 				    cal_prev->start - 1,
-				    new_cigar_code_string(sa_alignment->c_final),
+				    cigar_str,
 				    sa_alignment->c_final->ops->size, 
 				    sa_alignment->c_final->distance, 
 				    1, 0,

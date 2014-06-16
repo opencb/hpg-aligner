@@ -7,6 +7,22 @@
 //--------------------------------------------------------------------
 // workflow input                                                                                                                                    //--------------------------------------------------------------------  
 
+void fastq_read_revcomp(fastq_read_t *read) {
+  extern char convert_ASCII[128];
+
+  read->revcomp = (char *)malloc((read->length + 1)*sizeof(char));
+
+  register int i, j;
+
+  for (i = read->length - 1, j = 0; i >= 0; i--, j++) {
+    read->revcomp[j] = convert_ASCII[read->sequence[i]];
+  }
+  
+  read->revcomp[j] = '\0';
+
+}
+
+
 void *write_sam_header_BWT(genome_t *genome, FILE *f) {
   fprintf(f, "@PG\tID:HPG-Aligner\tVN:2.0\n");
   for (int i = 0; i < genome->num_chromosomes; i++) {
@@ -1444,13 +1460,14 @@ void rna_aligner(options_t *options) {
   pair_server_input_init(pair_mng, report_optarg, NULL, NULL, NULL, &pair_input);
 
   batch_writer_input_t writer_input;
-  batch_writer_input_init( output_filename,
-			   exact_filename, 
-			   extend_filename, 
-			   alignments_list, 
-			   genome, &writer_input);
+  batch_writer_input_init(output_filename,
+			  exact_filename, 
+			  extend_filename, 
+			  alignments_list, 
+			  genome, 
+			  &writer_input);
 
-
+  writer_input.bam_format = options->bam_format;
   if (options->bam_format) {
     bam_header_t *bam_header;
     if (options->fast_mode) {
@@ -1707,7 +1724,8 @@ void rna_aligner(options_t *options) {
       workflow_set_producer(sa_fq_reader_rna, "FastQ reader", wf);
 
       if (options->bam_format) {
-	workflow_set_consumer(sa_bam_writer_rna, "BAM writer", wf);
+	//workflow_set_consumer(sa_bam_writer_rna, "BAM writer", wf);
+	workflow_set_consumer(write_to_file, "SAM writer", wf);
       } else {
 	//workflow_set_consumer(sa_sam_writer_rna, "SAM writer", wf);
 	workflow_set_consumer(write_to_file, "SAM writer", wf);
@@ -1721,7 +1739,8 @@ void rna_aligner(options_t *options) {
       workflow_set_producer(sa_alignments_reader_rna, "FastQ reader", wf_last);
       
       if (options->bam_format) {
-	workflow_set_consumer(sa_bam_writer_rna, "BAM writer", wf_last);
+	//workflow_set_consumer(sa_bam_writer_rna, "BAM writer", wf_last);
+	workflow_set_consumer(write_to_file, "SAM writer", wf_last);
       } else {
 	//workflow_set_consumer(sa_sam_writer_rna, "SAM writer", wf_last);
 	workflow_set_consumer(write_to_file, "SAM writer", wf_last);
@@ -1810,8 +1829,6 @@ void rna_aligner(options_t *options) {
       extern size_t insert_calls;
       extern double time_search;
       extern double time_insert;
-
-      printf("Numero de búsquedas : %lu (%f)\nNúmero de Inserciones: %lu (%f)\n", search_calls, time_search / 1000000, insert_calls, time_insert / 1000000);
 
      
       printf("Load Genome Time : %f(s)\n", time_genome / 1000000);

@@ -23,9 +23,11 @@ bam_header_t *create_bam_header_by_genome(genome_t *genome) {
 
 //------------------------------------------------------------------------------------
 
-void batch_writer_input_init(char* match_filename, char* splice_exact_filename, 
+void batch_writer_input_init(char* match_filename, 
+			     char* splice_exact_filename, 
 			     char* splice_extend_filename, 
-			     linked_list_t* list_p, genome_t* genome, 
+			     linked_list_t* list_p, 
+			     genome_t* genome, 
 			     batch_writer_input_t* input_p) {
 
   input_p->match_filename = match_filename;

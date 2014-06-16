@@ -662,7 +662,7 @@ void write_mapped_read(array_list_t *array_list, bam_file_t *bam_file) {
       bam_destroy1(bam1);	 
       alignment_free(alig);
     } else {
-      LOG_FATAL_F("alig is NULL, num_items = %lu\n", num_items)
+      LOG_FATAL_F("alig is NULL, num_items = %lu\n", num_items);
     }
     //printf("\t**************** %i(%i)\n", j, num_items);
   }

@@ -66,7 +66,7 @@ options_t *options_new(void) {
   options->min_seed_size = 0;
   options->seed_size = 0;
   options->flank_length = 0;
-  options->fast_mode = 0;
+  options->fast_mode = 1;
 
   //new variables for bisulphite case in index generation
   options->bs_index = 0;
@@ -106,7 +106,7 @@ void validate_options(options_t *options) {
     DEFAULT_SEEDS_MAX_DISTANCE = 100;
   }else if (mode == RNA_MODE) {
     strcpy(options->str_mode, "RNA");
-    DEFAULT_READ_BATCH_SIZE = 200000;
+    DEFAULT_READ_BATCH_SIZE = 20000;
     DEFAULT_NUM_SEEDS	= 20;
     DEFAULT_SEED_SIZE = 16;
     DEFAULT_FLANK_LENGTH = 30;
@@ -385,7 +385,7 @@ void** argtable_options_new(int mode) {
   argtable[count++] = arg_str0(NULL, "prefix", NULL, "File prefix name");
   argtable[count++] = arg_int0("l", "log-level", NULL, "Log debug level");
   argtable[count++] = arg_lit0("h", "help", "Help option");
-  argtable[count++] = arg_lit0(NULL, "bam-format", "BAM output format (otherwise, SAM format)");
+  argtable[count++] = arg_lit0(NULL, "bam-format", "BAM output format (otherwise, SAM format), this option turn the process slow");
   argtable[count++] = arg_lit0(NULL, "indel-realignment", "Indel-based realignment");
   argtable[count++] = arg_lit0(NULL, "recalibration", "Base quality score recalibration");
 
@@ -397,7 +397,7 @@ void** argtable_options_new(int mode) {
     argtable[count++] = arg_int0(NULL, "seed-size", NULL, "Number of nucleotides in a seed");
     argtable[count++] = arg_int0(NULL, "max-intron-size", NULL, "Maximum intron size");
     argtable[count++] = arg_int0(NULL, "min-intron-size", NULL, "Minimum intron size");
-    argtable[count++] = arg_lit0(NULL, "fast-mode", "Fast mode for SA index");
+    argtable[count++] = arg_lit0(NULL, "bwt-mode", "Slow mode for low memory consumption (SA mode pair-mode is not implemented yet)");
   }
 
   argtable[num_options] = arg_end(count);
@@ -490,10 +490,11 @@ options_t *read_CLI_options(void **argtable, options_t *options) {
     if (((struct arg_int*)argtable[++count])->count) { options->seed_size = *(((struct arg_int*)argtable[count])->ival); }
     if (((struct arg_int*)argtable[++count])->count) { options->max_intron_length = *(((struct arg_int*)argtable[count])->ival); }
     if (((struct arg_int*)argtable[++count])->count) { options->min_intron_length = *(((struct arg_int*)argtable[count])->ival); }
-    if (((struct arg_file*)argtable[++count])->count) { options->fast_mode = (((struct arg_int *)argtable[count])->count); }
+    if (((struct arg_file*)argtable[++count])->count) { options->fast_mode = !(((struct arg_int *)argtable[count])->count); }
   }
 
   return options;
+
 }
 
 

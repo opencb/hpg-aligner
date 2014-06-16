@@ -6489,6 +6489,9 @@ int apply_rna_last(sw_server_input_t* input_p, batch_t *batch) {
   for (i = 0; i < num_reads; i++) {
     meta_alignments_list[i] = array_list_new(20, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
     fq_read = array_list_get(i, mapping_batch->fq_batch);
+    //Rev-comp
+    fastq_read_revcomp(fq_read);
+
     cals_list = mapping_batch->mapping_lists[i];
     scores_ranking[i] = (float *)calloc(200, sizeof(float));
     from_single_anchors = 0;
@@ -7679,6 +7682,9 @@ int apply_rna_last_hc(sw_server_input_t* input_p, batch_t *batch) {
   //Convert CALs in META_ALIGNMENTS 
   for (int i = 0; i < num_reads; i++) {
     fq_read = array_list_get(i, mapping_batch->fq_batch);
+    //Rev-comp
+    fastq_read_revcomp(fq_read);
+
     meta_alignments_list = mapping_batch->mapping_lists[i];
     //printf("WK_3ph (%i): %s\n", array_list_size(meta_alignments_list), fq_read->id );
     

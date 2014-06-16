@@ -37,8 +37,8 @@ size_t total_sw = 0;
 
 
 
-double time_free_alig = 0;
-double time_free_list = 0;
+double time_write = 0;
+double time_free = 0;
 double time_free_batch = 0;
 
 double time_timer0 = 0;
@@ -148,8 +148,6 @@ int main(int argc, char* argv[]) {
   */
 
   options_free(options);
-
-  printf("TOTAL SW w2:  %ld\n", total_sw);
 
   return 0;
 

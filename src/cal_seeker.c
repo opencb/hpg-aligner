@@ -1032,7 +1032,7 @@ int apply_caling_rna(cal_seeker_input_t* input, batch_t *batch) {
     /* } */
     /* printf("<<<<<===== CAL SERVER END =====>>>>>\n"); */
    
-    printf("Total CALs %i\n", num_cals);
+    //printf("Total CALs %i\n", num_cals);
 
   }
 
