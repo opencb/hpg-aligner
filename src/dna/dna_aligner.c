@@ -307,7 +307,10 @@ void dna_aligner(options_t *options) {
     }
     strcat(realig_filename, "realigned_out.bam");
 
-    alig_bam_file(aux, "dna_compression.bin", sa_dirname, realig_filename);
+    char ref_filename[512] = "";
+    strcpy(ref_filename, sa_dirname);
+    strcat(ref_filename, "dna_compression.bin");
+    alig_bam_file(aux, ref_filename, realig_filename);
     aux = realig_filename;
     printf("Realigned file     : %s\n", realig_filename);
   }
@@ -327,15 +330,20 @@ void dna_aligner(options_t *options) {
       strcat(recal_filename, "recalibrated_out.bam");
     }
 
+    char ref_filename[512] = "";
+	strcpy(ref_filename, sa_dirname);
+	strcat(ref_filename, "dna_compression.bin");
+
     recal_info_t *recal_info;
     recal_info = (recal_info_t *)malloc(sizeof(recal_info_t));
     recal_init_info(500, recal_info);
-    printf("-----------------------------------\nCollecting data for recalibration...\n");
+    /*printf("-----------------------------------\nCollecting data for recalibration...\n");
     recal_get_data_from_file(aux, "dna_compression.bin", sa_dirname, recal_info);
     printf("-----------------------------------\n");
     recal_calc_deltas(recal_info);
     printf("-----------------------------------\nRecalibrating...\n");
-    recal_recalibrate_bam_file(aux, recal_info, recal_filename);
+    recal_recalibrate_bam_file(aux, recal_info, recal_filename);*/
+    recal_bam_file(RECALIBRATE_COLLECT | RECALIBRATE_RECALIBRATE, aux, ref_filename, recal_info, NULL, recal_filename, 500);
     printf("Recalibrated file  : %s\n", recal_filename);
     recal_destroy_info(recal_info);
     free(recal_info);

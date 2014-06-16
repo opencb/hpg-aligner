@@ -474,7 +474,7 @@ bfwork_run(bam_fwork_t *fwork)
 		printf("Reference path: %s\n", ref_path);
 		printf("Reference name: %s\n", ref_name);
 		printf("Opening reference genome from \"%s%s\" ...\n", ref_path, ref_name);
-		fwork->reference = genome_new(ref_name, ref_path);
+		fwork->reference = genome_new(ref_name, ref_path, BWT_MODE);
 		assert(fwork->reference);
 		printf("Reference opened!...\n");
 	}

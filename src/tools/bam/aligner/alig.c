@@ -1059,7 +1059,7 @@ alig_bam_file_old(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 	//Open reference genome
 	{
 		printf("Opening reference genome from \"%s%s\" ...\n", ref_path, ref_name);
-		ref = genome_new(ref_name, ref_path);
+		ref = genome_new(ref_name, ref_path, BWT_MODE);
 		assert(ref);
 		printf("Reference opened!...\n");
 	}
