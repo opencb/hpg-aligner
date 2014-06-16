@@ -305,7 +305,7 @@ void fill_gaps(mapping_batch_t *mapping_batch, sw_optarg_t *sw_optarg,
 	  }
 	  
 	  // insert gap in the list
-	  new_s = seed_region_new(gap_read_start, gap_read_end, gap_genome_start, gap_genome_end, 0);
+	  new_s = seed_region_new(gap_read_start, gap_read_end, gap_genome_start, gap_genome_end, 0, 0, 0);
 	  new_s->info = (void *) cigar_code;
 	  linked_list_iterator_insert(new_s, itr);
 
@@ -437,7 +437,7 @@ void fill_gaps(mapping_batch_t *mapping_batch, sw_optarg_t *sw_optarg,
 	}
 	
 	// insert gap in the list
-	new_s = seed_region_new(gap_read_start, gap_read_end, gap_genome_start, gap_genome_end, 0);
+	new_s = seed_region_new(gap_read_start, gap_read_end, gap_genome_start, gap_genome_end, 0, 0, 0);
 	new_s->info = (void *) cigar_code;
 	linked_list_insert_last(new_s, cal->sr_list);
 
@@ -876,7 +876,7 @@ int apply_caling_rna(cal_seeker_input_t* input, batch_t *batch) {
 					     1.25f, 
 					     COLLECTION_MODE_ASYNCHRONIZED);
   
-  //extern pthread_mutex_t mutex_sp;
+  extern pthread_mutex_t mutex_sp;
   //extern size_t TOTAL_READS_SEEDING, TOTAL_READS_SEEDING2;
 
   //pthread_mutex_lock(&mutex_sp);
@@ -906,6 +906,12 @@ int apply_caling_rna(cal_seeker_input_t* input, batch_t *batch) {
     // if we want to seed with 24-length seeds,
     if (num_cals == 0) {
       //printf("No Cals seeding...\n");
+      
+      //pthread_mutex_lock(&mutex_sp);
+      //extern size_t seeds_1err;
+      //seeds_1err++;
+      //pthread_mutex_unlock(&mutex_sp);
+
       int seed_size = 24;
       //First, Delete old regions
       array_list_clear(region_list, (void *)region_bwt_free);
@@ -926,7 +932,8 @@ int apply_caling_rna(cal_seeker_input_t* input, batch_t *batch) {
 						   &min_seeds, &max_seeds,
 						   genome->num_chromosomes + 1,
 						   list, read->length,
-						   cal_optarg->min_cal_size);
+						   cal_optarg->min_cal_size,
+						   0);
 
       //input->cal_optarg->min_cal_size = prev_min_cal;
 
@@ -934,7 +941,8 @@ int apply_caling_rna(cal_seeker_input_t* input, batch_t *batch) {
       //TOTAL_READS_SEEDING2++;
       //pthread_mutex_unlock(&mutex_sp);
 
-    }
+    } 
+
     array_list_clear(region_list, (void *)region_bwt_free);
 
     //filter-incoherent CALs
@@ -1226,7 +1234,7 @@ int apply_caling(cal_seeker_input_t* input, batch_t *batch) {
 						   &min_seeds, &max_seeds,
 						   num_chromosomes,
 						   list, read->length,
-						   input->cal_optarg->min_cal_size);
+						   input->cal_optarg->min_cal_size, 0);
     } else {
       //We have double anchors with smaller distance between they
       //printf("Easy case... Two anchors and same distance between read gap and genome distance\n");
@@ -1245,7 +1253,7 @@ int apply_caling(cal_seeker_input_t* input, batch_t *batch) {
 	//printf("\t seed0[%i-%i][%lu-%lu]\n", 0, anchor_nt - 1,
 	//     bwt_anchor_forw->start, bwt_anchor_forw->end);
 	seed_region_start = seed_region_new(0, anchor_nt - 1,
-					    bwt_anchor_forw->start, bwt_anchor_forw->end, 0);
+					    bwt_anchor_forw->start, bwt_anchor_forw->end, 0, 0, 0);
 
 	//Seed for the first anchor
 	gap_nt = read->length - (anchor_nt + (bwt_anchor_back->end - bwt_anchor_back->start));
@@ -1253,7 +1261,7 @@ int apply_caling(cal_seeker_input_t* input, batch_t *batch) {
 	//printf("\t seed1[%i-%i][%lu-%lu]\n", anchor_nt + gap_nt, read->length - 1, 
 	//     bwt_anchor_back->start + 1, bwt_anchor_back->end);
 	seed_region_end = seed_region_new(anchor_nt + gap_nt, read->length - 1,
-					  bwt_anchor_back->start + 1, bwt_anchor_back->end, 1);
+					  bwt_anchor_back->start + 1, bwt_anchor_back->end, 1, 0, 0);
 
 	//The reference distance is 0 and the read distance not
 	//The read distance is 0 and the reference distance not

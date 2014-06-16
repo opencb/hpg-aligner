@@ -7,13 +7,14 @@
 #include "options.h"
 #include "buffers.h"
 #include "cal_seeker.h"
+#include "pair_server.h"
 
 #include "sa/sa_index3.h"
 
 //--------------------------------------------------------------------
 
-//#define NUM_COUNTERS 10
-//extern int counters[NUM_COUNTERS];
+#define NUM_COUNTERS 10
+extern int counters[NUM_COUNTERS];
 
 //--------------------------------------------------------------------
 
@@ -64,13 +65,17 @@ char func_names[NUM_TIMING][1024];
 
 typedef struct sa_mapping_batch {
 
-  //  int counters[NUM_COUNTERS];
+  int counters[NUM_COUNTERS];
 
   int bam_format;
   size_t num_reads;
+
   #ifdef _TIMING
   double func_times[NUM_TIMING];
   #endif
+
+  options_t *options;
+
   array_list_t *fq_reads;
   array_list_t **mapping_lists;
 } sa_mapping_batch_t;
@@ -83,12 +88,13 @@ static inline sa_mapping_batch_t *sa_mapping_batch_new(array_list_t *fq_reads) {
 
   sa_mapping_batch_t *p = (sa_mapping_batch_t *) malloc(sizeof(sa_mapping_batch_t));
 
-  //  for (int i = 0; i < NUM_COUNTERS; i++) {
-  //    p->counters[i] = 0;
-  //  }
+  for (int i = 0; i < NUM_COUNTERS; i++) {
+    p->counters[i] = 0;
+  }
 
   p->bam_format = 0;
   p->num_reads = num_reads;
+
   p->fq_reads = fq_reads;
   p->mapping_lists = (array_list_t **) malloc(num_reads * sizeof(array_list_t *));
   for (size_t i = 0; i < num_reads; i++) {
@@ -122,21 +128,26 @@ typedef struct sa_wf_batch {
   options_t *options;
   sa_index3_t *sa_index;
   batch_writer_input_t *writer_input;
-  sa_mapping_batch_t *mapping_batch;  
+  void *mapping_batch;  
+  void *data;
 } sa_wf_batch_t;
 
 //--------------------------------------------------------------------
 
 static inline sa_wf_batch_t *sa_wf_batch_new(options_t *options,
-				      sa_index3_t *sa_index,
-				      batch_writer_input_t *writer_input,
-				      sa_mapping_batch_t *mapping_batch) {
-  
+					     sa_index3_t *sa_index,
+					     batch_writer_input_t *writer_input,
+					     void *mapping_batch,
+					     void *data) {  
   sa_wf_batch_t *p = (sa_wf_batch_t *) malloc(sizeof(sa_wf_batch_t));
+
   p->options = options;
   p->sa_index = sa_index;
   p->writer_input = writer_input;
+
   p->mapping_batch = mapping_batch;
+  p->data          = data;
+
   return p;
 }
 
@@ -177,16 +188,38 @@ static inline void sa_wf_input_free(sa_wf_input_t *p) {
 //--------------------------------------------------------------------
 // cigar_t
 //--------------------------------------------------------------------
+#define NUM_INITIAL_CIGAR_OPS 200
 
 typedef struct cigar {
-  uint32_t ops[2000];
   int num_ops;
+  int num_allocated_ops;
+  uint32_t ops_array[NUM_INITIAL_CIGAR_OPS];
+  uint32_t *ops_pointer;
+  uint32_t *ops;
 } cigar_t;
+
+//--------------------------------------------------------------------
+
+static inline void cigar_init(cigar_t *p) {
+  p->num_ops = 0;
+  p->num_allocated_ops = NUM_INITIAL_CIGAR_OPS;
+  p->ops = p->ops_array;
+  p->ops_pointer = NULL;
+}
+
+//--------------------------------------------------------------------
+
+static inline void cigar_clean(cigar_t *p) {
+  if (p->ops_pointer) {
+    free(p->ops_pointer);
+  }
+}
 
 //--------------------------------------------------------------------
 
 static inline cigar_t *cigar_new(int value, int name) {
   cigar_t *p = (cigar_t *) malloc(sizeof(cigar_t));
+  cigar_init(p);
   p->ops[0] = ((value << 8) | (name & 255));
   p->num_ops = 1;
   //  printf("+++++ cigar_new: p = %x\n", p);
@@ -197,6 +230,7 @@ static inline cigar_t *cigar_new(int value, int name) {
 
 static inline cigar_t *cigar_new_empty() {
   cigar_t *p = (cigar_t *) malloc(sizeof(cigar_t));
+  cigar_init(p);
   p->num_ops = 0;
   //  printf("+++++ cigar_new_empty: p = %x\n", p);
   return p;
@@ -204,7 +238,18 @@ static inline cigar_t *cigar_new_empty() {
 
 //--------------------------------------------------------------------
 
-static inline void cigar_init(cigar_t *p) {
+static inline void cigar_free(cigar_t *p) {
+  //  printf("---------- cigar_free: p = %x (%s)\n", p, cigar_to_string(p));
+  //  printf("---------- cigar_free: p = %x\n", p);
+  if (p) {
+    cigar_clean(p);
+    free(p);
+  }
+}
+
+//--------------------------------------------------------------------
+
+static inline void cigar_set_zero(cigar_t *p) {
   if (p) {
     p->num_ops = 0;
   }
@@ -213,12 +258,18 @@ static inline void cigar_init(cigar_t *p) {
 //--------------------------------------------------------------------
 
 static inline void cigar_get_op(int index, int *value, int *name, cigar_t *p) {
-  assert(index < p->num_ops);
+  //  printf("cigar_get_op: (index, num_ops) = (%i, %i) %s\n", 
+  //	 index, p->num_ops, cigar_to_string(p));
+  if (index >= p->num_ops) {
+    printf("cigar_get_op: (index, num_ops) = (%i, %i)\n", index, p->num_ops);
+    assert(index < p->num_ops);
+  }
   *name = (p->ops[index] & 255);
   *value = (p->ops[index] >> 8);
 }
 
 //--------------------------------------------------------------------
+
 
 static inline char *cigar_to_string(cigar_t *p) {
   char *str = (char *) malloc(p->num_ops * 10);
@@ -233,10 +284,35 @@ static inline char *cigar_to_string(cigar_t *p) {
 
 //--------------------------------------------------------------------
 
-static inline void cigar_free(cigar_t *p) {
-  //  printf("---------- cigar_free: p = %x (%s)\n", p, cigar_to_string(p));
-  //  printf("---------- cigar_free: p = %x\n", p);
-  if (p) free(p);
+static inline char *cigar_to_M_string(int *num_mismatches, int *num_cigar_ops, cigar_t *p) {
+  char *str = (char *) malloc(p->num_ops * 10);
+  int name, value, num_ops = 0, num_m = 0, mis = 0;
+  str[0] = 0;
+  for (int i = 0; i < p->num_ops; i++) {
+    cigar_get_op(i, &value, &name, p);
+    if (name == '=') {
+      num_m += value;
+    } else if (name == 'X') {
+      num_m += value;
+      mis += value;
+    } else {
+      if (num_m > 0) {
+	num_ops++;
+	sprintf(str, "%s%iM", str, num_m);
+	num_m = 0;
+      }
+      num_ops++;
+      sprintf(str, "%s%i%c", str, value, name);
+    }
+  }
+  if (num_m > 0) {
+    num_ops++;
+    sprintf(str, "%s%iM", str, num_m);
+  }
+
+  *num_mismatches = mis;
+  *num_cigar_ops = num_ops;
+  return str;
 }
 
 //--------------------------------------------------------------------
@@ -246,12 +322,17 @@ static inline void cigar_set_op(int index, int value, int name, cigar_t *p) {
 }
 
 //--------------------------------------------------------------------
-
+/*
 static inline void _cigar_append_op(int value, int name, cigar_t *p) {
+  if ((p->num_ops + 1) == p->num_allocated_ops) {
+    printf("_cigar_append_op: (num_ops, num_allocated_ops) = (%i, %i)", 
+	   p->num_ops, p->num_allocated_ops);
+    exit(-1);
+  }
   cigar_set_op(p->num_ops, value, name, p);
   p->num_ops++;
 }
-
+*/
 //--------------------------------------------------------------------
 
 static inline void cigar_append_op(int value, int name, cigar_t *p) {
@@ -264,6 +345,21 @@ static inline void cigar_append_op(int value, int name, cigar_t *p) {
     if (last_op_name == name) {
       cigar_set_op(p->num_ops - 1, last_op_value + value, name, p);      
     } else {
+      
+      if (p->num_allocated_ops <= p->num_ops) {
+	p->num_allocated_ops += (2 * NUM_INITIAL_CIGAR_OPS);
+	uint32_t *aux = malloc(p->num_allocated_ops * sizeof(uint32_t));
+	memcpy(aux, p->ops, p->num_ops * sizeof(uint32_t));
+	if (p->ops_pointer) {
+	  free(p->ops_pointer);
+	}
+	p->ops_pointer = aux;
+	p->ops = p->ops_pointer;
+	//	printf("cigar_append_op: (num_ops, num_allocated_ops) = (%i, %i)\n", 
+	//	       p->num_ops, p->num_allocated_ops);
+	//	exit(-1);
+      }
+
       cigar_set_op(p->num_ops, value, name, p);
       p->num_ops++;      
     }
@@ -273,6 +369,21 @@ static inline void cigar_append_op(int value, int name, cigar_t *p) {
 //--------------------------------------------------------------------
 
 static inline void cigar_concat(cigar_t *src, cigar_t *dst) {
+  //check if there is space in dst to copy src
+  if (dst->num_allocated_ops < (dst->num_ops + src->num_ops)) {
+    dst->num_allocated_ops += (src->num_ops + (2 * NUM_INITIAL_CIGAR_OPS));
+    uint32_t *aux = malloc(dst->num_allocated_ops * sizeof(uint32_t));
+    memcpy(aux, dst->ops, dst->num_ops * sizeof(uint32_t));
+    if (dst->ops_pointer) {
+      free(dst->ops_pointer);
+    }
+    dst->ops_pointer = aux;
+    dst->ops = dst->ops_pointer;
+   //    printf("cigar_concat: dst->num_allocated_ops = %i < (dst->num_ops = %i + src->num_ops = %i)\n", 
+    //	   dst->num_allocated_ops, dst->num_ops, src->num_ops);
+    //    exit(-1);
+  }
+  
   if (dst->num_ops == 0) {
     memcpy(dst->ops, src->ops, src->num_ops * sizeof(uint32_t));
     dst->num_ops = src->num_ops;
@@ -297,10 +408,25 @@ static inline void cigar_concat(cigar_t *src, cigar_t *dst) {
 
 static inline void cigar_copy(cigar_t *dst, cigar_t *src) {
   if (src->num_ops > 0) {
+    //check if there is space in dst to copy src
+    if (dst->num_allocated_ops < src->num_ops) {
+      dst->num_allocated_ops = (src->num_ops + (2 * NUM_INITIAL_CIGAR_OPS));
+      uint32_t *aux = malloc(dst->num_allocated_ops * sizeof(uint32_t));
+      memcpy(aux, dst->ops, dst->num_ops * sizeof(uint32_t));
+      if (dst->ops_pointer) {
+	free(dst->ops_pointer);
+      }
+      dst->ops_pointer = aux;
+      dst->ops = dst->ops_pointer;
+      //      printf("cigar_copy: dst->num_allocated_ops = %i < src->num_ops = %i)\n", 
+      //	   dst->num_allocated_ops, src->num_ops);
+      //      exit(-1);
+    }
+
     dst->num_ops = src->num_ops;
     memcpy(dst->ops, src->ops, src->num_ops * sizeof(uint32_t));
   } else {
-    cigar_init(dst);
+    cigar_set_zero(dst);
   }
 }
 
@@ -308,6 +434,21 @@ static inline void cigar_copy(cigar_t *dst, cigar_t *src) {
 
 static inline void cigar_revcopy(cigar_t *dst, cigar_t *src) {
   if (src->num_ops > 0) {
+    //check if there is space in dst to copy src
+    if (dst->num_allocated_ops < src->num_ops) {
+      dst->num_allocated_ops = (src->num_ops + (2 * NUM_INITIAL_CIGAR_OPS));
+      uint32_t *aux = malloc(dst->num_allocated_ops * sizeof(uint32_t));
+      memcpy(aux, dst->ops, dst->num_ops * sizeof(uint32_t));
+      if (dst->ops_pointer) {
+	free(dst->ops_pointer);
+      }
+      dst->ops_pointer = aux;
+      dst->ops = dst->ops_pointer;
+      //      printf("cigar_revcopy: dst->num_allocated_ops = %i < src->num_ops = %i)\n", 
+      //	   dst->num_allocated_ops, src->num_ops);
+      //      exit(-1);
+    }
+
     dst->num_ops = src->num_ops;
     for (int i = 0, j = src->num_ops - 1; i < src->num_ops; i++, j--) {
       dst->ops[i] = src->ops[j];
@@ -320,10 +461,12 @@ static inline void cigar_revcopy(cigar_t *dst, cigar_t *src) {
 static inline void cigar_rev(cigar_t *p) {
   if (p->num_ops > 0) {
     cigar_t aux;
+    cigar_init(&aux);
     cigar_copy(&aux, p);
     for (int i = 0, j = p->num_ops - 1; i < p->num_ops; i++, j--) {
       p->ops[i] = aux.ops[j];
     }
+    cigar_clean(&aux);
   }
 }
 
@@ -348,7 +491,7 @@ static inline void cigar_ltrim_ops(int len, cigar_t *p) {
   int num_ops;
   if ((num_ops = p->num_ops) > 0) {
     if (len >= num_ops) {
-      cigar_init(p);
+      cigar_set_zero(p);
     } else {
       num_ops -= len;
       for (int i = 0, j = len; i < num_ops; i++, j++) {
@@ -366,7 +509,7 @@ static inline void cigar_rtrim_ops(int len, cigar_t *p) {
   int num_ops;
   if ((num_ops = p->num_ops) > 0) {
     if (len >= num_ops) {
-      cigar_init(p);
+      cigar_set_zero(p);
     } else {
       p->num_ops -= len;
     }
@@ -410,6 +553,11 @@ typedef struct seed {
   size_t genome_start;
   size_t genome_end;
 
+  size_t suf_read_start;
+  size_t suf_read_end;
+  size_t suf_genome_start;
+  size_t suf_genome_end;
+
   int strand;
   int chromosome_id;
   int num_mismatches;
@@ -431,6 +579,11 @@ static inline seed_t *seed_new(size_t read_start, size_t read_end,
   p->genome_start = genome_start;
   p->genome_end = genome_end;
 
+  p->suf_read_start = read_start;
+  p->suf_read_end = read_end;
+  p->suf_genome_start = genome_start;
+  p->suf_genome_end = genome_end;
+
   p->strand = 0;
   p->chromosome_id = 0;
   p->num_mismatches = 0;
@@ -446,6 +599,210 @@ static inline seed_t *seed_new(size_t read_start, size_t read_end,
 //--------------------------------------------------------------------
 
 void seed_free(seed_t *p);
+
+//--------------------------------------------------------------------
+
+static inline void seed_ltrim_read(int len, seed_t *p) {
+  // look at left-side cigar
+  cigar_t *cigar = &p->cigar;
+  int op_value, op_name;
+  int remain = len, q_trim = 0, r_trim = 0, trim_ops = 0, num_ops = cigar->num_ops;
+
+  for (int i = 0; i < num_ops; i++) {
+    cigar_get_op(i, &op_value, &op_name, cigar);
+
+    if (op_name == '=' || op_name == 'X') {
+
+      if (op_value >= remain) {
+	q_trim += remain;
+	r_trim += remain;
+	cigar_set_op(i, op_value - remain, op_name, cigar);
+	break;
+      } else {
+	q_trim += op_value;
+	r_trim += op_value;
+	remain -= op_value;
+	trim_ops++;
+      }
+
+    } if (op_name == 'I') {
+
+      if (op_value >= remain) {
+	q_trim += remain;
+	cigar_set_op(i, op_value - remain, op_name, cigar);
+	break;
+      } else {
+	q_trim += op_value;
+	remain -= op_value;
+	trim_ops++;
+      }
+
+    } else if (op_name == 'D') {
+
+      r_trim += op_value;
+      trim_ops++;
+
+    }
+  }
+  p->read_start += q_trim;
+  p->genome_start += r_trim;
+  if (trim_ops) {
+    cigar_ltrim_ops(trim_ops, cigar);
+  }
+}
+
+//--------------------------------------------------------------------
+
+static inline void seed_rtrim_read(int len, seed_t *p) {
+  // look at right-side cigar
+  cigar_t *cigar = &p->cigar;
+  int op_value, op_name;
+  int remain = len, q_trim = 0, r_trim = 0, trim_ops = 0, num_ops = cigar->num_ops;
+
+  for (int i = num_ops - 1; i >= 0; i--) {
+    cigar_get_op(i, &op_value, &op_name, cigar);
+
+    if (op_name == '=' || op_name == 'X') {
+
+      if (op_value >= remain) {
+	q_trim += remain;
+	r_trim += remain;
+	cigar_set_op(i, op_value - remain, op_name, cigar);
+	break;
+      } else {
+	q_trim += op_value;
+	r_trim += op_value;
+	remain -= op_value;
+	trim_ops++;
+      }
+
+    } if (op_name == 'I') {
+
+      if (op_value >= remain) {
+	q_trim += remain;
+	cigar_set_op(i, op_value - remain, op_name, cigar);
+	break;
+      } else {
+	q_trim += op_value;
+	remain -= op_value;
+	trim_ops++;
+      }
+
+    } else if (op_name == 'D') {
+
+      r_trim += op_value;
+      trim_ops++;
+
+    }
+  }
+  p->read_end -= q_trim;
+  p->genome_end -= r_trim;
+  if (trim_ops) {
+    cigar_rtrim_ops(trim_ops, cigar);
+  }
+}
+
+//--------------------------------------------------------------------
+
+static inline void seed_ltrim_genome(int len, seed_t *p) {
+  // look at left-side cigar
+  cigar_t *cigar = &p->cigar;
+  int op_value, op_name;
+  int remain = len, q_trim = 0, r_trim = 0, trim_ops = 0, num_ops = cigar->num_ops;
+
+  for (int i = 0; i < num_ops; i++) {
+    cigar_get_op(i, &op_value, &op_name, cigar);
+
+    if (op_name == '=' || op_name == 'X') {
+
+      if (op_value >= remain) {
+	q_trim += remain;
+	r_trim += remain;
+	cigar_set_op(i, op_value - remain, op_name, cigar);
+	break;
+      } else {
+	q_trim += op_value;
+	r_trim += op_value;
+	remain -= op_value;
+	trim_ops++;
+      }
+
+    } if (op_name == 'D') {
+
+      if (op_value >= remain) {
+	q_trim += remain;
+	cigar_set_op(i, op_value - remain, op_name, cigar);
+	break;
+      } else {
+	q_trim += op_value;
+	remain -= op_value;
+	trim_ops++;
+      }
+
+    } else if (op_name == 'I') {
+
+      r_trim += op_value;
+      trim_ops++;
+
+    }
+  }
+  p->read_start += q_trim;
+  p->genome_start += r_trim;
+  if (trim_ops) {
+    cigar_ltrim_ops(trim_ops, cigar);
+  }
+}
+
+//--------------------------------------------------------------------
+
+static inline void seed_rtrim_genome(int len, seed_t *p) {
+  // look at right-side cigar
+  cigar_t *cigar = &p->cigar;
+  int op_value, op_name;
+  int remain = len, q_trim = 0, r_trim = 0, trim_ops = 0, num_ops = cigar->num_ops;
+
+  for (int i = num_ops - 1; i >= 0; i--) {
+    cigar_get_op(i, &op_value, &op_name, cigar);
+
+    if (op_name == '=' || op_name == 'X') {
+
+      if (op_value >= remain) {
+	q_trim += remain;
+	r_trim += remain;
+	cigar_set_op(i, op_value - remain, op_name, cigar);
+	break;
+      } else {
+	q_trim += op_value;
+	r_trim += op_value;
+	remain -= op_value;
+	trim_ops++;
+      }
+
+    } if (op_name == 'D') {
+
+      if (op_value >= remain) {
+	q_trim += remain;
+	cigar_set_op(i, op_value - remain, op_name, cigar);
+	break;
+      } else {
+	q_trim += op_value;
+	remain -= op_value;
+	trim_ops++;
+      }
+
+    } else if (op_name == 'I') {
+
+      r_trim += op_value;
+      trim_ops++;
+
+    }
+  }
+  p->read_end -= q_trim;
+  p->genome_end -= r_trim;
+  if (trim_ops) {
+    cigar_rtrim_ops(trim_ops, cigar);
+  }
+}
 
 //--------------------------------------------------------------------
 // cigarset_t
@@ -505,6 +862,7 @@ typedef struct seed_cal {
   int read_area;
   int invalid;
 
+  int cigar_len;
 
   int num_mismatches;
   int num_open_gaps;
@@ -537,6 +895,8 @@ static inline seed_cal_t *seed_cal_new(const size_t chromosome_id,
   p->read_area = 0;
   p->invalid = 0;
 
+  p->cigar_len = 0;
+
   p->num_mismatches = 0;
   p->num_open_gaps = 0;
   p->num_extend_gaps = 0;
@@ -557,6 +917,28 @@ void seed_cal_free(seed_cal_t *p);
 
 //--------------------------------------------------------------------
 
+static inline void seed_cal_update_info(seed_cal_t *cal) {
+  int read_area = 0, num_mismatches = 0, num_open_gaps = 0, num_extend_gaps = 0;
+  seed_t *seed;
+
+  for (linked_list_item_t *item = cal->seed_list->first; 
+       item != NULL; item = item->next) {
+    seed = item->item;
+    num_mismatches += seed->num_mismatches;
+    num_open_gaps += seed->num_open_gaps;
+    num_extend_gaps += seed->num_extend_gaps;
+    read_area += (seed->read_end - seed->read_start - num_mismatches - num_open_gaps - num_extend_gaps);
+    
+  }
+  cal->num_mismatches = num_mismatches;
+  cal->num_open_gaps = num_open_gaps;
+  cal->num_extend_gaps = num_extend_gaps;
+  cal->num_mismatches = num_mismatches;
+  cal->read_area = read_area;
+}
+
+//--------------------------------------------------------------------
+
 static inline void seed_cal_set_cigar_by_seed(seed_t *seed, seed_cal_t *cal) {
   cal->num_mismatches = seed->num_mismatches;
   cal->num_open_gaps = seed->num_open_gaps;
@@ -565,22 +947,25 @@ static inline void seed_cal_set_cigar_by_seed(seed_t *seed, seed_cal_t *cal) {
 }
 
 //--------------------------------------------------------------------
+void print_seed(char *msg, seed_t *s);
 
 static inline void seed_cal_print(seed_cal_t *cal) {
-  printf(" CAL (%c)[%lu:%lu-%lu] (%s, x:%i, og:%i, eg:%i):\n", 
+  printf(" CAL (%c)[%lu:%lu-%lu] (%s, x:%i, og:%i, eg:%i) score = %0.2f: (read id %s)\n", 
 	 (cal->strand == 0 ? '+' : '-'), 
 	 cal->chromosome_id, cal->start, cal->end, cigar_to_string(&cal->cigar), cal->num_mismatches,
-	     cal->num_open_gaps, cal->num_extend_gaps);
-  printf("\t SEEDS LIST: ");
+	 cal->num_open_gaps, cal->num_extend_gaps, cal->score,
+	 cal->read->id);
+  printf("\tSEEDS LIST:\n");
   if (cal->seed_list == NULL || cal->seed_list->size == 0) {
-    printf(" NULL\n");
+    printf("\t\tno seeds\n");
   } else {
     for (linked_list_item_t *item = cal->seed_list->first; 
 	 item != NULL; item = item->next) {
       seed_t *seed = item->item;
-      printf(" [%lu|%lu - %lu|%lu] (%s, x:%i, og:%i, eg:%i)", seed->genome_start, seed->read_start, 
-	     seed->read_end, seed->genome_end, cigar_to_string(&seed->cigar), seed->num_mismatches,
-	     seed->num_open_gaps, seed->num_extend_gaps);
+      print_seed("\t\t", seed);
+      //      printf(" [%lu|%lu - %lu|%lu] (%s, x:%i, og:%i, eg:%i)", seed->genome_start, seed->read_start, 
+      //	     seed->read_end, seed->genome_end, cigar_to_string(&seed->cigar), seed->num_mismatches,
+      //	     seed->num_open_gaps, seed->num_extend_gaps);
     }
     printf("\n");
   }
@@ -594,20 +979,34 @@ float get_max_score(array_list_t *cal_list);
 int get_min_num_mismatches(array_list_t *cal_list);
 int get_max_read_area(array_list_t *cal_list);
 
+//--------------------------------------------------------------------
+
 void filter_cals_by_min_read_area(int read_area, array_list_t **list);
 void filter_cals_by_max_read_area(int read_area, array_list_t **list);
 void filter_cals_by_max_score(float score, array_list_t **list);
 void filter_cals_by_max_num_mismatches(int num_mismatches, array_list_t **list);
+void filter_cals_by_pair_mode(int pair_mode, int pair_min_distance, int pair_max_distance, 
+			      int num_lists, array_list_t **cal_lists);
+
+//--------------------------------------------------------------------
+
+void create_bam_alignments(array_list_t *cal_list, fastq_read_t *read, 
+		       array_list_t *mapping_list);
 
 void create_alignments(array_list_t *cal_list, fastq_read_t *read, 
-		       array_list_t *mapping_list, sa_mapping_batch_t *mapping_batch);
+		       int bam_format, array_list_t *mapping_list);
+
+//--------------------------------------------------------------------
 
 void display_suffix_mappings(int strand, size_t r_start, size_t suffix_len, 
 			     size_t low, size_t high, sa_index3_t *sa_index);
-void print_seed(char *msg, seed_t *s);
 void display_sequence(uint j, sa_index3_t *index, uint len);
 char *get_subsequence(char *seq, size_t start, size_t len);
 void display_cmp_sequences(fastq_read_t *read, sa_index3_t *sa_index);
+
+//--------------------------------------------------------------------
+
+void complete_pairs(sa_mapping_batch_t *batch);
 
 //--------------------------------------------------------------------
 //--------------------------------------------------------------------

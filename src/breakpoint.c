@@ -317,6 +317,7 @@ int cigar_code_validate_(fastq_read_t *fq_read, cigar_code_t *p) {
     }
     if (op->name == 'M' || 
 	op->name == 'I' || 
+	op->name == 'S' ||
 	op->name == 'H') {
       cigar_len += op->number;
     }
@@ -584,7 +585,11 @@ cigar_code_t *generate_cigar_code(char *query_map, char *ref_map, unsigned int m
     dist += query_start;
     if (ref_type == FIRST_SW) {
       //Normal Case
-      cigar_code_append_op(cigar_op_new(query_start, 'H'), p);
+      if (query_start <= 5) {
+	cigar_code_append_op(cigar_op_new(query_start, 'M'), p);
+      } else {
+	cigar_code_append_op(cigar_op_new(query_start, 'H'), p);
+      }
     } else {
       //Middle or last ref
       if (ref_start == 0) {
@@ -716,7 +721,13 @@ cigar_code_t *generate_cigar_code(char *query_map, char *ref_map, unsigned int m
     if (ref_type == LAST_SW) {
       //Normal Case
       //cigar_code_append_op(cigar_op_new(query_start, 'H'), p);
-      cigar_code_append_op(cigar_op_new(last_h, 'H'), p);
+      if (query_start <= 5) {
+	cigar_code_append_op(cigar_op_new(last_h, 'M'), p);
+      } else {
+	cigar_code_append_op(cigar_op_new(last_h, 'H'), p);
+      }
+
+
     } else {
       //Middle or first ref
       if (map_ref_len == ref_len) {
@@ -972,9 +983,9 @@ linked_list_item_t *__metaexon_insert(linked_list_t* list_p,
 
 //-----------------------------------------------------------------------------
 
-metaexons_t *metaexons_new(genome_t *genome) {
+metaexons_t *metaexons_new(unsigned int num_chromosomes, size_t *chr_size) {
   metaexons_t *metaexons = (metaexons_t *)malloc(sizeof(metaexons_t));
-  unsigned int num_chromosomes = genome->num_chromosomes;
+  //unsigned int num_chromosomes = genome->num_chromosomes;
   size_t num_chunks;
   size_t tot_chunks = 0;
 
@@ -989,8 +1000,8 @@ metaexons_t *metaexons_new(genome_t *genome) {
 
   //(linked_list_t *)calloc(num_chromosomes, sizeof(linked_list_t));
   for (unsigned int i = 0; i < num_chromosomes; i++) {
-    num_chunks = genome->chr_size[i] >> CHUNK_SHIFT;
-    if (genome->chr_size[i] % (int)pow(2, CHUNK_SHIFT) > 0) {
+    num_chunks = chr_size[i] >> CHUNK_SHIFT;
+    if (chr_size[i] % (int)pow(2, CHUNK_SHIFT) > 0) {
       num_chunks++;
     }
     metaexons->metaexons_list[i] =  linked_list_new(COLLECTION_MODE_ASYNCHRONIZED);
@@ -1016,22 +1027,18 @@ metaexons_t *metaexons_new(genome_t *genome) {
 }
 
 void metaexons_free(metaexons_t *metaexons) {
-  return;
-  /*  for (int chr = 0; chr < metaexons->num_chromosomes; chr++) {
-    for (int chk = 0; chk < metaexons->num_chunks[chr]; chk++) {
-      if (metaexons->metaexons_table[chr][chk]) {
-	linked_list_free(metaexons->metaexons_table[chr][chk][0], (void *)metaexon_free);
-	linked_list_free(metaexons->metaexons_table[chr][chk][1], (void *)metaexon_free);
-	  free(metaexons->metaexons_table[chr][chk]);
-      }
-    }
-    free(metaexons->metaexons_table[chr]);
+  for (int i = 0; i < metaexons->num_chromosomes; i++) {
+	linked_list_free(metaexons->metaexons_list[i], (void *)metaexon_free);
+	free(metaexons->bypass_pointer[i]);
   }
-  free(metaexons->metaexons_table);
+
   free(metaexons->num_chunks);
   free(metaexons->mutex);
+  free(metaexons->metaexons_list);
+  free(metaexons->bypass_pointer);
+  
+  free(metaexons);
 
-  free(metaexons);*/
 }
 
 int metaexon_search(unsigned int strand, 
@@ -1133,6 +1140,15 @@ int metaexon_insert(unsigned int strand, unsigned int chromosome,
 		     unsigned char type, void *info_break, 
 		     metaexons_t *metaexons) {
   //Calculating start chunk and end chunk
+  //assert(chromosome <= 25);
+
+  if (end < start) { 
+    printf("META-ERR: %lu - %lu\n", start, end); 
+    exit(-1);
+  }
+
+  //assert(start < end);
+
   int ck_start = start >> CHUNK_SHIFT;
   int ck_end   = end  >> CHUNK_SHIFT;
   int ck;
@@ -1147,7 +1163,7 @@ int metaexon_insert(unsigned int strand, unsigned int chromosome,
   for (ck = ck_start; ck <= ck_end; ck++) {
     if (metaexons->bypass_pointer[chromosome][ck].first) {
       //You have found a reference. Insert metaexon
-      //printf("chunk :%i \n", ck);
+      //printf("chr:%i, chunk :%i \n", chromosome, ck);
       list_item     = metaexons->bypass_pointer[chromosome][ck].first;
       list_item_ref = __metaexon_insert(metaexons->metaexons_list[chromosome],
 					list_item, start, end,
@@ -1182,12 +1198,15 @@ int metaexon_insert(unsigned int strand, unsigned int chromosome,
 	loop_end--;
 	//printf("\tStar end actualization %i\n", ck_end);
 	list_item = metaexons->bypass_pointer[chromosome][ck_end].first;
+	assert(list_item);
 	metaexon  = (metaexon_t *)list_item->item;
+
 	if (metaexon_ref->start <= metaexon->start) {
 	  metaexons->bypass_pointer[chromosome][ck_end].first = list_item_ref;
 	}
 	
 	list_item = metaexons->bypass_pointer[chromosome][ck_end].last;
+	assert(list_item);
 	metaexon  = (metaexon_t *)list_item->item;
 	//printf(" %lu >= %lu ??\n", metaexon_ref->start, metaexon->start);
 	if (metaexon_ref->end >= metaexon->end) {
@@ -1415,37 +1434,31 @@ void metaexons_print_chr(metaexons_t *metaexons, int chr) {
   linked_list_iterator_free(itr); 
 }
 */
-/*
-void metaexons_bypass_print_chr(metaexons_t *metaexons, int chr) {
 
-  for (int i = 0; i < metaexons->num_chunks[chr]; i++) {
-    linked_list_item_t *linked_item_prev = metaexons->bypass_pointer[chr][i][0];
-    linked_list_item_t *linked_item_next = metaexons->bypass_pointer[chr][i][1];
-    printf("(%i)", i);
-    if (linked_item_prev) {
-      printf("[%lu-%lu]", ((metaexon_t *)linked_item_prev->item)->start, 
-	     ((metaexon_t *)linked_item_prev->item)->end);
-    } else {
-      printf("[]");
+void metaexons_print_chr(metaexons_t *metaexons, int chr) {
+  linked_list_t *linked_list = metaexons->metaexons_list[chr];
+  printf("CHROM(%i):\n", chr);
+  if (linked_list->size) {
+    linked_list_item_t *item = linked_list->first;
+    while (item) {
+      printf("[%lu-%lu] ", ((metaexon_t *)item->item)->start, 
+	     ((metaexon_t *)item->item)->end);
+      item = item->next;
     }
-
-    if (linked_item_next) {
-      printf("[%lu-%lu]", ((metaexon_t *)linked_item_next->item)->start, 
-	     ((metaexon_t *)linked_item_next->item)->end);
-    } else {
-      printf("[]");
-    }
-    printf("|");    
+  } else {
+    printf("[]");
   }
-  printf("\n");
+  printf("\n\n");
 }
+
 
 void metaexons_print(metaexons_t *metaexons) {
   for (int i = 0; i < metaexons->num_chromosomes; i++) {    
     metaexons_print_chr(metaexons, i);
   }
 }
-*/
+
+
 //Always return the last metaexon found
 /*
 int metaexon_search(unsigned int strand, unsigned int chromosome,

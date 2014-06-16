@@ -11,7 +11,7 @@ void prepare_paired_alignments(pair_server_input_t *input, mapping_batch_t *batc
 
 //------------------------------------------------------------------------------------
 
-static inline void filter_alignments(char report_all,
+void filter_alignments(char report_all,
 			      size_t report_n_best, 
 			      size_t report_n_hits,
 			      int report_best,
@@ -58,7 +58,7 @@ void prepare_pair_server(pair_server_input_t* input) {
 
 //------------------------------------------------------------------------------------
 
-static inline array_list_t *create_new_list(size_t *valid_items, size_t num_valids, array_list_t *list) {
+array_list_t *create_new_list(size_t *valid_items, size_t num_valids, array_list_t *list) {
   void *item;
   int num = 0;
 
@@ -517,13 +517,25 @@ void update_mispaired_pair(int pair_num, size_t num_items, array_list_t *list) {
     alig->mate_strand = 0;
     alig->pair_num = pair_num;
 
+    // tmp
+    if (num_items == 1) {
+      alig->map_quality = 3;
+    } else if (num_items == 2) {
+      alig->map_quality = 2;
+    } else if (num_items > 2 && num_items < 9) {
+      alig->map_quality = 1;
+    } else {
+      alig->map_quality = 0;
+    }
+
+
 //    printf("update_mispaired_pair = %i\n", alig->template_length);
   }
 }
 
 //------------------------------------------------------------------------------------
 
-static inline void update_mispaired_alignment(int pair_num, alignment_t *alig) {
+void update_mispaired_alignment(int pair_num, alignment_t *alig) {
     // set pair fields
     alig->mate_position = 0;
     alig->mate_chromosome = 0;
@@ -540,8 +552,8 @@ static inline void update_mispaired_alignment(int pair_num, alignment_t *alig) {
 
 //------------------------------------------------------------------------------------
 
-static inline void update_mispaired_pairs(size_t num_items1, size_t num_items2,
-				   array_list_t *list1, array_list_t *list2) {
+void update_mispaired_pairs(size_t num_items1, size_t num_items2,
+			    array_list_t *list1, array_list_t *list2) {
   alignment_t *alig;
   alignment_t *first1 = array_list_get(0, list1);
   alignment_t *first2 = array_list_get(0, list2);
@@ -595,28 +607,6 @@ static inline void update_mispaired_pairs(size_t num_items1, size_t num_items2,
 }
 
 //------------------------------------------------------------------------------------
-typedef struct pair {
-  int index1;
-  int index2;
-  float score;
-} pair_t;
-
-pair_t *pair_new(int index1, int index2, float score) {
-  pair_t *p = (pair_t *) calloc(1, sizeof(pair_t));
-  p->index1 = index1;
-  p->index2 = index2;
-  p->score = score;
-  return p;
-}
-
-void pair_free(pair_t *p) {
-  if (p) 
-    free(p);
-}
-
-
-//------------------------------------------------------------------------------------
-
 
 void prepare_paired_alignments(pair_server_input_t *input, mapping_batch_t *batch) {
 
@@ -854,7 +844,7 @@ void prepare_paired_alignments(pair_server_input_t *input, mapping_batch_t *batc
 	    // report all mappings 
 	    update_mispaired_pairs(num_items1, num_items2, list1, list2);
 	  } else if (best) {
-	    filter_alignments(0, 0, 0, 1, batch->mapping_lists[1]);
+	    filter_alignments(0, 0, 0, 1, batch->mapping_lists[i]);
 	  } else if (n_hits) {
 	    //select n hits from first pair
 	    filter_alignments(0, 0, n_hits, 0, batch->mapping_lists[i]);
@@ -1012,11 +1002,13 @@ static inline void select_best (array_list_t *mapping_list) {
   size_t num_items = array_list_size(mapping_list);
   int max_quality = 0;
   alignment_t *alig;
+  int num_best = 0;
 
   //printf("===============================================================================\n");
   for (int i = 0; i < num_items; i++) {
     alig = array_list_get(i, mapping_list);
-    if (alig->map_quality > max_quality) {
+    if (alig->map_quality >= max_quality) {
+      num_best++;
       max_quality = alig->map_quality;
     }
     //alignment_print(alig);
@@ -1055,11 +1047,11 @@ static inline void select_best (array_list_t *mapping_list) {
 
 //-----------------------------------------------------------------------------
 
-static inline void filter_alignments(char report_all,
-			      size_t report_n_best, 
-			      size_t report_n_hits,
-			      int report_best,
-			      array_list_t *mapping_list) {
+void filter_alignments(char report_all,
+		       size_t report_n_best, 
+		       size_t report_n_hits,
+		       int report_best,
+		       array_list_t *mapping_list) {
 
   size_t num_mappings = array_list_size(mapping_list);
   //printf("filter\n");

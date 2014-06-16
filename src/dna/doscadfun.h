@@ -35,7 +35,8 @@ static inline void alig_out_init(alig_out_t *out) {
   out->gap_open = 0;
   out->gap_extend = 0;
   out->st_map_len = 0;
-  cigar_init(&out->cigar);
+  //  cigar_init(&out->cigar);
+  cigar_set_zero(&out->cigar);
   // 	char *st1_map;	char *st2_map;
 }
 

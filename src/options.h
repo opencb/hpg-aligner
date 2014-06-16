@@ -42,7 +42,7 @@
 #define DEFAULT_PAIR_MIN_DISTANCE	50
 #define DEFAULT_PAIR_MAX_DISTANCE	800
 #define MINIMUM_BATCH_SIZE              10000
-#define DEFAULT_FILTER_READ_MAPPINGS    50
+#define DEFAULT_FILTER_READ_MAPPINGS    500
 #define DEFAULT_FILTER_SEED_MAPPINGS    500
 //new variable for default uses
 #define DEFAULT_NUCLEOTIDES             "ACGT"
@@ -54,9 +54,13 @@
 //#define RNA_MODE 1
 //#define BS_MODE  2
 
+
 #define NUM_OPTIONS			29
-#define NUM_RNA_OPTIONS			 5
+#define NUM_RNA_OPTIONS			 6
 #define NUM_DNA_OPTIONS			 1
+
+//#define NUM_OPTIONS			26
+//#define NUM_RNA_OPTIONS			 6
 
 
 typedef struct options {
@@ -104,6 +108,7 @@ typedef struct options {
   int filter_read_mappings;
   int filter_seed_mappings;
   int bs_index;
+  int fast_mode;
   double min_score;
   double match;
   double mismatch;

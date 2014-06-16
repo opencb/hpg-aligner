@@ -439,7 +439,7 @@ void *file_reader_2(void *input) {
  
     //fastq_read_t *fq_read = file_fastq_read_new(&num_items, fd);
     fastq_read_t *fq_read = file_read_fastq_reads(&num_items, fd);
-    if (fq_read == NULL) { printf("fq NULL\n"); break; }
+    if (fq_read == NULL) { /*printf("fq NULL\n");*/ break; }
     //printf("(num items %i)\nID : %s\nSEQ: %s\nQUA: %s\n", num_items, fq_read->id, fq_read->sequence, fq_read->quality);
 
     array_list_insert(fq_read, reads);
