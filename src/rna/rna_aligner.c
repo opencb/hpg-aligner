@@ -5,22 +5,9 @@
 #define NUM_SECTIONS_TIME 		8
 
 //--------------------------------------------------------------------
-// workflow input                                                                                                                                    //--------------------------------------------------------------------  
+// workflow input                                                                                        //--------------------------------------------------------------------  
 
-void fastq_read_revcomp(fastq_read_t *read) {
-  extern char convert_ASCII[128];
 
-  read->revcomp = (char *)malloc((read->length + 1)*sizeof(char));
-
-  register int i, j;
-
-  for (i = read->length - 1, j = 0; i >= 0; i--, j++) {
-    read->revcomp[j] = convert_ASCII[read->sequence[i]];
-  }
-  
-  read->revcomp[j] = '\0';
-
-}
 
 
 void *write_sam_header_BWT(genome_t *genome, FILE *f) {

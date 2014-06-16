@@ -769,6 +769,7 @@ cigar_code_t *generate_cigar_code(char *query_map, char *ref_map, unsigned int m
   return p;
 }
 
+
 //--------------------------------------------------------------------------------------
 //        M E T A E X O N   S T R U C T U R E S   I M P L E M E N T A T I O N
 //--------------------------------------------------------------------------------------

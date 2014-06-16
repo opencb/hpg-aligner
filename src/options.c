@@ -326,7 +326,7 @@ void options_display(options_t *options) {
        }
        printf("\tMax intron length: %d\n", max_intron_length);
        printf("\tMin intron length: %d\n", min_intron_length);
-       printf("\tMin score        : %d\n", min_score);
+       //printf("\tMin score        : %d\n", min_score);
      }
 
      if (options->realignment || options->recalibration) {

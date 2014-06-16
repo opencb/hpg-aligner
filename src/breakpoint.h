@@ -89,6 +89,11 @@ int cigar_code_validate(int read_length, cigar_code_t *p);
 int cigar_code_validate_(fastq_read_t *fq_read, cigar_code_t *p);
 void cigar_code_update(cigar_code_t *p);
 
+
+//char *cigar_code_find_and_report_sj(size_t start_map, cigar_code_t *cigar_code, 
+//				    int chromosome, int strand, avls_list_t *avls_list,
+//				    metaexons_t *metaexons, genome_t *genome, fastq_read_t *read);
+
 //cigar_code_t *generate_cigar_code(char *query_map, char *ref_map, unsigned int map_len,
 //				  unsigned int query_start, unsigned int query_len, 
 //				  int *distance);
