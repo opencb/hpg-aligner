@@ -23,8 +23,15 @@
 #include <bioformats/bam/alignment.h>
 #include <aligners/bwt/genome.h>
 #include "aux/aux_common.h"
+#include "bfwork/bfwork.h"
 
 #define RECAL_REFERENCE_CORRECTION_OFFSET 1
+
+/**
+ * RECALIBRATION FLAGS
+ */
+#define RECALIBRATE_COLLECT 			0x01
+#define RECALIBRATE_RECALIBRATE 	0x02
 
 /**
  * \brief Recalibration data storage.
@@ -98,6 +105,22 @@ typedef enum DINUC
 	d_X = 16	/* Not a dinucleotide. For example "NT" or "NN".*/
 } DINUCLEOTIDE;
 
+/***********************************************
+ * FRAMEWORK RECALIBRATOR
+ **********************************************/
+
+/**
+ * \brief Recalibrate BAM file
+ *
+ * \param[in] flags Flags for recalibration. Can be RECALIBRATE_COLLECT and RECALIBRATE_RECALIBRATE.
+ * \param[in] bam_path Input BAM file.
+ * \param[in] ref Path to reference 'dna_compression.bin'. OPTIONAL if not RECALIBRATE_COLLECT.
+ * \param[in/out] data_file Path to data file. OPTIONAL, can be input if RECALIBRATE_RECALIBRATE only or output if not.
+ * \param[in] info_file Path to text format of data file. OPTIONAL, if NULL no info file will be written.
+ * \param[in] outbam Output BAM path. OPTIONAL, if NULL no output will be written.
+ * \param[in] cycles Max cycles to recalibrate.
+ */
+EXTERNC ERROR_CODE recal_bam_file(uint8_t flags, char *bam_path, char *ref, char *data_file, char *info_file, char *outbam, int cycles);
 
 /***********************************************
  * DATA MANAGEMENT
@@ -224,7 +247,7 @@ EXTERNC ERROR_CODE recal_get_dinuc(const char A, const char B, U_DINUC *out_dinu
  * \param ref_path Path to reference.
  * \param out_info Data struct to fill.
  */
-EXTERNC ERROR_CODE recal_get_data_from_file(const char *bam_path, const char *ref_name, const char *ref_path, recal_info_t *out_info);
+EXTERNC ERROR_CODE recal_get_data_from_file(const char *bam_path, const char *ref_name, const char *ref_path, recal_info_t *out_info) __ATTR_DEPRECATED;
 
 /**
  * \brief Get recalibration data from BAM file.
@@ -265,7 +288,7 @@ EXTERNC ERROR_CODE recal_get_data_from_bam_alignment(const bam1_t* alig, const g
  * \param bam_info Data struct with recalibration info.
  * \param recal_bam_path Path to output BAM.
  */
-EXTERNC ERROR_CODE recal_recalibrate_bam_file(const char *orig_bam_path, const recal_info_t *bam_info, const char *recal_bam_path);
+EXTERNC ERROR_CODE recal_recalibrate_bam_file(const char *orig_bam_path, const recal_info_t *bam_info, const char *recal_bam_path) __ATTR_DEPRECATED;
 
 /**
  * \brief Recalibrate BAM file and store in file.

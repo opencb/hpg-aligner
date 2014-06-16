@@ -34,6 +34,7 @@
 #include "aux/aux_common.h"
 #include "aux/aux_library.h"
 #include "aux/timestats.h"
+#include "bfwork/bfwork.h"
 #include "alig_region.h"
 
 //VERSION
@@ -48,7 +49,7 @@
 #define ALIG_LIST_COUNT_THRESHOLD_TO_WRITE 500
 
 #define ALIG_REFERENCE_ADDITIONAL_OFFSET 100
-#define ALIG_REFERENCE_CORRECTION_OFFSET 4
+#define ALIG_REFERENCE_CORRECTION_OFFSET 1
 
 #define ALIG_IMPROVEMENT_THREHOLD 0.0
 
@@ -126,6 +127,19 @@ typedef enum {
 	NO_INTERVAL,
 	INTERVAL
 } alig_status;
+
+/***********************************************
+ * FRAMEWORK REALIGNER
+ **********************************************/
+
+/**
+ * \brief Realign around indels BAM file
+ *
+ * \param[in] bam_path Input BAM file.
+ * \param[in] ref_path Path to reference 'dna_compression.bin'.
+ * \param[in] outbam Output BAM path. OPTIONAL, if NULL no output will be written.
+ */
+EXTERNC ERROR_CODE alig_bam_file(char *bam_path, char *ref_path, char *outbam);
 
 /**
  * CONTEXT
@@ -205,7 +219,7 @@ EXTERNC ERROR_CODE alig_region_clear(alig_context_t *context);
  * \param[in] ref_path Path to reference file (not including name).
  * \param[in] outbam Path to output BAM file.
  */
-EXTERNC ERROR_CODE alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam) __ATTR_DEPRECATED;
+EXTERNC ERROR_CODE alig_bam_file_old(char *bam_path, char *ref_name, char *ref_path, char *outbam) __ATTR_DEPRECATED;
 
 /**
  * PRIVATE FUNCTIONS

@@ -21,7 +21,7 @@
 #include "aligner/alig.h"
 
 int align_launch(char *reference, char *bam, char *output);
-ERROR_CODE wander_bam_file(char *bam_path, char *ref_path, char *outbam);
+//ERROR_CODE wander_bam_file(char *bam_path, char *ref_path, char *outbam);
 
 int alig_bam(int argc, char **argv)
 {
@@ -215,81 +215,14 @@ align_launch(char *reference, char *bam, char *output)
 #endif
 	printf("------------\n");
 
-	wander_bam_file(bam, reference, output);
+	alig_bam_file(bam, reference, output);
 
 	stop_log();
 
 	return 0;
 }
 
-int
-realign_wanderer(bam_fwork_t *fwork, bam_region_t *region, bam1_t *read)
-{
-	int i, err;
-
-	//Current region
-	size_t aux_init_pos;
-	size_t aux_end_pos;
-	size_t read_pos;
-
-	assert(fwork);
-	assert(region);
-	assert(read);
-
-	//Filter read
-	if(filter_read(read, FILTER_ZERO_QUAL | FILTER_DIFF_MATE_CHROM | FILTER_NO_CIGAR | FILTER_DEF_MASK))
-	{
-		//Read is not valid for process
-		return WANDER_READ_FILTERED;
-	}
-
-	//Get read position
-	read_pos = read->core.pos;
-
-	//Inside this region?
-	if(region->end_pos != SIZE_MAX)
-	{
-		if(	region->chrom != read->core.tid
-				|| region->end_pos < read->core.pos)
-		{
-			//Not in window region
-			return WANDER_REGION_CHANGED;
-		}
-	}
-
-	//Get interval for this alignment
-	err = region_get_from_bam1(read, &aux_init_pos, &aux_end_pos);
-	if(err)
-	{
-		LOG_ERROR_F("Trying to get region from invalid read: %s\n", bam1_qname(read));
-		return INVALID_INPUT_BAM;
-	}
-
-	//This alignment have an interval?
-	if(aux_init_pos != SIZE_MAX && aux_end_pos != SIZE_MAX)
-	{
-		//Interval found
-
-		//Update region chrom
-		region->chrom = read->core.tid;
-
-		//Update region start position
-		if(region->init_pos == SIZE_MAX || region->init_pos > aux_init_pos)
-		{
-			region->init_pos = aux_init_pos;
-		}
-
-		//Update region end position
-		if(region->end_pos == SIZE_MAX || region->end_pos < aux_end_pos)
-		{
-			region->end_pos = aux_end_pos;
-		}
-	}
-
-	return NO_ERROR;
-}
-
-int
+/*int
 dummy_processor(bam_fwork_t *fwork, bam_region_t *region)
 {
 	int i;
@@ -331,63 +264,8 @@ dummy_processor(bam_fwork_t *fwork, bam_region_t *region)
 
 	return NO_ERROR;
 }
-
-int
-realigner_processor(bam_fwork_t *fwork, bam_region_t *region)
-{
-	int err;
-	alig_context_t context;
-	bam1_t **v_reads;
-	size_t v_reads_l;
-
-	//Create contexts
-	omp_set_lock(&fwork->reference_lock);
-	alig_init(&context, fwork->reference, ALIG_LEFT_ALIGN | ALIG_REFERENCE_PRIORITY);
-	omp_unset_lock(&fwork->reference_lock);
-
-	//Load region reads in aligner context
-	v_reads = region->reads;
-	v_reads_l = region->size;
-	err = alig_region_next(v_reads, v_reads_l, 1, &context);
-	if(err && err != ALIG_INCOMPLETE_INTERVAL)
-	{
-		LOG_ERROR_F("Cannot obtain next region in aligner, error code = %d\n", err);
-		return err;
-	}
-
-	//Load reference for this region
-	omp_set_lock(&fwork->reference_lock);
-	err = alig_region_load_reference(&context);
-	omp_unset_lock(&fwork->reference_lock);
-	if(err)
-	{
-		LOG_ERROR_F("Loading reference sequence, error code = %d\n", err);
-		return err;
-	}
-
-	//Obtain haplotypes
-	err = alig_region_haplotype_process(&context);
-	if(err)
-	{
-		LOG_ERROR_F("Obtaining haplotypes, error code = %d\n", err);
-		return err;
-	}
-
-	//Realign
-	err = alig_region_indel_realignment(&context);
-	if(err)
-	{
-		LOG_ERROR_F("Realigning, error code = %d\n", err);
-		return err;
-	}
-
-	//Destroy region
-	alig_destroy(&context);
-
-	return NO_ERROR;
-}
-
-void
+*/
+/*void
 reduce_reads_dummy(void *data, void *dest)
 {
 	size_t *s_data, *s_dest;
@@ -400,9 +278,9 @@ reduce_reads_dummy(void *data, void *dest)
 
 	//Add
 	*s_dest += *s_data;
-}
+}*/
 
-static inline ERROR_CODE
+/*static inline ERROR_CODE
 wander_bam_file_dummy(bam_fwork_t *fwork, const char *in, const char *out, const char *ref)
 {
 	bfwork_context_t context;
@@ -461,54 +339,9 @@ wander_bam_file_dummy(bam_fwork_t *fwork, const char *in, const char *out, const
 	bfwork_context_destroy(&context);
 
 	return NO_ERROR;
-}
+}*/
 
-static inline ERROR_CODE
-wander_bam_file_realigner(bam_fwork_t *fwork, const char *in, const char *out, const char *ref)
-{
-	bfwork_context_t context;
-
-	assert(fwork);
-	assert(in);
-	assert(ref);
-
-	//Init wandering
-	bfwork_init(fwork);
-
-	//Create realigner context
-	bfwork_context_init(&context,
-			(int (*)(void *, bam_region_t *, bam1_t *))realign_wanderer,
-			(int (*)(void *, bam_region_t *))realigner_processor);
-
-#ifdef D_TIME_DEBUG
-	//Init timing
-	bfwork_context_init_timing(&context, "realigner");
-#endif
-
-	//Configure wanderer
-	bfwork_configure(fwork, in, out, ref, &context);
-
-	//Run wander
-	bfwork_run(fwork);
-
-#ifdef D_TIME_DEBUG
-	//Print times
-	bfwork_context_print_times(&context);
-
-	//Destroy wanderer time
-	bfwork_context_destroy_timing(&context);
-#endif
-
-	//Destroy wanderer
-	bfwork_destroy(fwork);
-
-	//Destroy context
-	bfwork_context_destroy(&context);
-
-	return NO_ERROR;
-}
-
-ERROR_CODE
+/*ERROR_CODE
 wander_bam_file(char *bam_path, char *ref_path, char *outbam)
 {
 	//Times
@@ -523,9 +356,6 @@ wander_bam_file(char *bam_path, char *ref_path, char *outbam)
 	//Dummy wandering
 	//wander_bam_file_dummy(&fwork, bam_path, outbam, ref_path);
 
-	//Realigner wandering
-	wander_bam_file_realigner(&fwork, bam_path, outbam, ref_path);
-
 	return NO_ERROR;
-}
+}*/
 
