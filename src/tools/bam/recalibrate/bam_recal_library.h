@@ -33,6 +33,12 @@
 #define RECALIBRATE_COLLECT 			0x01
 #define RECALIBRATE_RECALIBRATE 	0x02
 
+//VERSION
+#define RECAL_VER_CURRENT		"1"
+#define RECAL_VER_REVISION		"0"
+#define RECAL_VER_AGE			"0"
+#define RECAL_VER 			RECAL_VER_CURRENT"."RECAL_VER_REVISION"."RECAL_VER_AGE
+
 /**
  * \brief Recalibration data storage.
  *

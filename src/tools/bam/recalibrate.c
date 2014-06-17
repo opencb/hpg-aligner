@@ -43,9 +43,10 @@ int mymain(	int full,
 			const char *datafile, 
 			int datacount,
 			const char *infofile,
-			int infocount,
-			const char *compfile,
-			int compcount)
+			int infocount
+			//const char *compfile,
+			//int compcount
+			)
 {	
 	char *refc, *inputc, *outputc, *infofilec, *datafilec;
 	char *sched;
@@ -89,9 +90,9 @@ int mymain(	int full,
 	}
 	
 	//Default case: No phase selected
-    if (!full && !p1 && !p2 && !compcount)
+    if (!full && !p1 && !p2)
     {
-		printf("No recalibration phase specified or comparation, executing full recalibration.\n");
+		printf("No recalibration phase specified, executing full recalibration.\n");
 		full = 1;
 	}
 
@@ -235,13 +236,13 @@ int recalibrate_bam(int argc, char **argv)
     struct arg_file *outfile = arg_file0("o",NULL,"<output>","output recalibrated BAM file, default:\"output.bam\"");
     struct arg_file *datafile = arg_file0("d",NULL,"<data>","data file containing recalibration information");
     struct arg_file *infofile = arg_file0("i",NULL,"<info>","info file (human readable) containing recalibration information");
-    struct arg_file *compfile = arg_file0("c",NULL,"<compfile>","bam file to compare with recalibrated bam");
+    //struct arg_file *compfile = arg_file0("c",NULL,"<compfile>","bam file to compare with recalibrated bam");
     struct arg_lit  *help    = arg_lit0("h","help","print this help and exit");
     struct arg_lit  *version = arg_lit0(NULL,"version","print version information and exit");
     struct arg_end  *end     = arg_end(20);
     
-    void* argtable[] = {full,phase1,phase2,cycles,threads,refile,infile,outfile,datafile,infofile,compfile,help,version,end};
-    const char* progname = "hpg-bam recalibrate";
+    void* argtable[] = {full,phase1,phase2,cycles,threads,refile,infile,outfile,datafile,infofile,help,version,end};
+    const char* progname = "hpg-bam recalibrate v"RECAL_VER;
     int nerrors;
     int exitcode=0;
 
@@ -340,9 +341,10 @@ int recalibrate_bam(int argc, char **argv)
 						datafile->filename[0],
 						datafile->count,
 						infofile->filename[0],
-						infofile->count,
-						compfile->filename[0],
-						compfile->count);
+						infofile->count
+						//compfile->filename[0],
+						//compfile->count
+						);
 
     exit:
     /* deallocate each non-null entry in argtable[] */
