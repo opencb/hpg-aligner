@@ -2195,7 +2195,9 @@ int sa_rna_mapper(void *data) {
   seed_region_t *seed_prev, *seed_next, *s_prev;
   int num_sa_alignments;
   float cals_score[2048];
-    
+
+  char *read_quality_rev = NULL;
+
   //printf("****************** Batch ******************\n");
   for (int r = 0; r < num_reads; r++) {
     delete_targets[r] = 0;
@@ -2286,6 +2288,10 @@ int sa_rna_mapper(void *data) {
 	n_alig = MAX_ALIG;
       }
 
+      if (n_alig > 0 && !read_quality_rev) {
+	read_quality_rev = str_reverse(read->quality);
+      }
+
       size_t suff = low_n;
       for (size_t a = 0; a < n_alig; a++, suff++) {
 
@@ -2298,7 +2304,7 @@ int sa_rna_mapper(void *data) {
 	alignment = alignment_new();
 	alignment_init_single_end(strdup(read->id), 
 				  strdup(read->revcomp), 
-				  strdup(read->quality), 
+				  strdup(read_quality_rev),
 				  1, chrom + 1,
 				  g_start, 
 				  strdup(cigar_str), 
@@ -2946,10 +2952,20 @@ int sa_rna_mapper(void *data) {
 	char *cigar_str = cigar_code_find_and_report_sj(cal->start - 1, sa_alignment->c_final, cal->chromosome_id, 
 							cal->strand, avls_list, metaexons, genome, read);	
 
+	char *quality_tmp;
+	if (cal->strand) {
+	  if (!read_quality_rev) {
+	    read_quality_rev = str_reverse(read->quality);
+	  }
+	  quality_tmp = read_quality_rev;
+	} else {
+	  quality_tmp = read->quality;
+	}
+
 	alignment_t *alignment = alignment_new();
 	alignment_init_single_end(strdup(read->id), 
 				  strdup(read->sequence), 
-				  strdup(read->quality),
+				  strdup(quality_tmp),
 				  cal->strand, 
 				  cal->chromosome_id,
 				  cal->start - 1,        
@@ -3006,10 +3022,20 @@ int sa_rna_mapper(void *data) {
 	    char *cigar_str = cigar_code_find_and_report_sj(cal->start - 1, sa_alignment->c_final, cal->chromosome_id, 
 							    cal->strand, avls_list, metaexons, genome, read);	
 
+	    char *quality_tmp;
+	    if (cal->strand) {
+	      if (!read_quality_rev) {
+		read_quality_rev = str_reverse(read->quality);
+	      }
+	      quality_tmp = read_quality_rev;
+	    } else {
+	      quality_tmp = read->quality;
+	    }
+
 	    alignment_t *alignment = alignment_new();
 	    alignment_init_single_end(strdup(read->id), 
 				      strdup(read->sequence), 
-				      strdup(read->quality),
+				      strdup(quality_tmp),
 				      cal->strand, 
 				      cal->chromosome_id,
 				      cal->start - 1,
@@ -3135,8 +3161,8 @@ int sa_rna_mapper(void *data) {
     array_list_free(sa_alignments_list[r], (void *)NULL);
     array_list_clear(target_cals, (void *)NULL);
 
-    //Fill optional flags
-    
+    free(read_quality_rev);
+    read_quality_rev = NULL;
     
   } //End for reads
   
@@ -3214,8 +3240,9 @@ int sa_rna_mapper_last(void *data) {
   sw_depth.depth = 0;
 
   //metaexons_print(metaexons);
-
   //printf("||======= SECOND WORKFLOW =========||\n");
+
+  char *read_quality_rev = NULL;
   
   for (int r = 0; r < num_reads; r++) {
     fastq_read_t *read = array_list_get(r, sa_batch->fq_reads);
@@ -3491,10 +3518,20 @@ int sa_rna_mapper_last(void *data) {
 	char *cigar_str = cigar_code_find_and_report_sj(cal->start - 1, sa_alignment->c_final, cal->chromosome_id, 
 							cal->strand, avls_list, metaexons, genome, read);	
 
+	char *quality_tmp;
+	if (cal->strand) {
+	  if (!read_quality_rev) {
+	    read_quality_rev = str_reverse(read->quality);
+	  }
+	  quality_tmp = read_quality_rev;
+	} else {
+	  quality_tmp = read->quality;
+	}
+
 	alignment_t *alignment = alignment_new();
 	alignment_init_single_end(strdup(read->id), 
 				  strdup(read->sequence), 
-				  strdup(read->quality),
+				  strdup(quality_tmp),
 				  cal->strand, 
 				  cal->chromosome_id,
 				  cal->start - 1,
@@ -3609,10 +3646,20 @@ int sa_rna_mapper_last(void *data) {
 	      char *cigar_str = cigar_code_find_and_report_sj(cal_tmp->start, cc_aux, cal_tmp->chromosome_id, 
 							      cal_tmp->strand, avls_list, metaexons, genome, read);	
 
+	      char *quality_tmp;
+	      if (cal_tmp->strand) {
+		if (!read_quality_rev) {
+		  read_quality_rev = str_reverse(read->quality);
+		}
+		quality_tmp = read_quality_rev;
+	      } else {
+		quality_tmp = read->quality;
+	      }
+
 	      alignment_t *alignment = alignment_new();
 	      alignment_init_single_end(strdup(read->id), 
 					strdup(read->sequence), 
-					strdup(read->quality),
+					strdup(quality_tmp),
 					cal_tmp->strand, 
 					cal_tmp->chromosome_id,
 					cal_tmp->start,
@@ -3683,10 +3730,20 @@ int sa_rna_mapper_last(void *data) {
 	      char *cigar_str = cigar_code_find_and_report_sj(cal_tmp->start, cc_aux, cal_tmp->chromosome_id, 
 							      cal_tmp->strand, avls_list, metaexons, genome, read);	
 
+	      char *quality_tmp;
+	      if (cal_tmp->strand) {
+		if (!read_quality_rev) {
+		  read_quality_rev = str_reverse(read->quality);
+		}
+		quality_tmp = read_quality_rev;
+	      } else {
+		quality_tmp = read->quality;
+	      }
+
 	      alignment_t *alignment = alignment_new();
 	      alignment_init_single_end(strdup(read->id), 
 					strdup(read->sequence), 
-					strdup(read->quality),
+					strdup(quality_tmp),
 					cal_tmp->strand, 
 					cal_tmp->chromosome_id,
 					cal_tmp->start,
@@ -4282,10 +4339,20 @@ int sa_rna_mapper_last(void *data) {
 	  char *cigar_str = cigar_code_find_and_report_sj(cal_prev->start - 1, sa_alignment->c_final, cal_prev->chromosome_id, 
 							  cal_prev->strand, avls_list, metaexons, genome, read);	
 
+	  char *quality_tmp;
+	  if (cal_prev->strand) {
+	    if (!read_quality_rev) {
+	      read_quality_rev = str_reverse(read->quality);
+	    }
+	    quality_tmp = read_quality_rev;
+	  } else {
+	    quality_tmp = read->quality;
+	  }
+
 	  alignment_t *alignment = alignment_new();
 	  alignment_init_single_end(strdup(read->id), 
 				    strdup(read->sequence), 
-				    strdup(read->quality),
+				    strdup(quality_tmp),
 				    cal_prev->strand,
 				    cal_prev->chromosome_id,
 				    cal_prev->start - 1,
@@ -4329,6 +4396,9 @@ int sa_rna_mapper_last(void *data) {
 
     array_list_free(sa_batch->mapping_lists[r], (void *)NULL);
     sa_batch->mapping_lists[r] = alignments_list_aux;
+
+    free(read_quality_rev);
+    read_quality_rev = NULL;
     
   } //End reads 
 
