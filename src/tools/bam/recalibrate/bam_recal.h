@@ -12,8 +12,6 @@
 #include "recalibrate/recal_config.h"
 #include "bam_recal_library.h"
 
-
-
 #include "recal_structs.h"
 
 /***********************************************

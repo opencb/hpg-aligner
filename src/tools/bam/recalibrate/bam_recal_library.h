@@ -125,8 +125,9 @@ typedef enum DINUC
  * \param[in] info_file Path to text format of data file. OPTIONAL, if NULL no info file will be written.
  * \param[in] outbam Output BAM path. OPTIONAL, if NULL no output will be written.
  * \param[in] cycles Max cycles to recalibrate.
+ * \param[in] stats_path Path to timing stats output folder. OPTIONAL, if NULL no timing output will be written.
  */
-EXTERNC ERROR_CODE recal_bam_file(uint8_t flags, char *bam_path, char *ref, char *data_file, char *info_file, char *outbam, int cycles);
+EXTERNC ERROR_CODE recal_bam_file(uint8_t flags, const char *bam_path, const char *ref, const char *data_file, const char *info_file, const char *outbam, int cycles, const char *stats_path);
 
 /***********************************************
  * DATA MANAGEMENT

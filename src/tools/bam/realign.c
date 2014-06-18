@@ -20,21 +20,22 @@
 #include "bfwork/bfwork.h"
 #include "aligner/alig.h"
 
-int align_launch(char *reference, char *bam, char *output);
+int align_launch(const char *reference, const char *bam, const char *output, const char *stats_path);
 //ERROR_CODE wander_bam_file(char *bam_path, char *ref_path, char *outbam);
 
 int alig_bam(int argc, char **argv)
 {
-	char *refc, *bamc, *outputc;
+	char *refc, *bamc, *outputc, *statsc;
 
     struct arg_file *refile = arg_file0("r",NULL,"<reference>","reference genome compressed file (dna_compression.bin)");
     struct arg_file *infile = arg_file0("b",NULL,"<input>","input BAM file");
     struct arg_file *outfile = arg_file0("o",NULL,"<output>","output processed BAM file");
+    struct arg_file *stats = arg_file0("s",NULL,"<stats>","folder to store timing stats");
     struct arg_lit  *help    = arg_lit0("h","help","print this help and exit");
     struct arg_lit  *version = arg_lit0(NULL,"version","print version information and exit");
     struct arg_end  *end     = arg_end(20);
 
-    void* argtable[] = {refile,infile,outfile,help,version,end};
+    void* argtable[] = {refile,infile,outfile,stats,help,version,end};
     const char* progname = "hpg-bam realign v"ALIG_VER;
     int nerrors;
     int exitcode=0;
@@ -165,9 +166,13 @@ int alig_bam(int argc, char **argv)
 	if(refile->count > 0)
 		refc = strdup(refile->filename[0]);
 
+	statsc = NULL;
+	if(stats->count > 0)
+		statsc = strdup(stats->filename[0]);
+
     /* normal case: realignment */
 	{
-		exitcode = align_launch(	refc, bamc, outputc);
+		exitcode = align_launch(	refc, bamc, outputc, statsc);
 	}
 
 	if(bamc)
@@ -176,6 +181,8 @@ int alig_bam(int argc, char **argv)
 		free(outputc);
 	if(refc)
 		free(refc);
+	if(statsc)
+		free(statsc);
 
     exit:
     /* deallocate each non-null entry in argtable[] */
@@ -185,7 +192,7 @@ int alig_bam(int argc, char **argv)
 }
 
 int
-align_launch(char *reference, char *bam, char *output)
+align_launch(const char *reference, const char *bam, const char *output, const char *stats_path)
 {
 	int err, threads;
 	char *sched;
@@ -215,7 +222,7 @@ align_launch(char *reference, char *bam, char *output)
 #endif
 	printf("------------\n");
 
-	alig_bam_file(bam, reference, output);
+	alig_bam_file(bam, reference, output, stats_path);
 
 	stop_log();
 

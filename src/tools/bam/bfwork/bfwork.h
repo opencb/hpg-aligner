@@ -243,8 +243,9 @@ static int bfwork_context_local_user_data_free(bfwork_context_t *context, void (
  *
  * \param[in] context Target context to activate timing.
  * \param[in] tag Tag to be used in output file. OPTIONAL.
+ * \param[in] path_folder Folder where store stats. OPTIONAL.
  */
-EXTERNC int bfwork_context_init_timing(bfwork_context_t *context, const char *tag);
+EXTERNC int bfwork_context_init_timing(bfwork_context_t *context, const char *tag, const char *path_folder);
 
 /**
  * \brief Destroy timing of a context.

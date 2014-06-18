@@ -186,7 +186,7 @@ destroy_data(void *data)
  * Recalibrate BAM file
  */
 ERROR_CODE
-recal_bam_file(uint8_t flags, char *bam_path, char *ref, char *data_file, char *info_file, char *outbam, int cycles)
+recal_bam_file(uint8_t flags, const char *bam_path, const char *ref, const char *data_file, const char *info_file, const char *outbam, int cycles, const char *stats_path)
 {
 	int bytes;
 
@@ -230,7 +230,7 @@ recal_bam_file(uint8_t flags, char *bam_path, char *ref, char *data_file, char *
 
 #ifdef D_TIME_DEBUG
 		//Init timing
-		bfwork_context_init_timing(&context, "collect");
+		bfwork_context_init_timing(&context, "collect", stats_path);
 #endif
 
 		//Set user data
@@ -309,7 +309,7 @@ recal_bam_file(uint8_t flags, char *bam_path, char *ref, char *data_file, char *
 
 #ifdef D_TIME_DEBUG
 		//Init timing
-		bfwork_context_init_timing(&context, "recalibrate");
+		bfwork_context_init_timing(&context, "recalibrate", stats_path);
 #endif
 
 		//Set context user data

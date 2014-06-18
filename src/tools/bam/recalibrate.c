@@ -43,12 +43,12 @@ int mymain(	int full,
 			const char *datafile, 
 			int datacount,
 			const char *infofile,
-			int infocount
-			//const char *compfile,
-			//int compcount
+			int infocount,
+			const char *stats,
+			int statscount
 			)
 {	
-	char *refc, *inputc, *outputc, *infofilec, *datafilec;
+	char *refc, *inputc, *outputc, *infofilec, *datafilec, *statsc;
 	char *sched;
 	char cwd[1024];
 	
@@ -176,26 +176,31 @@ int mymain(	int full,
 
 	//Output BAM
 	outputc = NULL;
-	if(output)
+	if(outcount > 0)
 		outputc = strdup(output);
+
+	//Stats path
+	statsc = NULL;
+	if(statscount > 0)
+		statsc = strdup(stats);
 
 	//Recalibrate
 	if(p1 && p2)
 	{
 		printf("Full recalibration\n");
-		recal_bam_file(RECALIBRATE_COLLECT | RECALIBRATE_RECALIBRATE, inputc, refc, datafilec, infofilec, outputc, cycles);
+		recal_bam_file(RECALIBRATE_COLLECT | RECALIBRATE_RECALIBRATE, inputc, refc, datafilec, infofilec, outputc, cycles, statsc);
 	}
 	else
 	{
 		if(p1)
 		{
 			printf("Phase 1 recalibration\n");
-			recal_bam_file(RECALIBRATE_COLLECT, inputc, refc, datafilec, infofilec, outputc, cycles);
+			recal_bam_file(RECALIBRATE_COLLECT, inputc, refc, datafilec, infofilec, outputc, cycles, statsc);
 		}
 		else
 		{
 			printf("Phase 2 recalibration\n");
-			recal_bam_file(RECALIBRATE_RECALIBRATE, inputc, refc, datafilec, infofilec, outputc, cycles);
+			recal_bam_file(RECALIBRATE_RECALIBRATE, inputc, refc, datafilec, infofilec, outputc, cycles, statsc);
 		}
 	}
 	if(inputc)
@@ -208,6 +213,8 @@ int mymain(	int full,
 		free(datafilec);
 	if(infofilec)
 		free(infofilec);
+	if(statsc)
+		free(statsc);
 	
 	stop_log();
 
@@ -236,12 +243,12 @@ int recalibrate_bam(int argc, char **argv)
     struct arg_file *outfile = arg_file0("o",NULL,"<output>","output recalibrated BAM file, default:\"output.bam\"");
     struct arg_file *datafile = arg_file0("d",NULL,"<data>","data file containing recalibration information");
     struct arg_file *infofile = arg_file0("i",NULL,"<info>","info file (human readable) containing recalibration information");
-    //struct arg_file *compfile = arg_file0("c",NULL,"<compfile>","bam file to compare with recalibrated bam");
+    struct arg_file *stats = arg_file0("s",NULL,"<stats>","folder to store timing stats");
     struct arg_lit  *help    = arg_lit0("h","help","print this help and exit");
     struct arg_lit  *version = arg_lit0(NULL,"version","print version information and exit");
     struct arg_end  *end     = arg_end(20);
     
-    void* argtable[] = {full,phase1,phase2,cycles,threads,refile,infile,outfile,datafile,infofile,help,version,end};
+    void* argtable[] = {full,phase1,phase2,cycles,threads,refile,infile,outfile,datafile,infofile,stats,help,version,end};
     const char* progname = "hpg-bam recalibrate v"RECAL_VER;
     int nerrors;
     int exitcode=0;
@@ -341,9 +348,9 @@ int recalibrate_bam(int argc, char **argv)
 						datafile->filename[0],
 						datafile->count,
 						infofile->filename[0],
-						infofile->count
-						//compfile->filename[0],
-						//compfile->count
+						infofile->count,
+						stats->filename[0],
+						stats->count
 						);
 
     exit:

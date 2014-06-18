@@ -139,7 +139,7 @@ typedef enum {
  * \param[in] ref_path Path to reference 'dna_compression.bin'.
  * \param[in] outbam Output BAM path. OPTIONAL, if NULL no output will be written.
  */
-EXTERNC ERROR_CODE alig_bam_file(char *bam_path, char *ref_path, char *outbam);
+EXTERNC ERROR_CODE alig_bam_file(const char *bam_path, const char *ref_path, const char *outbam, const char *stats_path);
 
 /**
  * CONTEXT

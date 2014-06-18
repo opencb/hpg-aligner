@@ -168,7 +168,7 @@ realigner_processor(bam_fwork_t *fwork, bam_region_t *region)
  * Realign around indels BAM file
  */
 ERROR_CODE
-alig_bam_file(char *bam_path, char *ref_path, char *outbam)
+alig_bam_file(const char *bam_path, const char *ref_path, const char *outbam, const char *stats_path)
 {
 	//Times
 	double times;
@@ -190,7 +190,7 @@ alig_bam_file(char *bam_path, char *ref_path, char *outbam)
 
 #ifdef D_TIME_DEBUG
 	//Init timing
-	bfwork_context_init_timing(&context, "realigner");
+	bfwork_context_init_timing(&context, "realigner", stats_path);
 #endif
 
 	//Configure wanderer

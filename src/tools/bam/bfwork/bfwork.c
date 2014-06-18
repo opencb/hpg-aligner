@@ -14,6 +14,7 @@
 * You should have received a copy of the GNU General Public License
 * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
+ #include <errno.h>
 
 #include "bfwork.h"
 
@@ -657,8 +658,9 @@ bfwork_context_set_user_data(bfwork_context_t *context, void *user_data)
  * Initialize and activate timing of a context.
  */
 int
-bfwork_context_init_timing(bfwork_context_t *context, const char *tag)
+bfwork_context_init_timing(bfwork_context_t *context, const char *tag, const char *path_folder)
 {
+	int err;
 	char *sched;
 	char filename[100];
 	char intaux[20];
@@ -678,52 +680,52 @@ bfwork_context_init_timing(bfwork_context_t *context, const char *tag)
 	//Get OMP schedule
 	sched = getenv("OMP_SCHEDULE");
 
-	//Get working dir
-	if (getcwd(cwd, sizeof(cwd)) != NULL)
+	//Target folder for stats?
+	if(path_folder != NULL)
 	{
-		printf("Current working dir: %s\n", cwd);
-	}
-	else
-	{
-		perror("WARNING: getcwd() dont work\n");
-	}
+		strcpy(filename, path_folder);
 
-	strcpy(filename, cwd);
-	strcat(filename,"/stats/");
+		//Create stats directory
+		err = mkdir(filename, S_IRWXU);
+		if(err)
+		{
+			err = errno;
+			LOG_WARN_F("Failed to create stats directory \"%s\", error code: %s\n", filename, strerror(err));
+		}
 
-	//Create stats directory
-	mkdir(filename, S_IRWXU);
+		strcat(filename, "/");
+		if(tag)
+		{
+			strcat(filename,tag);
+		}
+		if(sched)
+		{
+			strcat(filename,"_");
+			strcat(filename,sched);
+		}
+		else
+		{
+			printf("ERROR: Obtaining OMP_SCHEDULE environment value\n");
+		}
 
-	if(tag)
-	{
-		strcat(filename,tag);
-	}
-	if(sched)
-	{
-		strcat(filename,"_");
-		strcat(filename,sched);
-	}
-	else
-	{
-		printf("ERROR: Obtaining OMP_SCHEDULE environment value\n");
-	}
+		//strcat(filename,"_");
+		//sprintf(intaux, "%d", MAX_BATCH_SIZE);
+		//strcat(filename, intaux);
+		strcat(filename, "_");
+		sprintf(intaux, "%d", omp_get_max_threads());
+		strcat(filename, intaux);
+		strcat(filename, ".stats");
 
-	//strcat(filename,"_");
-	//sprintf(intaux, "%d", MAX_BATCH_SIZE);
-	//strcat(filename, intaux);
-	strcat(filename, "_");
-	sprintf(intaux, "%d", omp_get_max_threads());
-	strcat(filename, intaux);
-	strcat(filename, ".stats");
+		//Set output file
+		if(time_set_output_file(filename, context->time_stats))
+		{
+			LOG_ERROR_F("Failed to set timing file output to \"%s\"\n", filename);
+		}
+		else
+		{
+			printf("STATISTICS ACTIVATED, output file: %s\n\n", filename);
+		}
 
-	//Set output file
-	if(time_set_output_file(filename, context->time_stats))
-	{
-		LOG_ERROR_F("Failed to set timing file output to \"%s\"\n", filename);
-	}
-	else
-	{
-		printf("STATISTICS ACTIVATED, output file: %s\n\n", filename);
 	}
 
 	return NO_ERROR;
