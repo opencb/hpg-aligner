@@ -157,7 +157,7 @@ recalibrate_recalibrate_processor(bam_fwork_t *fwork, bam_region_t *region)
 }
 
 void
-reduce_data(void *data, void *dest)
+reduce_data(void *dest, void *data)
 {
 	recal_info_t *data_ptr, *dest_ptr;
 	assert(data);
@@ -169,6 +169,10 @@ reduce_data(void *data, void *dest)
 
 	//Combine
 	recal_reduce_info(dest_ptr, data_ptr);
+
+	//Delta processing
+	recal_calc_deltas(dest_ptr);
+	//printf("Estimated %.2f \tEmpirical %.2f \t TotalDelta %.2f\n", dest_ptr->total_estimated_Q, dest_ptr->total_delta + dest_ptr->total_estimated_Q, dest_ptr->total_delta);
 }
 
 void
@@ -200,7 +204,8 @@ recal_bam_file(uint8_t flags, const char *bam_path, const char *ref, const char 
 
 	//Wanderer
 	bam_fwork_t fwork;
-	bfwork_context_t context;
+	bfwork_context_t collect_context;
+	bfwork_context_t recal_context;
 
 	assert(bam_path);
 
@@ -215,74 +220,59 @@ recal_bam_file(uint8_t flags, const char *bam_path, const char *ref, const char 
 	aux_cycles = cycles;
 	recal_init_info(aux_cycles, &info);
 
+	//Init wandering
+	bfwork_init(&fwork);
+
+	//Configure framework
+	bfwork_configure(&fwork, bam_path, outbam, ref, NULL);
+
 	//Collection is needed?
 	if(flags & RECALIBRATE_COLLECT)
 	{
 		assert(ref);
 
-		//Init wandering
-		bfwork_init(&fwork);
-
 		//Create data collection context
-		bfwork_context_init(&context,
+		bfwork_context_init(&collect_context,
 				(int (*)(void *, bam_region_t *, bam1_t *))recalibrate_wanderer,
-				(int (*)(void *, bam_region_t *))recalibrate_collect_processor);
+				(int (*)(void *, bam_region_t *))recalibrate_collect_processor,
+				(int (*)(void *, void *))reduce_data,
+				&info
+		);
 
 #ifdef D_TIME_DEBUG
 		//Init timing
-		bfwork_context_init_timing(&context, "collect", stats_path);
+		bfwork_context_init_timing(&collect_context, "collect", stats_path);
 #endif
 
 		//Set user data
 		cycles_param = cycles;
-		bfwork_context_set_user_data(&context, &cycles_param);
+		bfwork_context_set_user_data(&collect_context, &cycles_param);
 
-		//Configure wanderer for data collection
-		bfwork_configure(&fwork, bam_path, NULL, ref, &context);
+		//Add context for data collection
+		bfwork_add_context(&fwork, &collect_context, FWORK_CONTEXT_QUEUE_SEQUENTIAL);
 
 		printf("Cycles: %d\n",cycles);
-
-		//Run wander
-		bfwork_run(&fwork);
-
-		//Reduce data
-		bfwork_context_local_user_data_reduce(&context, &info, reduce_data);
-		bfwork_context_local_user_data_free(&context, destroy_data);
-
-		//Delta processing
-		recal_calc_deltas(&info);
-		printf("Estimated %.2f \tEmpirical %.2f \t TotalDelta %.2f\n", info.total_estimated_Q, info.total_delta + info.total_estimated_Q, info.total_delta);
-
-		//Save data file
-		if(data_file)
-		{
-			recal_save_recal_info(&info, data_file);
-		}
-
-		//Save info file
-		if(info_file)
-		{
-			recal_fprint_info(&info, info_file);
-		}
-
-#ifdef D_TIME_DEBUG
-		//Print times
-		bfwork_context_print_times(&context);
-
-		//Destroy wanderer time
-		bfwork_context_destroy_timing(&context);
-#endif
-
-		//Destroy wanderer
-		bfwork_destroy(&fwork);
-
-		//Destroy context
-		bfwork_context_destroy(&context);
 	}
 
 	//Recalibration is needed?
 	if(flags & RECALIBRATE_RECALIBRATE)
 	{
+		//Create recalibration context
+		bfwork_context_init(&recal_context,
+						(int (*)(void *, bam_region_t *, bam1_t *))recalibrate_wanderer,
+						(int (*)(void *, bam_region_t *))recalibrate_recalibrate_processor,
+						NULL,	//No reduction needed
+						NULL
+		);
+
+#ifdef D_TIME_DEBUG
+		//Init timing
+		bfwork_context_init_timing(&recal_context, "recalibrate", stats_path);
+#endif
+
+		//Set context user data
+		bfwork_context_set_user_data(&recal_context, &info);
+
 		//Previous collect?
 		if(!(flags & RECALIBRATE_COLLECT))
 		{
@@ -299,45 +289,62 @@ recal_bam_file(uint8_t flags, const char *bam_path, const char *ref, const char 
 			}
 		}
 
-		//Init wandering
-		bfwork_init(&fwork);
+		//Add context for recalibration
+		bfwork_add_context(&fwork, &recal_context, FWORK_CONTEXT_QUEUE_SEQUENTIAL);
+	}
 
-		//Create recalibration context
-		bfwork_context_init(&context,
-						(int (*)(void *, bam_region_t *, bam1_t *))recalibrate_wanderer,
-						(int (*)(void *, bam_region_t *))recalibrate_recalibrate_processor);
+	//Run wander
+	bfwork_run(&fwork);
 
-#ifdef D_TIME_DEBUG
-		//Init timing
-		bfwork_context_init_timing(&context, "recalibrate", stats_path);
-#endif
+	//Collection last operations
+	if(flags & RECALIBRATE_COLLECT)
+	{
+		//Save data file
+		if(data_file)
+		{
+			recal_save_recal_info(&info, data_file);
+		}
 
-		//Set context user data
-		bfwork_context_set_user_data(&context, &info);
+		//Save info file
+		if(info_file)
+		{
+			recal_fprint_info(&info, info_file);
+		}
 
-		//Configure wanderer for recalibration
-		bfwork_configure(&fwork, bam_path, outbam, NULL, &context);
-
-		//Run wander
-		bfwork_run(&fwork);
-
-		//Free local data
-		bfwork_context_local_user_data_free(&context, destroy_data);
+		bfwork_context_local_user_data_free(&collect_context, destroy_data);
 
 #ifdef D_TIME_DEBUG
 		//Print times
-		bfwork_context_print_times(&context);
+		bfwork_context_print_times(&collect_context);
 
 		//Destroy wanderer time
-		bfwork_context_destroy_timing(&context);
+		bfwork_context_destroy_timing(&collect_context);
 #endif
 
-		//Destroy wanderer
-		bfwork_destroy(&fwork);
+		//Destroy context
+		bfwork_context_destroy(&collect_context);
+	}
+
+	//Recalibration last operations
+	if(flags & RECALIBRATE_RECALIBRATE)
+	{
+		//Free local data
+		bfwork_context_local_user_data_free(&recal_context, destroy_data);
+
+#ifdef D_TIME_DEBUG
+		//Print times
+		bfwork_context_print_times(&recal_context);
+
+		//Destroy wanderer time
+		bfwork_context_destroy_timing(&recal_context);
+#endif
 
 		//Destroy context
-		bfwork_context_destroy(&context);
+		bfwork_context_destroy(&recal_context);
 	}
+
+	//Destroy wanderer
+	bfwork_destroy(&fwork);
 
 	//Free data memory
 	recal_destroy_info(&info);

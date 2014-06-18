@@ -34,6 +34,10 @@
 #define FWORK_VER_AGE			"0"
 #define FWORK_VER 			FWORK_VER_CURRENT"."FWORK_VER_REVISION"."FWORK_VER_AGE
 
+//CONTEXT EXECUTION
+#define FWORK_CONTEXT_QUEUE_SEQUENTIAL	0x01
+#define FWORK_CONTEXT_QUEUE_PARALLEL 0x02
+
 //FIXED SIZES
 #define FWORK_REGIONS_MAX 1000
 #define FWORK_CONTEXT_MAX 	16
@@ -52,6 +56,11 @@ typedef int (*wanderer_function)(void *, bam_region_t *, bam1_t *) ;
 typedef int (*processor_function)(void *, bam_region_t *) ;
 
 /**
+ * CONTEXT REDUCTION FUNCTION AFTER RUN
+ */
+typedef int (*reducer_function)(void *, void *) ;
+
+/**
  * WANDERING CONTEXT
  */
 typedef struct {
@@ -61,6 +70,10 @@ typedef struct {
 	//Processing functions
 	processor_function processing_f[FWORK_PROC_FUNC_MAX];
 	size_t processing_f_l;
+
+	//Callback function
+	reducer_function reduce;
+	void *reduce_dest;
 
 	//User data
 	void *user_data;
@@ -130,6 +143,15 @@ EXTERNC void bfwork_destroy(bam_fwork_t *fwork);
 EXTERNC int bfwork_configure(bam_fwork_t *fwork, const char *in_file, const char *out_file, const char *reference, bfwork_context_t *context);
 
 /**
+ * \brief Add additional context to execute in framework.
+ *
+ * \param[in] fwork Framework to add context.
+ * \param[in] context Context to be used in framework.
+ * \param[in] flags Specify execution queue for this context. Can be FWORK_CONTEXT_QUEUE_SEQUENTIAL or FWORK_CONTEXT_QUEUE_PARALLEL.
+ */
+EXTERNC int bfwork_add_context(bam_fwork_t *fwork, bfwork_context_t *context, uint8_t flags);
+
+/**
  * \brief Run framework contexts.
  *
  * \param[in] fwork Framework to run.
@@ -147,7 +169,7 @@ EXTERNC int bfwork_run(bam_fwork_t *fwork);
  * \param[in] wf Wandering function to use with this context.
  * \param[in] pf Processing function to use with this context.
  */
-EXTERNC void bfwork_context_init(bfwork_context_t *context, wanderer_function wf, processor_function pf);
+EXTERNC void bfwork_context_init(bfwork_context_t *context, wanderer_function wf, processor_function pf, reducer_function rf, void *reduce_dest);
 
 /**
  * \brief Destroy BAM context data structure.
@@ -220,9 +242,9 @@ static int bfwork_local_user_data_set(bam_fwork_t *fwork, void *user_data);
  *
  * \param[in] context Target context to reduce its threads local data.
  * \param[out] reduced Destination data where reduction must be done.
- * \param[in] cb_reduce Reduction function.
+ * \param[in] reducer_function Reduction function.
  */
-static int bfwork_context_local_user_data_reduce(bfwork_context_t *context, void *reduced, void (*cb_reduce)(void *, void *));
+static int bfwork_context_local_user_data_reduce(bfwork_context_t *context, void *reduced, reducer_function rf);
 
 /**
  * \brief Free all threads local data using custom function.
@@ -361,14 +383,14 @@ bfwork_local_user_data_set(bam_fwork_t *fwork, void *user_data)
  * Reduce all local data pointers of every threads of a context using custom function.
  */
 static inline int
-bfwork_context_local_user_data_reduce(bfwork_context_t *context, void *reduced, void (*cb_reduce)(void *, void *))
+bfwork_context_local_user_data_reduce(bfwork_context_t *context, void *reduced, reducer_function rf)
 {
 	int i, threads;
 	void *data;
 
 	assert(context);
 	assert(reduced);
-	assert(cb_reduce);
+	assert(rf);
 
 	//Get num threads
 	threads = omp_get_max_threads();
@@ -383,10 +405,7 @@ bfwork_context_local_user_data_reduce(bfwork_context_t *context, void *reduced, 
 		if(data != NULL)
 		{
 			//Callback
-			if(cb_reduce != NULL)
-			{
-				cb_reduce(data, reduced);
-			}
+			rf(reduced, data);
 		}
 	}
 

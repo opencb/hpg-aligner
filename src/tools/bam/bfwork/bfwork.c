@@ -115,7 +115,6 @@ bfwork_configure(bam_fwork_t *fwork, const char *in_file, const char *out_file, 
 {
 	assert(fwork);
 	assert(in_file);
-	assert(context);
 
 	//Set I/O
 	fwork->input_file_str = (char *)in_file;
@@ -126,15 +125,50 @@ bfwork_configure(bam_fwork_t *fwork, const char *in_file, const char *out_file, 
 	fwork->reference_str = (char *)reference;
 	omp_unset_lock(&fwork->reference_lock);
 
-	//Set context
-	fwork->context = context;
+	//Initial context have been specified?
+	if(context)
+	{
+		//Set context
+		fwork->context = context;
 
-	//Add to context list
-	fwork->v_context[0] = context;
-	fwork->v_context_l = 1;
+		//Add to context list
+		fwork->v_context[0] = context;
+		fwork->v_context_l = 1;
+	}
 
 	//Logging
 	LOG_INFO("Framework configured\n");
+
+	return NO_ERROR;
+}
+
+/**
+ * Add additional context to execute in framework.
+ */
+int
+bfwork_add_context(bam_fwork_t *fwork, bfwork_context_t *context, uint8_t flags)
+{
+	assert(fwork);
+	assert(context);
+	assert(flags != 0);
+
+	//What kind of execution queue have this context?
+	if(flags & FWORK_CONTEXT_QUEUE_PARALLEL)
+	{
+		//Not supported yet
+		LOG_WARN("FWORK_CONTEXT_QUEUE_PARALLEL is not supported yet, changing to FWORK_CONTEXT_QUEUE_SEQUENTIAL\n");
+		flags = FWORK_CONTEXT_QUEUE_SEQUENTIAL;
+	}
+	if(flags & FWORK_CONTEXT_QUEUE_SEQUENTIAL)
+	{
+		//Add to sequential execution queue
+		fwork->v_context[fwork->v_context_l] = context;
+		fwork->v_context_l++;
+	}
+	else
+	{
+		LOG_FATAL_F("Trying to add a context with not known flags: %x\n", flags);
+	}
 
 	return NO_ERROR;
 }
@@ -446,7 +480,7 @@ bfwork_run_threaded(bam_fwork_t *fwork)
 int
 bfwork_run(bam_fwork_t *fwork)
 {
-	int err;
+	int err, c;
 	double times;
 	bam1_t *read;
 
@@ -460,19 +494,13 @@ bfwork_run(bam_fwork_t *fwork)
 
 	printf("============== BEGIN RUN  ==============\n");
 
-	//Logging
-	LOG_INFO("Framwork is initializing\n");
-
-#ifdef D_TIME_DEBUG
-	times = omp_get_wtime();
-#endif
-
-	//Open input bam
+	//Check if contexts present
+	if(fwork->v_context_l == 0)
 	{
-		printf("Opening BAM from \"%s\" ...\n", fwork->input_file_str);
-		fwork->input_file = bam_fopen(fwork->input_file_str);
-		assert(fwork->input_file);
-		printf("BAM opened!...\n");
+		LOG_WARN("No contexts have been specified to run!\n");
+		printf("============== END RUN  ==============\n\n");
+
+		return NO_ERROR;
 	}
 
 	//Open reference
@@ -490,50 +518,95 @@ bfwork_run(bam_fwork_t *fwork)
 		printf("Reference opened!...\n");
 	}
 
-	//Create new bam
-	if(fwork->output_file_str)
+	for(c = 0; c < fwork->v_context_l; c++)
 	{
-		printf("Creating new bam file in \"%s\"...\n", fwork->output_file_str);
-		//init_empty_bam_header(orig_bam_f->bam_header_p->n_targets, recal_bam_header);
-		fwork->output_file = bam_fopen_mode(fwork->output_file_str, fwork->input_file->bam_header_p, "w");
-		assert(fwork->output_file);
-		bam_fwrite_header(fwork->output_file->bam_header_p, fwork->output_file);
-		fwork->output_file->bam_header_p = NULL;
-		printf("New BAM initialized!...\n");
-	}
+		//Select next context
+		fwork->context = fwork->v_context[c];
+		assert(fwork->context);
 
 #ifdef D_TIME_DEBUG
-	times = omp_get_wtime() - times;
-	time_add_time_slot(D_FWORK_INIT, fwork->context->time_stats, times);
+		times = omp_get_wtime();
 #endif
 
-	//Logging
-	LOG_INFO("Framework is now running\n");
+		//Open input bam
+		{
+			printf("Opening BAM from \"%s\" ...\n", fwork->input_file_str);
+			fwork->input_file = bam_fopen(fwork->input_file_str);
+			assert(fwork->input_file);
+			printf("BAM opened!...\n");
+		}
+
+		//Create new bam
+		if(fwork->output_file_str)
+		{
+			printf("Creating new bam file in \"%s\"...\n", fwork->output_file_str);
+			//init_empty_bam_header(orig_bam_f->bam_header_p->n_targets, recal_bam_header);
+			fwork->output_file = bam_fopen_mode(fwork->output_file_str, fwork->input_file->bam_header_p, "w");
+			assert(fwork->output_file);
+			bam_fwrite_header(fwork->output_file->bam_header_p, fwork->output_file);
+			fwork->output_file->bam_header_p = NULL;
+			printf("New BAM initialized!...\n");
+		}
 
 #ifdef D_TIME_DEBUG
-	times = omp_get_wtime();
+		times = omp_get_wtime() - times;
+		time_add_time_slot(D_FWORK_INIT, fwork->context->time_stats, times);
 #endif
 
-	if(omp_get_max_threads() > 1)
-	{
-		//Run in multithreaded mode
-		err = bfwork_run_threaded(fwork);
-	}
-	else
-	{
-		//Run in sequential mode
-		err = bfwork_run_sequential(fwork);
-	}
+		//Logging
+		if(fwork->context->tag)
+		{
+			printf("Context %s is now running\n", fwork->context->tag);
+		}
+		else
+		{
+			printf("Context %d is now running\n", c);
+		}
 
 #ifdef D_TIME_DEBUG
-	times = omp_get_wtime() - times;
-	time_add_time_slot(D_FWORK_TOTAL, fwork->context->time_stats, times);
+		times = omp_get_wtime();
 #endif
 
-	//Close input BAM
-	printf("\nClosing BAM file...\n");
-	bam_fclose(fwork->input_file);
-	printf("BAM closed.\n");
+		//Run this context
+		if(omp_get_max_threads() > 1)
+		{
+			//Run in multithreaded mode
+			err = bfwork_run_threaded(fwork);
+		}
+		else
+		{
+			//Run in sequential mode
+			err = bfwork_run_sequential(fwork);
+		}
+
+		//Reduce needed?
+		if(fwork->context->reduce && fwork->context->reduce_dest)
+		{
+			//Reduce into context reduce data
+			bfwork_context_local_user_data_reduce(fwork->context, fwork->context->reduce_dest, fwork->context->reduce);
+		}
+
+#ifdef D_TIME_DEBUG
+		times = omp_get_wtime() - times;
+		time_add_time_slot(D_FWORK_TOTAL, fwork->context->time_stats, times);
+#endif
+
+		//Close input BAM
+		printf("\nClosing BAM file...\n");
+		bam_fclose(fwork->input_file);
+		printf("BAM closed.\n");
+
+		//Close output file
+		if(fwork->output_file != NULL)
+		{
+			printf("Closing \"%s\" BAM file...\n", fwork->output_file_str);
+			bam_fclose(fwork->output_file);
+			printf("BAM closed.\n");
+		}
+
+		//Logging
+		LOG_INFO("Context SUCCESS!\n");
+	}
 
 	//Close reference
 	if(fwork->reference != NULL)
@@ -541,14 +614,6 @@ bfwork_run(bam_fwork_t *fwork)
 		printf("\nClosing reference file...\n");
 		genome_free(fwork->reference);
 		printf("Reference closed.\n");
-	}
-
-	//Close output file
-	if(fwork->output_file != NULL)
-	{
-		printf("Closing \"%s\" BAM file...\n", fwork->output_file_str);
-		bam_fclose(fwork->output_file);
-		printf("BAM closed.\n");
 	}
 
 	//Logging
@@ -567,7 +632,7 @@ bfwork_run(bam_fwork_t *fwork)
  * Initialize empty BAM context data structure.
  */
 void
-bfwork_context_init(bfwork_context_t *context, wanderer_function wf, processor_function pf)
+bfwork_context_init(bfwork_context_t *context, wanderer_function wf, processor_function pf, reducer_function rf, void *reduce_dest)
 {
 	int threads;
 
@@ -587,6 +652,8 @@ bfwork_context_init(bfwork_context_t *context, wanderer_function wf, processor_f
 	context->wander_f = wf;
 	context->processing_f[0] = pf;
 	context->processing_f_l = 1;
+	context->reduce = rf;
+	context->reduce_dest = reduce_dest;
 
 	//Init locks
 	omp_init_lock(&context->user_data_lock);

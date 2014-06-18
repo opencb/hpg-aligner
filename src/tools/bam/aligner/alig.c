@@ -186,7 +186,10 @@ alig_bam_file(const char *bam_path, const char *ref_path, const char *outbam, co
 	//Create realigner context
 	bfwork_context_init(&context,
 			(int (*)(void *, bam_region_t *, bam1_t *))realign_wanderer,
-			(int (*)(void *, bam_region_t *))realigner_processor);
+			(int (*)(void *, bam_region_t *))realigner_processor,
+			NULL,	//No reduction needed
+			NULL
+	);
 
 #ifdef D_TIME_DEBUG
 	//Init timing
