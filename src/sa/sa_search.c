@@ -48,7 +48,7 @@ size_t search_prefix(char *sequence, size_t *low, size_t *high,
   int idx, size = ia2 - ia1;
   for (ia = ia1; ia < ia2; ia++) {
     a1 = sa_index->A[ia];
-    ja = sa_index->JA[ia];
+    //ja = sa_index->JA[ia];
     //      printf("\t\tA[%lu] = %lu\t JA[%lu] = %lu\n", 
     //      	     ia, a1, ia, ja);
     if (sa_index->JA[ia] == col) {

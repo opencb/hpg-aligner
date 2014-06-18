@@ -620,11 +620,18 @@ array_list_t *search_mate_cal_by_prefixes(cal_t *cal, fastq_read_t *read,
 
   cal_mng_to_array_list(read->length / 3, cal_list, cal_mng);
 
+  //  printf("***********   from search_mate_cal_by_prefixes   *************\n");
+
+  select_best_cals(read, &cal_list);
+
+  /*
   int max_read_area = get_max_read_area(cal_list);
   if (max_read_area > read->length) max_read_area = read->length;
   filter_cals_by_max_read_area(max_read_area, &cal_list);
   int min_num_mismatches = get_min_num_mismatches(cal_list);
   filter_cals_by_max_num_mismatches(min_num_mismatches, &cal_list);
+  */
+
 
   //  printf("======> after search_mate_cal_by_prefixes: list size = %i\n", array_list_size(cal_list));
   //  for (int kk = 0; kk < array_list_size(cal_list); kk++) { seed_cal_print(array_list_get(kk, cal_list)); }
@@ -639,9 +646,9 @@ int is_valid_cal_pair(seed_cal_t *cal1, seed_cal_t *cal2,
   int distance, valid_pair = 0;
   if (cal1->chromosome_id == cal2->chromosome_id) {
     if (cal2->start > cal1->end) {
-      distance = cal2->start + cal2->read->length - cal1->end;
+      distance = cal2->end - cal1->start + 1;
     } else {
-      distance = cal1->end + cal1->read->length - cal2->start;
+      distance = cal1->end - cal2->start + 1;
     }
     if (distance >= min_distance && distance <= max_distance) {
       valid_pair = 1;
@@ -770,6 +777,7 @@ void check_pairs(array_list_t **cal_lists, sa_index3_t *sa_index,
       for (int i2 = 0; i2 < list2_size; i2++) {
 	cal2 = array_list_get(i2, list2);
 	valid_pair = is_valid_cal_pair(cal1, cal2, min_distance, max_distance, &distance);
+	//	printf(">>>>>>>>>>>>>>>> valid_pair = %i (distance = %i)\n", valid_pair, distance);
 	if (valid_pair) break;
       }
       if (valid_pair) break;
@@ -805,7 +813,7 @@ void check_pairs(array_list_t **cal_lists, sa_index3_t *sa_index,
 
 	  for (int jj = 0; jj < array_list_size(mate_list); jj++) { 
 	    mate_cal = array_list_get(jj, mate_list);
-	    mate_cal->mapq = 1;
+	    //	    mate_cal->mapq = 1;
 	    //printf("----->> found cals for the previous cal:\n");
 	    //seed_cal_print(mate_cal);
 	    read_area = cal->read_area + mate_cal->read_area;
@@ -2714,6 +2722,7 @@ int sa_pair_mapper(void *data) {
       //printf("after create_cals: list size = %i\n", array_list_size(cal_list));
       //for (int kk = 0; kk < array_list_size(cal_list); kk++) { seed_cal_print(array_list_get(kk, cal_list)); }
 
+      //      printf("***********   from sa_pair_mapper   *************\n");
       select_best_cals(read, &cal_list);
 
       //      printf("after filtering min. num mismatches (%i) before cleaning cals...\n", min_num_mismatches);

@@ -335,7 +335,6 @@ void select_best_cals(fastq_read_t *read, array_list_t **cal_list) {
   first_cal = sort_cals[0].cal;
 
   mapq = compute_mapq(first_cal, second_cal, num_hits);
-
   /*
   printf("--------------------------------------------------------------------\n");
   printf("after sorting and trimming (mapq = %i, first score = %0.2f, second score = %0.2f, num_hits = %i) %s ...\n", 
@@ -1036,7 +1035,21 @@ void complete_pairs(sa_mapping_batch_t *batch) {
 	} // end for j2
       } // end for j1
 
-      //      printf("\nnum pairs = %i\n", num_pairs);
+      //      printf("***** num pairs = %i\n", num_pairs);
+      /*
+      if (num_pairs == 1) {
+	linked_list_iterator_first(pair_list_itr);
+	pair = (pair_t *) linked_list_iterator_curr(pair_list_itr);
+	alig1 = (alignment_t *) array_list_get(pair->index1, list1);
+	if (alig1->mapq == 0) {
+	  alig1->mapq = 14;
+	}
+	alig2 = (alignment_t *) array_list_get(pair->index2, list2);
+	if (alig2->mapq == 0) {
+	  alig2->mapq = 14;
+	}
+      }
+      */
       // compute number of mappings with the best score
       num_pairs = 0;
       linked_list_iterator_first(pair_list_itr);
@@ -1051,7 +1064,8 @@ void complete_pairs(sa_mapping_batch_t *batch) {
 	linked_list_iterator_next(pair_list_itr);
 	pair = linked_list_iterator_curr(pair_list_itr);
       }
-      //      printf("num pairs (best score = %0.2f) = %i\n\n", best_score, num_pairs);
+
+      //      printf("***** num pairs with best-score = %i (best score = %0.2f)\n", num_pairs, best_score);
       
       //batch->counters[(num_pairs > 9) ? 9 : num_pairs]++;
 
