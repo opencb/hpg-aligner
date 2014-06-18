@@ -51,6 +51,7 @@ double time_read_fq_process   = 0;
 double time_read_alig = 0;
 double time_read_proc = 0;
 
+
 char convert_ASCII[128];
 
 
@@ -118,6 +119,23 @@ int main(int argc, char* argv[]) {
   // now, we can set logs according to the command-line
   init_log_custom(options->log_level, 1, "hpg-aligner.log", "w");
   LOG_DEBUG_F("Command Mode: %s\n", command);
+
+  //convert ASCII fill 
+  
+  convert_ASCII['a'] = 'T';
+  convert_ASCII['A'] = 'T';
+
+  convert_ASCII['c'] = 'G';
+  convert_ASCII['C'] = 'G';
+
+  convert_ASCII['g'] = 'C';
+  convert_ASCII['G'] = 'C';
+
+  convert_ASCII['t'] = 'a';
+  convert_ASCII['T'] = 'A';
+
+  convert_ASCII['n'] = 'N';
+  convert_ASCII['N'] = 'N';
 
   
   if(strcmp(command, "dna") == 0) { 

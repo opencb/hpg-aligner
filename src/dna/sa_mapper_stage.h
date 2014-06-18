@@ -48,5 +48,9 @@ array_list_t *step_one(fastq_read_t *read, char *revcomp_seq,
 		       sa_index3_t *sa_index, cal_mng_t *cal_mng);
 
 //--------------------------------------------------------------------
+
+void fastq_read_revcomp(fastq_read_t *read);
+
+//--------------------------------------------------------------------
 //--------------------------------------------------------------------
 #endif // _SA_MAPPER_STAGE_H

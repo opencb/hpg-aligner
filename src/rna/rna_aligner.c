@@ -1149,22 +1149,6 @@ void sa_index3_parallel_genome_new(char *sa_index_dirname, int num_threads,
 
 
 void rna_aligner(options_t *options) {
-  //convert ASCII fill 
-  extern char convert_ASCII[128];
-  convert_ASCII['a'] = 'T';
-  convert_ASCII['A'] = 'T';
-
-  convert_ASCII['c'] = 'G';
-  convert_ASCII['C'] = 'G';
-
-  convert_ASCII['g'] = 'C';
-  convert_ASCII['G'] = 'C';
-
-  convert_ASCII['t'] = 'a';
-  convert_ASCII['T'] = 'A';
-
-  convert_ASCII['n'] = 'N';
-  convert_ASCII['N'] = 'N';
   //End fill 
 
   int path_length = strlen(options->output_name);

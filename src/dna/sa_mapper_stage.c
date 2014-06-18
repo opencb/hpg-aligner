@@ -2550,6 +2550,7 @@ int sa_single_mapper(void *data) {
   // for each read, create cals and prepare sw
   for (int i = 0; i < num_reads; i++) {
     read = array_list_get(i, mapping_batch->fq_reads);
+    fastq_read_revcomp(read);
 
     if (wf_batch->options->adapter) {
       cut_adapter(wf_batch->options->adapter, wf_batch->options->adapter_length, read);
@@ -2709,6 +2710,7 @@ int sa_pair_mapper(void *data) {
   // for each read, create cals and prepare sw
   for (int i = 0; i < num_reads; i++) {
     read = array_list_get(i, mapping_batch->fq_reads);
+    fastq_read_revcomp(read);
 
     if (wf_batch->options->adapter) {
       cut_adapter(wf_batch->options->adapter, wf_batch->options->adapter_length, read);
