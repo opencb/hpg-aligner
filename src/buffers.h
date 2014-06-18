@@ -525,11 +525,39 @@ void insert_file_item_2(fastq_read_t *fq_read, array_list_t *items, FILE *f_hc);
 
 //======================================================================================
 
+typedef struct simple_alignment {
+  int gap_start;
+  int gap_end;
+  int map_strand;
+  int map_chromosome;
+  size_t map_start;
+  int map_distance;
+  int cigar_len;
+} simple_alignment_t;
+
+typedef struct alignment_data {
+  simple_alignment_t *simple_alignments_array;
+  char *cigars_str;
+  int num_items;
+} alignment_data_t;
+
+inline alignment_data_t *alignment_data_new() {
+  alignment_data_t *t = (alignment_data_t *)malloc(sizeof(alignment_data_t));
+  
+  return t;
+}
+
+inline void alignment_data_free(alignment_data_t *alignment_data) {
+  if (alignment_data) { free(alignment_data); }
+}
+
 //------------------------------------------------------------------
 
 typedef struct sa_alignment {
   int left_close;
   int right_close;
+  int left_dsp_w2;
+  int right_dsp_w2;
   int num_sp;
   int complete;
   array_list_t *cals_list;
@@ -537,6 +565,7 @@ typedef struct sa_alignment {
   cigar_code_t *c_right;
   cigar_code_t *c_final;
   int sp_middle[20];
+  void *cigar_middle[20];
   int reported;
 } sa_alignment_t;
 
@@ -549,11 +578,16 @@ inline sa_alignment_t *sa_alignment_new(array_list_t *cals_list) {
   sa_a->right_close = 0;
   sa_a->c_left  = NULL;
   sa_a->c_right = NULL;
+  sa_a->c_final = NULL;
 
   memset(sa_a->sp_middle, 0, 20);
   sa_a->num_sp = 0;
   sa_a->complete = 0;
   sa_a->reported = 0;
+
+  sa_a->left_dsp_w2  = 0;
+  sa_a->right_dsp_w2 = 0;
+
   return sa_a;
 
 }
@@ -581,16 +615,6 @@ typedef struct meta_alignment {
 } meta_alignment_t;
 
 meta_alignment_t *meta_alignment_new();
-
-typedef struct simple_alignment {
-  int gap_start;
-  int gap_end;
-  int map_strand;
-  int map_chromosome;
-  size_t map_start;
-  int map_distance;
-  int cigar_len;
-} simple_alignment_t;
 
 typedef struct alignment_aux {
   int mapping_len;
@@ -624,8 +648,8 @@ int file_read_meta_alignments(size_t num_items, array_list_t *list,
 int file_read_alignments(size_t num_items, array_list_t *list, 
 			 fastq_read_t *fq_read, FILE *fd);
 
-int sa_file_read_alignments(size_t num_items, array_list_t *list, 
-			    fastq_read_t *fq_read, FILE *fd);
+alignment_data_t *sa_file_read_alignments(size_t num_items, array_list_t *list, 
+					  fastq_read_t *fq_read, FILE *fd);
 
 void sa_file_write_alignments(fastq_read_t *fq_read, array_list_t *items, FILE *fd);
 

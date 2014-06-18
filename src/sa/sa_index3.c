@@ -1102,6 +1102,7 @@ sa_index3_t *sa_index3_new(char *sa_index_dirname) {
   return p;
 }
 
+
 //--------------------------------------------------------------------------------------
 
 void sa_index3_free(sa_index3_t *p) {

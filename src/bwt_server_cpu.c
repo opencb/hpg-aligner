@@ -369,6 +369,10 @@ int apply_bwt_rna(bwt_server_input_t* input, batch_t *batch) {
   
   for (int i = 0; i < num_reads; i++) {
     fastq_read_t *read = array_list_get(i, mapping_batch->fq_batch);
+
+    //Rev-comp
+    fastq_read_revcomp(read);
+
     //printf("BWT: %s\n", read->id);
     list = mapping_batch->mapping_lists[i];    
     

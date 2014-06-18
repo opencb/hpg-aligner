@@ -6,7 +6,7 @@
 #include "commons/log.h"
 #include "commons/file_utils.h"
 
-#include "commons/workflow_scheduler.h"
+//#include "commons/workflow_scheduler.h"
 
 #include "bioformats/fastq/fastq_batch_reader.h"
 #include "bioformats/bam/bam_file.h"
@@ -39,7 +39,10 @@ void *file_reader_2(void *input);
 // workflow consumer
 //--------------------------------------------------------------------
 
+void write_mapped_read(array_list_t *array_list, bam_file_t *bam_file);
+void write_unmapped_read(fastq_read_t *fq_read, bam_file_t *bam_file);
 int bam_writer(void *data);
+int sam_writer(void *data);
 
 //--------------------------------------------------------------------
 // stage functions

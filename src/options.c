@@ -67,7 +67,7 @@ options_t *options_new(void) {
   options->min_seed_size = 0;
   options->seed_size = 0;
   options->flank_length = 0;
-  options->fast_mode = 0;
+  options->fast_mode = 1;
 
   options->adapter_length = 0;
 
@@ -108,7 +108,7 @@ void validate_options(options_t *options) {
     DEFAULT_SEEDS_MAX_DISTANCE = 100;
   }else if (mode == RNA_MODE) {
     strcpy(options->str_mode, "RNA");
-    DEFAULT_READ_BATCH_SIZE = 200000;
+    DEFAULT_READ_BATCH_SIZE = 20000;
     DEFAULT_NUM_SEEDS	= 20;
     DEFAULT_SEED_SIZE = 16;
     DEFAULT_FLANK_LENGTH = 30;
@@ -187,6 +187,11 @@ void validate_options(options_t *options) {
     options->report_n_hits = 0;    
     options->report_all = 0;
   }
+
+  //if (!options->fast_mode) {
+  //options->bam_format = 1;
+  //}
+
 }
 
 
@@ -275,8 +280,9 @@ void options_display(options_t *options) {
      printf("\tFastQ gzip mode: %s\n", options->gzip == 1 ? "Enable" : "Disable");
      printf("\tIndex directory name: %s\n", bwt_dirname);
      printf("\tOutput directory name: %s\n", output_name);
+          
      printf("\tOutput file format: %s\n", 
-	    (options->bam_format || options->realignment || options->recalibration) ? "SAM" : "BAM");
+	    (options->bam_format || options->realignment || options->recalibration) ? "BAM" : "SAM");
      printf("\tFastQ gzip mode: %s\n", options->gzip == 1 ? "Enable" : "Disable");
      printf("\tAdapter: %s\n", (adapter ? adapter : "Not present"));
      printf("\n");
@@ -328,7 +334,7 @@ void options_display(options_t *options) {
        }
        printf("\tMax intron length: %d\n", max_intron_length);
        printf("\tMin intron length: %d\n", min_intron_length);
-       printf("\tMin score        : %d\n", min_score);
+       //printf("\tMin score        : %d\n", min_score);
      }
 
      if (options->realignment || options->recalibration) {
@@ -388,7 +394,7 @@ void** argtable_options_new(int mode) {
   argtable[count++] = arg_str0(NULL, "prefix", NULL, "File prefix name");
   argtable[count++] = arg_int0("l", "log-level", NULL, "Log debug level");
   argtable[count++] = arg_lit0("h", "help", "Help option");
-  argtable[count++] = arg_lit0(NULL, "bam-format", "BAM output format (otherwise, SAM format)");
+  argtable[count++] = arg_lit0(NULL, "bam-format", "BAM output format (otherwise, SAM format), this option turn the process slow");
   argtable[count++] = arg_lit0(NULL, "indel-realignment", "Indel-based realignment");
   argtable[count++] = arg_lit0(NULL, "recalibration", "Base quality score recalibration");
   argtable[count++] = arg_str0("a", "adapter", NULL, "Adapter sequence in the read");
@@ -401,7 +407,7 @@ void** argtable_options_new(int mode) {
     argtable[count++] = arg_int0(NULL, "seed-size", NULL, "Number of nucleotides in a seed");
     argtable[count++] = arg_int0(NULL, "max-intron-size", NULL, "Maximum intron size");
     argtable[count++] = arg_int0(NULL, "min-intron-size", NULL, "Minimum intron size");
-    argtable[count++] = arg_lit0(NULL, "fast-mode", "Fast mode for SA index");
+    argtable[count++] = arg_lit0(NULL, "bwt-mode", "Slow mode for low memory consumption (SA mode pair-mode is not implemented yet)");
   }
 
   argtable[num_options] = arg_end(count);
@@ -480,7 +486,9 @@ options_t *read_CLI_options(void **argtable, options_t *options) {
   if (((struct arg_str*)argtable[++count])->count) { options->prefix_name = strdup(*(((struct arg_str*)argtable[count])->sval)); }
   if (((struct arg_file*)argtable[++count])->count) { options->log_level = *(((struct arg_int*)argtable[count])->ival); }
   if (((struct arg_int*)argtable[++count])->count) { options->help = ((struct arg_int*)argtable[count])->count; }
+
   if (((struct arg_int*)argtable[++count])->count) { options->bam_format = ((struct arg_int*)argtable[count])->count; }
+
   if (((struct arg_int*)argtable[++count])->count) { options->realignment = ((struct arg_int*)argtable[count])->count; }
   if (((struct arg_int*)argtable[++count])->count) { options->recalibration = ((struct arg_int*)argtable[count])->count; }
   if (((struct arg_str*)argtable[++count])->count) { options->adapter = strdup(*(((struct arg_str*)argtable[count])->sval)); }
@@ -495,10 +503,11 @@ options_t *read_CLI_options(void **argtable, options_t *options) {
     if (((struct arg_int*)argtable[++count])->count) { options->seed_size = *(((struct arg_int*)argtable[count])->ival); }
     if (((struct arg_int*)argtable[++count])->count) { options->max_intron_length = *(((struct arg_int*)argtable[count])->ival); }
     if (((struct arg_int*)argtable[++count])->count) { options->min_intron_length = *(((struct arg_int*)argtable[count])->ival); }
-    if (((struct arg_file*)argtable[++count])->count) { options->fast_mode = (((struct arg_int *)argtable[count])->count); }
+    if (((struct arg_file*)argtable[++count])->count) { options->fast_mode = !(((struct arg_int *)argtable[count])->count); }
   }
 
   return options;
+
 }
 
 

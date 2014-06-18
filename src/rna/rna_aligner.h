@@ -16,7 +16,8 @@
 #include "commons/log.h"
 #include "commons/file_utils.h"
 
-#include "commons/workflow_scheduler.h"
+#include "rna/workflow_scheduler.h"
+//#include "commons/workflow_scheduler.h"
 
 #include "bioformats/fastq/fastq_batch_reader.h"
 
@@ -44,6 +45,7 @@
 #include "dna/doscadfun.h"
 #include "dna/sa_io_stages.h"
 #include "dna/sa_mapper_stage.h"
+
 
 typedef struct buffer_reader_input {
   fastq_batch_reader_input_t *reader_input;

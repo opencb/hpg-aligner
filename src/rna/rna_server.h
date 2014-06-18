@@ -35,6 +35,12 @@
 //#include "list.h"
 //#include "genome.h"
 
+void fastq_read_revcomp(fastq_read_t *read);
+
+char *cigar_code_find_and_report_sj(size_t start_map, cigar_code_t *cigar_code, 
+				    int chromosome, int strand, avls_list_t *avls_list,
+				    metaexons_t *metaexons, genome_t *genome, fastq_read_t *read);
+
 //===============================================================================================================
 
 typedef struct info_sp {

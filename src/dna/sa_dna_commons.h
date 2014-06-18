@@ -130,6 +130,7 @@ typedef struct sa_wf_batch {
   batch_writer_input_t *writer_input;
   void *mapping_batch;  
   void *data;
+  int data_size;
 } sa_wf_batch_t;
 
 //--------------------------------------------------------------------

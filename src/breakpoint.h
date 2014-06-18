@@ -3,6 +3,7 @@
 
 #include "containers/array_list.h"
 #include "containers/linked_list.h"
+//#include "containers/skip_list.h"
 
 #include "aligners/bwt/genome.h"
 #include "bioformats/bam/alignment.h"
@@ -88,6 +89,11 @@ int cigar_code_validate(int read_length, cigar_code_t *p);
 int cigar_code_validate_(fastq_read_t *fq_read, cigar_code_t *p);
 void cigar_code_update(cigar_code_t *p);
 
+
+//char *cigar_code_find_and_report_sj(size_t start_map, cigar_code_t *cigar_code, 
+//				    int chromosome, int strand, avls_list_t *avls_list,
+//				    metaexons_t *metaexons, genome_t *genome, fastq_read_t *read);
+
 //cigar_code_t *generate_cigar_code(char *query_map, char *ref_map, unsigned int map_len,
 //				  unsigned int query_start, unsigned int query_len, 
 //				  int *distance);
@@ -169,10 +175,15 @@ typedef struct metaexons {
   size_t             *num_chunks;
   pthread_mutex_t    *mutex;
   linked_list_t      **metaexons_list;  
+  //skip_list_t        **metaexons_list;  
   metaexon_pair_t    **bypass_pointer;
-
+  
   //linked_list_t      ***metaexons_x;  
 } metaexons_t;
+
+
+void metaexon_merge_breaks(void *source, void *target);
+
 
 metaexons_t *metaexons_new(unsigned int num_chromosomes, 
 			   size_t *chr_size);

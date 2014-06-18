@@ -93,7 +93,8 @@ void *fastq_reader(void *input) {
      }
 
      //if (time_on) { stop_timer(start, end, time); timing_add(time, FASTQ_READER, timing); }
-
+     //printf("Read batch %i\n", num_reads);
+     
      return new_batch;
 }
 
@@ -499,128 +500,146 @@ void write_unmapped_read(fastq_read_t *fq_read, bam_file_t *bam_file);
 
 //--------------------------------------------------------------------
 
-int bam_writer(void *data) {
-     struct timeval start, end;
-     double time;
-
-     //if (time_on) { start_timer(start); }
-
-     batch_t *batch = (batch_t *) data;
-     fastq_read_t *fq_read;
-     array_list_t *array_list;
-     size_t num_items;
-
-     //bam1_t *bam1;
-     //alignment_t *alig;
-
-     mapping_batch_t *mapping_batch = (mapping_batch_t *) batch->mapping_batch;
-
-     batch_writer_input_t *writer_input = batch->writer_input;
-     bam_file_t *bam_file = writer_input->bam_file;     
-     linked_list_t *linked_list = writer_input->list_p;
-     size_t num_reads_b = array_list_size(mapping_batch->fq_batch);
-     size_t num_mapped_reads = 0;
-     size_t total_mappings = 0;
-     unsigned char found_p1 = 0;
-     unsigned char found_p2 = 0;
-     int i = 0;
-
-     extern size_t bwt_correct;
-     extern size_t bwt_error;
-     extern pthread_mutex_t bwt_mutex, mutex_sp;
-
-     writer_input->total_batches++;
-
-     extern size_t *histogram_sw;
-
-     extern size_t num_reads_map;
-     extern size_t num_reads;
-     extern size_t tot_reads;
-     
-     free(mapping_batch->histogram_sw);
-     //
-     // DNA/RNA mode
-     //
-     for (size_t i = 0; i < num_reads_b; i++) {
-       num_items = array_list_size(mapping_batch->mapping_lists[i]);
-       total_mappings += num_items;
-       fq_read = (fastq_read_t *) array_list_get(i, mapping_batch->fq_batch);
-       
-       // mapped or not mapped ?	 
-       if (num_items == 0) {
-	 total_mappings++;
-	 write_unmapped_read(fq_read, bam_file);
-	 if (mapping_batch->mapping_lists[i]) {
-	   array_list_free(mapping_batch->mapping_lists[i], NULL);
-	 }	 
-       } else {
-	 num_mapped_reads++;
-	 write_mapped_read(mapping_batch->mapping_lists[i], bam_file);
-       }
-     }
-     
-     //num_reads     += num_reads_b;
-     //num_reads_map += num_mapped_reads;
- 
-     //fprintf(stderr, "TOTAL READS PROCESS: %lu\n", basic_st->total_reads);
-     //if (basic_st->total_reads >= writer_input->limit_print) {
-       //LOG_DEBUG_F("TOTAL READS PROCESS: %lu\n", basic_st->total_reads);
-       //LOG_DEBUG_F("\tTotal Reads Mapped: %lu(%.2f%)\n", 
-       //	   basic_st->num_mapped_reads, 
-       //	   (float) (basic_st->num_mapped_reads*100)/(float)(basic_st->total_reads));
-       //writer_input->limit_print += 1000000;
-
-       /*
-       fprintf(stderr, "TOTAL READS PROCESS: %lu\n", tot_reads);
-       printf("\tTotal Reads Mapped: %lu(%.2f%)\n", 
-	      basic_st->num_mapped_reads, 
-	      (float) (basic_st->num_mapped_reads*100)/(float)(basic_st->total_reads));
-       */
-
-       //writer_input->limit_print += 100000;
-
-       //extern size_t TOTAL_SW,
-       //TOTAL_READS_PROCESS,
-       //TOTAL_READS_SEEDING,
-       //TOTAL_READS_SEEDING2,
-       //TOTAL_READS_SA;
-       
-
-       //fprintf(stderr, "TOTAL READS PROCESS = %lu,\n TOTAL READS SEEDING x1 = %lu,\n TOTAL READS SEEDING x2 = %lu,\n TOTAL SW = %lu,\n TOTAL READS SINGLE ANCHOR FINAL = %lu\n\n",
-       //      TOTAL_READS_PROCESS, TOTAL_READS_SEEDING, TOTAL_READS_SEEDING2, TOTAL_SW, TOTAL_READS_SA);
-       
-     //}
-     
-     //printf("Batch Write OK!\n");     
-     
-     if (mapping_batch) {
-       mapping_batch_free(mapping_batch);
-     }
-     
-     if (batch) batch_free(batch);
-     
-     basic_statistics_add(num_reads_b, num_mapped_reads, total_mappings, basic_st);
-     
-     //if (time_on) { stop_timer(start, end, time); timing_add(time, BAM_WRITER, timing); }
-}
-
-//--------------------------------------------------------------------
-/*
-int search_hard_clipping(array_list_t *array_list) {
-  size_t num_items = array_list_size(array_list);
+int sam_writer(void *data) {
+  batch_t *batch = (batch_t *) data;
+  batch_writer_input_t *writer_input = batch->writer_input;
+  //bam_file_t *bam_file = writer_input->bam_file;    
+  FILE *out_file = (FILE *) writer_input->bam_file;
+  genome_t *genome = writer_input->genome;
+  fastq_read_t *read;
+  mapping_batch_t *mapping_batch = (mapping_batch_t *) batch->mapping_batch;
+  size_t num_reads = array_list_size(mapping_batch->fq_batch);
+  //linked_list_t *linked_list = writer_input->list_p;
+  array_list_t *read_list = mapping_batch->fq_batch;
+  array_list_t *mapping_list;
+  size_t num_mappings;
+  size_t num_mapped_reads = 0;
+  size_t total_mappings = 0;  
   alignment_t *alig;
-  int found = 0;
+  int flag, pnext = 0, tlen = 0;
+  char rnext[4] = "*\0";
 
-  for (size_t j = 0; j < num_items; j++) {
-    alig = (alignment_t *) array_list_get(j, array_list);
-    if (alig->large_hard_clipping) {
-      return 0;
+  for (size_t i = 0; i < num_reads; i++) {
+    read = (fastq_read_t *) array_list_get(i, read_list);
+    mapping_list = mapping_batch->mapping_lists[i];
+    num_mappings = array_list_size(mapping_list);
+    total_mappings += num_mappings;
+    //printf("%i.Read %s (num_mappings %i)\n", i, read->id, num_mappings);    
+    if (num_mappings > 0) {
+      num_mapped_reads++;
+      for (size_t j = 0; j < num_mappings; j++) {
+	alig = (alignment_t *) array_list_get(j, mapping_list);
+	flag = (alig->seq_strand ? 16 : 0);
+	fprintf(out_file, "%s\t%i\t%s\t%lu\t%i\t%s\t%s\t%lu\t%i\t%s\t%s\n", 
+		alig->query_name,
+		flag,
+		genome->chr_name[alig->chromosome],
+		alig->position + 1,
+		alig->map_quality,
+		alig->cigar,
+		rnext,
+		pnext,
+		tlen,
+		alig->sequence,
+		alig->quality);
+	//alig->optional_fields);
+	
+	alignment_free(alig);	 
+      }
+      array_list_free(mapping_list, NULL);
+    } else {
+      total_mappings++;
+      if (mapping_list) {
+	array_list_free(mapping_list, NULL);
+      }	 
+      
+      fprintf(out_file, "%s\t4\t*\t0\t0\t*\t*\t0\t0\t%s\t%s\n", 
+	      read->id,
+	      read->sequence,
+	      read->quality);
+
     }
   }
-  return 0;
-}*/
 
-//--------------------------------------------------------------------
+  if (mapping_batch) {
+    mapping_batch_free(mapping_batch);
+  }
+  
+  if (batch) batch_free(batch);
+
+  basic_statistics_add(num_reads, num_mapped_reads, total_mappings, basic_st);
+
+}
+
+int bam_writer(void *data) {
+  struct timeval start, end;
+  double time;
+  
+  //if (time_on) { start_timer(start); }
+  
+  batch_t *batch = (batch_t *) data;
+  fastq_read_t *fq_read;
+  array_list_t *array_list;
+  size_t num_items;
+  
+  //bam1_t *bam1;
+  //alignment_t *alig;
+
+  mapping_batch_t *mapping_batch = (mapping_batch_t *) batch->mapping_batch;
+  
+  batch_writer_input_t *writer_input = batch->writer_input;
+  bam_file_t *bam_file = writer_input->bam_file;     
+  linked_list_t *linked_list = writer_input->list_p;
+  size_t num_reads_b = array_list_size(mapping_batch->fq_batch);
+  size_t num_mapped_reads = 0;
+  size_t total_mappings = 0;
+  unsigned char found_p1 = 0;
+  unsigned char found_p2 = 0;
+  int i = 0;
+  
+  extern size_t bwt_correct;
+  extern size_t bwt_error;
+  extern pthread_mutex_t bwt_mutex, mutex_sp;
+  
+  writer_input->total_batches++;
+  
+  extern size_t *histogram_sw;
+  
+  extern size_t num_reads_map;
+  extern size_t num_reads;
+  extern size_t tot_reads;
+  
+  free(mapping_batch->histogram_sw);
+  //
+  // DNA/RNA mode
+  //
+  for (size_t i = 0; i < num_reads_b; i++) {
+    num_items = array_list_size(mapping_batch->mapping_lists[i]);
+    total_mappings += num_items;
+    fq_read = (fastq_read_t *) array_list_get(i, mapping_batch->fq_batch);
+    
+    // mapped or not mapped ?	 
+    if (num_items == 0) {
+      total_mappings++;
+      write_unmapped_read(fq_read, bam_file);
+      if (mapping_batch->mapping_lists[i]) {
+	array_list_free(mapping_batch->mapping_lists[i], NULL);
+      }	 
+    } else {
+      num_mapped_reads++;
+      write_mapped_read(mapping_batch->mapping_lists[i], bam_file);
+    }
+  }
+  
+  if (mapping_batch) {
+    mapping_batch_free(mapping_batch);
+  }
+  
+  if (batch) batch_free(batch);
+  
+  basic_statistics_add(num_reads_b, num_mapped_reads, total_mappings, basic_st);
+     
+}
 
 void write_mapped_read(array_list_t *array_list, bam_file_t *bam_file) {
   size_t num_items = array_list_size(array_list);
@@ -636,14 +655,14 @@ void write_mapped_read(array_list_t *array_list, bam_file_t *bam_file) {
     //printf("\t-----> %s\n", alig->cigar);
     LOG_DEBUG("writting bam..\n");
     //alignment_print(alig);
-
+    //exit(-1);
     if (alig != NULL) {
       bam1 = convert_to_bam(alig, 33);
       bam_fwrite(bam1, bam_file);
       bam_destroy1(bam1);	 
       alignment_free(alig);
     } else {
-      LOG_FATAL_F("alig is NULL, num_items = %lu\n", num_items)
+      LOG_FATAL_F("alig is NULL, num_items = %lu\n", num_items);
     }
     //printf("\t**************** %i(%i)\n", j, num_items);
   }

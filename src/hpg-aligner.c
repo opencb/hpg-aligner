@@ -30,12 +30,44 @@ pthread_mutex_t mutex_sp;
 FILE *fd_log;
 size_t junction_id;
 
+size_t total_reads = 0;
+size_t reads_no_map = 0;
+
+size_t total_sw = 0;
+
+
+
+double time_write = 0;
+double time_free = 0;
+double time_free_batch = 0;
+
+double time_timer0 = 0;
+double time_timer1 = 0;
+double time_timer2 = 0;
+double time_timer3 = 0;
+
+double time_read_fq   = 0;
+double time_read_fq_process   = 0;
+double time_read_alig = 0;
+double time_read_proc = 0;
+
+char convert_ASCII[128];
+
+
+size_t search_calls = 0;
+size_t insert_calls = 0;
+double time_search = 0.0;
+double time_insert = 0.0;
+pthread_mutex_t mutex_calls;
+
 //--------------------------------------------------------------------
 // main parameters support
 //--------------------------------------------------------------------
 int main(int argc, char* argv[]) {
   pthread_mutex_init(&mutex_sp, NULL);
   
+  pthread_mutex_init(&mutex_calls, NULL);
+
   //memset(tot_cals, 0, sizeof(int)*50);
   //const char HEADER_FILE[1024] = "Human_NCBI37.hbam\0";
 
@@ -121,7 +153,7 @@ int main(int argc, char* argv[]) {
   */
 
   options_free(options);
-  
+
   return 0;
 
 }

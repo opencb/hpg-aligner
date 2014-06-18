@@ -119,6 +119,167 @@ extern pthread_mutex_t mutex_sp;
 //extern size_t tot_reads_in;
 //extern size_t tot_reads_out;
 
+char *cigar_code_find_and_report_sj(size_t start_map, cigar_code_t *cigar_code, 
+				    int chromosome, int strand, avls_list_t *avls_list,
+				    metaexons_t *metaexons, genome_t *genome, fastq_read_t *read) {
+
+  size_t sj_start, sj_end;
+  size_t offset = start_map;
+  size_t exon_start = offset;
+  size_t exon_end;
+  
+  const int MAX_SJ = 100;
+  int exons_array[MAX_SJ*4];
+  int num_sj = 0;
+  int pos = 0;
+
+  avl_node_t *node_avl_start, *node_avl_end;
+
+  char cigar_str[2048] = "\0";
+    
+  //printf("Start %lu\n", start_map);
+
+  for (int i = 0; i < array_list_size(cigar_code->ops); i++) {
+    cigar_op_t *op = array_list_get(i, cigar_code->ops);
+    sprintf(cigar_str, "%s%i%c", cigar_str, op->number, op->name);
+
+    if (op->name == 'D' || op->name == 'M') {
+      offset += op->number;
+    }
+    
+    if (op->name == 'N') {
+      exon_end = offset;
+      
+      exons_array[pos++] = exon_start;
+      exons_array[pos++] = exon_end;
+      num_sj++;
+
+      offset += op->number;
+      exon_start = offset;
+    }
+    
+  }
+
+  if (num_sj > 0) {
+    exon_end = offset;
+    exons_array[pos++] = exon_start;
+    exons_array[pos++] = exon_end;
+    
+    pos = 0;
+
+    int sp_type = 1;
+    //char sj_start_ref[10];
+    //char sj_end_ref[10];
+    char sj_ref[10];
+    size_t genome_start, genome_end;
+    int sj_strand;
+    int report;
+    for (int i = 0; i < num_sj; i++) {
+      sj_start = exons_array[pos + 1] + 1;
+      sj_end   = exons_array[pos + 2];
+      
+      //printf("%lu - %lu\n", sj_start, sj_end);
+
+      genome_start = sj_start;
+      genome_end   = genome_start + 2;      
+      genome_read_sequence_by_chr_index(sj_ref, 0, chromosome - 1,
+					&genome_start, &genome_end, genome);
+      
+      //printf("SP_START: %c%c\n", sj_start_ref[0], sj_start_ref[1]);
+
+      sj_ref[2] = '-';
+
+      genome_start = sj_end - 1;
+      genome_end   = genome_start + 1;
+      genome_read_sequence_by_chr_index(&sj_ref[3], 0, chromosome - 1,
+					&genome_start, &genome_end, genome);
+
+      
+      sj_ref[5] = '\0';
+
+      //printf("SJ %lu-%lu: %s\n", sj_start, sj_end, sj_ref);
+      
+      //sj_strand = strand;
+      report = 0;
+      if ((sj_ref[0] == 'C' && sj_ref[1] == 'T' && sj_ref[3] == 'A' && sj_ref[4] == 'C')) {// || 
+	  //(sj_ref[0] == 'G' && sj_ref[1] == 'T' && sj_ref[3] == 'A' && sj_ref[4] == 'T') || 
+	  //(sj_ref[0] == 'C' && sj_ref[1] == 'T' && sj_ref[3] == 'G' && sj_ref[4] == 'C')) {
+	report = 1;
+	sj_strand = 1;
+	  } else if ((sj_ref[0] == 'G' && sj_ref[1] == 'T' && sj_ref[3] == 'A' && sj_ref[4] == 'G')) {// || 
+		 //(sj_ref[0] == 'A' && sj_ref[1] == 'T' && sj_ref[3] == 'A' && sj_ref[4] == 'C') || 
+		 //(sj_ref[0] == 'G' && sj_ref[1] == 'C' && sj_ref[3] == 'A' && sj_ref[4] == 'G')) {
+	sj_strand = 0;
+	report = 1;
+      }
+
+      //if (sj_ref[0] == 'C' && sj_ref[1] == 'C' && sj_ref[3] == 'C' && sj_ref[4] == 'A') {
+      //}
+
+      if (report) {
+	//printf("%s : %i:%lu, cigar: %s, SP=> %lu-%lu\n", read->id, chromosome, start_map, new_cigar_code_string(cigar_code), sj_start, sj_end);
+	
+	allocate_start_node(chromosome - 1,
+			    sj_strand,
+			    sj_start,
+			    sj_end,
+			    sj_start,
+			    sj_end,
+			    FROM_READ,
+			    sp_type,
+			    sj_ref,
+			    &node_avl_start,
+			    &node_avl_end,
+			    avls_list);
+	
+	exon_start = exons_array[pos] + 1;
+	exon_end = sj_start - 1;
+	//printf("Meta-L: %lu - %lu\n", exon_start, exon_end);
+	
+	metaexon_insert(strand, chromosome - 1,
+			exon_start, exon_end, 40,
+			METAEXON_RIGHT_END, node_avl_start,
+			metaexons);
+	
+	exon_start = sj_end + 1;
+	exon_end   = exons_array[pos + 3];
+	//printf("Meta-R: %lu - %lu\n", exon_start, exon_end);
+	
+	metaexon_insert(strand, chromosome - 1,
+			exon_start, exon_end, 40,
+			METAEXON_LEFT_END, node_avl_end,
+			metaexons);
+	
+      }
+
+      pos += 2;
+
+    }
+ 
+  }
+  
+  return strdup(cigar_str);
+
+}
+
+
+
+
+void fastq_read_revcomp(fastq_read_t *read) {
+  extern char convert_ASCII[128];
+
+  read->revcomp = (char *)malloc((read->length + 1)*sizeof(char));
+
+  register int i, j;
+
+  for (i = read->length - 1, j = 0; i >= 0; i--, j++) {
+    read->revcomp[j] = convert_ASCII[read->sequence[i]];
+  }
+  
+  read->revcomp[j] = '\0';
+
+}
+
 
 cigar_code_t *search_left_single_anchor(int gap_close, 
 					cal_t *cal,
@@ -424,6 +585,7 @@ cigar_code_t *generate_cigar_sw_output(char *seq_sw,
 	if (found != NOT_SPLICE) {
 	  if (end_splice - start_splice + 1 >= min_intron_size) {
 	    //printf("SP:=>%i:%lu-%lu\n", chromosome, start_splice, end_splice);
+	    /*
 	    allocate_start_node(chromosome - 1,
 				strand,
 				start_splice,
@@ -436,6 +598,7 @@ cigar_code_t *generate_cigar_sw_output(char *seq_sw,
 				node_avl_start,
 				node_avl_end, 
 				avls_list);
+	    */
 	  } else {
 	    array_list_clear(cigar_code->ops, (void *)cigar_op_free);
 	    cigar_code_free(cigar_code); 
@@ -542,6 +705,8 @@ cigar_code_t *generate_cigar_sw_output(char *seq_sw,
       cigar_code->distance += cigar_op->number;
     }
   }
+  
+  cigar_code->distance += (insertions_tot + deletions_tot);
   
   //printf(" :::: => %s\n", new_cigar_code_string(cigar_code));
 
@@ -688,7 +853,7 @@ cigar_code_t *meta_alignment_fill_extrem_gap(char *query,
 
   //cal_print(cal);
 
-  pthread_mutex_lock(&metaexons->mutex[cal->chromosome_id - 1]);
+  pthread_mutex_lock(&(metaexons->mutex[cal->chromosome_id - 1]));
 
   //FILL_GAP_LEFT  0
   //FILL_GAP_RIGHT 1
@@ -774,7 +939,7 @@ cigar_code_t *meta_alignment_fill_extrem_gap(char *query,
 					   avls_list);   
   }
   
-  pthread_mutex_unlock(&metaexons->mutex[cal->chromosome_id - 1]);
+  pthread_mutex_unlock(&(metaexons->mutex[cal->chromosome_id - 1]));
 
 
   return cigar_code;
@@ -832,7 +997,7 @@ cigar_code_t *fill_extrem_gap(char *query,
 
   //printf("FILL EXTREM GAP: [%i-%i]\n", read_start, read_end);
 
-  pthread_mutex_lock(&metaexons->mutex[cal->chromosome_id - 1]);
+  pthread_mutex_lock(&(metaexons->mutex[cal->chromosome_id - 1]));
 
   //printf("genome_start = %i, genome_end = %i\n", genome_start, genome_end);
 
@@ -897,7 +1062,7 @@ cigar_code_t *fill_extrem_gap(char *query,
   if (cigar_code == NULL) {
     //printf("Search NORMAL\n");
     if (genome_end - genome_start >= 2048) {
-      pthread_mutex_unlock(&metaexons->mutex[cal->chromosome_id - 1]);
+      pthread_mutex_unlock(&(metaexons->mutex[cal->chromosome_id - 1]));
       return NULL;
     }    
    
@@ -940,7 +1105,7 @@ cigar_code_t *fill_extrem_gap(char *query,
     
   }
   
-  pthread_mutex_unlock(&metaexons->mutex[cal->chromosome_id - 1]);
+  pthread_mutex_unlock(&(metaexons->mutex[cal->chromosome_id - 1]));
 
 
   return cigar_code;
@@ -2191,7 +2356,7 @@ void meta_alignment_fill_gaps(int meta_type,
 	    if (nt) {
 	      cigar_code->distance = distance_aux;
 	      int sp_strand = (sp_type == CT_AC_SPLICE ? 1 : 0);
-
+	      /*
 	      allocate_start_node(cal->chromosome_id - 1,
 				  sp_strand,
 				  sp_start,
@@ -2217,7 +2382,7 @@ void meta_alignment_fill_gaps(int meta_type,
 			      node_avl_end->position, seed_next->genome_end, 40,
 			      METAEXON_LEFT_END, node_avl_end,
 			      metaexons);
-	      
+	      */
 	      closed = 1;
 	      sp_found = 1;
 	      //TODO: ADD DISTANCE
@@ -2500,7 +2665,8 @@ void sw_depth_process(sw_optarg_t *sw_optarg, sw_multi_output_t *output,
 	  cigar_code = NULL;
 	}
 	info_sp_free(info_sp);
-	if (cigar_code) {
+	/*
+	if (cigar_code) {	  
 	  int err_l = 0, err_r = 0;
 	  if (node_avl_start && node_avl_end) {
 	    
@@ -2522,7 +2688,7 @@ void sw_depth_process(sw_optarg_t *sw_optarg, sw_multi_output_t *output,
 	    exit(-1);
 	  }
 	}
-
+	*/
 	meta_alignment_insert_cigar(cigar_code, CIGAR_SW_MIDDLE, sw_item->cal_id, sw_item->meta_alignment);	  		
       }
       free(output->query_map_p[i]);
@@ -2680,7 +2846,7 @@ info_sp_t* sw_reference_splice_junction(cal_t *cal_prev, cal_t *cal_next,
     read_start = read_end;
     read_end = aux_start;
   } else if (read_start == read_end) {
-    LOG_FATAL("ERROR COORDS FUSION\n");
+    //LOG_FATAL("ERROR COORDS FUSION\n");    
   }
 
   //if (read_start > read_end) { LOG_FATAL_F("READ COORDS ERROR %s\n", query_map); }
@@ -2799,13 +2965,13 @@ int search_simple_splice_junction_semi_cannonical(seed_region_t *s_prev, seed_re
   size_t dsp_l, dsp_r, type;
 
   size_t breaks_starts[gap_read];
-  int found_starts = 0, found_starts_semi = 0;
+  int /*found_starts = 0, */found_starts_semi = 0;
 
   size_t breaks_ends[gap_read];
-  int found_ends = 0, found_ends_semi = 0;
+  int /*found_ends = 0, */found_ends_semi = 0;
 
-  size_t type_starts[gap_read];
-  size_t type_ends[gap_read];
+  //size_t type_starts[gap_read];
+  //size_t type_ends[gap_read];
 
   size_t breaks_starts_semi[gap_read];
   size_t breaks_ends_semi[gap_read];
@@ -2825,69 +2991,75 @@ int search_simple_splice_junction_semi_cannonical(seed_region_t *s_prev, seed_re
  
   //printf("search start!\n");
   // Search step by step (GT)/(AG) 
-  for (c_s = 0, c_e = strlen(right_exon) - 1;
-       c_s < end_search; c_s++, c_e--) {
-
+  
+  c_s = 0;
+  c_e = strlen(right_exon) - 1;
+  
+  //c_s = 0, c_e = strlen(right_exon) - 1;
+  for (int pos = 0; pos < end_search - 1; pos++) {
     //Search Start Marks
-    if (left_exon[c_s] == 'G' && left_exon[c_s + 1] == 'T') {
-      type_starts[found_starts] = GT_AG_SPLICE;
-      breaks_starts[found_starts++] = c_s;
-
-      type_starts_semi[found_starts_semi] = GT_AT_SPLICE;
-      breaks_starts_semi[found_starts_semi++] = c_s;
-      LOG_DEBUG_F("S: FOUND GT (%i)\n", c_s);
-    } else if (left_exon[c_s] == 'C' && left_exon[c_s + 1] == 'T') {
-      type_starts[found_starts] = CT_AC_SPLICE;
-      breaks_starts[found_starts++] = c_s;
-
-      type_starts_semi[found_starts_semi] = CT_GC_SPLICE;
-      breaks_starts_semi[found_starts_semi++] = c_s;
-      LOG_DEBUG_F("S: FOUND CT (%i)\n", c_s);
-    } else if (left_exon[c_s] == 'A' && left_exon[c_s + 1] == 'T') {
-      LOG_DEBUG_F("S: FOUND AT (%i)\n", strlen(right_exon) - c_e - 1);
-      type_starts_semi[found_starts_semi] = AT_AC_SPLICE;
-      breaks_starts_semi[found_starts_semi++] = c_s;
-    } else if (left_exon[c_s] == 'G' && left_exon[c_s + 1] == 'C') {
-      LOG_DEBUG_F("S: FOUND GC (%i)\n", strlen(right_exon) - c_e - 1);
-      type_starts_semi[found_starts_semi] = GC_AG_SPLICE;
-      breaks_starts_semi[found_starts_semi++] = c_s;
+    if (c_s < strlen(left_exon) - 1) {
+      if (left_exon[c_s] == 'G' && left_exon[c_s + 1] == 'T') {
+	//type_starts[found_starts] = GT_AG_SPLICE;
+	//breaks_starts[found_starts++] = c_s;
+	type_starts_semi[found_starts_semi] = GT_AT_SPLICE;
+	breaks_starts_semi[found_starts_semi++] = c_s;
+	LOG_DEBUG_F("S: FOUND GT (%i)\n", c_s);
+      } else if (left_exon[c_s] == 'C' && left_exon[c_s + 1] == 'T') {
+	//type_starts[found_starts] = CT_AC_SPLICE;
+	//breaks_starts[found_starts++] = c_s;
+	type_starts_semi[found_starts_semi] = CT_GC_SPLICE;
+	breaks_starts_semi[found_starts_semi++] = c_s;
+	LOG_DEBUG_F("S: FOUND CT (%i)\n", c_s);
+      } else if (left_exon[c_s] == 'A' && left_exon[c_s + 1] == 'T') {
+	LOG_DEBUG_F("S: FOUND AT (%i)\n", strlen(right_exon) - c_e - 1);
+	type_starts_semi[found_starts_semi] = AT_AC_SPLICE;
+	breaks_starts_semi[found_starts_semi++] = c_s;
+      } else if (left_exon[c_s] == 'G' && left_exon[c_s + 1] == 'C') {
+	LOG_DEBUG_F("S: FOUND GC (%i)\n", strlen(right_exon) - c_e - 1);
+	type_starts_semi[found_starts_semi] = GC_AG_SPLICE;
+	breaks_starts_semi[found_starts_semi++] = c_s;
+      }
     }
 
-    //Search End Marks
-    if (right_exon[c_e - 1] == 'A' && right_exon[c_e] == 'G') {
-      type_ends[found_ends] = GT_AG_SPLICE;
-      breaks_ends[found_ends++] = strlen(right_exon) - c_e - 1;
-
-      type_ends_semi[found_ends_semi] = GC_AG_SPLICE;
-      breaks_ends_semi[found_ends_semi++] = strlen(right_exon) - c_e - 1;      
-      LOG_DEBUG_F("E: FOUND AG (%i)\n", strlen(right_exon) - c_e - 1);
-    } else if (right_exon[c_e - 1] == 'A' && right_exon[c_e] == 'C') {
-      type_ends[found_ends] = CT_AC_SPLICE;
-      breaks_ends[found_ends++] = strlen(right_exon) - c_e - 1;
-
-      type_ends_semi[found_ends_semi] = AT_AC_SPLICE;
-      breaks_ends_semi[found_ends_semi++] = strlen(right_exon) - c_e - 1;      
-      LOG_DEBUG_F("E: FOUND AC (%i)\n", strlen(right_exon) - c_e - 1);
-    } else if (right_exon[c_e - 1] == 'A' && right_exon[c_e] == 'T') {
-      type_ends_semi[found_ends_semi] = GT_AT_SPLICE;
-      breaks_ends_semi[found_ends_semi++] = strlen(right_exon) - c_e - 1;
-      LOG_DEBUG_F("E: FOUND AT (%i)\n", strlen(right_exon) - c_e - 1);
-    } else if (right_exon[c_e - 1] == 'G' && right_exon[c_e] == 'C') {
-      LOG_DEBUG_F("E: FOUND GC (%i)\n", strlen(right_exon) - c_e - 1);
-      type_ends_semi[found_ends_semi] = CT_GC_SPLICE;
-      breaks_ends_semi[found_ends_semi++] = strlen(right_exon) - c_e - 1;      
+    if (c_e >= 1) {
+      //Search End Marks
+      if (right_exon[c_e - 1] == 'A' && right_exon[c_e] == 'G') {
+	//type_ends[found_ends] = GT_AG_SPLICE;
+	//breaks_ends[found_ends++] = strlen(right_exon) - c_e - 1;
+	type_ends_semi[found_ends_semi] = GC_AG_SPLICE;
+	breaks_ends_semi[found_ends_semi++] = strlen(right_exon) - c_e - 1;      
+	LOG_DEBUG_F("E: FOUND AG (%i)\n", strlen(right_exon) - c_e - 1);
+      } else if (right_exon[c_e - 1] == 'A' && right_exon[c_e] == 'C') {
+	//type_ends[found_ends] = CT_AC_SPLICE;
+	//breaks_ends[found_ends++] = strlen(right_exon) - c_e - 1;
+	type_ends_semi[found_ends_semi] = AT_AC_SPLICE;
+	breaks_ends_semi[found_ends_semi++] = strlen(right_exon) - c_e - 1;      
+	LOG_DEBUG_F("E: FOUND AC (%i)\n", strlen(right_exon) - c_e - 1);
+      } else if (right_exon[c_e - 1] == 'A' && right_exon[c_e] == 'T') {
+	type_ends_semi[found_ends_semi] = GT_AT_SPLICE;
+	breaks_ends_semi[found_ends_semi++] = strlen(right_exon) - c_e - 1;
+	LOG_DEBUG_F("E: FOUND AT (%i)\n", strlen(right_exon) - c_e - 1);
+      } else if (right_exon[c_e - 1] == 'G' && right_exon[c_e] == 'C') {
+	LOG_DEBUG_F("E: FOUND GC (%i)\n", strlen(right_exon) - c_e - 1);
+	type_ends_semi[found_ends_semi] = CT_GC_SPLICE;
+	breaks_ends_semi[found_ends_semi++] = strlen(right_exon) - c_e - 1;      
+      }
     }
 
+    c_s++;
+    c_e--;
+    
   }
 
   //Not found any splice junction Cannonical
-  if ((found_starts <= 0 || found_ends <= 0) && 
+  if (//(found_starts <= 0 || found_ends <= 0) && 
       (found_starts_semi <= 0 || found_ends_semi <= 0)) {
     //Not found any splice junction Semmi-Cannonical
     return 0;
   }   
 
-  array_list_t *splice_junction = array_list_new(found_starts + found_ends, 
+  array_list_t *splice_junction = array_list_new(found_starts_semi + found_ends_semi, 
 						 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
 
   //array_list_t *splice_junction_1 = array_list_new(found_starts + found_ends, 
@@ -2895,7 +3067,7 @@ int search_simple_splice_junction_semi_cannonical(seed_region_t *s_prev, seed_re
   //printf("FOUND STARTS %i, FOUND ENDS %i, FOUND STARTS SEMI %i, FOUND ENDS SEMI %i\n", found_starts, found_ends, found_starts_semi, 
   //	 found_ends_semi);
 
-
+  /*
   //If found more than one break...Search cannonical
   for (int i = 0; i < found_starts; i++) {
     for (int j = 0; j < found_ends; j++) {
@@ -2911,26 +3083,25 @@ int search_simple_splice_junction_semi_cannonical(seed_region_t *s_prev, seed_re
       }
     }
   }
-
+*/
   
   //If not found cannonical sp, search semmi-cannonical
-  if (array_list_size(splice_junction) <= 0) {
-    for (int i = 0; i < found_starts_semi; i++) {
-      for (int j = 0; j < found_ends_semi; j++) {
-	//printf("%i(%i) + %i(%i)=%i\n", breaks_starts_semi[i], type_starts_semi[i],
-	//     breaks_ends_semi[j], type_ends_semi[j], breaks_starts_semi[i] + breaks_ends_semi[j]);
-	if (type_starts_semi[i] == type_ends_semi[j]) {
-	  int gap_break = breaks_starts_semi[i] + breaks_ends_semi[j];
-	  if (gap_break == gap_read) {
-	    array_list_insert((void *)breaks_starts_semi[i], splice_junction);
-	    array_list_insert((void *)breaks_ends_semi[j], splice_junction);
-	    array_list_insert((void *)type_ends_semi[j], splice_junction);
-	  }      
-	}
+  //if (array_list_size(splice_junction) <= 0) {
+  for (int i = 0; i < found_starts_semi; i++) {
+    for (int j = 0; j < found_ends_semi; j++) {
+      //printf("%i(%i) + %i(%i)=%i\n", breaks_starts_semi[i], type_starts_semi[i],
+      //     breaks_ends_semi[j], type_ends_semi[j], breaks_starts_semi[i] + breaks_ends_semi[j]);
+      if (type_starts_semi[i] == type_ends_semi[j]) {
+	int gap_break = breaks_starts_semi[i] + breaks_ends_semi[j];
+	if (gap_break == gap_read) {
+	  array_list_insert((void *)breaks_starts_semi[i], splice_junction);
+	  array_list_insert((void *)breaks_ends_semi[j], splice_junction);
+	  array_list_insert((void *)type_ends_semi[j], splice_junction);
+	}      
       }
-    } 
-  }
-
+    }
+  } 
+  //}
 
   //If not found splice-junctions exit.
   if (array_list_size(splice_junction) <= 0) {
@@ -3043,6 +3214,7 @@ int search_simple_splice_junction_semi_cannonical(seed_region_t *s_prev, seed_re
   *sp_type  = type;
 
   //printf("SP :=> [%i:%lu-%lu]\n", chromosome_id, start_splice, end_splice);
+
   intron_size = end_splice - start_splice + 1;
   
  exit:
@@ -3193,7 +3365,7 @@ int search_simple_splice_junction(seed_region_t *s_prev, seed_region_t *s_next,
       //breaks_ends[j], type_ends[j], breaks_starts[i] + breaks_ends[j]);
       if (type_starts[i] == type_ends[j]) {
 	int gap_break = breaks_starts[i] + breaks_ends[j];
-	//printf("::(%i, %i), ¿%i - %i?\n", breaks_starts[i], breaks_ends[j], gap_break, gap_read);
+	//printf("::(%i, %i), ¿gap_break=%i - gap_read=%i?\n", breaks_starts[i], breaks_ends[j], gap_break, gap_read);
 	if (gap_break == gap_read) {	  
 	  //printf("END:%i-START:%i\n", type_ends[j], type_starts[i]);
 	  array_list_insert((void *)breaks_starts[i], splice_junction);
@@ -3727,7 +3899,7 @@ cigar_code_t *search_left_single_anchor(int gap_close,
 	  type = UNKNOWN_SPLICE;
 	  sprintf(str_sp_type, "%c%c-%c%c\0", nt_start[0], nt_start[1], nt_end[0], nt_end[1]);
 	}
-	
+	/*
 	allocate_start_node(cal->chromosome_id - 1,
 			    splice_strand,
 			    start_sp,
@@ -3740,6 +3912,7 @@ cigar_code_t *search_left_single_anchor(int gap_close,
 			    &avl_node_start,
 			    &avl_node_end, 
 			    avls_list);	
+	*/
       }
 
       //printf("\tADD %i%c\n", op->number, op->name);
@@ -4149,7 +4322,7 @@ cigar_code_t *search_right_single_anchor(int gap_close,
 	  sprintf(str_sp_type, "%c%c-%c%c\0", nt_start[0], nt_start[1], nt_end[0], nt_end[1]);
 	}
 
-	
+	/*
 	allocate_start_node(cal->chromosome_id - 1,
 			    splice_strand,
 			    start_sp,
@@ -4162,6 +4335,7 @@ cigar_code_t *search_right_single_anchor(int gap_close,
 			    &avl_node_start,
 			    &avl_node_end, 
 			    avls_list);
+	*/
       }
       //printf("\tADD %i%c\n", op->number, op->name);
       cigar_code_insert_first_op(op, cigar_code);
@@ -4219,7 +4393,7 @@ cigar_code_t *search_double_anchors_cal(char *query_map,
 
   *type = META_ALIGNMENT_MIDDLE;
 
-  pthread_mutex_lock(&metaexons->mutex[first_cal->chromosome_id - 1]);
+  pthread_mutex_lock(&(metaexons->mutex[first_cal->chromosome_id - 1]));
 
   //printf("-------------------------------------------\n");
   //cal_print(first_cal);
@@ -4575,7 +4749,7 @@ cigar_code_t *search_double_anchors_cal(char *query_map,
 	  type = UNKNOWN_SPLICE;
 	  sprintf(str_sp_type, "%c%c-%c%c\0", nt_start[0], nt_start[1], nt_end[0], nt_end[1]);
 	}
-
+	/*
 	allocate_start_node(first_cal->chromosome_id - 1,
 			    splice_strand,
 			    start_sp,
@@ -4588,7 +4762,7 @@ cigar_code_t *search_double_anchors_cal(char *query_map,
 			    &avl_node_start,
 			    &avl_node_end, 
 			    avls_list);
-
+	*/
 	break; //If found break loop	
       } else {
 	LOG_DEBUG_F("@@@PROBLEM CALCULATING SPLICE JUNCTION id = %s\n", fq_read->id);
@@ -4603,7 +4777,7 @@ cigar_code_t *search_double_anchors_cal(char *query_map,
 
   //if (cigar_code == NULL) { exit(-1); }
 
-  pthread_mutex_unlock(&metaexons->mutex[first_cal->chromosome_id - 1]);  
+  pthread_mutex_unlock(&(metaexons->mutex[first_cal->chromosome_id - 1]));  
 
   return cigar_code;
 
@@ -5186,6 +5360,7 @@ int apply_sw_rna(sw_server_input_t* input_p, batch_t *batch) {
   //pthread_mutex_unlock(&mutex_sp);
 
 
+  //printf("W1 Reads %i\n", num_reads);
 
   for (i = 0; i < num_reads; i++) {        
     cals_list = mapping_batch->mapping_lists[i];
@@ -5426,7 +5601,7 @@ int apply_sw_rna(sw_server_input_t* input_p, batch_t *batch) {
 		  //assert(s_prev_aux->genome_start < sp_start);
 		  //assert(node_avl_end->position + 1 < s_next_aux->genome_end);
 		  int sp_strand = (sp_type == CT_AC_SPLICE ? 1 : 0);
-
+		  /*
 		  allocate_start_node(first_cal->chromosome_id - 1,
 				      sp_strand,
 				      sp_start,
@@ -5453,7 +5628,7 @@ int apply_sw_rna(sw_server_input_t* input_p, batch_t *batch) {
 					  min_intron_size,
 					  METAEXON_LEFT_END, node_avl_end,
 					  metaexons);
-		  
+		  */
 		  meta_alignment_insert_cigar(cigar_code, CIGAR_SIMPLE_MIDDLE, c - 1, meta_alignment);
 
 		} else { 			  
@@ -5785,7 +5960,7 @@ int apply_sw_rna(sw_server_input_t* input_p, batch_t *batch) {
 		int err_l, err_r;
 
 		int sp_strand = (sp_type == CT_AC_SPLICE ? 1 : 0);
-
+		/*
 		allocate_start_node(first_cal->chromosome_id - 1,
 				    sp_strand,
 				    sp_start,
@@ -5811,7 +5986,7 @@ int apply_sw_rna(sw_server_input_t* input_p, batch_t *batch) {
 					node_avl_end->position + 1, s_next_aux->genome_end, min_intron_size,
 					METAEXON_LEFT_END, node_avl_end,
 					metaexons);
-		
+		*/
 		meta_alignment_insert_cigar(cigar_code, CIGAR_SIMPLE_MIDDLE, c - 1, meta_alignment);
 		
 	      } else { 
@@ -6078,11 +6253,15 @@ int apply_sw_rna(sw_server_input_t* input_p, batch_t *batch) {
 	}
 
 	alignment = alignment_new();
+
+	char *cigar_str = cigar_code_find_and_report_sj(start_mapping - 1, cigar_code, first_cal->chromosome_id, 
+							first_cal->strand, avls_list, metaexons, genome, fq_read);	
+
 	alignment_init_single_end(strdup(fq_read->id),
 				  strdup(query),
 				  strdup(quality),
 				  first_cal->strand, first_cal->chromosome_id - 1, start_mapping - 1,
-				  strdup(new_cigar_code_string(cigar_code)),//strdup(cigar_fake)
+				  cigar_str,//strdup(new_cigar_code_string(cigar_code)),//strdup(cigar_fake)
 				  cigar_code_get_num_ops(cigar_code),//1
 				  cigar_code_score(cigar_code, fq_read->length),
 				  1, 
@@ -6338,7 +6517,6 @@ int apply_sw_rna(sw_server_input_t* input_p, batch_t *batch) {
 }
 
 int apply_rna_last(sw_server_input_t* input_p, batch_t *batch) {
-
   int min_intron_size = input_p->min_intron_size;
   size_t max_intron_size = input_p->max_intron_size;
   mapping_batch_t *mapping_batch = batch->mapping_batch;
@@ -6471,9 +6649,14 @@ int apply_rna_last(sw_server_input_t* input_p, batch_t *batch) {
   //  exit(-1);
   //1st - MAP THE EASY READS  
 
+  //printf("W2 Reads %i\n", num_reads);
+
   for (i = 0; i < num_reads; i++) {
     meta_alignments_list[i] = array_list_new(20, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
     fq_read = array_list_get(i, mapping_batch->fq_batch);
+    //Rev-comp
+    fastq_read_revcomp(fq_read);
+
     cals_list = mapping_batch->mapping_lists[i];
     scores_ranking[i] = (float *)calloc(200, sizeof(float));
     from_single_anchors = 0;
@@ -6819,7 +7002,7 @@ int apply_rna_last(sw_server_input_t* input_p, batch_t *batch) {
 		  seed_region_t *s_next_aux = linked_list_get_first(last_cal->sr_list);
 
 		  int sp_strand = (sp_type == CT_AC_SPLICE ? 1 : 0);
-
+		  /*
 		  allocate_start_node(first_cal->chromosome_id - 1,
 				      sp_strand,
 				      sp_start,
@@ -6845,7 +7028,7 @@ int apply_rna_last(sw_server_input_t* input_p, batch_t *batch) {
 				  node_avl_end->position, s_next_aux->genome_end, 40,
 				  METAEXON_LEFT_END, node_avl_end,
 				  metaexons);
-		  
+		  */
 		  meta_alignment_insert_cigar(cigar_code, CIGAR_SIMPLE_MIDDLE, c - 1, meta_alignment);
 		
 		} else {
@@ -7207,11 +7390,15 @@ int apply_rna_last(sw_server_input_t* input_p, batch_t *batch) {
 	    //fprintf(stderr, "META ALIGNMENT REPORT %i: %s\n", m, new_cigar_code_string(cigar_code));
 	    //printf("WK_2ph: * * * M E T A    A L I G N M E N T    R E P O R T  [%i:%lu]  %s* * *\n", 
 	    //	   first_cal->chromosome_id, first_cal->start, new_cigar_code_string(cigar_code));
+	  char *cigar_str = cigar_code_find_and_report_sj(start_mapping - 1, cigar_code, first_cal->chromosome_id, 
+							  first_cal->strand, avls_list, metaexons, genome, read);	
+
 	  alignment_init_single_end(strdup(fq_read->id),
 				    strdup(query)/*match_seq*/,
 				    strdup(quality)/*match_qual*/,
 				    first_cal->strand, first_cal->chromosome_id - 1, start_mapping - 1,
-				    strdup(new_cigar_code_string(cigar_code))/*strdup(cigar_fake)*/,
+				    cigar_str,
+				    //strdup(new_cigar_code_string(cigar_code))/*strdup(cigar_fake)*/,
 				    cigar_code_get_num_ops(cigar_code)/*1*/,
 				    cigar_code_score(cigar_code, fq_read->length), 
 				    1, (array_list_size(meta_alignments_list[i]) < 1),
@@ -7530,8 +7717,8 @@ int apply_rna_last(sw_server_input_t* input_p, batch_t *batch) {
   //============================= Delete!!! ===============================
 
   return LAST_RNA_POST_PAIR_STAGE;
-
-  }
+  
+}
 
 int apply_rna_last_hc(sw_server_input_t* input_p, batch_t *batch) {
   int min_intron_size = input_p->min_intron_size;
@@ -7658,10 +7845,15 @@ int apply_rna_last_hc(sw_server_input_t* input_p, batch_t *batch) {
   //extern size_t tot_reads_in;
   //tot_reads_in += num_reads;
   //pthread_mutex_unlock(&mutex_sp);
+
+  //printf("W3 Reads %i\n", num_reads);
   
   //Convert CALs in META_ALIGNMENTS 
   for (int i = 0; i < num_reads; i++) {
     fq_read = array_list_get(i, mapping_batch->fq_batch);
+    //Rev-comp
+    fastq_read_revcomp(fq_read);
+
     meta_alignments_list = mapping_batch->mapping_lists[i];
     //printf("WK_3ph (%i): %s\n", array_list_size(meta_alignments_list), fq_read->id );
     
@@ -8067,11 +8259,15 @@ int apply_rna_last_hc(sw_server_input_t* input_p, batch_t *batch) {
         pthread_mutex_unlock(&mutex_sp);
       */
 
+      char *cigar_str = cigar_code_find_and_report_sj(start_mapping - 1, cigar_code, first_cal->chromosome_id, 
+						      first_cal->strand, avls_list, metaexons, genome, read);	
+
       alignment_init_single_end(strdup(fq_read->id),
 				strdup(query)/*match_seq*/,
 				strdup(quality)/*match_qual*/,
 				first_cal->strand, first_cal->chromosome_id - 1, start_mapping - 1,
-				strdup(new_cigar_code_string(cigar_code))/*strdup(cigar_fake)*/,
+				cigar_str,
+				//strdup(new_cigar_code_string(cigar_code))/*strdup(cigar_fake)*/,
 				cigar_code_get_num_ops(cigar_code)/*1*/,
 				cigar_code_score(cigar_code, fq_read->length),
 				1, (array_list_size(meta_alignments_list) < 1),

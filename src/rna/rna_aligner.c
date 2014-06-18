@@ -1,10 +1,26 @@
 #include "rna_aligner.h"
 
+//#include "extrae_user_events.h" 
+
 #define NUM_SECTIONS_TIME 		8
 
 //--------------------------------------------------------------------
-// workflow input                                                                                                                                                    
-//--------------------------------------------------------------------  
+// workflow input                                                                                        //--------------------------------------------------------------------  
+
+
+
+
+void *write_sam_header_BWT(genome_t *genome, FILE *f) {
+  fprintf(f, "@PG\tID:HPG-Aligner\tVN:2.0\n");
+  for (int i = 0; i < genome->num_chromosomes; i++) {
+    fprintf(f, "@SQ\tSN:%s\tLN:%lu\n", genome->chr_name[i], genome->chr_size[i] + 1);
+    //printf("%iName %s\n", i, genome->chr_name[i]);
+  }
+  //fclose(f);
+  //exit(-1);
+}
+
+
 extern int splice_junction_type(char nt_start_1, char nt_start_2, char nt_end_1, char nt_end_2);
 
 
@@ -34,8 +50,1123 @@ int w3_function(void *data) {
 
 
 
+//--------------------------------------------------------------------------------------
+
+void sa_index3_parallel_genome_new(char *sa_index_dirname, int num_threads,
+				   sa_index3_t **sa_index_out, genome_t **genome_out) {  
+
+  FILE *f_tab;
+  char line[1024], filename_tab[strlen(sa_index_dirname) + 1024];
+  char *prefix;
+  uint k_value, pre_length, A_items, IA_items, num_suffixes, genome_len, num_chroms, num_items;
+
+  struct timeval stop, start, end;
+
+  PREFIX_TABLE_NT_VALUE['A'] = 0;
+  PREFIX_TABLE_NT_VALUE['N'] = 0;
+  PREFIX_TABLE_NT_VALUE['C'] = 1;
+  PREFIX_TABLE_NT_VALUE['G'] = 2;
+  PREFIX_TABLE_NT_VALUE['T'] = 3;
+
+  sprintf(filename_tab, "%s/params.txt", sa_index_dirname, prefix);
+  //printf("reading %s\n", filename_tab);
+
+  f_tab = fopen(filename_tab, "r");
+  if (!f_tab) {
+    fprintf(stderr, "Error opening file %s!\n", filename_tab);
+    exit(-1);
+  }
+
+  // prefix
+  fgets(line, 1024, f_tab);
+  line[strlen(line) - 1] = 0;
+  prefix = strdup(line);
+  // k_value
+  fgets(line, 1024, f_tab);
+  k_value = atoi(line);
+  // pre_length
+  fgets(line, 1024, f_tab);
+  pre_length = atoi(line);
+  // A_items
+  fgets(line, 1024, f_tab);
+  A_items = atoi(line);
+  // IA_items
+  fgets(line, 1024, f_tab);
+  IA_items = atol(line);
+  // num_suffixes
+  fgets(line, 1024, f_tab);
+  num_suffixes = atoi(line);
+  // genome_length
+  fgets(line, 1024, f_tab);
+  genome_len = atoi(line);
+  // num_chroms
+  fgets(line, 1024, f_tab);
+  num_chroms = atoi(line);
+
+  size_t *chrom_lengths = (size_t *) malloc(num_chroms * sizeof(size_t));
+  char **chrom_names = (char **) malloc(num_chroms * sizeof(char *));
+  char chrom_name[1024];
+  size_t chrom_len;
+		  
+  for (int i = 0; i < num_chroms; i++) {
+    fgets(line, 1024, f_tab);
+    sscanf(line, "%s %lu\n", chrom_name, &chrom_len);
+    //printf("chrom_name: %s, chrom_len: %lu\n", chrom_name, chrom_len);
+    chrom_names[i] = strdup(chrom_name);
+    chrom_lengths[i] = chrom_len;
+  }
+
+  fclose(f_tab);
+
+  char *S, *CHROM;
+  unsigned char *JA;
+  sa_genome3_t *genome;
+  uint *SA, *PRE, *A, *IA;
+  genome_t *genome_;
+
+  //printf("Parametro: %i num threads \n", num_threads);
+
+  // Compressed Row Storage (IA table)
+  //struct timeval start_f, end_f;
+  //double time_f = 0;
+
+  int final_threads = num_threads >= 2 ? 2 : num_threads;
+
+  {
+    #pragma omp parallel sections num_threads(final_threads)
+    {
+      #pragma omp section
+      {
+	struct timeval stop, start;
+	FILE *f_tab;
+	char filename_tab[strlen(sa_index_dirname) + 1024];
+
+	// read S from file
+	sprintf(filename_tab, "%s/%s.S", sa_index_dirname, prefix);
+	f_tab = fopen(filename_tab, "rb");
+	if (f_tab == NULL) {
+	  printf("Error: could not open %s to write\n", filename_tab);
+	  exit(-1);
+	}
+	//  printf("genome: filename %s, length = %lu\n", filename_tab, genome_len);
+	S = (char *) malloc(genome_len);
+  
+	//printf("\nreading S from file %s...\n", filename_tab);
+	gettimeofday(&start, NULL);
+	num_items = fread(S, sizeof(char), genome_len, f_tab);
+	if (num_items != genome_len) {
+	  printf("Error: (%s) mismatch num_items = %lu vs length = %lu\n", 
+		 filename_tab, num_items, genome_len);
+	  exit(-1);
+	}
+	gettimeofday(&stop, NULL);
+	//printf("end of reading S (%lu len) from file %s in %0.2f s\n", 
+	//	     genome_len, filename_tab,
+	//	     (stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);      
+	fclose(f_tab);
+      
+	genome = sa_genome3_new(genome_len, num_chroms, 
+				chrom_lengths, chrom_names, S);
+      
+	for (size_t i = 0; i < genome->length; i++) {
+	  if (genome->S[i] == 'N' || genome->S[i] == 'n') {
+	    genome->S[i] = 'A';
+	  }
+	}
+
+	// Compressed Row Storage (A table)
+	A = NULL;
+	sprintf(filename_tab, "%s/%s.A", sa_index_dirname, prefix);
+	f_tab = fopen(filename_tab, "rb");
+	if (f_tab) {
+	  A = (uint *) malloc(A_items * sizeof(uint));
+	
+	  //	printf("\nreading A table (Compression Row Storage) from file %s...\n", filename_tab);
+	  gettimeofday(&start, NULL);
+	  if ((num_items = fread(A, sizeof(uint), A_items, f_tab)) != A_items) {
+	    printf("Error: (%s) mismatch read num_items = %lu (it must be %lu)\n", 
+		   filename_tab, num_items, A_items);
+	    exit(-1);
+	  }
+	  gettimeofday(&stop, NULL);
+	  //	printf("end of reading A table (%lu num_items) from file %s in %0.2f s\n", 
+	  //	       num_items, filename_tab,
+	  //	       (stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);  
+	  fclose(f_tab);
+	}
+
+	// Compressed Row Storage (IA table)
+	IA = NULL;
+	sprintf(filename_tab, "%s/%s.IA", sa_index_dirname, prefix);
+	f_tab = fopen(filename_tab, "rb");
+	if (f_tab) {
+	  IA = (uint *) malloc(IA_items * sizeof(uint));
+	
+	  //	printf("\nreading IA table (Compression Row Storage) from file %s...\n", filename_tab);
+	  gettimeofday(&start, NULL);
+	  if ((num_items = fread(IA, sizeof(uint), IA_items, f_tab)) != IA_items) {
+	    printf("Error: (%s) mismatch read num_items = %lu (it must be %lu)\n", 
+		   filename_tab, num_items, IA_items);
+	    exit(-1);
+	  }
+	  gettimeofday(&stop, NULL);
+	  //	printf("end of reading IA table (%lu num_items) from file %s in %0.2f s\n", 
+	  //	       num_items, filename_tab,
+	  //	       (stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);  
+	  fclose(f_tab);
+	}
+      }
+
+      #pragma omp section
+      {
+	struct timeval stop, start;
+	FILE *f_tab;
+	char filename_tab[strlen(sa_index_dirname) + 1024];
+
+	// read SA table from file
+	sprintf(filename_tab, "%s/%s.SA", sa_index_dirname, prefix);
+	f_tab = fopen(filename_tab, "rb");
+	if (f_tab == NULL) {
+	  printf("Error: could not open %s to write\n", filename_tab);
+	  exit(-1);
+	}
+	//      printf("SA: filename %s, num_suffixes = %lu\n", filename_tab, num_suffixes);
+	SA = (uint *) malloc(num_suffixes * sizeof(uint));
+  
+	//      printf("\nreading SA table from file %s...\n", filename_tab);
+	gettimeofday(&start, NULL);
+	num_items = fread(SA, sizeof(uint), num_suffixes, f_tab);
+	if (num_items != num_suffixes) {
+	  printf("Error: (%s) mismatch num_items = %lu vs num_suffixes = %lu\n", 
+		 filename_tab, num_items, num_suffixes);
+	  exit(-1);
+	}
+	gettimeofday(&stop, NULL);
+	//      printf("end of reading SA table (%lu num_suffixes) from file %s in %0.2f s\n", 
+	//	     num_suffixes, filename_tab,
+	//	     (stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);      
+	fclose(f_tab);
+
+	// read CHROM table from file
+	sprintf(filename_tab, "%s/%s.CHROM", sa_index_dirname, prefix);
+	f_tab = fopen(filename_tab, "rb");
+	if (f_tab == NULL) {
+	  printf("Error: could not open %s to write\n", filename_tab);
+	  exit(-1);
+	}
+	//      printf("CHROM: filename %s, num_suffixes = %lu\n", filename_tab, num_suffixes);
+	CHROM = (char *) malloc(num_suffixes * sizeof(char));
+      
+	//      printf("\nreading CHROM table from file %s...\n", filename_tab);
+	gettimeofday(&start, NULL);
+	num_items = fread(CHROM, sizeof(char), num_suffixes, f_tab);
+	if (num_items != num_suffixes) {
+	  printf("Error: (%s) mismatch num_items = %lu vs num_suffixes = %lu\n", 
+		 filename_tab, num_items, num_suffixes);
+	  exit(-1);
+	}
+	gettimeofday(&stop, NULL);
+	//      printf("end of reading CHROM table (%lu num_suffixes) from file %s in %0.2f s\n", 
+	//	     num_suffixes, filename_tab,
+	//	     (stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);      
+	fclose(f_tab);
+
+	// read PRE table from file
+	PRE = NULL;
+	sprintf(filename_tab, "%s/%s.PRE", sa_index_dirname, prefix);
+	f_tab = fopen(filename_tab, "rb");
+	if (f_tab) {
+	  num_items = 1LLU << (2 * k_value);
+	  assert(num_items == pre_length);
+	  PRE = (uint *) malloc(num_items * sizeof(uint));
+	
+	  //	printf("\nreading PRE table from file %s...\n", filename_tab);
+	  gettimeofday(&start, NULL);
+	  if (num_items != fread(PRE, sizeof(uint), num_items, f_tab)) {
+	    printf("Error: (%s) mismatch num_items = %lu\n", 
+		   filename_tab, num_items);
+	    exit(-1);
+	  }
+	  gettimeofday(&stop, NULL);
+	  //	printf("end of reading PRE table (%lu num_items) from file %s in %0.2f s\n", 
+	  //	       num_items, filename_tab,
+	  //	       (stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);  
+	  fclose(f_tab);
+	}
+   
+	// Compressed Row Storage (JA table)
+	JA = NULL;
+	sprintf(filename_tab, "%s/%s.JA", sa_index_dirname, prefix);
+	f_tab = fopen(filename_tab, "rb");
+	if (f_tab) {
+	  JA = (unsigned char *) malloc(A_items * sizeof(unsigned char));
+	
+	  //	printf("\nreading JA table (Compression Row Storage) from file %s...\n", filename_tab);
+	  gettimeofday(&start, NULL);
+	  if ((num_items = fread(JA, sizeof(unsigned char), A_items, f_tab)) != A_items) {
+	    printf("Error: (%s) mismatch read num_items = %lu (it must be %lu)\n", 
+		   filename_tab, num_items, A_items);
+	    exit(-1);
+	  }
+	  gettimeofday(&stop, NULL);
+	  //	printf("end of reading JA table (%lu num_items) from file %s in %0.2f s\n", 
+	  //	       num_items, filename_tab,
+	  //	       (stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);  
+	  fclose(f_tab);
+	}
+
+	genome_ = genome_new("dna_compression.bin", sa_index_dirname, SA_MODE);	
+
+	genome_->num_chromosomes = num_chroms;
+	genome_->chr_name = (char **) calloc(genome_->num_chromosomes, sizeof(char *));
+	genome_->chr_size = (size_t *) calloc(genome_->num_chromosomes, sizeof(size_t));
+	genome_->chr_offset = (size_t *) calloc(genome_->num_chromosomes, sizeof(size_t));
+	size_t offset = 0;
+	
+	for (int c = 0; c < num_chroms; c++) {
+	  genome_->chr_size[c] = chrom_lengths[c];
+	  genome_->chr_name[c] = strdup(chrom_names[c]);
+	  genome_->chr_offset[c] = offset;
+	  offset += genome_->chr_size[c];
+	}
+	
+      }
+    }  
+  }
+
+  goto final;
+
+  //======================================================================
+  {
+    #pragma omp parallel sections num_threads(final_threads)
+    {
+      #pragma omp section
+      {
+	struct timeval stop, start;
+	FILE *f_tab;
+	char filename_tab[strlen(sa_index_dirname) + 1024];
+
+	// read S from file
+	sprintf(filename_tab, "%s/%s.S", sa_index_dirname, prefix);
+	f_tab = fopen(filename_tab, "rb");
+	if (f_tab == NULL) {
+	  printf("Error: could not open %s to write\n", filename_tab);
+	  exit(-1);
+	}
+	// printf("genome: filename %s, length = %lu\n", filename_tab, genome_len);
+	S = (char *) malloc(genome_len);
+  
+	//printf("\nreading S from file %s...\n", filename_tab);
+	gettimeofday(&start, NULL);
+	num_items = fread(S, sizeof(char), genome_len, f_tab);
+	if (num_items != genome_len) {
+	  printf("Error: (%s) mismatch num_items = %lu vs length = %lu\n",
+		 filename_tab, num_items, genome_len);
+	  exit(-1);
+	}
+	gettimeofday(&stop, NULL);
+	//printf("end of reading S (%lu len) from file %s in %0.2f s\n",
+	// genome_len, filename_tab,
+	// (stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);
+	fclose(f_tab);
+      
+	genome = sa_genome3_new(genome_len, num_chroms,
+				chrom_lengths, chrom_names, S);
+      
+	for (size_t i = 0; i < genome->length; i++) {
+	  if (genome->S[i] == 'N' || genome->S[i] == 'n') {
+	    genome->S[i] = 'A';
+	  }
+	}
+
+
+	// Compressed Row Storage (IA table)
+	IA = NULL;
+	sprintf(filename_tab, "%s/%s.IA", sa_index_dirname, prefix);
+	f_tab = fopen(filename_tab, "rb");
+	if (f_tab) {
+	  IA = (uint *) malloc(IA_items * sizeof(uint));
+
+	  // printf("\nreading IA table (Compression Row Storage) from file %s...\n", filename_tab);
+	  gettimeofday(&start, NULL);
+	  if ((num_items = fread(IA, sizeof(uint), IA_items, f_tab)) != IA_items) {
+	    printf("Error: (%s) mismatch read num_items = %lu (it must be %lu)\n",
+		   filename_tab, num_items, IA_items);
+	    exit(-1);
+	  }
+	  gettimeofday(&stop, NULL);
+	  // printf("end of reading IA table (%lu num_items) from file %s in %0.2f s\n",
+	  // num_items, filename_tab,
+	  // (stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);
+	  fclose(f_tab);
+	}
+      }
+      #pragma omp section
+      {
+	struct timeval stop, start;
+	FILE *f_tab;
+	char filename_tab[strlen(sa_index_dirname) + 1024];
+
+	// Compressed Row Storage (A table)
+	A = NULL;
+	sprintf(filename_tab, "%s/%s.A", sa_index_dirname, prefix);
+	f_tab = fopen(filename_tab, "rb");
+	if (f_tab) {
+	  A = (uint *) malloc(A_items * sizeof(uint));
+
+	  // printf("\nreading A table (Compression Row Storage) from file %s...\n", filename_tab);
+	  gettimeofday(&start, NULL);
+	  if ((num_items = fread(A, sizeof(uint), A_items, f_tab)) != A_items) {
+	    printf("Error: (%s) mismatch read num_items = %lu (it must be %lu)\n",
+		   filename_tab, num_items, A_items);
+	    exit(-1);
+	  }
+	  gettimeofday(&stop, NULL);
+	  // printf("end of reading A table (%lu num_items) from file %s in %0.2f s\n",
+	  // num_items, filename_tab,
+	  // (stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);
+	  fclose(f_tab);
+	}
+
+      }
+      #pragma omp section
+      {
+	struct timeval stop, start;
+	FILE *f_tab;
+	char filename_tab[strlen(sa_index_dirname) + 1024];
+
+	// read SA table from file
+	sprintf(filename_tab, "%s/%s.SA", sa_index_dirname, prefix);
+	f_tab = fopen(filename_tab, "rb");
+	if (f_tab == NULL) {
+	  printf("Error: could not open %s to write\n", filename_tab);
+	  exit(-1);
+	}
+	// printf("SA: filename %s, num_suffixes = %lu\n", filename_tab, num_suffixes);
+	SA = (uint *) malloc(num_suffixes * sizeof(uint));
+  
+	// printf("\nreading SA table from file %s...\n", filename_tab);
+	gettimeofday(&start, NULL);
+	num_items = fread(SA, sizeof(uint), num_suffixes, f_tab);
+	if (num_items != num_suffixes) {
+	  printf("Error: (%s) mismatch num_items = %lu vs num_suffixes = %lu\n",
+		 filename_tab, num_items, num_suffixes);
+	  exit(-1);
+	}
+	gettimeofday(&stop, NULL);
+	// printf("end of reading SA table (%lu num_suffixes) from file %s in %0.2f s\n",
+	// num_suffixes, filename_tab,
+	// (stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);
+	fclose(f_tab);
+
+	genome_ = genome_new("dna_compression.bin", sa_index_dirname, SA_MODE);	
+	genome_->num_chromosomes = num_chroms;
+	genome_->chr_name = (char **) calloc(genome_->num_chromosomes, sizeof(char *));
+	genome_->chr_size = (size_t *) calloc(genome_->num_chromosomes, sizeof(size_t));
+	genome_->chr_offset = (size_t *) calloc(genome_->num_chromosomes, sizeof(size_t));
+	size_t offset = 0;
+	
+	for (int c = 0; c < num_chroms; c++) {
+	  genome_->chr_size[c] = chrom_lengths[c];
+	  genome_->chr_name[c] = chrom_names[c];
+	  genome_->chr_offset[c] = offset;
+	  offset += genome_->chr_size[c];
+	}
+	
+	//stop_timer(start, end, time);
+	//printf("************* Tiempo GENOME : %f\n", time / 1000000);
+	
+      }
+
+      #pragma omp section 
+      {
+	struct timeval stop, start;
+	FILE *f_tab;
+	char filename_tab[strlen(sa_index_dirname) + 1024];
+
+	// read CHROM table from file
+	sprintf(filename_tab, "%s/%s.CHROM", sa_index_dirname, prefix);
+	f_tab = fopen(filename_tab, "rb");
+	if (f_tab == NULL) {
+	  printf("Error: could not open %s to write\n", filename_tab);
+	  exit(-1);
+	}
+	// printf("CHROM: filename %s, num_suffixes = %lu\n", filename_tab, num_suffixes);
+	CHROM = (char *) malloc(num_suffixes * sizeof(char));
+      
+	// printf("\nreading CHROM table from file %s...\n", filename_tab);
+	gettimeofday(&start, NULL);
+	num_items = fread(CHROM, sizeof(char), num_suffixes, f_tab);
+	if (num_items != num_suffixes) {
+	  printf("Error: (%s) mismatch num_items = %lu vs num_suffixes = %lu\n",
+		 filename_tab, num_items, num_suffixes);
+	  exit(-1);
+	}
+	gettimeofday(&stop, NULL);
+	// printf("end of reading CHROM table (%lu num_suffixes) from file %s in %0.2f s\n",
+	// num_suffixes, filename_tab,
+	// (stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);
+	fclose(f_tab);
+
+	// read PRE table from file
+	PRE = NULL;
+	sprintf(filename_tab, "%s/%s.PRE", sa_index_dirname, prefix);
+	f_tab = fopen(filename_tab, "rb");
+	if (f_tab) {
+	  num_items = 1LLU << (2 * k_value);
+	  assert(num_items == pre_length);
+	  PRE = (uint *) malloc(num_items * sizeof(uint));
+
+	  // printf("\nreading PRE table from file %s...\n", filename_tab);
+	  gettimeofday(&start, NULL);
+	  if (num_items != fread(PRE, sizeof(uint), num_items, f_tab)) {
+	    printf("Error: (%s) mismatch num_items = %lu\n",
+		   filename_tab, num_items);
+	    exit(-1);
+	  }
+	  gettimeofday(&stop, NULL);
+	  // printf("end of reading PRE table (%lu num_items) from file %s in %0.2f s\n",
+	  // num_items, filename_tab,
+	  // (stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);
+	  fclose(f_tab);
+	}
+   
+	// Compressed Row Storage (JA table)
+	JA = NULL;
+	sprintf(filename_tab, "%s/%s.JA", sa_index_dirname, prefix);
+	f_tab = fopen(filename_tab, "rb");
+	if (f_tab) {
+	  JA = (unsigned char *) malloc(A_items * sizeof(unsigned char));
+
+	  // printf("\nreading JA table (Compression Row Storage) from file %s...\n", filename_tab);
+	  gettimeofday(&start, NULL);
+	  if ((num_items = fread(JA, sizeof(unsigned char), A_items, f_tab)) != A_items) {
+	    printf("Error: (%s) mismatch read num_items = %lu (it must be %lu)\n",
+		   filename_tab, num_items, A_items);
+	    exit(-1);
+	  }
+	  gettimeofday(&stop, NULL);
+	  // printf("end of reading JA table (%lu num_items) from file %s in %0.2f s\n",
+	  // num_items, filename_tab,
+	  // (stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);
+	  fclose(f_tab);
+	}
+
+      }
+    }
+  }
+  
+  goto final;
+
+  {
+    
+    struct timeval start_f, end_f;
+    double time_f;
+
+    start_timer(start_f); 
+    
+    
+    // read SA table from file
+    FILE *f_tab, *f_tab2;
+    char filename_tab[strlen(sa_index_dirname) + 1024];
+    struct timeval end, start;
+    double time;
+
+    uint num_items0, num_items1, num_items2, num_items3;
+    
+    start_timer(start); 
+    sprintf(filename_tab, "%s/%s.SA", sa_index_dirname, prefix);
+    printf("SA: filename %s, num_suffixes = %lu\n", filename_tab, num_suffixes);
+    SA = (uint *) malloc(num_suffixes * sizeof(uint));      
+    #pragma omp parallel sections num_threads(2)
+    {
+        #pragma omp section
+        {
+	  f_tab = fopen(filename_tab, "rb");
+	  size_t offset = sizeof(uint)*(num_suffixes/2);
+	  uint extra = num_suffixes % 2;
+	  fseek(f_tab, offset, SEEK_SET);
+
+	  num_items0 = fread(&SA[num_suffixes/2], sizeof(uint), num_suffixes/2 + extra, f_tab);
+	}
+        #pragma omp section
+        {
+	  f_tab2 = fopen(filename_tab, "rb");
+	  num_items1 = fread(SA, sizeof(uint), num_suffixes/2, f_tab2);
+	}
+    }
+    fclose(f_tab);
+    fclose(f_tab2);
+    stop_timer(start, end, time);
+    printf("****************Tiempo SA (%lu =? %lu): %f\n", num_items0 + num_items1, num_suffixes, time / 1000000);            
+
+
+    start_timer(start); 
+    sprintf(filename_tab, "%s/%s.A", sa_index_dirname, prefix);
+    A = (uint *) malloc(A_items * sizeof(uint));
+    #pragma omp parallel sections num_threads(2)
+    {
+        #pragma omp section
+        {
+	  f_tab = fopen(filename_tab, "rb");
+	  size_t offset = sizeof(uint)*(A_items/2);
+	  uint extra = A_items % 2;
+	  fseek(f_tab, offset, SEEK_CUR);
+	  num_items0 = fread(&A[A_items/2], sizeof(uint), A_items/2 + extra, f_tab);
+	}
+        #pragma omp section
+        {
+	  f_tab2 = fopen(filename_tab, "rb");
+	  num_items1 = fread(A, sizeof(uint), A_items/2, f_tab2);
+	}
+    }	
+    fclose(f_tab);    
+    stop_timer(start, end, time);
+    printf("**************Tiempo A (%lu =? %lu): %f\n", num_items0 + num_items1, A_items, time / 1000000);
+
+
+    
+    //exit(-1);
+    
+    char filename_tab_2[2048];
+    sprintf(filename_tab, "%s/%s.S", sa_index_dirname, prefix);
+    sprintf(filename_tab_2, "%s/%s.CHROM", sa_index_dirname, prefix);
+
+    S = (char *) malloc(genome_len);
+    CHROM = (char *) malloc(num_suffixes);
+    #pragma omp parallel sections num_threads(4)
+    {
+      #pragma omp section
+      {
+	  f_tab = fopen(filename_tab, "rb");
+	  size_t offset = sizeof(char)*(genome_len/2);
+	  uint extra = genome_len % 2;
+	  fseek(f_tab, offset, SEEK_CUR);
+	  num_items0 = fread(&S[genome_len/2], sizeof(char), genome_len/2 + extra, f_tab);
+      }
+
+      #pragma omp section
+      {
+	f_tab2 = fopen(filename_tab, "rb");
+	num_items1 = fread(S, sizeof(char), genome_len/2, f_tab2);
+      }
+      
+      #pragma omp section
+      {
+	FILE *f_tab3 = fopen(filename_tab_2, "rb");
+	size_t offset = sizeof(char)*(num_suffixes/2);
+	uint extra = num_suffixes % 2;
+	fseek(f_tab, offset, SEEK_CUR);
+	num_items2 = fread(&CHROM[num_suffixes/2], sizeof(char), num_suffixes/2 + extra, f_tab3);
+      }
+      
+      #pragma omp section
+      {
+	FILE *f_tab4 = fopen(filename_tab_2, "rb");
+	num_items3 = fread(CHROM, sizeof(char), num_suffixes/2, f_tab4);
+      }	
+    }
+    fclose(f_tab);
+    stop_timer(start, end, time);
+    printf("**************** Tiempo S (%lu =? %lu) | CHROM (%lu =? %lu): %f\n",  num_items0 + num_items1, genome_len,  num_items2 + num_items3, num_suffixes, time / 1000000);
+
+
+
+    
+
+    start_timer(start); 
+    sprintf(filename_tab, "%s/%s.JA", sa_index_dirname, prefix);
+    JA = (unsigned char *) malloc(A_items * sizeof(unsigned char));
+    #pragma omp parallel sections num_threads(2)
+    {
+        #pragma omp section
+        {
+	  f_tab = fopen(filename_tab, "rb");
+	  size_t offset = sizeof(unsigned char)*(A_items/2);
+	  uint extra = A_items % 2;
+	  fseek(f_tab, offset, SEEK_CUR);
+	  num_items0 = fread(&JA[A_items/2], sizeof(unsigned char), A_items/2 + extra, f_tab);
+	}
+        #pragma omp section
+        {
+	  f_tab2 = fopen(filename_tab, "rb");
+	  num_items1 = fread(JA, sizeof(unsigned char), A_items/2, f_tab2);
+	}
+    }	
+    fclose(f_tab);    
+    stop_timer(start, end, time);
+    printf("**************Tiempo JA (%lu =? %lu): %f\n", num_items0 + num_items1, A_items, time / 1000000);
+
+
+
+
+    
+    start_timer(start); 
+    IA = NULL;
+    sprintf(filename_tab, "%s/%s.IA", sa_index_dirname, prefix);
+    f_tab = fopen(filename_tab, "rb");
+    IA = (uint *) malloc(IA_items * sizeof(uint));
+    #pragma omp parallel sections num_threads(2)
+    {
+        #pragma omp section
+        {
+	  f_tab = fopen(filename_tab, "rb");
+	  size_t offset = sizeof(uint)*(IA_items/2);
+	  uint extra = IA_items % 2;
+	  fseek(f_tab, offset, SEEK_CUR);
+	  num_items0 = fread(&IA[IA_items/2], sizeof(uint), IA_items/2 + extra, f_tab);
+	}
+        #pragma omp section
+        {
+	  f_tab2 = fopen(filename_tab, "rb");
+	  num_items1 = fread(IA, sizeof(uint), IA_items/2, f_tab2);
+	}
+    }
+    fclose(f_tab);    
+    stop_timer(start, end, time);
+    printf("**************Tiempo IA (%lu =? %lu): %f\n", num_items0 + num_items1, IA_items, time / 1000000);
+	
+
+
+
+    #pragma omp parallel sections num_threads(3)
+    {
+        #pragma omp section
+        {
+	  PRE = NULL;
+	  sprintf(filename_tab, "%s/%s.PRE", sa_index_dirname, prefix);
+	  f_tab = fopen(filename_tab, "rb");
+	  if (f_tab) {
+	    num_items = 1LLU << (2 * k_value);
+	    assert(num_items == pre_length);
+	    PRE = (uint *) malloc(num_items * sizeof(uint));
+	    if (num_items != fread(PRE, sizeof(uint), num_items, f_tab)) {
+	      printf("Error: (%s) mismatch num_items = %lu\n", 
+		     filename_tab, num_items);
+	      exit(-1);
+	    }
+	    fclose(f_tab);
+	  }
+	}
+        #pragma omp section
+        {
+	  genome = sa_genome3_new(genome_len, num_chroms, 
+				  chrom_lengths, chrom_names, S);
+	  
+	  for (size_t i = 0; i < genome->length; i++) {
+	    if (genome->S[i] == 'N' || genome->S[i] == 'n') {
+	      genome->S[i] = 'A';
+	    }
+	  }
+	}	
+        #pragma omp section
+        {
+	  genome_ = genome_new("dna_compression.bin", sa_index_dirname, SA_MODE);
+      
+	  genome_->num_chromosomes = num_chroms;
+	  genome_->chr_name = (char **) calloc(genome_->num_chromosomes, sizeof(char *));
+	  genome_->chr_size = (size_t *) calloc(genome_->num_chromosomes, sizeof(size_t));
+	  genome_->chr_offset = (size_t *) calloc(genome_->num_chromosomes, sizeof(size_t));
+	  size_t offset = 0;
+      
+	  for (int c = 0; c < num_chroms; c++) {
+	    genome_->chr_size[c] = chrom_lengths[c];
+	    genome_->chr_name[c] = chrom_names[c];
+	    genome_->chr_offset[c] = offset;
+	    offset += genome_->chr_size[c];
+	  }
+
+	  stop_timer(start, end, time);
+	  //printf("************* Tiempo GENOME : %f\n", time / 1000000);
+
+	}
+    }
+    
+    stop_timer(start_f, end_f, time_f);
+    printf("FINAL TIME : %f\n", time_f / 1000000);
+    
+  }
+  //======================================================================
+
+ final:
+  free(prefix);
+
+  {
+    // creating the sa_index_t structure
+    sa_index3_t *p = (sa_index3_t *) malloc(sizeof(sa_index3_t));
+
+    p->num_suffixes = num_suffixes;
+    p->prefix_length = pre_length;
+    p->A_items = A_items;
+    p->IA_items = IA_items;
+    p->k_value = k_value;
+    p->SA = SA;
+    p->CHROM = CHROM;
+    p->PRE = PRE;
+    p->A = A;
+    p->IA = IA;
+    p->JA = JA;
+    p->genome = genome;
+    
+    *sa_index_out = p;
+    *genome_out = genome_;
+    
+    return;
+    
+  }
+
+  exit(-1);
+
+    /*    
+    start_timer(start); 
+    sprintf(filename_tab, "%s/%s.CHROM", sa_index_dirname, prefix);
+    CHROM = (char *) malloc(num_suffixes * sizeof(char));
+    #pragma omp parallel sections num_threads(2)
+    {
+        #pragma omp section
+        {
+	  f_tab = fopen(filename_tab, "rb");
+	  int offset = sizeof(char)*(num_suffixes/2);
+	  int extra = num_suffixes % 2;
+	  fseek(f_tab, offset, SEEK_CUR);
+	  fread(&CHROM[num_suffixes/2], sizeof(char), num_suffixes/2 + extra, f_tab);
+	}
+        #pragma omp section
+        {
+	  f_tab2 = fopen(filename_tab, "rb");
+	  fread(CHROM, sizeof(char), num_suffixes/2, f_tab2);
+	}
+    }    
+    fclose(f_tab);
+    stop_timer(start, end, time);
+    printf("**************Tiempo CHROM : %f\n", time / 1000000);        
+    */
+
+  //start_timer(start_f); 
+  #pragma omp parallel sections num_threads(final_threads)
+  {
+    //printf("Parallel section %i\n", omp_get_num_threads());
+    #pragma omp section
+    {
+      FILE *f_tab;
+      char filename_tab[strlen(sa_index_dirname) + 1024];
+      struct timeval end, start;      
+      double time;  
+      time = 0;
+      start_timer(start); 
+
+      IA = NULL;
+      sprintf(filename_tab, "%s/%s.IA", sa_index_dirname, prefix);
+      f_tab = fopen(filename_tab, "rb");
+      if (f_tab) {
+	IA = (uint *) malloc(IA_items * sizeof(uint));
+	
+	//	printf("\nreading IA table (Compression Row Storage) from file %s...\n", filename_tab);
+	//gettimeofday(&start, NULL);
+	if ((num_items = fread(IA, sizeof(uint), IA_items, f_tab)) != IA_items) {
+	  printf("Error: (%s) mismatch read num_items = %lu (it must be %lu)\n", 
+		 filename_tab, num_items, IA_items);
+	  exit(-1);
+	}
+	//gettimeofday(&stop, NULL);
+	//	printf("end of reading IA table (%lu num_items) from file %s in %0.2f s\n", 
+	//	       num_items, filename_tab,
+	//	       (stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);  
+	fclose(f_tab);
+      }
+      //stop_timer(start, end, time);
+      //printf("Tiempo IA : %f\n", time / 1000000);
+
+
+      // read CHROM table from file
+      //FILE *f_tab;
+      //char filename_tab[strlen(sa_index_dirname) + 1024];
+      //struct timeval end, start;
+      //double time;
+      //time = 0;
+      //start_timer(start); 
+
+      sprintf(filename_tab, "%s/%s.CHROM", sa_index_dirname, prefix);
+      f_tab = fopen(filename_tab, "rb");
+      if (f_tab == NULL) {
+	printf("Error: could not open %s to write\n", filename_tab);
+	exit(-1);
+      }
+      //      printf("CHROM: filename %s, num_suffixes = %lu\n", filename_tab, num_suffixes);
+      CHROM = (char *) malloc(num_suffixes * sizeof(char));
+      
+      //      printf("\nreading CHROM table from file %s...\n", filename_tab);
+      //gettimeofday(&start, NULL);
+      num_items = fread(CHROM, sizeof(char), num_suffixes, f_tab);
+      if (num_items != num_suffixes) {
+	printf("Error: (%s) mismatch num_items = %lu vs num_suffixes = %lu\n", 
+	       filename_tab, num_items, num_suffixes);
+	exit(-1);
+      }
+      //gettimeofday(&stop, NULL);
+      //      printf("end of reading CHROM table (%lu num_suffixes) from file %s in %0.2f s\n", 
+      //	     num_suffixes, filename_tab,
+      //	     (stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);      
+      fclose(f_tab);
+      //stop_timer(start, end,  time);
+      //printf("Tiempo CHROM : %f\n", time / 1000000);
+
+
+      // read PRE table from file
+      //FILE *f_tab;
+      //char filename_tab[strlen(sa_index_dirname) + 1024];
+      //struct timeval end, start;
+      //double time;
+      //time = 0;
+      //start_timer(start); 
+
+      PRE = NULL;
+      sprintf(filename_tab, "%s/%s.PRE", sa_index_dirname, prefix);
+      f_tab = fopen(filename_tab, "rb");
+      if (f_tab) {
+	num_items = 1LLU << (2 * k_value);
+	assert(num_items == pre_length);
+	PRE = (uint *) malloc(num_items * sizeof(uint));
+	
+	//	printf("\nreading PRE table from file %s...\n", filename_tab);
+	//gettimeofday(&start, NULL);
+	if (num_items != fread(PRE, sizeof(uint), num_items, f_tab)) {
+	  printf("Error: (%s) mismatch num_items = %lu\n", 
+		 filename_tab, num_items);
+	  exit(-1);
+	}
+	//gettimeofday(&stop, NULL);
+	//	printf("end of reading PRE table (%lu num_items) from file %s in %0.2f s\n", 
+	//	       num_items, filename_tab,
+	//	       (stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);  
+	fclose(f_tab);
+      }
+      //stop_timer(start, end, time);
+      //printf("Tiempo PRE : %f\n", time / 1000000);
+
+
+      // Compressed Row Storage (JA table)
+      //FILE *f_tab;
+      //char filename_tab[strlen(sa_index_dirname) + 1024];
+      //struct timeval end, start;
+      //double time;
+      //time = 0;
+      //start_timer(start); 
+
+      JA = NULL;
+      sprintf(filename_tab, "%s/%s.JA", sa_index_dirname, prefix);
+      f_tab = fopen(filename_tab, "rb");
+      if (f_tab) {
+	JA = (unsigned char *) malloc(A_items * sizeof(unsigned char));
+	
+	//	printf("\nreading JA table (Compression Row Storage) from file %s...\n", filename_tab);
+	//gettimeofday(&start, NULL);
+	if ((num_items = fread(JA, sizeof(unsigned char), A_items, f_tab)) != A_items) {
+	  printf("Error: (%s) mismatch read num_items = %lu (it must be %lu)\n", 
+		 filename_tab, num_items, A_items);
+	  exit(-1);
+	}
+	//gettimeofday(&stop, NULL);
+	//	printf("end of reading JA table (%lu num_items) from file %s in %0.2f s\n", 
+	//	       num_items, filename_tab,
+	//	       (stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);  
+	fclose(f_tab);
+      }
+      //stop_timer(start, end, time);
+      //printf("Tiempo JA : %f\n", time / 1000000);
+
+
+      //FILE *f_tab;
+      //char filename_tab[strlen(sa_index_dirname) + 1024];
+      //struct timeval end, start;
+      //double time;
+      //time = 0;
+      //start_timer(start); 
+
+      genome_ = genome_new("dna_compression.bin", sa_index_dirname, SA_MODE);
+      
+      genome_->num_chromosomes = num_chroms;
+      genome_->chr_name = (char **) calloc(genome_->num_chromosomes, sizeof(char *));
+      genome_->chr_size = (size_t *) calloc(genome_->num_chromosomes, sizeof(size_t));
+      genome_->chr_offset = (size_t *) calloc(genome_->num_chromosomes, sizeof(size_t));
+      size_t offset = 0;
+      
+      for (int c = 0; c < num_chroms; c++) {
+	genome_->chr_size[c] = chrom_lengths[c];
+	genome_->chr_name[c] = chrom_names[c];
+	genome_->chr_offset[c] = offset;
+	offset += genome_->chr_size[c];
+      }
+      stop_timer(start, end, time);
+      printf("************* Tiempo GENOME : %f\n", time / 1000000);
+    }
+
+    #pragma omp section
+    {
+      //struct timeval stop, start;
+      //FILE *f_tab;
+      FILE *f_tab;
+      char filename_tab[strlen(sa_index_dirname) + 1024];
+      struct timeval end, start;
+      double time;
+      time = 0;
+      start_timer(start); 
+      
+      // read S from file
+      sprintf(filename_tab, "%s/%s.S", sa_index_dirname, prefix);
+      f_tab = fopen(filename_tab, "rb");
+      if (f_tab == NULL) {
+	printf("Error: could not open %s to write\n", filename_tab);
+	exit(-1);
+      }
+      //  printf("genome: filename %s, length = %lu\n", filename_tab, genome_len);
+      S = (char *) malloc(genome_len);
+  
+      //printf("\nreading S from file %s...\n", filename_tab);
+      //gettimeofday(&start, NULL);
+      num_items = fread(S, sizeof(char), genome_len, f_tab);
+      if (num_items != genome_len) {
+	printf("Error: (%s) mismatch num_items = %lu vs length = %lu\n", 
+	       filename_tab, num_items, genome_len);
+	exit(-1);
+      }
+      //gettimeofday(&stop, NULL);
+      //printf("end of reading S (%lu len) from file %s in %0.2f s\n", 
+      //	     genome_len, filename_tab,
+      //	     (stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);      
+      fclose(f_tab);
+      
+      genome = sa_genome3_new(genome_len, num_chroms, 
+			      chrom_lengths, chrom_names, S);
+      
+      for (size_t i = 0; i < genome->length; i++) {
+	if (genome->S[i] == 'N' || genome->S[i] == 'n') {
+	  genome->S[i] = 'A';
+	}
+      }
+
+      stop_timer(start, end, time);
+      printf("**************** Tiempo S : %f\n", time / 1000000);
+
+    }
+
+    #pragma omp section
+    {
+      // Compressed Row Storage (A table)
+      FILE *f_tab;
+      char filename_tab[strlen(sa_index_dirname) + 1024];
+      struct timeval end, start;
+      double time;
+      start_timer(start); 
+
+      A = NULL;
+      sprintf(filename_tab, "%s/%s.A", sa_index_dirname, prefix);
+      f_tab = fopen(filename_tab, "rb");
+      if (f_tab) {
+	A = (uint *) malloc(A_items * sizeof(uint));
+	
+	//	printf("\nreading A table (Compression Row Storage) from file %s...\n", filename_tab);
+	//gettimeofday(&start, NULL);
+	if ((num_items = fread(A, sizeof(uint), A_items, f_tab)) != A_items) {
+	  printf("Error: (%s) mismatch read num_items = %lu (it must be %lu)\n", 
+		 filename_tab, num_items, A_items);
+	  exit(-1);
+	}
+	//gettimeofday(&stop, NULL);
+	//	printf("end of reading A table (%lu num_items) from file %s in %0.2f s\n", 
+	//	       num_items, filename_tab,
+	//	       (stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);  
+	fclose(f_tab);
+      }
+      stop_timer(start, end, time);
+      printf("**************Tiempo A : %f\n", time / 1000000);
+    }
+
+    #pragma omp section
+    {
+      // read SA table from file
+      FILE *f_tab;
+      char filename_tab[strlen(sa_index_dirname) + 1024];
+      struct timeval end, start;
+      double time;
+      start_timer(start); 
+      //gettimeofday(&start, NULL);
+
+      sprintf(filename_tab, "%s/%s.SA", sa_index_dirname, prefix);
+      f_tab = fopen(filename_tab, "rb");
+      if (f_tab == NULL) {
+	printf("Error: could not open %s to write\n", filename_tab);
+	exit(-1);
+      }
+      //      printf("SA: filename %s, num_suffixes = %lu\n", filename_tab, num_suffixes);
+      SA = (uint *) malloc(num_suffixes * sizeof(uint));  
+      //      printf("\nreading SA table from file %s...\n", filename_tab);
+      num_items = fread(SA, sizeof(uint), num_suffixes, f_tab);
+      if (num_items != num_suffixes) {
+	printf("Error: (%s) mismatch num_items = %lu vs num_suffixes = %lu\n", 
+	       filename_tab, num_items, num_suffixes);
+	exit(-1);
+      }
+      stop_timer(start, end, time);
+      printf("****************Tiempo SA : %f\n", time / 1000000);
+      //      printf("end of reading SA table (%lu num_suffixes) from file %s in %0.2f s\n", 
+      //	     num_suffixes, filename_tab,
+      //	     (stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);      
+      fclose(f_tab);
+    }
+  }
+  //stop_timer(start_f, end_f, time_f);
+  //printf("tiempo final %f :)\n", time_f / 1000000);
+
+  free(prefix);
+
+  // creating the sa_index_t structure
+  sa_index3_t *p = (sa_index3_t *) malloc(sizeof(sa_index3_t));
+
+  p->num_suffixes = num_suffixes;
+  p->prefix_length = pre_length;
+  p->A_items = A_items;
+  p->IA_items = IA_items;
+  p->k_value = k_value;
+  p->SA = SA;
+  p->CHROM = CHROM;
+  p->PRE = PRE;
+  p->A = A;
+  p->IA = IA;
+  p->JA = JA;
+  p->genome = genome;
+
+  *sa_index_out = p;
+  *genome_out = genome_;
+
+  //exit(-1);
+
+  return p;
+}
+
+
+
+
 
 void rna_aligner(options_t *options) {
+  //convert ASCII fill 
+  extern char convert_ASCII[128];
+  convert_ASCII['a'] = 'T';
+  convert_ASCII['A'] = 'T';
+
+  convert_ASCII['c'] = 'G';
+  convert_ASCII['C'] = 'G';
+
+  convert_ASCII['g'] = 'C';
+  convert_ASCII['G'] = 'C';
+
+  convert_ASCII['t'] = 'a';
+  convert_ASCII['T'] = 'A';
+
+  convert_ASCII['n'] = 'N';
+  convert_ASCII['N'] = 'N';
+  //End fill 
+
   int path_length = strlen(options->output_name);
   int prefix_length = 0;
   
@@ -64,7 +1195,7 @@ void rna_aligner(options_t *options) {
     strcat(log_results, "/");
     strcat(log_results, options->prefix_name);
     strcat(log_results, "_hpg-aligner.log");  
-
+    
     strcat(extend_junctions, "/");
     strcat(extend_junctions, options->prefix_name);
     strcat(extend_junctions, "_extend_junctions.bed");
@@ -74,10 +1205,10 @@ void rna_aligner(options_t *options) {
     strcat(exact_junctions, "_exact_junctions.bed");
  
   } else {
-    if (!options->fast_mode) {
+    if (options->bam_format) {
       strcat(reads_results, "/alignments.bam");
     } else {
-      strcat(reads_results, "/alignments.sam");
+      strcat(reads_results, "/alignments.sam");    
     }
     strcat(log_results, "/hpg-aligner.log");
     strcat(extend_junctions, "/extend_junctions.bed");
@@ -155,39 +1286,51 @@ void rna_aligner(options_t *options) {
     //////////////////////////////////////////////////////
   } else {    
     ///////////////// LOAD SA INDEX ////////////////////// 
-    LOG_DEBUG("Loading SA tables...");
-    sa_index = sa_index3_new(options->bwt_dirname);
-    sa_index3_display(sa_index);
 
+    LOG_DEBUG("Loading SA tables...");
+    //sa_index = sa_index3_new(options->bwt_dirname);
+    start_timer(time_genome_s);
+    sa_index3_parallel_genome_new(options->bwt_dirname, options->num_cpu_threads, &sa_index, &genome);
+    
+    /*
+    sa_index3_display(sa_index);
+    stop_timer(time_genome_s, time_genome_e, time_genome);
+    printf("1.TOTAL Carga genoma: %f(s)\n", time_genome / 1000000);
+    
+    start_timer(time_genome_s);
     LOG_DEBUG("Reading genome...");
     genome = genome_new("dna_compression.bin", options->bwt_dirname, SA_MODE);
-
+    
     genome->num_chromosomes = sa_index->genome->num_chroms;
     genome->chr_name = (char **) calloc(genome->num_chromosomes, sizeof(char *));
     genome->chr_size = (size_t *) calloc(genome->num_chromosomes, sizeof(size_t));
     genome->chr_offset = (size_t *) calloc(genome->num_chromosomes, sizeof(size_t));
     size_t offset = 0;
-
+    
     for (int c = 0; c < genome->num_chromosomes; c++) {
       genome->chr_size[c] = sa_index->genome->chrom_lengths[c];
       genome->chr_name[c] = strdup(sa_index->genome->chrom_names[c]);
       genome->chr_offset[c] = offset;
       offset += genome->chr_size[c];
     }
+    stop_timer(time_genome_s, time_genome_e, time_genome);
+    printf("2.TOTAL Carga genoma: %f(s)\n", time_genome / 1000000);
 
     LOG_DEBUG("Done !!");
-    //metaexons = metaexons_new(sa_index->genome->num_chroms, 
-    //			      sa_index->genome->chrom_lengths);    
-    //////////////////////////////////////////////////////
+    */
   }
 
   num_chromosomes = genome->num_chromosomes;
 
+  //start_timer(time_genome_s);
   // Metaexons structure
   metaexons = metaexons_new(genome->num_chromosomes, 
 			    genome->chr_size);
   
   stop_timer(time_genome_s, time_genome_e, time_genome);
+  
+  printf("TOTAL Carga genoma: %f(s)\n", time_genome / 1000000);
+  //exit(-1);
 
   //============================= INPUT INITIALIZATIONS =========================//  
   //BWT parameters
@@ -304,20 +1447,30 @@ void rna_aligner(options_t *options) {
   pair_server_input_init(pair_mng, report_optarg, NULL, NULL, NULL, &pair_input);
 
   batch_writer_input_t writer_input;
-  batch_writer_input_init( output_filename,
-			   exact_filename, 
-			   extend_filename, 
-			   alignments_list, 
-			   genome, &writer_input);
+  batch_writer_input_init(output_filename,
+			  exact_filename, 
+			  extend_filename, 
+			  alignments_list, 
+			  genome, 
+			  &writer_input);
 
-  if (!options->fast_mode) {
-    bam_header_t *bam_header = create_bam_header_by_genome(genome);
-    //printf("%s\n", output_filename);
+  writer_input.bam_format = options->bam_format;
+  if (options->bam_format) {
+    bam_header_t *bam_header;
+    if (options->fast_mode) {
+      bam_header = create_bam_header(sa_index->genome);
+    } else {
+      bam_header = create_bam_header_by_genome(genome);
+    }
     writer_input.bam_file = bam_fopen_mode(output_filename, bam_header, "w");
     bam_fwrite_header(bam_header, writer_input.bam_file);
   } else {
     writer_input.bam_file = (bam_file_t *) fopen(output_filename, "w"); 
-    write_sam_header(sa_index->genome, (FILE *) writer_input.bam_file);
+    if (options->fast_mode) {
+      write_sam_header(sa_index->genome, (FILE *) writer_input.bam_file);
+    } else {
+      write_sam_header_BWT(genome, (FILE *) writer_input.bam_file);
+    }
   }
 
   extra_stage_t extra_stage_input;
@@ -370,6 +1523,9 @@ void rna_aligner(options_t *options) {
   double time_alig;
   struct timeval time_start_alig, time_end_alig;  
   char *file1, *file2;
+
+  double time_total_1, time_total_2;
+  struct timeval time_s1, time_e1, time_s2, time_e2;
 
   printf("\n\n\t\t==================================================\n");
   printf("\t\t|................. M A P P I N G ................|\n");
@@ -448,21 +1604,37 @@ void rna_aligner(options_t *options) {
       workflow_set_stages(4, (workflow_stage_function_t *)&stage_functions, stage_labels, wf);
       // optional producer and consumer functions
       workflow_set_producer((workflow_producer_function_t *)fastq_reader, "FastQ reader", wf);
-      workflow_set_consumer((workflow_consumer_function_t *)bam_writer, "BAM writer", wf);
-  
+
+      if (options->bam_format) {
+	workflow_set_consumer((workflow_consumer_function_t *)bam_writer, "BAM writer", wf);
+      } else {
+	workflow_set_consumer((workflow_consumer_function_t *)sam_writer, "SAM writer", wf);
+      }
+
       workflow_t *wf_last = workflow_new();
       workflow_stage_function_t stage_functions_last[] = {rna_last_stage, post_pair_stage};
       char *stage_labels_last[] = {"RNA LAST STAGE", "POST PAIR"};
       workflow_set_stages(2, (workflow_stage_function_t *)&stage_functions_last, stage_labels_last, wf_last);
       workflow_set_producer((workflow_producer_function_t *)file_reader, "Buffer reader", wf_last);
-      workflow_set_consumer((workflow_consumer_function_t *)bam_writer, "BAM writer", wf_last);
+
+      if (options->bam_format) {
+	workflow_set_consumer((workflow_consumer_function_t *)bam_writer, "BAM writer", wf_last);
+      } else {
+	workflow_set_consumer((workflow_consumer_function_t *)sam_writer, "SAM writer", wf_last);
+      }
+
 
       workflow_t *wf_hc = workflow_new();
       workflow_stage_function_t stage_functions_hc[] = {rna_last_hc_stage, post_pair_stage};
       char *stage_labels_hc[] = {"RNA HARD CLIPPINGS", "POST PAIR"};
       workflow_set_stages(2, (workflow_stage_function_t *)&stage_functions_hc, stage_labels_hc, wf_hc);
       workflow_set_producer((workflow_producer_function_t *)file_reader_2, "Buffer reader", wf_hc);
-      workflow_set_consumer((workflow_consumer_function_t *)bam_writer, "BAM writer", wf_hc);
+
+      if (options->bam_format) {
+	workflow_set_consumer((workflow_consumer_function_t *)bam_writer, "BAM writer", wf_hc);
+      } else {
+	workflow_set_consumer((workflow_consumer_function_t *)sam_writer, "SAM writer", wf_hc);
+      }
      
 
       // Create new thread POSIX for search extra Splice Junctions
@@ -526,8 +1698,9 @@ void rna_aligner(options_t *options) {
       sa_rna.file1 = f_sa;
       sa_rna.file2 = f_hc;
       //printf("FILEEEEEEEEEEEEEEEE %p\n", f_sa);
+
       sa_wf_batch_t *wf_batch = sa_wf_batch_new(NULL, (void *)sa_index, &writer_input, NULL, &sa_rna);
-      sa_wf_input_t *wf_input = sa_wf_input_new(0, &reader_input, wf_batch);
+      sa_wf_input_t *wf_input = sa_wf_input_new(options->bam_format, &reader_input, wf_batch);
       
       // create and initialize workflow
       workflow_t *wf = workflow_new();      
@@ -536,35 +1709,94 @@ void rna_aligner(options_t *options) {
       workflow_set_stages(1, (workflow_stage_function_t *)&stage_functions, stage_labels, wf);      
       // optional producer and consumer functions
       workflow_set_producer(sa_fq_reader_rna, "FastQ reader", wf);
-      workflow_set_consumer(sa_sam_writer_rna, "SAM writer", wf);
-      
+
+      if (options->bam_format) {
+	//workflow_set_consumer(sa_bam_writer_rna, "BAM writer", wf);
+	workflow_set_consumer(write_to_file, "SAM writer", wf);
+      } else {
+	//workflow_set_consumer(sa_sam_writer_rna, "SAM writer", wf);
+	workflow_set_consumer(write_to_file, "SAM writer", wf);
+      }
+
       //Create and initialize second workflow
       workflow_t *wf_last = workflow_new();
       workflow_stage_function_t stage_functions_last[] = {sa_rna_mapper_last};
       char *stage_labels_last[] = {"SA mapper last stage"};
       workflow_set_stages(1, (workflow_stage_function_t *)&stage_functions_last, stage_labels_last, wf_last);
       workflow_set_producer(sa_alignments_reader_rna, "FastQ reader", wf_last);
-      workflow_set_consumer(sa_sam_writer_rna, "SAM writer", wf_last);
-
-      double time_total;
-      struct timeval time_s1, time_e1;
+      
+      if (options->bam_format) {
+	//workflow_set_consumer(sa_bam_writer_rna, "BAM writer", wf_last);
+	workflow_set_consumer(write_to_file, "SAM writer", wf_last);
+      } else {
+	//workflow_set_consumer(sa_sam_writer_rna, "SAM writer", wf_last);
+	workflow_set_consumer(write_to_file, "SAM writer", wf_last);
+      }
 
       printf("Run workflow with %i threads\n", options->num_cpu_threads);
 
+      //Extrae_init(); 
+
       start_timer(time_s1);
       workflow_run_with(options->num_cpu_threads, wf_input, wf);
-      stop_timer(time_s1, time_e1, time_total);
+      stop_timer(time_s1, time_e1, time_total_1);
 
-      printf("Time W1: %f(s)\n", time_total / 1000000);
-      
-      printf("=============== SECOND WORKFLOW ================\n");
-      start_timer(time_s1);
+
+      //extern size_t total_reads;
+      //extern size_t reads_no_map;
+      //printf("===== W1 %f(s) =====\n", time_total_1 / (double) 1000000);
+
+      //printf("Total Reads           : %lu\n", total_reads);
+      //printf("Total Reads Mapped    : %lu (%f)\n", total_reads - reads_no_map, (double)((total_reads - reads_no_map) * 100) / (double)(total_reads) );
+      //printf("Total Reads No Mapped : %lu (%f)\n", reads_no_map, (double)((reads_no_map) * 100) / (double)(total_reads) );
+      //printf("====================\n");
+
+      printf("= = = = T I M I N G    W O R K F L O W    '1' = = = =\n");
+      workflow_display_timing(wf);
+      printf("= = = = - - - - - - - - - - - - - - - - - - - = = = =\n\n");
+
+      //Extrae_event(6000019, 9); 
+      //sleep(2);
+      //Extrae_event(6000019, 0); 
+      //extern double time_free_alig, time_free_list, time_free_batch;
+      //printf("Time free Writer Alig-free=%f(s), list-free=%f(s), batch-free=%f\n", time_free_alig / (double)1000000, time_free_list / (double)1000000, time_free_batch / (double)1000000);
+
+      //extern double time_timer0;
+      //extern double time_timer1;
+      //extern double time_timer2;
+      //extern double time_timer3;
+
+      //printf("Metaexon times: Timer0 = %f, Timer1 = %f, Timer2 = %f, Timer3 = %f\n", time_timer0 / (double)1000000, 
+      //     time_timer1 / (double)1000000, time_timer2 / (double)1000000, time_timer3 / (double)1000000);
+
+
+
+      start_timer(time_s2);
       rewind(f_sa);
       workflow_run_with(options->num_cpu_threads, wf_input, wf_last);      
-      stop_timer(time_s1, time_e1, time_total);
+      stop_timer(time_s2, time_e2, time_total_2);
 
-      printf("Time W2: %f(s)\n", time_total / 1000000);
 
+      //Extrae_fini();
+      //printf("===== W2 %f(s) =====\n", time_total_2 / (double)1000000);
+      //printf("Total Reads           : %i\n", total_reads);
+      //printf("Total Reads Mapped    : %i (%f)\n", total_reads - reads_no_map, (double)((total_reads - reads_no_map) * 100) / (double)(total_reads) );
+      //printf("Total Reads No Mapped : %i (%f)\n", reads_no_map, (double)((reads_no_map) * 100) / (double)(total_reads) );
+      //printf("====================\n");
+      
+      printf("= = = = T I M I N G    W O R K F L O W    '2' = = = =\n");
+      workflow_display_timing(wf_last);
+      printf("= = = = - - - - - - - - - - - - - - - - - - - = = = =\n\n");
+
+      //extern double time_read_fq  ;
+      //extern double time_read_fq_process ;
+      //extern double time_read_alig ;
+      //extern double time_read_proc ;
+      
+      //printf("Tiempo Lectura fq = %f, Tiempo procesamiento lectura = %f, Tiempo lectura Alig & buffer = %f, Tiempo procesamiento = %f\n", time_read_fq / (double)1000000, time_read_fq_process / (double)1000000, time_read_alig / (double)1000000, time_read_proc / (double)1000000);
+      
+      //printf("Time W2: %f(s)\n", time_total / 1000000);
+      //fprintf(stderr, "========== FINISHED MAPPING in %f(s) =========\n", (time_total_1 + time_total_2) / 1000000);
       //printf("TOTAL TIME : %f\n", time_total / 1000000);
       //printf("----------------------------------------------\n");
       //workflow_display_timing(wf);
@@ -580,7 +1812,19 @@ void rna_aligner(options_t *options) {
       //for (int x = 0; x <= 10; x++) {
       //printf("%i CALs: %i reads (%f)\n", x, tot_cals[x], ((float)tot_cals[x]*100)/(float)total_reads );
       //}
-      
+      extern size_t search_calls;
+      extern size_t insert_calls;
+      extern double time_search;
+      extern double time_insert;
+
+     
+      printf("Load Genome Time : %f(s)\n", time_genome / 1000000);
+      printf("         W1 Time : %f(s)\n", time_total_1 / 1000000);
+      printf("         W2 Time : %f(s)\n", time_total_2 / 1000000);
+      printf("         W TOTAL : %f(s)\n", (time_total_1 + time_total_2) / 1000000);
+      printf("         TOTAL   : %f(s)\n", (time_genome + time_total_1 + time_total_2) / 1000000);
+     
+
     }
 
     if (file1) { free(file1); }
@@ -638,7 +1882,14 @@ void rna_aligner(options_t *options) {
   //free(basic_st);
   
   //if (time_on){ timing_free(timing); }
-  metaexons_free(metaexons);
+  //size_t total_meta = 0;
+  //for (unsigned int i = 0; i < num_chromosomes; i++) {
+  //printf("Chr %i : %lu\n", i + 1, linked_list_size(metaexons->metaexons_list[i]));
+  //total_meta += linked_list_size(metaexons->metaexons_list[i]);
+  //}
+  //printf("Total Metaexons = %lu\n", total_meta);
+  //metaexons_free(metaexons);
+  
   /*  
   //========================= O P E N M P    P I P E L I N E =============================//
   
@@ -930,12 +2181,17 @@ void rna_aligner(options_t *options) {
   if (!options->fast_mode) {
     // free memory
     if (bwt_index) { bwt_index_free(bwt_index); }
-    bam_fclose(writer_input.bam_file);
   } else {
     // free memory
     if (sa_index)  { sa_index3_free(sa_index);  }
+  }
+
+  if (options->bam_format) {
+    bam_fclose(writer_input.bam_file);
+  } else {
     fclose((FILE *) writer_input.bam_file);
   }
+    
  
   batch_free(batch);
 
