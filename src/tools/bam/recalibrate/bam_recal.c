@@ -249,7 +249,7 @@ recal_bam_file(uint8_t flags, const char *bam_path, const char *ref, const char 
 		bfwork_context_set_user_data(&collect_context, &cycles_param);
 
 		//Add context for data collection
-		bfwork_add_context(&fwork, &collect_context, FWORK_CONTEXT_QUEUE_SEQUENTIAL);
+		bfwork_add_context(&fwork, &collect_context, FWORK_CONTEXT_SEQUENTIAL);
 
 		printf("Cycles: %d\n",cycles);
 	}
@@ -290,7 +290,7 @@ recal_bam_file(uint8_t flags, const char *bam_path, const char *ref, const char 
 		}
 
 		//Add context for recalibration
-		bfwork_add_context(&fwork, &recal_context, FWORK_CONTEXT_QUEUE_SEQUENTIAL);
+		bfwork_add_context(&fwork, &recal_context, FWORK_CONTEXT_SEQUENTIAL);
 	}
 
 	//Run wander

@@ -35,8 +35,8 @@
 #define FWORK_VER 			FWORK_VER_CURRENT"."FWORK_VER_REVISION"."FWORK_VER_AGE
 
 //CONTEXT EXECUTION
-#define FWORK_CONTEXT_QUEUE_SEQUENTIAL	0x01
-#define FWORK_CONTEXT_QUEUE_PARALLEL 0x02
+#define FWORK_CONTEXT_SEQUENTIAL	0x01
+#define FWORK_CONTEXT_PARALLEL 0x02
 
 //FIXED SIZES
 #define FWORK_REGIONS_MAX 1000
@@ -75,6 +75,10 @@ typedef struct {
 	reducer_function reduce;
 	void *reduce_dest;
 
+	//Intermediate output
+	char *output_file_str;
+	uint8_t output_temp;
+
 	//User data
 	void *user_data;
 	omp_lock_t user_data_lock;
@@ -93,6 +97,7 @@ typedef struct {
 	char *input_file_str;
 	char *output_file_str;
 	char *reference_str;
+	char *last_temp_file_str;
 	bam_file_t *input_file;
 	bam_file_t *output_file;
 	genome_t *reference;
@@ -147,7 +152,7 @@ EXTERNC int bfwork_configure(bam_fwork_t *fwork, const char *in_file, const char
  *
  * \param[in] fwork Framework to add context.
  * \param[in] context Context to be used in framework.
- * \param[in] flags Specify execution queue for this context. Can be FWORK_CONTEXT_QUEUE_SEQUENTIAL or FWORK_CONTEXT_QUEUE_PARALLEL.
+ * \param[in] flags Specify execution queue for this context. Can be FWORK_CONTEXT_SEQUENTIAL or FWORK_CONTEXT_PARALLEL.
  */
 EXTERNC int bfwork_add_context(bam_fwork_t *fwork, bfwork_context_t *context, uint8_t flags);
 
@@ -185,6 +190,14 @@ EXTERNC void bfwork_context_destroy(bfwork_context_t *context);
  * \param[in] pf Processing function to add.
  */
 EXTERNC int bfwork_context_add_proc(bfwork_context_t *context, processor_function pf);
+
+/**
+ * \brief Define if this context modify original input file for next contexts.
+ *
+ * \param[in] context Target context.
+ * \param[in] file_str Output filename for intermediate BAM. If NULL, the BAM will be temporal and removed when execution ends.
+ */
+EXTERNC int bfwork_context_set_output(bfwork_context_t *context, const char *file_str);
 
 /**
  * USER DATA

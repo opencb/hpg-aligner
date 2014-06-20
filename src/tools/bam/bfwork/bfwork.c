@@ -14,7 +14,8 @@
 * You should have received a copy of the GNU General Public License
 * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
- #include <errno.h>
+#include <errno.h>
+#include <string.h>
 
 #include "bfwork.h"
 
@@ -153,13 +154,13 @@ bfwork_add_context(bam_fwork_t *fwork, bfwork_context_t *context, uint8_t flags)
 	assert(flags != 0);
 
 	//What kind of execution queue have this context?
-	if(flags & FWORK_CONTEXT_QUEUE_PARALLEL)
+	if(flags & FWORK_CONTEXT_PARALLEL)
 	{
 		//Not supported yet
 		LOG_WARN("FWORK_CONTEXT_QUEUE_PARALLEL is not supported yet, changing to FWORK_CONTEXT_QUEUE_SEQUENTIAL\n");
-		flags = FWORK_CONTEXT_QUEUE_SEQUENTIAL;
+		flags = FWORK_CONTEXT_SEQUENTIAL;
 	}
-	if(flags & FWORK_CONTEXT_QUEUE_SEQUENTIAL)
+	if(flags & FWORK_CONTEXT_SEQUENTIAL)
 	{
 		//Add to sequential execution queue
 		fwork->v_context[fwork->v_context_l] = context;
@@ -203,6 +204,7 @@ bfwork_run_sequential(bam_fwork_t *fwork)
 #ifdef D_TIME_DEBUG
 		times = omp_get_wtime() - times;
 		if(region->size != 0)
+			if(context->time_stats)
 			time_add_time_slot(D_FWORK_READ, context->time_stats, times / (double)region->size);
 #endif
 		if(err)
@@ -222,6 +224,7 @@ bfwork_run_sequential(bam_fwork_t *fwork)
 				}
 #ifdef D_TIME_DEBUG
 				times = omp_get_wtime() - times;
+				if(context->time_stats)
 				if(region->size != 0)
 				{
 					time_add_time_slot(D_FWORK_PROC,  context->time_stats, times / (double)region->size);
@@ -246,6 +249,7 @@ bfwork_run_sequential(bam_fwork_t *fwork)
 
 #ifdef D_TIME_DEBUG
 				times = omp_get_wtime() - times;
+				if(context->time_stats)
 				if(reads_to_write != 0)
 					time_add_time_slot(D_FWORK_WRITE, context->time_stats, times / (double)reads_to_write);
 #endif
@@ -318,6 +322,7 @@ bfwork_run_threaded(bam_fwork_t *fwork)
 #ifdef D_TIME_DEBUG
 					times = omp_get_wtime() - times;
 					omp_set_lock(&region->lock);
+					if(fwork->context->time_stats)
 					if(region->size != 0)
 						time_add_time_slot(D_FWORK_READ, fwork->context->time_stats, times / (double)region->size);
 					omp_unset_lock(&region->lock);
@@ -351,6 +356,7 @@ bfwork_run_threaded(bam_fwork_t *fwork)
 								}
 #ifdef D_TIME_DEBUG
 								times = omp_get_wtime() - times;
+								if(fwork->context->time_stats)
 								if(region->size != 0)
 									time_add_time_slot(D_FWORK_PROC_FUNC, fwork->context->time_stats, times / (double)region->size);
 								aux_time = omp_get_wtime();
@@ -365,6 +371,7 @@ bfwork_run_threaded(bam_fwork_t *fwork)
 #ifdef D_TIME_DEBUG
 								aux_time = omp_get_wtime() - aux_time;
 								omp_set_lock(&region->lock);
+								if(fwork->context->time_stats)
 								if(region->size != 0)
 									time_add_time_slot(D_FWORK_PROC, fwork->context->time_stats, (times + aux_time) / (double)region->size);
 								omp_unset_lock(&region->lock);
@@ -445,6 +452,7 @@ bfwork_run_threaded(bam_fwork_t *fwork)
 #ifdef D_TIME_DEBUG
 					times = omp_get_wtime() - times;
 					omp_set_lock(&region->lock);
+					if(fwork->context->time_stats)
 					if(reads_to_write != 0)
 						time_add_time_slot(D_FWORK_WRITE, fwork->context->time_stats, times / (double)reads_to_write);
 					omp_unset_lock(&region->lock);
@@ -518,6 +526,8 @@ bfwork_run(bam_fwork_t *fwork)
 		printf("Reference opened!...\n");
 	}
 
+	printf("--------------------------------------\n");
+
 	for(c = 0; c < fwork->v_context_l; c++)
 	{
 		//Select next context
@@ -530,31 +540,72 @@ bfwork_run(bam_fwork_t *fwork)
 
 		//Open input bam
 		{
-			printf("Opening BAM from \"%s\" ...\n", fwork->input_file_str);
-			fwork->input_file = bam_fopen(fwork->input_file_str);
-			assert(fwork->input_file);
-			printf("BAM opened!...\n");
+			//If last context had no output
+			if(!fwork->last_temp_file_str)
+			{
+				//Open initial input file
+				printf("Opening BAM from \"%s\" ...\n", fwork->input_file_str);
+				fwork->input_file = bam_fopen(fwork->input_file_str);
+				assert(fwork->input_file);
+				printf("BAM opened!...\n");
+			}
+			else
+			{
+				//Open last context output
+				printf("Opening intermediate BAM from \"%s\" ...\n", fwork->last_temp_file_str);
+				fwork->input_file = bam_fopen(fwork->last_temp_file_str);
+				assert(fwork->input_file);
+				printf("Intermediate BAM opened!...\n");
+			}
 		}
 
-		//Create new bam
-		if(fwork->output_file_str)
+		//Create new output bam if last context
+		if(c == fwork->v_context_l - 1)
 		{
-			printf("Creating new bam file in \"%s\"...\n", fwork->output_file_str);
-			//init_empty_bam_header(orig_bam_f->bam_header_p->n_targets, recal_bam_header);
-			fwork->output_file = bam_fopen_mode(fwork->output_file_str, fwork->input_file->bam_header_p, "w");
+			if(fwork->output_file_str)
+			{
+				if(fwork->context->output_file_str == NULL)
+				{
+					//Allocate
+					fwork->context->output_file_str = (char *)malloc(256 * sizeof(char));
+				}
+
+				//Set final output
+				strncpy(fwork->context->output_file_str, fwork->output_file_str, 256);
+			}
+		}
+		else
+		{
+			//Temporary file?
+			if(fwork->context->output_temp)
+			{
+				//Allocate
+				fwork->context->output_file_str = malloc(256 * sizeof(char));
+
+				//Set output temp path
+				sprintf(fwork->context->output_file_str, "/tmp/bfwork_tmp_%d.tmp", c);
+			}
+		}
+
+		//Create new temporary bam if context have output
+		if(fwork->context->output_file_str != NULL)
+		{
+			printf("Creating new intermediate bam file in \"%s\"...\n", fwork->context->output_file_str);
+			fwork->output_file = bam_fopen_mode(fwork->context->output_file_str, fwork->input_file->bam_header_p, "w");
 			assert(fwork->output_file);
 			bam_fwrite_header(fwork->output_file->bam_header_p, fwork->output_file);
 			fwork->output_file->bam_header_p = NULL;
-			printf("New BAM initialized!...\n");
+			printf("New intermediate BAM initialized!...\n");
 		}
 
 #ifdef D_TIME_DEBUG
 		times = omp_get_wtime() - times;
-		time_add_time_slot(D_FWORK_INIT, fwork->context->time_stats, times);
+		if(fwork->context->time_stats)
+			time_add_time_slot(D_FWORK_INIT, fwork->context->time_stats, times);
 #endif
 
 		//Logging
-		if(fwork->context->tag)
+		if(fwork->context->tag != NULL)
 		{
 			printf("Context %s is now running\n", fwork->context->tag);
 		}
@@ -580,7 +631,7 @@ bfwork_run(bam_fwork_t *fwork)
 		}
 
 		//Reduce needed?
-		if(fwork->context->reduce && fwork->context->reduce_dest)
+		if(fwork->context->reduce != NULL && fwork->context->reduce_dest != NULL)
 		{
 			//Reduce into context reduce data
 			bfwork_context_local_user_data_reduce(fwork->context, fwork->context->reduce_dest, fwork->context->reduce);
@@ -588,24 +639,53 @@ bfwork_run(bam_fwork_t *fwork)
 
 #ifdef D_TIME_DEBUG
 		times = omp_get_wtime() - times;
-		time_add_time_slot(D_FWORK_TOTAL, fwork->context->time_stats, times);
+		if(fwork->context->time_stats)
+			time_add_time_slot(D_FWORK_TOTAL, fwork->context->time_stats, times);
 #endif
 
 		//Close input BAM
 		printf("\nClosing BAM file...\n");
 		bam_fclose(fwork->input_file);
+		fwork->input_file = NULL;
 		printf("BAM closed.\n");
 
 		//Close output file
 		if(fwork->output_file != NULL)
 		{
-			printf("Closing \"%s\" BAM file...\n", fwork->output_file_str);
+			printf("Closing \"%s\" BAM file...\n", fwork->output_file->filename);
 			bam_fclose(fwork->output_file);
+			fwork->output_file = NULL;
 			printf("BAM closed.\n");
 		}
 
+		//Set last file
+		if(fwork->context->output_file_str)
+		{
+			//Remove last temporary file
+			if(fwork->last_temp_file_str != NULL)
+			{
+				//Delete file
+				printf("Deleting %s...\n", fwork->last_temp_file_str);
+				remove(fwork->last_temp_file_str);
+				fwork->last_temp_file_str = NULL;
+			}
+
+			//Set last temporary file if not the last context
+			if(c < fwork->v_context_l - 1)
+				fwork->last_temp_file_str = fwork->context->output_file_str;
+		}
+
 		//Logging
+		printf("--------------------------------------\n");
 		LOG_INFO("Context SUCCESS!\n");
+	}
+
+	//Remove last temporary file
+	if(fwork->last_temp_file_str != NULL)
+	{
+		//Delete file
+		printf("Deleting %s...\n", fwork->last_temp_file_str);
+		remove(fwork->last_temp_file_str);
 	}
 
 	//Close reference
@@ -667,6 +747,10 @@ bfwork_context_destroy(bfwork_context_t *context)
 {
 	assert(context);
 
+	//Free
+	if(context->output_file_str)
+		free(context->output_file_str);
+
 	//Destroy locks
 	omp_destroy_lock(&context->user_data_lock);
 }
@@ -693,6 +777,35 @@ bfwork_context_add_proc(bfwork_context_t *context, processor_function pf)
 
 	//Logging
 	LOG_INFO("Added processor function\n");
+
+	return NO_ERROR;
+}
+
+/**
+ * Define if this context modify original input file for next contexts.
+ */
+int
+bfwork_context_set_output(bfwork_context_t *context, const char *file_str)
+{
+	assert(context);
+
+	if(context->output_file_str)
+		free(context->output_file_str);
+
+	//Set intermediate file name
+	if(file_str)
+	{
+		//Allocate
+		context->output_file_str = malloc(256 * sizeof(char));
+
+		//Set to string file
+		strncpy(context->output_file_str, file_str, 256);
+	}
+	else
+	{
+		//Set to temp
+		context->output_temp = 1;
+	}
 
 	return NO_ERROR;
 }
@@ -823,57 +936,60 @@ bfwork_context_print_times(bfwork_context_t *context)
 	double min, max, mean;
 
 #ifdef D_TIME_DEBUG
-	//Print time stats
-	printf("----------------------------\nTime stats for %s: \n", context->tag != NULL ? context->tag : "context");
+	if(context->time_stats)
+	{
+		//Print time stats
+		printf("----------------------------\nTime stats for %s: \n", context->tag != NULL ? context->tag : "context");
 
-	printf("\n====== General times ======\n");
-	time_get_mean_slot(D_FWORK_TOTAL, context->time_stats, &mean);
-	time_get_min_slot(D_FWORK_TOTAL, context->time_stats, &min);
-	time_get_max_slot(D_FWORK_TOTAL, context->time_stats, &max);
-	printf("Total time to process -> %.2f s - min/max = %.2f/%.2f\n",
-			mean, min, max);
+		printf("\n====== General times ======\n");
+		time_get_mean_slot(D_FWORK_TOTAL, context->time_stats, &mean);
+		time_get_min_slot(D_FWORK_TOTAL, context->time_stats, &min);
+		time_get_max_slot(D_FWORK_TOTAL, context->time_stats, &max);
+		printf("Total time to process -> %.2f s - min/max = %.2f/%.2f\n",
+				mean, min, max);
 
-	time_get_mean_slot(D_FWORK_INIT, context->time_stats, &mean);
-	time_get_min_slot(D_FWORK_INIT, context->time_stats, &min);
-	time_get_max_slot(D_FWORK_INIT, context->time_stats, &max);
-	printf("Time used to initialize framework -> %.2f s - min/max = %.2f/%.2f\n",
-			mean, min, max);
+		time_get_mean_slot(D_FWORK_INIT, context->time_stats, &mean);
+		time_get_min_slot(D_FWORK_INIT, context->time_stats, &min);
+		time_get_max_slot(D_FWORK_INIT, context->time_stats, &max);
+		printf("Time used to initialize framework -> %.2f s - min/max = %.2f/%.2f\n",
+				mean, min, max);
 
-	printf("\n====== Wandering function ======\n");
-	time_get_mean_slot(D_FWORK_WANDER_FUNC, context->time_stats, &mean);
-	time_get_min_slot(D_FWORK_WANDER_FUNC, context->time_stats, &min);
-	time_get_max_slot(D_FWORK_WANDER_FUNC, context->time_stats, &max);
-	printf("Time of wandering function per alignment (inside framework read time) -> %.2f us - min/max = %.2f/%.2f\n",
+		printf("\n====== Wandering function ======\n");
+		time_get_mean_slot(D_FWORK_WANDER_FUNC, context->time_stats, &mean);
+		time_get_min_slot(D_FWORK_WANDER_FUNC, context->time_stats, &min);
+		time_get_max_slot(D_FWORK_WANDER_FUNC, context->time_stats, &max);
+		printf("Time of wandering function per alignment (inside framework read time) -> %.2f us - min/max = %.2f/%.2f\n",
+					mean*1000000.0, min*1000000.0, max*1000000.0);
+
+		printf("\n====== Processing function ======\n");
+		time_get_mean_slot(D_FWORK_PROC_FUNC, context->time_stats, &mean);
+		time_get_min_slot(D_FWORK_PROC_FUNC, context->time_stats, &min);
+		time_get_max_slot(D_FWORK_PROC_FUNC, context->time_stats, &max);
+		printf("Time of processing function per alignment (inside framework process time) -> %.2f us - min/max = %.2f/%.2f\n",
 				mean*1000000.0, min*1000000.0, max*1000000.0);
 
-	printf("\n====== Processing function ======\n");
-	time_get_mean_slot(D_FWORK_PROC_FUNC, context->time_stats, &mean);
-	time_get_min_slot(D_FWORK_PROC_FUNC, context->time_stats, &min);
-	time_get_max_slot(D_FWORK_PROC_FUNC, context->time_stats, &max);
-	printf("Time of processing function per alignment (inside framework process time) -> %.2f us - min/max = %.2f/%.2f\n",
-			mean*1000000.0, min*1000000.0, max*1000000.0);
+		printf("\n====== Framework ======\n");
 
-	printf("\n====== Framework ======\n");
+		time_get_mean_slot(D_FWORK_PROC, context->time_stats, &mean);
+		time_get_min_slot(D_FWORK_PROC, context->time_stats, &min);
+		time_get_max_slot(D_FWORK_PROC, context->time_stats, &max);
+		printf("Time used for process per alignment -> %.2f us - min/max = %.2f/%.2f\n",
+				mean*1000000.0, min*1000000.0, max*1000000.0);
 
-	time_get_mean_slot(D_FWORK_PROC, context->time_stats, &mean);
-	time_get_min_slot(D_FWORK_PROC, context->time_stats, &min);
-	time_get_max_slot(D_FWORK_PROC, context->time_stats, &max);
-	printf("Time used for process per alignment -> %.2f us - min/max = %.2f/%.2f\n",
-			mean*1000000.0, min*1000000.0, max*1000000.0);
+		time_get_mean_slot(D_FWORK_READ, context->time_stats, &mean);
+		time_get_min_slot(D_FWORK_READ, context->time_stats, &min);
+		time_get_max_slot(D_FWORK_READ, context->time_stats, &max);
+		printf("Time used for read per alignment -> %.2f us - min/max = %.2f/%.2f\n",
+				mean*1000000.0, min*1000000.0, max*1000000.0);
 
-	time_get_mean_slot(D_FWORK_READ, context->time_stats, &mean);
-	time_get_min_slot(D_FWORK_READ, context->time_stats, &min);
-	time_get_max_slot(D_FWORK_READ, context->time_stats, &max);
-	printf("Time used for read per alignment -> %.2f us - min/max = %.2f/%.2f\n",
-			mean*1000000.0, min*1000000.0, max*1000000.0);
+		time_get_mean_slot(D_FWORK_WRITE, context->time_stats, &mean);
+		time_get_min_slot(D_FWORK_WRITE, context->time_stats, &min);
+		time_get_max_slot(D_FWORK_WRITE, context->time_stats, &max);
+		printf("Time used for write per alignment -> %.2f us - min/max = %.2f/%.2f\n",
+				mean*1000000.0, min*1000000.0, max*1000000.0);
 
-	time_get_mean_slot(D_FWORK_WRITE, context->time_stats, &mean);
-	time_get_min_slot(D_FWORK_WRITE, context->time_stats, &min);
-	time_get_max_slot(D_FWORK_WRITE, context->time_stats, &max);
-	printf("Time used for write per alignment -> %.2f us - min/max = %.2f/%.2f\n",
-			mean*1000000.0, min*1000000.0, max*1000000.0);
-
-	printf("-------------\n\n");
+		printf("-------------\n\n");
+	}
 #endif
 
 	return NO_ERROR;
@@ -972,7 +1088,8 @@ bfwork_obtain_region(bam_fwork_t *fwork, bam_region_t *region)
 		err = fwork->context->wander_f(fwork, region, read);
 #ifdef D_TIME_DEBUG
 			times = omp_get_wtime() - times;
-			time_add_time_slot(D_FWORK_WANDER_FUNC, fwork->context->time_stats, times);
+			if(fwork->context->time_stats)
+				time_add_time_slot(D_FWORK_WANDER_FUNC, fwork->context->time_stats, times);
 #endif
 		omp_unset_lock(&region->lock);
 		switch(err)
