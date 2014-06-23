@@ -21,13 +21,14 @@
 //#include "bfwork/bfwork.h"
 //#include "aligner/alig.h"
 
-int align_launch(const char *reference, const char *bam, const char *output, const char *stats_path);
+int align_launch(const char *reference, const char *bam, const char *output, const char *stats_path, int recalibration);
 //ERROR_CODE wander_bam_file(char *bam_path, char *ref_path, char *outbam);
 
 int alig_bam(int argc, char **argv)
 {
 	char *refc, *bamc, *outputc, *statsc;
 
+	struct arg_file *recal = arg_lit0(NULL,"recalibrate","performs a base quality recalibration");
     struct arg_file *refile = arg_file0("r",NULL,"<reference>","reference genome compressed file (dna_compression.bin)");
     struct arg_file *infile = arg_file0("b",NULL,"<input>","input BAM file");
     struct arg_file *outfile = arg_file0("o",NULL,"<output>","output processed BAM file");
@@ -36,7 +37,7 @@ int alig_bam(int argc, char **argv)
     struct arg_lit  *version = arg_lit0(NULL,"version","print version information and exit");
     struct arg_end  *end     = arg_end(20);
 
-    void* argtable[] = {refile,infile,outfile,stats,help,version,end};
+    void* argtable[] = {recal,refile,infile,outfile,stats,help,version,end};
     const char* progname = "hpg-bam realign v"ALIG_VER;
     int nerrors;
     int exitcode=0;
@@ -173,7 +174,7 @@ int alig_bam(int argc, char **argv)
 
     /* normal case: realignment */
 	{
-		exitcode = align_launch(	refc, bamc, outputc, statsc);
+		exitcode = align_launch(	refc, bamc, outputc, statsc,recal->count);
 	}
 
 	if(bamc)
@@ -193,7 +194,7 @@ int alig_bam(int argc, char **argv)
 }
 
 int
-align_launch(const char *reference, const char *bam, const char *output, const char *stats_path)
+align_launch(const char *reference, const char *bam, const char *output, const char *stats_path, int recalibration)
 {
 	int err, threads;
 	char *sched;
@@ -223,8 +224,20 @@ align_launch(const char *reference, const char *bam, const char *output, const c
 #endif
 	printf("------------\n");
 
-	alig_bam_file(bam, reference, output, stats_path);
-	//alig_recal_bam_file(bam, reference, NULL, NULL, output, 200, NULL);
+	if(recalibration)
+	{
+		printf("Executing realign and recalibration\n");
+
+		//Realign and recalibration
+		alig_recal_bam_file(bam, reference, NULL, NULL, output, 200, NULL);
+	}
+	else
+	{
+		printf("Executing realign\n");
+
+		//Only realign
+		alig_bam_file(bam, reference, output, stats_path);
+	}
 
 	stop_log();
 
