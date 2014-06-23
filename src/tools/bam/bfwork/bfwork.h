@@ -98,6 +98,7 @@ typedef struct {
 	char *output_file_str;
 	char *reference_str;
 	char *last_temp_file_str;
+	int erase_tmp;
 	bam_file_t *input_file;
 	bam_file_t *output_file;
 	genome_t *reference;

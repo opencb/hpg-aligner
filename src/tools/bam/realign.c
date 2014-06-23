@@ -17,8 +17,9 @@
 
 #include "aux/timestats.h"
 #include "aux/aux_common.h"
-#include "bfwork/bfwork.h"
-#include "aligner/alig.h"
+#include "bfwork/bam_file_ops.h"
+//#include "bfwork/bfwork.h"
+//#include "aligner/alig.h"
 
 int align_launch(const char *reference, const char *bam, const char *output, const char *stats_path);
 //ERROR_CODE wander_bam_file(char *bam_path, char *ref_path, char *outbam);
@@ -223,6 +224,7 @@ align_launch(const char *reference, const char *bam, const char *output, const c
 	printf("------------\n");
 
 	alig_bam_file(bam, reference, output, stats_path);
+	//alig_recal_bam_file(bam, reference, NULL, NULL, output, 200, NULL);
 
 	stop_log();
 

@@ -560,6 +560,7 @@ bfwork_run(bam_fwork_t *fwork)
 		}
 
 		//Create new output bam if last context
+		fwork->erase_tmp = 0;
 		if(c == fwork->v_context_l - 1)
 		{
 			if(fwork->output_file_str)
@@ -584,6 +585,7 @@ bfwork_run(bam_fwork_t *fwork)
 
 				//Set output temp path
 				sprintf(fwork->context->output_file_str, "/tmp/bfwork_tmp_%d.tmp", c);
+				fwork->erase_tmp = 1;
 			}
 		}
 
@@ -658,18 +660,19 @@ bfwork_run(bam_fwork_t *fwork)
 			printf("BAM closed.\n");
 		}
 
+		//Remove last temporary file
+		if(fwork->last_temp_file_str != NULL && fwork->erase_tmp)
+		{
+			//Delete file
+			printf("Deleting %s...\n", fwork->last_temp_file_str);
+			remove(fwork->last_temp_file_str);
+			fwork->last_temp_file_str = NULL;
+			fwork->erase_tmp = 0;
+		}
+
 		//Set last file
 		if(fwork->context->output_file_str)
 		{
-			//Remove last temporary file
-			if(fwork->last_temp_file_str != NULL)
-			{
-				//Delete file
-				printf("Deleting %s...\n", fwork->last_temp_file_str);
-				remove(fwork->last_temp_file_str);
-				fwork->last_temp_file_str = NULL;
-			}
-
 			//Set last temporary file if not the last context
 			if(c < fwork->v_context_l - 1)
 				fwork->last_temp_file_str = fwork->context->output_file_str;
@@ -681,7 +684,7 @@ bfwork_run(bam_fwork_t *fwork)
 	}
 
 	//Remove last temporary file
-	if(fwork->last_temp_file_str != NULL)
+	if(fwork->last_temp_file_str != NULL && fwork->erase_tmp)
 	{
 		//Delete file
 		printf("Deleting %s...\n", fwork->last_temp_file_str);
@@ -800,6 +803,9 @@ bfwork_context_set_output(bfwork_context_t *context, const char *file_str)
 
 		//Set to string file
 		strncpy(context->output_file_str, file_str, 256);
+
+		//Set temp
+		context->output_temp = 0;
 	}
 	else
 	{

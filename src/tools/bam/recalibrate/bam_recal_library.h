@@ -112,24 +112,6 @@ typedef enum DINUC
 } DINUCLEOTIDE;
 
 /***********************************************
- * FRAMEWORK RECALIBRATOR
- **********************************************/
-
-/**
- * \brief Recalibrate BAM file
- *
- * \param[in] flags Flags for recalibration. Can be RECALIBRATE_COLLECT and RECALIBRATE_RECALIBRATE.
- * \param[in] bam_path Input BAM file.
- * \param[in] ref Path to reference 'dna_compression.bin'. OPTIONAL if not RECALIBRATE_COLLECT.
- * \param[in/out] data_file Path to data file. OPTIONAL, can be input if RECALIBRATE_RECALIBRATE only or output if not.
- * \param[in] info_file Path to text format of data file. OPTIONAL, if NULL no info file will be written.
- * \param[in] outbam Output BAM path. OPTIONAL, if NULL no output will be written.
- * \param[in] cycles Max cycles to recalibrate.
- * \param[in] stats_path Path to timing stats output folder. OPTIONAL, if NULL no timing output will be written.
- */
-EXTERNC ERROR_CODE recal_bam_file(uint8_t flags, const char *bam_path, const char *ref, const char *data_file, const char *info_file, const char *outbam, int cycles, const char *stats_path);
-
-/***********************************************
  * DATA MANAGEMENT
  **********************************************/
 

@@ -128,19 +128,6 @@ typedef enum {
 	INTERVAL
 } alig_status;
 
-/***********************************************
- * FRAMEWORK REALIGNER
- **********************************************/
-
-/**
- * \brief Realign around indels BAM file
- *
- * \param[in] bam_path Input BAM file.
- * \param[in] ref_path Path to reference 'dna_compression.bin'.
- * \param[in] outbam Output BAM path. OPTIONAL, if NULL no output will be written.
- */
-EXTERNC ERROR_CODE alig_bam_file(const char *bam_path, const char *ref_path, const char *outbam, const char *stats_path);
-
 /**
  * CONTEXT
  */
