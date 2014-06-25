@@ -260,7 +260,14 @@ bfwork_run_sequential(bam_fwork_t *fwork)
 			}
 			else
 			{
-				LOG_FATAL_F("Failed to read next region, error code: %d\n", err);
+				if(err == WANDER_READ_TRUNCATED)
+				{
+					LOG_WARN("Readed truncated read\n");
+				}
+				else
+				{
+					LOG_FATAL_F("Failed to read next region, error code: %d\n", err);
+				}
 				break;
 			}
 		}
@@ -387,7 +394,14 @@ bfwork_run_threaded(bam_fwork_t *fwork)
 						}
 						else
 						{
-							LOG_FATAL_F("Failed to read next region, error code: %d\n", err);
+							if(err == WANDER_READ_TRUNCATED)
+							{
+								LOG_WARN("Readed truncated read\n");
+							}
+							else
+							{
+								LOG_FATAL_F("Failed to read next region, error code: %d\n", err);
+							}
 							break;
 						}
 					}
@@ -1144,12 +1158,10 @@ bfwork_obtain_region(bam_fwork_t *fwork, bam_region_t *region)
 		//End of file
 		if(bytes == -1)
 		{
-			LOG_INFO("EOF\n");
 			return WANDER_READ_EOF;
 		}
 		else
 		{
-			LOG_INFO("TRUNCATED\n");
 			return WANDER_READ_TRUNCATED;
 		}
 	}
