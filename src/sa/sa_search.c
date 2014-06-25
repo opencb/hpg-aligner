@@ -90,8 +90,6 @@ size_t search_suffix(char *seq, uint len, int max_num_suffixes,
   size_t num_suffixes = 0;
   uint matched, max_matched = 0;
 
-  *suffix_len = 0;
-
   #ifdef _TIMING
   gettimeofday(&start, NULL);
   #endif
@@ -104,6 +102,9 @@ size_t search_suffix(char *seq, uint len, int max_num_suffixes,
   #ifdef _VERBOSE	  
   printf("\t\tnum. prefixes = %lu\n", num_prefixes);
   #endif
+
+  *suffix_len = 0;
+  num_suffixes = num_prefixes;
 
   if (num_prefixes && num_prefixes < max_num_suffixes) {   
 

@@ -78,6 +78,8 @@ typedef struct sa_mapping_batch {
 
   array_list_t *fq_reads;
   array_list_t **mapping_lists;
+
+  char *status;
 } sa_mapping_batch_t;
 
 //--------------------------------------------------------------------
@@ -101,6 +103,8 @@ static inline sa_mapping_batch_t *sa_mapping_batch_new(array_list_t *fq_reads) {
     p->mapping_lists[i] = array_list_new(10, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
   }
 
+  p->status = (char *) calloc(num_reads, sizeof(char));
+
   #ifdef _TIMING
   for (int i = 0; i < NUM_TIMING; i++) {
     p->func_times[i] = 0;
@@ -116,6 +120,7 @@ static inline void sa_mapping_batch_free(sa_mapping_batch_t *p) {
   if (p) {
     if (p->fq_reads) { array_list_free(p->fq_reads, (void *) fastq_read_free); }
     if (p->mapping_lists) { free(p->mapping_lists); }
+    if (p->status) { free(p->status); }
     free(p);
   }
 }  

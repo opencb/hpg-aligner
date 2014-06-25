@@ -341,6 +341,14 @@ void select_best_cals(fastq_read_t *read, array_list_t **cal_list) {
 	 mapq, (first_cal == NULL ? -99999.9f : first_cal->score), (second_cal == NULL ? -99999.9f : second_cal->score), num_hits,
 	 first_cal->read->sequence);
   printf("--------------------------------------------------------------------\n");
+  for (int kk = 0; kk < num_cals; kk++) { seed_cal_print(sort_cals[kk].cal); }
+  */
+  /*
+  printf("--------------------------------------------------------------------\n");
+  printf("after sorting and trimming (mapq = %i, first score = %0.2f, second score = %0.2f, num_hits = %i) %s ...\n", 
+	 mapq, (first_cal == NULL ? -99999.9f : first_cal->score), (second_cal == NULL ? -99999.9f : second_cal->score), num_hits,
+	 first_cal->read->sequence);
+  printf("--------------------------------------------------------------------\n");
   printf("first CAL:\n");
   seed_cal_print(first_cal);
   if (second_cal) {

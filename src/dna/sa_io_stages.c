@@ -159,13 +159,13 @@ int sa_sam_writer(void *data) {
     int len;
     char *sequence, *quality;
 
-    char *seq;
+    char *seq, *opt_fields;
     alignment_t *alig;
     array_list_t *mate_list;
+  
     for (size_t i = 0; i < num_reads; i++) {
       read = (fastq_read_t *) array_list_get(i, read_list);
       //      seq = read->sequence;
-
       if (i % 2 == 0)  {
 	mate_list = mapping_batch->mapping_lists[i+1];
 	num_mate_mappings = array_list_size(mate_list);
@@ -187,7 +187,15 @@ int sa_sam_writer(void *data) {
 	num_mapped_reads++;
 	for (size_t j = 0; j < num_mappings; j++) {
 	  alig = (alignment_t *) array_list_get(j, mapping_list);
-	  
+
+	  if (alig->optional_fields) {
+	    opt_fields = (char *) calloc(strlen(alig->optional_fields) + 100, sizeof(char));
+	    sprintf(opt_fields, "%s XU:i:%i", alig->optional_fields, mapping_batch->status[i]);
+	  } else {
+	    opt_fields = (char *) calloc(100, sizeof(char));
+	    sprintf(opt_fields, "XU:i:%i", mapping_batch->status[i]);
+	  }
+
 	  // update alignment
 	  alig->secondary_alignment = 0;
 	  if (num_mate_mappings != 1) {
@@ -225,11 +233,12 @@ int sa_sam_writer(void *data) {
 		  alig->template_length,
 		  alig->sequence,
 		  alig->quality,
-		  (alig->optional_fields ? alig->optional_fields : "")
+		  opt_fields
 		  );
-
+	
+	  free(opt_fields);
+	  alignment_free(alig);	 
 	}
-	alignment_free(alig);	 
       } else {
 	if (num_mappings > 0) {
 	  num_multihit_reads++;
@@ -238,8 +247,8 @@ int sa_sam_writer(void *data) {
 	    alignment_free(alig);        
 	  }
 	}
-	char xmi[100];
-	sprintf(xmi, "XM:i:%i", num_mappings);
+	opt_fields = (char *) calloc(100, sizeof(char));
+	sprintf(opt_fields, "XM:i:%i XU:i:%i", num_mappings, mapping_batch->status[i]);
 
 	if (read->adapter) {
 	  len = read->length + abs(read->adapter_length);
@@ -275,8 +284,10 @@ int sa_sam_writer(void *data) {
 		read->id,
 		sequence,
 		quality,
-		xmi
+		opt_fields
 		);
+
+	free(opt_fields);
 
 	if (read->adapter) {
 	  free(sequence);
