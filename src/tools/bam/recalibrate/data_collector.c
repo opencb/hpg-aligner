@@ -437,16 +437,17 @@ recal_get_data_from_bam_alignment(const bam1_t* read, const genome_t* ref, recal
 		return NO_ERROR;
 	}
 
+	ref_seq = (char *)malloc(((end_pos - init_pos) + 2) * sizeof(char));
 	genome_read_sequence_by_chr_index(ref_seq, (flag & BAM_FREVERSE) ? 1 : 0, chr, &init_pos_ref, &end_pos_ref, (genome_t *)ref);
 
 	if((end_pos_ref - init_pos_ref) == 0)
 	{
 		//LOG_WARN_F("Cannot obtain reference for region %d:%d-%d, %s\n", read->core.tid + 1, init_pos_ref + 1, end_pos_ref + 1, bam1_qname(read));
+		free(ref_seq);
 		return NO_ERROR;
 	}
 
 	//Allocations
-	ref_seq = (char *)malloc(((end_pos - init_pos) + 2) * sizeof(char));
 	comp_res = (char *)malloc((read->core.l_qseq + 1) * sizeof(char));
 	comp_mask = (char *)malloc((read->core.l_qseq + 1) * sizeof(char));
 	dinucs = (char *)malloc((read->core.l_qseq + 1) * sizeof(char));
