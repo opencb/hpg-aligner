@@ -179,7 +179,7 @@ metaexons_t *metaexons_new(unsigned int num_chromosomes,
 
 void metaexons_free(metaexons_t *metaexons);
 
-int metaexon_insert(unsigned int strand, unsigned int chromosome,
+int metaexon_insert(unsigned int strand, int chromosome,
                      size_t metaexon_start, size_t metaexon_end, int min_intron_size,
                      unsigned char type, void *info_break, metaexons_t *metaexons);
 
@@ -188,7 +188,7 @@ int metaexon_insert_2(unsigned int strand, unsigned int chromosome,
 		      unsigned char type, void *info_break, metaexons_t *metaexons);
 
 //Return if the position is between metaexon coords
-int metaexon_search(unsigned int strand, unsigned int chromosome,
+int metaexon_search(unsigned int strand, int chromosome,
 		    size_t start, size_t end, metaexon_t **metaexon_found,
 		    metaexons_t *metaexons);
 

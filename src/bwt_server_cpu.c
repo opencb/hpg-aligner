@@ -401,7 +401,7 @@ int apply_bwt_rna(bwt_server_input_t* input, batch_t *batch) {
 	array_list_set_flag(ALIGNMENTS_FOUND, list);
 	for (int i = 0; i < num_mappings; i++) {
 	  alignment_t *alignment = array_list_get(i, list);
-	  metaexon_insert(0/*alignment->seq_strand*/, alignment->chromosome,
+	  metaexon_insert(0, alignment->chromosome,
 			  alignment->position, alignment->position + read->length, 40,
 			  METAEXON_NORMAL, NULL,
 			  metaexons);
