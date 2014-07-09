@@ -35,7 +35,7 @@ size_t reads_no_map = 0;
 
 size_t total_sw = 0;
 
-
+unsigned char mute;
 
 double time_write = 0;
 double time_free = 0;

@@ -935,9 +935,11 @@ static inline void seed_cal_update_info(seed_cal_t *cal) {
     num_mismatches += seed->num_mismatches;
     num_open_gaps += seed->num_open_gaps;
     num_extend_gaps += seed->num_extend_gaps;
-    read_area = (seed->read_end - seed->read_start > seed->genome_end - seed->genome_end ? 
-		 (seed->read_end - seed->read_start + 1) : 
-		 (seed->genome_end - seed->genome_start + 1));
+    read_area += (seed->read_end - seed->read_start > seed->genome_end - seed->genome_end ? 
+		  (seed->read_end - seed->read_start + 1) : 
+		  (seed->genome_end - seed->genome_start + 1));
+    
+    read_area -= (num_mismatches + (2 * num_open_gaps) + (num_extend_gaps));
     //    read_area += (seed->read_end - seed->read_start - num_mismatches - (2 * num_open_gaps) - (num_extend_gaps));
   }
   cal->num_mismatches = num_mismatches;

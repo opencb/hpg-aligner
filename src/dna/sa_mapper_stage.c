@@ -292,6 +292,9 @@ cal_mng_t * cal_mng_new(sa_genome3_t *genome) {
   p->max_read_area = 0;
   p->num_chroms = num_chroms;
   p->cals_lists = cals_lists;
+
+  p->suffix_mng = suffix_mng_new(genome);
+
   return p;
 }
 
@@ -307,6 +310,8 @@ void cal_mng_free(cal_mng_t *p) {
       }
       free(p->cals_lists);
     }
+    if (p->suffix_mng) suffix_mng_free(p->suffix_mng);
+
     free(p);
   }
 }
@@ -564,14 +569,16 @@ void cal_mng_select_best(int read_area, array_list_t *valid_list, array_list_t *
 //
 //--------------------------------------------------------------------
 
-array_list_t *search_mate_cal_by_prefixes(cal_t *cal, fastq_read_t *read,
+array_list_t *search_mate_cal_by_prefixes(seed_cal_t *cal, fastq_read_t *read,
 					  sa_index3_t *sa_index, sa_mapping_batch_t *batch,
 					  cal_mng_t *cal_mng) {
   array_list_t *cal_list = array_list_new(10, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
   char *seq;
-  int chromosome, start, end;
+  int chromosome;
+  size_t start, end;
   int read_pos, read_inc, read_end_pos;
-  
+
+  int mapq = cal->mapq;
   int num_seeds = batch->options->num_seeds;
 
   int min_distance = batch->options->pair_min_distance;
@@ -605,7 +612,8 @@ array_list_t *search_mate_cal_by_prefixes(cal_t *cal, fastq_read_t *read,
 	g_end_suf = g_start_suf + sa_index->k_value - 1;
 	
 	if (start <= g_start_suf && end >= g_end_suf) {
-	  //	  printf("\t\tfound at %i:%i-%i\n", chrom, g_start_suf, g_end_suf);
+	  //printf("\t\t%c reas_pos = %i, found at %i:%i-%i\n", 
+	  //	 (1 - cal->strand == 0 ? '+' : '-'), read_pos, chrom, g_start_suf, g_end_suf);
 	  generate_cals_from_suffixes(1 - cal->strand, read, read_pos,
 				      sa_index->k_value, i, i,
 				      sa_index, cal_mng
@@ -620,9 +628,29 @@ array_list_t *search_mate_cal_by_prefixes(cal_t *cal, fastq_read_t *read,
 
   cal_mng_to_array_list(read->length / 3, cal_list, cal_mng);
 
-  //  printf("***********   from search_mate_cal_by_prefixes   *************\n");
+  //  printf("*********** from search_mate_cal_by_prefixes   (num. cals = %i) *************\n", array_list_size(cal_list));
 
-  select_best_cals(read, &cal_list);
+
+  if (array_list_size(cal_list) > 0) {
+    //printf(">>>>> search_mate_cal_by_prefixes: (mapq = %i) num. cals = %i\n", mapq, array_list_size(cal_list));
+    select_best_cals(read, &cal_list);
+    if (array_list_size(cal_list) <= 0) {
+      suffix_mng_search_read_cals_by_region(read, num_seeds, sa_index, 1 - cal->strand,
+					  chromosome, start, end, cal_list, cal_mng->suffix_mng);
+      //printf(">>>>> search_mate_cal_by_prefixes: after calling suffix_mng_search_read_cals_by_region (%i:%lu-%lu), num. cals = %i\n", chromosome, start, end, array_list_size(cal_list));
+      if (array_list_size(cal_list) > 0) {
+	select_best_cals(read, &cal_list);
+      }
+    }
+    
+    for (int kk = 0; kk < array_list_size(cal_list); kk++) { 
+      cal = array_list_get(kk, cal_list);
+      if (cal->mapq > 0) {
+	cal->mapq = mapq;
+      }
+    }
+  }
+  
   /*
   int max_read_area = get_max_read_area(cal_list);
   if (max_read_area > read->length) max_read_area = read->length;
@@ -630,7 +658,6 @@ array_list_t *search_mate_cal_by_prefixes(cal_t *cal, fastq_read_t *read,
   int min_num_mismatches = get_min_num_mismatches(cal_list);
   filter_cals_by_max_num_mismatches(min_num_mismatches, &cal_list);
   */
-
 
   //  printf("======> after search_mate_cal_by_prefixes: list size = %i\n", array_list_size(cal_list));
   //  for (int kk = 0; kk < array_list_size(cal_list); kk++) { seed_cal_print(array_list_get(kk, cal_list)); }
@@ -684,12 +711,11 @@ void check_pairs(array_list_t **cal_lists, sa_index3_t *sa_index,
     /*
     list = list1;
     printf("======> list #1 size = %i\n", array_list_size(list));
-    for (int kk = 0; kk < array_list_size(list); kk++) { seed_cal_print(array_list_get(kk, list)); }
+    //for (int kk = 0; kk < array_list_size(list); kk++) { seed_cal_print(array_list_get(kk, list)); }
     list = list2;
     printf("======> list #2 size = %i\n", array_list_size(list));
-    for (int kk = 0; kk < array_list_size(list); kk++) { seed_cal_print(array_list_get(kk, list)); }
+    //for (int kk = 0; kk < array_list_size(list); kk++) { seed_cal_print(array_list_get(kk, list)); }
     */
-
     if (list1_size == 0 && list2_size == 0) continue;
 
     // no mate #1
@@ -788,7 +814,7 @@ void check_pairs(array_list_t **cal_lists, sa_index3_t *sa_index,
       for (int i2 = 0; i2 < list2_size; i2++) {
 	cal2 = array_list_get(i2, list2);
 	valid_pair = is_valid_cal_pair(cal1, cal2, min_distance, max_distance, &distance);
-	//	printf(">>>>>>>>>>>>>>>> valid_pair = %i (distance = %i)\n", valid_pair, distance);
+	//printf(">>>>>>>>>>>>>>>> valid_pair = %i (distance = %i)\n", valid_pair, distance);
 	if (valid_pair) break;
       }
       if (valid_pair) break;
@@ -824,7 +850,6 @@ void check_pairs(array_list_t **cal_lists, sa_index3_t *sa_index,
 
 	  for (int jj = 0; jj < array_list_size(mate_list); jj++) { 
 	    mate_cal = array_list_get(jj, mate_list);
-	    //	    mate_cal->mapq = 1;
 	    //printf("----->> found cals for the previous cal:\n");
 	    //seed_cal_print(mate_cal);
 	    read_area = cal->read_area + mate_cal->read_area;
@@ -851,12 +876,13 @@ void check_pairs(array_list_t **cal_lists, sa_index3_t *sa_index,
 		}
 		array_list_insert(mate_cal, mate1_list);
 	      }
-
-	      //printf("\t------ best read area = %i (before = %i)\n", read_area, max_read_area);
-	      //printf("list for mate #1\n");
-	      //for (int kk = 0; kk < array_list_size(mate1_list); kk++) { seed_cal_print(array_list_get(kk, mate1_list)); }
-	      //printf("list for mate #2\n");
-	      //for (int kk = 0; kk < array_list_size(mate2_list); kk++) { seed_cal_print(array_list_get(kk, mate2_list)); }
+	      /*
+	      printf("\t------ best read area = %i (before = %i)\n", read_area, max_read_area);
+	      printf("list for mate #1\n");
+	      for (int kk = 0; kk < array_list_size(mate1_list); kk++) { seed_cal_print(array_list_get(kk, mate1_list)); }
+	      printf("list for mate #2\n");
+	      for (int kk = 0; kk < array_list_size(mate2_list); kk++) { seed_cal_print(array_list_get(kk, mate2_list)); }
+	      */
 
 	      // update max read area
 	      max_read_area = read_area;	      
@@ -929,13 +955,13 @@ void check_pairs(array_list_t **cal_lists, sa_index3_t *sa_index,
     cal_lists[i+1] = mate2_list;
     batch->status[i] = 7; 
     batch->status[i+1] = 7; 
-
-    //printf("======> result: max read area = %i\n", max_read_area);
-    //printf("=========> mate #1 list size = %i\n", array_list_size(mate1_list));
-    //for (int kk = 0; kk < array_list_size(mate1_list); kk++) { seed_cal_print(array_list_get(kk, mate1_list)); }
-    //printf("=========> mate #2 list size = %i\n", array_list_size(mate2_list));
-    //for (int kk = 0; kk < array_list_size(mate2_list); kk++) { seed_cal_print(array_list_get(kk, mate2_list)); }
-
+    /*
+    printf("======> result: max read area = %i\n", max_read_area);
+    printf("=========> mate #1 list size = %i\n", array_list_size(mate1_list));
+    for (int kk = 0; kk < array_list_size(mate1_list); kk++) { seed_cal_print(array_list_get(kk, mate1_list)); }
+    printf("=========> mate #2 list size = %i\n", array_list_size(mate2_list));
+    for (int kk = 0; kk < array_list_size(mate2_list); kk++) { seed_cal_print(array_list_get(kk, mate2_list)); }
+    */
   }
 }
 
@@ -2600,7 +2626,13 @@ int sa_single_mapper(void *data) {
 
       select_best_cals(read, &cal_list);
       if (array_list_size(cal_list) <= 0) {
-	mapping_batch->status[i] = 3; // invalid
+	//	mapping_batch->status[i] = 3; // invalid
+	suffix_mng_search_read_cals(read, num_seeds, sa_index, cal_list, cal_mng->suffix_mng);
+	if (array_list_size(cal_list) > 0) {
+	  select_best_cals(read, &cal_list);
+	} else {
+	  mapping_batch->status[i] = 3; // invalid
+	}
       }
 
       //      printf("after select_best_cals and before cleaning cals...\n");
@@ -2768,9 +2800,17 @@ int sa_pair_mapper(void *data) {
       //for (int kk = 0; kk < array_list_size(cal_list); kk++) { seed_cal_print(array_list_get(kk, cal_list)); }
 
       //      printf("***********   from sa_pair_mapper   *************\n");
+      //printf(">>>>> sa_pair_mapper: read %i, num. cals = %i\n", i, array_list_size(cal_list));
       select_best_cals(read, &cal_list);
       if (array_list_size(cal_list) <= 0) {
-	mapping_batch->status[i] = 3; // invalid
+	//	mapping_batch->status[i] = 3; // invalid
+	suffix_mng_search_read_cals(read, num_seeds, sa_index, cal_list, cal_mng->suffix_mng);
+	if (array_list_size(cal_list) > 0) {
+	  //printf(">>>>> sa_pair_mapper: after calling suffix_mng_search_read_cals, read %i, num. cals = %i\n", i, array_list_size(cal_list));
+	  select_best_cals(read, &cal_list);
+	} else {
+	  mapping_batch->status[i] = 3; // invalid
+	}
       }
 
       //      printf("after filtering min. num mismatches (%i) before cleaning cals...\n", min_num_mismatches);
