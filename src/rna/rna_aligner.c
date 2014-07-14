@@ -679,7 +679,7 @@ void rna_aligner(options_t *options) {
 
 
       if (num_files1 > 1) {
-	printf("PROCESS FILE: %s\n", file1);
+	printf("\nPROCESS FILE: %s\n", file1);
       }
 
       start_timer(time_start_alig);
