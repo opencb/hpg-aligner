@@ -1,0 +1,3 @@
+[submodule "lib/hpg-libs"]
+	path = lib/hpg-libs
+	url = https://github.com/opencb/hpg-libs.git
