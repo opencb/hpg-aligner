@@ -253,9 +253,9 @@ void options_display(options_t *options) {
      float gap_extend =  (float)options->gap_extend;
 
      printf("\n");
-     printf("+--------------------------------------------------------------------------------------+\n");
-     printf("|                               PARAMETERS CONFIGURATION                               |\n");
-     printf("+--------------------------------------------------------------------------------------+\n");
+     printf("+---------------------------------------------------------------+\n");
+     printf("|       P A R A M E T E R S    C O N F I G U R A T I O N        |\n");
+     printf("+---------------------------------------------------------------+\n");
      //     printf("Num gpu threads %d\n", num_gpu_threads);
      //     printf("GPU Process: %s\n",  gpu_process == 0 ? "Disable":"Enable");
      printf("General parameters\n");
@@ -332,13 +332,137 @@ void options_display(options_t *options) {
 	 printf("\tRecalibration\n");
        }
      }
-     printf("+--------------------------------------------------------------------------------------+\n");
+     printf("+---------------------------------------------------------------+\n");
      
      free(in_filename);
      if (in_filename2 != NULL) free(in_filename2);
      free(bwt_dirname);
      free(genome_filename);
      free(output_name);
+}
+
+void options_to_file(options_t *options, FILE *fd) {
+  char* in_filename = strdup(options->in_filename);
+  char* in_filename2 = NULL;
+  if (options->in_filename2 != NULL) {
+    in_filename2 = strdup(options->in_filename2);
+  }
+  char* bwt_dirname =  strdup(options->bwt_dirname);
+  char* genome_filename =  NULL;
+  if (options->genome_filename != NULL) {
+    genome_filename =  strdup(options->genome_filename);
+  }
+  unsigned int  report_all = (unsigned int)options->report_all;
+  unsigned int  report_n_best = (unsigned int)options->report_n_best;
+  unsigned int  report_n_hits = (unsigned int)options->report_n_hits;
+  unsigned int  report_only_paired = (unsigned int)options->report_only_paired;
+  unsigned int  report_best = (unsigned int)options->report_best;
+          
+  char* output_name =  strdup(options->output_name);
+  unsigned int num_gpu_threads =  (unsigned int)options->num_gpu_threads;
+  unsigned int num_cpu_threads =  (unsigned int)options->num_cpu_threads;
+  unsigned int cal_seeker_errors =  (unsigned int)options->cal_seeker_errors; 
+  unsigned int min_cal_size =  (unsigned int)options->min_cal_size; 
+  unsigned int seeds_max_distance =  (unsigned int)options->seeds_max_distance; 
+  unsigned int batch_size =  (unsigned int)options->batch_size; 
+  unsigned int write_size =  (unsigned int)options->write_size;  
+  unsigned int min_seed_size =  (unsigned int)options->min_seed_size;
+  unsigned int seed_size =  (unsigned int)options->seed_size;
+  unsigned int num_seeds =  (unsigned int)options->num_seeds;
+  int min_num_seeds_in_cal =  (int)options->min_num_seeds_in_cal;
+  unsigned int max_intron_length =  (unsigned int)options->max_intron_length;
+  unsigned int flank_length =  (unsigned int)options->flank_length;
+  unsigned int pair_mode =  (unsigned int)options->pair_mode;
+  unsigned int pair_min_distance =  (unsigned int)options->pair_min_distance;
+  unsigned int pair_max_distance =  (unsigned int)options->pair_max_distance;
+  unsigned int min_intron_length =  (unsigned int)options->min_intron_length;
+  unsigned int fast_mode =   (unsigned int)options->fast_mode;
+
+  //unsigned int gpu_process = (unsigned int)options->gpu_process;
+
+  int min_score    =  (int)options->min_score;
+  float match      =  (float)options->match;
+  float mismatch   =  (float)options->mismatch;
+  float gap_open   =  (float)options->gap_open;
+  float gap_extend =  (float)options->gap_extend;
+   
+  fprintf(fd, "= G E N E R A L    P A R A M E T E R S \n");
+  fprintf(fd, "=------------------------------------=\n");
+  fprintf(fd, "= Mode: %s\n", options->str_mode);
+  if (in_filename2) {
+    fprintf(fd, "= Input FastQ filename, pair #1: %s\n", in_filename);
+    fprintf(fd, "= Input FastQ filename, pair #2: %s\n", in_filename2);
+  } else {
+    fprintf(fd, "= Input FastQ filename: %s\n", in_filename);
+  }
+  fprintf(fd, "= FastQ gzip mode: %s\n", options->gzip == 1 ? "Enable" : "Disable");
+  fprintf(fd, "= Index directory name: %s\n", bwt_dirname);
+  fprintf(fd, "= Output directory name: %s\n", output_name);
+  fprintf(fd, "= Output file format: %s\n", 
+	 (options->bam_format || options->realignment || options->recalibration) ? "SAM" : "BAM");
+  fprintf(fd, "\n\n");
+
+
+  fprintf(fd, "=  A R C H I T E C T U R E    P A R A M E T E R S\n"); 
+  fprintf(fd, "=-----------------------------------------------=\n");
+  fprintf(fd, "= Number of cpu threads %d\n",  num_cpu_threads);
+  fprintf(fd, "= Batch size: %d bytes\n",  batch_size);
+  fprintf(fd, "\n\n");
+
+
+  fprintf(fd, "= R E P O R T    P A R A M E T E R S\n");
+  fprintf(fd, "=-----------------------------------------=\n");
+  fprintf(fd, "= Report all hits: %s\n",  report_all == 0 ? "Disable":"Enable");
+  fprintf(fd, "= Report n best hits: %d\n",  report_n_best);
+  fprintf(fd, "= Report n hits: %d\n",  report_n_hits);
+  fprintf(fd, "= Report best hits: %s\n",  report_best == 0 ? "Disable":"Enable");
+  fprintf(fd, "= Report unpaired reads: %s\n",  report_only_paired == 0 ? "Enable":"Disable");
+  fprintf(fd, "\n");
+
+
+  fprintf(fd, "= S E E D I N G    A N D    C A L    P A R A M E T E R S \n");
+  fprintf(fd, "=------------------------------------------------------=\n");
+  if (options->mode == DNA_MODE) {
+    fprintf(fd, "= Num. seeds: %d\n",  num_seeds);
+  }
+  fprintf(fd, "= Min CAL size: %d\n",  min_cal_size);
+  fprintf(fd, "\n\n");
+
+
+  fprintf(fd, "= M A P P I N G    F I L T E R S \n");
+  fprintf(fd, "=------------------------------=\n");
+  fprintf(fd, "= For reads: %d mappings maximum, otherwise discarded\n", options->filter_read_mappings);
+  fprintf(fd, "= For seeds: %d mappings maximum, otherwise discarded\n", options->filter_seed_mappings);
+  fprintf(fd, "\n\n");
+
+
+  fprintf(fd, "= P A I R - M O D E    P A R A M E T E R S \n");
+  fprintf(fd, "=----------------------------------------=\n");
+  fprintf(fd, "= Pair mode: %d\n", pair_mode);
+  fprintf(fd, "= Min. distance: %d\n", pair_min_distance);
+  fprintf(fd, "= Max. distance: %d\n", pair_max_distance);
+  fprintf(fd, "\n\n");
+
+
+  fprintf(fd, "= S M I T H - W A T E R M A N    P A R A M E T E R S \n");
+  fprintf(fd, "=--------------------------------------------------=\n");
+  fprintf(fd, "= Match      : %0.4f\n", match);
+  fprintf(fd, "= Mismatch   : %0.4f\n", mismatch);
+  fprintf(fd, "= Gap open   : %0.4f\n", gap_open);
+  fprintf(fd, "= Gap extend : %0.4f\n", gap_extend);
+  fprintf(fd, "\n\n");
+
+
+  if (options->mode == RNA_MODE) {
+    fprintf(fd, "= R N A    P A R A M E T E R S \n");
+    fprintf(fd, "=----------------------------=\n");
+    fprintf(fd, "= Mode: %s\n", fast_mode ? "Fast":"Slow");
+    fprintf(fd, "= Seed size: %d\n",  seed_size);
+    fprintf(fd, "= Max intron length: %d\n", max_intron_length);
+    fprintf(fd, "= Min intron length: %d\n", min_intron_length);
+    fprintf(fd, "= Min score        : %d\n", min_score);
+  }
+  fprintf(fd, "\n");
 }
 
 //--------------------------------------------------------------------

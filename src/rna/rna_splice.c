@@ -1,10 +1,11 @@
 #include "rna_splice.h"
 
 extern size_t junction_id;
-size_t cannonical_sp = 0;
-size_t semi_cannonical_sp = 0;
+
 size_t total_splice = 0;
 
+extern pthread_mutex_t mutex_sp; 
+extern st_bwt_t st_bwt;
 
 //--------------------------------------------------------------------------------
 
@@ -494,7 +495,7 @@ allocate_buffers_t* process_avlnode_ends(avl_node_t *node_val, unsigned char st,
       allocate_batches->write_exact_sp->size += bytes_exact;
       //allocate_batches->write_extend_sp->size += bytes_extend;
       
-      total_splice += end_sp->reads_number;
+      //total_splice += end_sp->reads_number;
       junction_id++;
       //if (end_sp->type_sp >= AT_AC_SPLICE) {
       //semi_cannonical_sp++;
@@ -530,11 +531,11 @@ allocate_buffers_t * process_avlnode(cp_avlnode *node, unsigned char st,
 
 void write_chromosome_avls( char *extend_sp, char *exact_sp, 
 			    size_t num_chromosomes, avls_list_t *avls_list) {
+  junction_id = 0;
   int c, chr;
   unsigned char st;
   allocate_buffers_t *allocate_batches = (allocate_buffers_t *)malloc(sizeof(allocate_buffers_t));
   const int write_size = 5000000;
-
   FILE *fd_exact = fopen(exact_sp, "w");  
   if (!fd_exact) { 
     printf("Imposible to create FILE: %s\n", exact_sp);
@@ -588,7 +589,7 @@ void write_chromosome_avls( char *extend_sp, char *exact_sp,
 
   free(allocate_batches);
 
-  //basic_statistics_sp_init(total_splice, cannonical_sp, semi_cannonical_sp, basic_st);
+  st_bwt.dif_sj = junction_id;
     
 }
 

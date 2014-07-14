@@ -133,6 +133,8 @@ void options_free(options_t *options);
 
 void options_display(options_t *options);
 
+void options_to_file(options_t *options, FILE *fd);
+
 void usage_cli(int mode);
 
 void validate_options(options_t *options);

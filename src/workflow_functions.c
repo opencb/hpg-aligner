@@ -49,6 +49,8 @@ wf_input_file_t *wf_input_file_new(FILE *fd,
 
 void *fastq_reader(void *input) {
      struct timeval start, end;
+     extern size_t fd_read_bytes;
+     size_t read_bytes;
      double time;
 
      //if (time_on) { start_timer(start); }
@@ -72,11 +74,12 @@ void *fastq_reader(void *input) {
      } else {
        //Fastq file
        if (fq_reader_input->flags == SINGLE_END_MODE) {
-	 fastq_fread_bytes_se(reads, fq_reader_input->batch_size, fq_reader_input->fq_file1);
+	 read_bytes = fastq_fread_bytes_se(reads, fq_reader_input->batch_size, fq_reader_input->fq_file1);
        } else {
-	 fastq_fread_bytes_aligner_pe(reads, fq_reader_input->batch_size, 
-				      fq_reader_input->fq_file1, fq_reader_input->fq_file2);
+	 read_bytes = fastq_fread_bytes_aligner_pe(reads, fq_reader_input->batch_size, 
+						   fq_reader_input->fq_file1, fq_reader_input->fq_file2);
        }
+       fd_read_bytes += read_bytes;
      }
 
      size_t num_reads = array_list_size(reads);
@@ -333,6 +336,7 @@ int file_alignment_fill(size_t num_items, array_list_t *list,
 
 }
 */
+
 void *file_reader(void *input) {
   wf_input_file_t *wf_input = (wf_input_file_t *) input;
   FILE *fd = wf_input->file;
@@ -407,6 +411,9 @@ void *file_reader(void *input) {
     //array_list_free(reads, NULL);
     mapping_batch_free(mapping_batch);
   }
+
+  extern size_t reads_w2;
+  reads_w2 += num_reads;
 
   return new_batch;
 
@@ -485,6 +492,9 @@ void *file_reader_2(void *input) {
     mapping_batch_free(mapping_batch);
   }
 
+  extern size_t reads_w3;
+  reads_w3 += num_reads;
+
   return new_batch;
 
 }
@@ -536,7 +546,11 @@ int bam_writer(void *data) {
      extern size_t num_reads_map;
      extern size_t num_reads;
      extern size_t tot_reads;
-     
+
+     extern st_bwt_t st_bwt;
+
+     st_bwt.total_reads += num_reads_b;
+
      free(mapping_batch->histogram_sw);
      //
      // DNA/RNA mode
@@ -555,43 +569,15 @@ int bam_writer(void *data) {
 	 }	 
        } else {
 	 num_mapped_reads++;
+	 if (array_list_size(mapping_batch->mapping_lists[i]) == 1) {
+	   st_bwt.single_alig++;
+	 } else {
+	   st_bwt.multi_alig++;
+	 }
 	 write_mapped_read(mapping_batch->mapping_lists[i], bam_file);
        }
      }
      
-     //num_reads     += num_reads_b;
-     //num_reads_map += num_mapped_reads;
- 
-     //fprintf(stderr, "TOTAL READS PROCESS: %lu\n", basic_st->total_reads);
-     //if (basic_st->total_reads >= writer_input->limit_print) {
-       //LOG_DEBUG_F("TOTAL READS PROCESS: %lu\n", basic_st->total_reads);
-       //LOG_DEBUG_F("\tTotal Reads Mapped: %lu(%.2f%)\n", 
-       //	   basic_st->num_mapped_reads, 
-       //	   (float) (basic_st->num_mapped_reads*100)/(float)(basic_st->total_reads));
-       //writer_input->limit_print += 1000000;
-
-       /*
-       fprintf(stderr, "TOTAL READS PROCESS: %lu\n", tot_reads);
-       printf("\tTotal Reads Mapped: %lu(%.2f%)\n", 
-	      basic_st->num_mapped_reads, 
-	      (float) (basic_st->num_mapped_reads*100)/(float)(basic_st->total_reads));
-       */
-
-       //writer_input->limit_print += 100000;
-
-       //extern size_t TOTAL_SW,
-       //TOTAL_READS_PROCESS,
-       //TOTAL_READS_SEEDING,
-       //TOTAL_READS_SEEDING2,
-       //TOTAL_READS_SA;
-       
-
-       //fprintf(stderr, "TOTAL READS PROCESS = %lu,\n TOTAL READS SEEDING x1 = %lu,\n TOTAL READS SEEDING x2 = %lu,\n TOTAL SW = %lu,\n TOTAL READS SINGLE ANCHOR FINAL = %lu\n\n",
-       //      TOTAL_READS_PROCESS, TOTAL_READS_SEEDING, TOTAL_READS_SEEDING2, TOTAL_SW, TOTAL_READS_SA);
-       
-     //}
-     
-     //printf("Batch Write OK!\n");     
      
      if (mapping_batch) {
        mapping_batch_free(mapping_batch);

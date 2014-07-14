@@ -5,6 +5,16 @@
 //--------------------------------------------------------------------
 // workflow input                                                                                                                                                    
 //--------------------------------------------------------------------  
+
+extern size_t fd_read_bytes;
+extern size_t fd_total_bytes;
+extern int redirect_stdout;
+extern int gziped_fileds;
+extern int w1_end, w2_end, w3_end;
+
+extern size_t total_reads_w2, total_reads_w3;
+extern size_t reads_w2, reads_w3;
+
 extern int splice_junction_type(char nt_start_1, char nt_start_2, char nt_end_1, char nt_end_2);
 
 
@@ -33,6 +43,148 @@ int w3_function(void *data) {
 }
 
 
+int max = 63;
+
+void display_progress() {
+
+  if (redirect_stdout || gziped_fileds) { return; }
+  
+  float progress;
+
+  struct timeval wt_s, wt_e;
+  double w_time;
+
+  start_timer(wt_s);
+  while (!w1_end) {
+
+    if (fd_total_bytes <= 0) { 
+      progress = 0; 
+    } else {
+      progress = (fd_read_bytes * (size_t)100) / fd_total_bytes;
+    }
+
+    int c   = (max * progress) / 100;
+
+    printf("[");
+    for (int x = 0; x < c; x++)
+      printf("|");
+    for (int x = c; x < max; x++)
+      printf(" ");
+
+    stop_timer(wt_s, wt_e, w_time);
+    start_timer(wt_s);
+
+    size_t estimated;
+    if (fd_read_bytes <= 0) { 
+      estimated = 0;
+    } else {
+      estimated = ((fd_total_bytes - fd_read_bytes) * (w_time / 1000000) ) / fd_read_bytes;
+    }
+
+    size_t hour, min, sec;
+
+    min = estimated / 60;
+    sec = estimated % 60;
+
+    if (min >= 60) {
+      hour = min / 60;
+      min = min % 60;
+    } else {
+      hour = 0;      
+    }
+
+    printf("]  %.1f%% | %02lu:%02lu:%02lu ETA", progress, hour, min, sec);  
+    printf("\n\033[F\033[J");
+    
+    sleep(1);
+
+  }
+  
+    printf("[");
+  for (int x = 0; x < max; x++)
+    printf("|");        
+  
+  stop_timer(wt_s, wt_e, w_time);
+  printf("]  100%%\n\n\033[F");  
+
+}
+
+void display_progress_2_3(int w_id) {
+
+  if (redirect_stdout || gziped_fileds) { return; }
+  
+  float progress;
+
+  struct timeval wt_s, wt_e;
+  double w_time;
+
+  int total_reads, *actual_reads;
+  int *w_end;
+
+  if (w_id == 2) {
+    total_reads = total_reads_w2;    
+    w_end = &w2_end;
+    actual_reads = &reads_w2;
+  } else {
+    total_reads = total_reads_w3;
+    w_end = &w3_end;
+    actual_reads = &reads_w3;
+  }
+
+  start_timer(wt_s);
+  while (!(*w_end)) {
+    if (total_reads <= 0) { 
+      progress = 0; 
+    } else {
+      progress = ((*actual_reads) * (size_t)100) / (total_reads);
+    }
+
+    int c   = (max * progress) / 100;
+
+    printf("[");
+    for (int x = 0; x < c; x++)
+      printf("|");
+    for (int x = c; x < max; x++)
+      printf(" ");
+
+    stop_timer(wt_s, wt_e, w_time);
+    start_timer(wt_s);
+
+    size_t estimated;
+    if ((*actual_reads) <= 0) { 
+      estimated = 0;
+    } else {
+      estimated = ((total_reads - (*actual_reads)) * (w_time / 1000000) ) / (*actual_reads);
+    }
+
+    size_t hour, min, sec;
+
+    min = estimated / 60;
+    sec = estimated % 60;
+
+    if (min >= 60) {
+      hour = min / 60;
+      min = min % 60;
+    } else {
+      hour = 0;      
+    }
+
+    printf("]  %.1f%% | %02lu:%02lu:%02lu ETA", progress, hour, min, sec);  
+    printf("\n\033[F\033[J");
+    
+    sleep(1);
+
+  }
+  
+  printf("[");
+  for (int x = 0; x < max; x++)
+    printf("|");        
+  
+  stop_timer(wt_s, wt_e, w_time);
+  printf("]  100%%\n\n\033[F");  
+
+}
+
 
 
 void rna_aligner(options_t *options) {
@@ -44,12 +196,14 @@ void rna_aligner(options_t *options) {
   }
 
   char *reads_results = (char *)calloc((60 + prefix_length), sizeof(char));
-  char *log_results = (char *)calloc((60 + prefix_length), sizeof(char));
+  char *log_input = (char *)calloc((60 + prefix_length), sizeof(char));
+  char *log_output = (char *)calloc((60 + prefix_length), sizeof(char));
   char *extend_junctions = (char *)calloc((60 + prefix_length), sizeof(char));
   char *exact_junctions = (char *)calloc((60 + prefix_length), sizeof(char));
 
   char *output_filename = (char *)calloc((path_length + prefix_length + 60), sizeof(char));
-  char *log_filename = (char *)calloc((path_length + prefix_length + 60), sizeof(char));
+  char *log_filename_input = (char *)calloc((path_length + prefix_length + 60), sizeof(char));
+  char *log_filename_output = (char *)calloc((path_length + prefix_length + 60), sizeof(char));
   char *extend_filename = (char *)calloc((path_length + prefix_length + 60), sizeof(char));
   char *exact_filename = (char *)calloc((path_length + prefix_length + 60), sizeof(char));
 
@@ -61,9 +215,13 @@ void rna_aligner(options_t *options) {
     } else {
       strcat(reads_results, "_alignments.sam");  
     }
-    strcat(log_results, "/");
-    strcat(log_results, options->prefix_name);
-    strcat(log_results, "_hpg-aligner.log");  
+    strcat(log_input, "/");
+    strcat(log_input, options->prefix_name);
+    strcat(log_input, "_hpg-aligner_input.log");  
+
+    strcat(log_output, "/");
+    strcat(log_output, options->prefix_name);
+    strcat(log_output, "_hpg-aligner_ouput.log");  
 
     strcat(extend_junctions, "/");
     strcat(extend_junctions, options->prefix_name);
@@ -79,7 +237,8 @@ void rna_aligner(options_t *options) {
     } else {
       strcat(reads_results, "/alignments.sam");
     }
-    strcat(log_results, "/hpg-aligner.log");
+    strcat(log_input, "/hpg-aligner_input.log");
+    strcat(log_output, "/hpg-aligner_output.log");
     strcat(extend_junctions, "/extend_junctions.bed");
     strcat(exact_junctions, "/exact_junctions.bed");
   } 
@@ -88,9 +247,13 @@ void rna_aligner(options_t *options) {
   strcat(output_filename, reads_results);
   free(reads_results);
 
-  strcat(log_filename, options->output_name);
-  strcat(log_filename, log_results);
-  free(log_results);
+  strcat(log_filename_input, options->output_name);
+  strcat(log_filename_input, log_input);
+  free(log_input);
+
+  strcat(log_filename_output, options->output_name);
+  strcat(log_filename_output, log_output);
+  free(log_output);
 
   strcat(extend_filename, options->output_name);
   strcat(extend_filename, extend_junctions);
@@ -100,8 +263,9 @@ void rna_aligner(options_t *options) {
   strcat(exact_filename, exact_junctions);
   free(exact_junctions);
 
-  FILE *fd_log;
-  fd_log = fopen(log_filename, "w");
+  FILE *fd_log_input, *fd_log_output;
+  fd_log_input  = fopen(log_filename_input, "w");
+  fd_log_output = fopen(log_filename_output, "w");
 
   LOG_DEBUG("Auto Thread Configuration Done !");
 
@@ -124,6 +288,21 @@ void rna_aligner(options_t *options) {
   // display selected options
   LOG_DEBUG("Displaying options...\n");
   options_display(options);
+
+  fprintf(fd_log_input, "====================================================================================\n");
+  fprintf(fd_log_input, "=            H P G    A L I G N E R    L O G    I N P U T    F I L E               =\n");
+  fprintf(fd_log_input, "====================================================================================\n\n");
+
+  options_to_file(options, fd_log_input);
+
+  fprintf(fd_log_input, "====================================================================================\n");
+  fprintf(fd_log_input, "=                                                                                  =\n");
+  fprintf(fd_log_input, "====================================================================================\n");
+
+
+  fprintf(fd_log_output, "=====================================================================================\n");
+  fprintf(fd_log_output, "=            H P G    A L I G N E R    L O G    O U T P U T    F I L E              =\n");
+  fprintf(fd_log_output, "=====================================================================================\n\n");
 
   //time_on =  (unsigned int) options->timming;
   //statistics_on =  (unsigned int) options->statistics;
@@ -371,17 +550,19 @@ void rna_aligner(options_t *options) {
   struct timeval time_start_alig, time_end_alig;  
   char *file1, *file2;
 
-  printf("\n\n\t\t==================================================\n");
-  printf("\t\t|................. M A P P I N G ................|\n");
-  printf("\t\t==================================================\n");
-  printf("\t\t |                ___  ___  ___                 |\n");
-  printf("\t\t |              \\/ H \\/ P \\/ G \\/               |\n");
-  printf("\t\t |              /\\___/\\___/\\___/\\               |\n");
-  printf("\t\t |      ___  ___  ___  ___  ___  ___  ___       |\n");
-  printf("\t\t |    \\/ A \\/ L \\/ I \\/ G \\/ N \\/ E \\/ R \\/     |\n");
-  printf("\t\t |    /\\___/\\___/\\___/\\___/\\___/\\___/\\___/\\     |\n");
-  printf("\t\t |                                              |\n");
-  printf("\t\t==================================================\n");
+  printf("\n");
+
+  printf("+===============================================================+\n");
+  printf("|                           RNA MODE                            |\n");
+  printf("+===============================================================+\n");
+  printf("|      ___  ___  ___                                            |\n");
+  printf("|    \\/ H \\/ P \\/ G \\/                                          |\n");
+  printf("|    /\\___/\\___/\\___/\\                                          |\n");
+  printf("|      ___  ___  ___  ___  ___  ___  ___                        |\n");
+  printf("|    \\/ A \\/ L \\/ I \\/ G \\/ N \\/ E \\/ R \\/                      |\n");
+  printf("|    /\\___/\\___/\\___/\\___/\\___/\\___/\\___/\\                      |\n");
+  printf("|                                                               |\n");
+  printf("+===============================================================+\n");
 
   for (int f = 0; f < num_files1; f++) {
     file1 = array_list_get(f, files_fq1);
@@ -399,19 +580,36 @@ void rna_aligner(options_t *options) {
     if (options->pair_mode == SINGLE_END_MODE) {
       if (options->gzip) {
 	reader_input.fq_gzip_file1 = fastq_gzopen(file1);
+	gziped_fileds = 1;
       } else {
 	reader_input.fq_file1 = fastq_fopen(file1);
+
+	fseek(reader_input.fq_file1->fd, 0L, SEEK_END);
+	fd_total_bytes = ftell(reader_input.fq_file1->fd);
+	fseek(reader_input.fq_file1->fd, 0L, SEEK_SET);
+
       }
     } else {
       if (options->gzip) {
 	reader_input.fq_gzip_file1 = fastq_gzopen(file1);
 	reader_input.fq_gzip_file2 = fastq_gzopen(file2);
+	gziped_fileds = 1;
       } else {
 	reader_input.fq_file1 = fastq_fopen(file1);
+	fseek(reader_input.fq_file1->fd, 0L, SEEK_END);
+	fd_total_bytes = ftell(reader_input.fq_file1->fd);
+	fseek(reader_input.fq_file1->fd, 0L, SEEK_SET);
+
 	reader_input.fq_file2 = fastq_fopen(file2);
+	fseek(reader_input.fq_file2->fd, 0L, SEEK_END);
+	fd_total_bytes += ftell(reader_input.fq_file2->fd);
+	fseek(reader_input.fq_file2->fd, 0L, SEEK_SET);
       }
     }
 
+    if (!redirect_stdout && gziped_fileds) {
+      fprintf(stderr, "WARNING: The files input are gziped compressed, therefore progress bar are disable.\n");
+    }
 
     f_sa = fopen("buffer_sa.tmp", "w+b");
     if (f_sa == NULL) {
@@ -480,26 +678,69 @@ void rna_aligner(options_t *options) {
       tot_reads_out = 0;
 
 
+      if (num_files1 > 1) {
+	printf("PROCESS FILE: %s\n", file1);
+      }
+
       start_timer(time_start_alig);
-      printf("\t\t|................................................|\n");
-      printf("\t\t|            W O R K W F L O W    1              |\n");
-      workflow_run_with(options->num_cpu_threads, wf_input, wf);
 
-      printf("\t\t|................................................|\n");
-      printf("\t\t|            W O R K W F L O W    2              |\n");
+      printf("\nWORKFLOW 1\n");
+      w1_end = 0;
+      fd_read_bytes = 0;
+      #pragma omp parallel sections num_threads(2) 
+      {
+          #pragma omp section
+          {      
+	    workflow_run_with(options->num_cpu_threads, wf_input, wf);
+	    w1_end = 1;
+	  }
+          #pragma omp section
+	  {
+	    display_progress();
+	  }
+      }
+
+      printf("\nWORKFLOW 2\n");
       rewind(f_sa);
-      workflow_run_with(options->num_cpu_threads, wf_input_file, wf_last);
+      w2_end = 0;
+      reads_w2 = 0;
+      #pragma omp parallel sections num_threads(2) 
+      {
+          #pragma omp section
+          {      
+	    workflow_run_with(options->num_cpu_threads, wf_input_file, wf_last);
+	    w2_end = 1;
+	  }
+          #pragma omp section
+	  {
+	    display_progress_2_3(2);
+	  }
+      }
 
-      printf("\t\t|................................................|\n");
-      printf("\t\t|            W O R K W F L O W    3              |\n");
+      printf("\nWORKFLOW 3\n");
       rewind(f_hc);
-      workflow_run_with(options->num_cpu_threads, wf_input_file_hc, wf_hc);
-      printf("\t\t==================================================\n\n");
+      w3_end = 0;
+      reads_w3 = 0;
+      #pragma omp parallel sections num_threads(2) 
+      {
+          #pragma omp section
+          {      
+	    workflow_run_with(options->num_cpu_threads, wf_input_file_hc, wf_hc);
+	    w3_end = 1;
+	  }
+          #pragma omp section
+	  {
+	    display_progress_2_3(3);
+	  }
+      }
+      printf("\n");
+      total_reads_w3 = 0;
+      total_reads_w2 = 0;
+
       stop_timer(time_start_alig, time_end_alig, time_alig);
       //start_timer(time_start_alig);
 
-      basic_statistics_display(basic_st, 1, time_alig / 1000000, time_genome / 1000000);  
-
+      
       // free memory
       workflow_free(wf);
       workflow_free(wf_last);
@@ -614,318 +855,75 @@ void rna_aligner(options_t *options) {
   write_chromosome_avls(extend_filename,
 			exact_filename, num_chromosomes, avls_list);
   
-  
+  extern st_bwt_t st_bwt;
+  size_t mapped = st_bwt.single_alig + st_bwt.multi_alig;
+  size_t unmapped = st_bwt.total_reads - mapped;
 
-
-  /*  
-  printf("= = = = T I M I N G    W O R K F L O W    '1' = = = =\n");
-  workflow_display_timing(wf);
-  printf("= = = = - - - - - - - - - - - - - - - - - - - = = = =\n\n");
+  printf("+===============================================================+\n");
+  printf("|        H P G - A L I G N E R    S T A T I S T I C S           |\n");
+  printf("+===============================================================+\n");
+  printf("|              T I M E    S T A T I S T I C S                   |\n");
+  printf("+---------------------------------------------------------------+\n");
+  printf(" Loading time                            :  %.2f (s)\n", time_genome / 1000000);
+  printf(" Alignment time                          :  %.2f (s)\n", time_alig / 1000000);
+  printf(" Total time                              :  %.2f (s)\n", (time_genome / 1000000) + (time_alig / 1000000));
+  printf("+---------------------------------------------------------------+\n");
+  printf("|            M A P P I N G    S T A T I S T I C S               |\n");
+  printf("+---------------------------------------------------------------+\n");
+  printf(" Total reads process                     :  %lu\n", st_bwt.total_reads);
+  printf(" Total reads mapped                      :  %lu (%.2f%%)\n", mapped, (float)(mapped * 100) / (float)st_bwt.total_reads);
+  printf(" Total reads unmapped                    :  %lu (%.2f%%)\n", unmapped, (float)(unmapped * 100) / (float)st_bwt.total_reads);            
+  printf(" Reads with a single mapping             :  %lu (%.2f%%)\n", st_bwt.single_alig, (float)(st_bwt.single_alig * 100) / (float)st_bwt.total_reads);
+  printf(" Reads with multi mappings               :  %lu (%.2f%%)\n", st_bwt.multi_alig,  (float)(st_bwt.multi_alig * 100) / (float)st_bwt.total_reads);
+  printf(" Reads mapped with BWT phase             :  %lu (%.2f%%)\n", st_bwt.map_bwt,     (float)(st_bwt.map_bwt * 100) / (float)st_bwt.total_reads);
+  printf(" Reads mapped in workflow 1              :  %lu (%.2f%%)\n", st_bwt.map_w1 + st_bwt.map_bwt, (float)((st_bwt.map_w1 + st_bwt.map_bwt) * 100) / (float)st_bwt.total_reads);
+  printf(" Reads mapped in workflow 2              :  %lu (%.2f%%)\n", st_bwt.map_w2,     (float)(st_bwt.map_w2 * 100) / (float)st_bwt.total_reads);
+  printf(" Reads mapped in workflow 3              :  %lu (%.2f%%)\n", st_bwt.map_w3,     (float)(st_bwt.map_w3 * 100) / (float)st_bwt.total_reads);
+  printf("+---------------------------------------------------------------+\n");
+  printf("|    S P L I C E    J U N C T I O N S    S T A T I S T I C S    |\n");
+  printf("+---------------------------------------------------------------+\n");
+  printf(" Total splice junctions                  :  %lu\n", st_bwt.tot_sj);
+  printf(" Total cannonical splice junctions       :  %lu (%.2f%%)\n", st_bwt.cannonical_sj, (float)(st_bwt.cannonical_sj * 100)/(float)st_bwt.tot_sj);
+  printf(" Total semi-cannonical splice junctions  :  %lu (%.2f%%)\n", st_bwt.semi_cannonical_sj, (float)(st_bwt.semi_cannonical_sj * 100)/(float)st_bwt.tot_sj);
+  printf("+---------------------------------------------------------------+\n\n");
   
-  printf("= = = = T I M I N G    W O R K F L O W    '2' = = = =\n");
-  workflow_display_timing(wf_last);
-  printf("= = = = - - - - - - - - - - - - - - - - - - - = = = =\n\n");
   
-  printf("= = = = T I M I N G    W O R K F L O W    '3' = = = =\n");
-  workflow_display_timing(wf_hc); 
-  printf("= = = = - - - - - - - - - - - - - - - - - - - = = = =\n\n");
-  */
+  //Write to file 
+  fprintf(fd_log_output, "====================================================================================\n");
+  fprintf(fd_log_output, "=                                                                                  =\n");
+  fprintf(fd_log_output, "====================================================================================\n");
   
-
+  fprintf(fd_log_output, "\n= T I M E    S T A T I S T I C S\n");
+  fprintf(fd_log_output, "--------------------------------------------------------------\n");
+  fprintf(fd_log_output, " Loading time                            :  %.2f (s)\n", time_genome / 1000000);
+  fprintf(fd_log_output, " Alignment time                          :  %.2f (s)\n", time_alig / 1000000);
+  fprintf(fd_log_output, " Total time                              :  %.2f (s)\n", (time_genome / 1000000) + (time_alig / 1000000));
   
-  //Write statistics to file 
-
-  //free(basic_st);
+  fprintf(fd_log_output, "\n= M A P P I N G    S T A T I S T I C S\n");
+  fprintf(fd_log_output, "--------------------------------------------------------------\n");
+  fprintf(fd_log_output, " Total reads process                     :  %lu\n", st_bwt.total_reads);
+  fprintf(fd_log_output, " Total reads mapped                      :  %lu (%.2f%%)\n", mapped, (float)(mapped * 100) / (float)st_bwt.total_reads);
+  fprintf(fd_log_output, " Total reads unmapped                    :  %lu (%.2f%%)\n", unmapped, (float)(unmapped * 100) / (float)st_bwt.total_reads);            
+  fprintf(fd_log_output, " Reads with a single mapping             :  %lu (%.2f%%)\n", st_bwt.single_alig, (float)(st_bwt.single_alig * 100) / (float)st_bwt.total_reads);
+  fprintf(fd_log_output, " Reads with multi mappings               :  %lu (%.2f%%)\n", st_bwt.multi_alig,  (float)(st_bwt.multi_alig * 100) / (float)st_bwt.total_reads);
+  fprintf(fd_log_output, " Reads mapped with BWT phase             :  %lu (%.2f%%)\n", st_bwt.map_bwt,     (float)(st_bwt.map_bwt * 100) / (float)st_bwt.total_reads);
+  fprintf(fd_log_output, " Reads mapped in workflow 1              :  %lu (%.2f%%)\n", st_bwt.map_w1 + st_bwt.map_bwt, (float)((st_bwt.map_w1 + st_bwt.map_bwt) * 100) / (float)st_bwt.total_reads);
+  fprintf(fd_log_output, " Reads mapped in workflow 2              :  %lu (%.2f%%)\n", st_bwt.map_w2,     (float)(st_bwt.map_w2 * 100) / (float)st_bwt.total_reads);
+  fprintf(fd_log_output, " Reads mapped in workflow 3              :  %lu (%.2f%%)\n", st_bwt.map_w3,     (float)(st_bwt.map_w3 * 100) / (float)st_bwt.total_reads);
+  
+  fprintf(fd_log_output, "\n= S P L I C E    J U N C T I O N S    S T A T I S T I C S\n");
+  fprintf(fd_log_output, "--------------------------------------------------------------\n");
+  fprintf(fd_log_output, " Total splice junctions                  :  %lu\n", st_bwt.tot_sj);
+  fprintf(fd_log_output, " Total cannonical splice junctions       :  %lu (%.2f%%)\n", st_bwt.cannonical_sj, (float)(st_bwt.cannonical_sj * 100)/(float)st_bwt.tot_sj);
+  fprintf(fd_log_output, " Total semi-cannonical splice junctions  :  %lu (%.2f%%)\n", st_bwt.semi_cannonical_sj, (float)(st_bwt.semi_cannonical_sj * 100)/(float)st_bwt.tot_sj);
+  fprintf(fd_log_output, "--------------------------------------------------------------\n\n");
+  
+  fprintf(fd_log_output, "====================================================================================\n");
+  fprintf(fd_log_output, "=                                                                                  =\n");
+  fprintf(fd_log_output, "====================================================================================\n");
   
   //if (time_on){ timing_free(timing); }
   metaexons_free(metaexons);
-  /*  
-  //========================= O P E N M P    P I P E L I N E =============================//
-  
-  batch_t *batch = batch_new(&bwt_input, &region_input, &cal_input, 
-  &pair_input, &preprocess_rna, &sw_input, &writer_input, RNA_MODE, NULL);
-
-  
-  int num_threads = options->num_cpu_threads - 2;
-  
-  list_t fastq_list;
-  list_init("fastq-list", 1, options->num_cpu_threads * 3, &fastq_list);
-  
-  list_t bam_list;
-  list_init("bam-list", num_threads, options->num_cpu_threads * 3, &bam_list);
-  //  list_init("bam-list", 1, num_threads * 3, &bam_list);
-  
-  //omp_set_num_threads(num_threads);
-  
-  int num_cpus = 64;
-  int cpuArray[num_cpus];    
-  for (int i = 0; i < num_cpus; i++) {
-  cpuArray[i] = i;
-  }
-  omp_set_nested(1);
-    
-  double time_alig;
-  struct timeval time_start_alig, time_end_alig;
-  start_timer(time_start_alig);
-  
-  #pragma omp parallel sections num_threads (3)
-  {      
-  #pragma omp section
-  {
-  printf("OMP_THREAD (%i): START READER\n", omp_get_thread_num());
-  //testing_reader(fastq_filename, &reader_input, in);	  
-  // FastQ batch reader
-  //struct timeval start_time, end_time;
-  //double reading_time = 0, total_reading_time = 0;	  
-  //int id = omp_get_thread_num();
-  cpu_set_t cpu_set;
-  CPU_ZERO(&cpu_set);
-  CPU_SET(0, &cpu_set);
-  sched_setaffinity(syscall(SYS_gettid), sizeof(cpu_set), &cpu_set);
-  
-  list_item_t *item;
-  void *data;
-  size_t num_batches = 0;
-  while (1) {
-  //reading_time = 0;
-  data = fastq_reader(wf_input);
-  
-  if ((data) == NULL) break;
-  
-  item = list_item_new(num_batches, 0, data);
-  list_insert_item(item, &fastq_list);
-  num_batches++;
-  }
-  //printf("OMP_THREAD: END READER\n");
-  list_decr_writers(&fastq_list);
-  //printf("Reading time: %0.4f sec\n", total_reading_time / 1000000.0f);
-  }
-  #pragma omp section
-  {
-  // batch mapper
-  #pragma omp parallel num_threads(num_threads)
-  {
-  cpu_set_t cpu_set;
-  CPU_ZERO( &cpu_set);
-  int id = omp_get_thread_num() + 2;
-  CPU_SET( cpuArray[ id % num_cpus], &cpu_set);
-  sched_setaffinity(syscall(SYS_gettid), sizeof(cpu_set), &cpu_set);
-  
-  printf("START WORKER: %i\n", omp_get_thread_num());
-  list_item_t *item;
-  while ((item = list_remove_item(&fastq_list)) != NULL) {
-  bwt_stage(item->data_p);
-  cal_stage(item->data_p);
-  sw_stage(item->data_p);
-  post_pair_stage(item->data_p);
-  list_insert_item(item, &bam_list);
-  }
-  //printf("END WORKER %i\n", omp_get_thread_num());
-  list_decr_writers(&bam_list);
-  }
-  }
-  #pragma omp section
-  {
-  cpu_set_t cpu_set;
-  //int id = omp_get_thread_num();
-  CPU_ZERO(&cpu_set);
-  CPU_SET(1, &cpu_set);
-  sched_setaffinity(syscall(SYS_gettid), sizeof(cpu_set), &cpu_set);
-  //printf("OMP_THREAD (%i): START WRITER\n", omp_get_thread_num());
-  list_item_t *item;
-  //wf_batch_t *wf_batch;
-  size_t num_batches = 0;
-  while ((item = list_remove_item(&bam_list)) != NULL) {
-  //writing_time = 0;
-  //start_timer(start_time);
-  //bam_writer1(item->data_p);
-  //stop_timer(start_time, end_time, writing_time);
-  //total_writing_time += writing_time;
-  bam_writer(item->data_p);
-  list_item_free(item);
-  }
-  //printf("OMP_THREAD: END WRITER\n");
-  //printf("Writing time: %0.4f sec\n", total_writing_time / 1000000.0f);
-  }
-  }
-  
-  rewind(f_sa);
-  fastq_list.writers = 1;
-  bam_list.writers  = num_threads;
-  
-  #pragma omp parallel sections num_threads (3)
-  {
-  #pragma omp section
-  {
-  printf("OMP_THREAD: START READER\n");
-  //testing_reader(fastq_filename, &reader_input, in);	  
-  // FastQ batch reader
-  //struct timeval start_time, end_time;
-  //double reading_time = 0, total_reading_time = 0;	  
-  cpu_set_t cpu_set;
-  CPU_ZERO(&cpu_set);
-  CPU_SET(0, &cpu_set);
-  sched_setaffinity(syscall(SYS_gettid), sizeof(cpu_set), &cpu_set);
-  
-  list_item_t *item;
-  void *data;
-  size_t num_batches = 0;
-  while (1) {
-  //reading_time = 0;
-  data = file_reader(wf_input_file);
-  if ((data) == NULL) break;
-  
-  item = list_item_new(num_batches, 0, data);
-  list_insert_item(item, &fastq_list);
-  num_batches++;
-  }
-  printf("OMP_THREAD: END READER\n");
-  list_decr_writers(&fastq_list);
-  //printf("Reading time: %0.4f sec\n", total_reading_time / 1000000.0f);
-  }
-  #pragma omp section
-  {
-  // batch mapper
-  #pragma omp parallel num_threads(num_threads)
-  {
-  cpu_set_t cpu_set;
-  CPU_ZERO( &cpu_set);
-  int id = omp_get_thread_num() + 2;
-  CPU_SET( cpuArray[ id % num_cpus], &cpu_set);
-  sched_setaffinity(syscall(SYS_gettid), sizeof(cpu_set), &cpu_set);
-  
-  printf("START WORKER: %i\n", omp_get_thread_num());
-  list_item_t *item;
-  while ((item = list_remove_item(&fastq_list)) != NULL) {
-  rna_last_stage(item->data_p);
-  post_pair_stage(item->data_p);
-  list_insert_item(item, &bam_list);
-  }
-  printf("END WORKER %i\n", omp_get_thread_num());
-  list_decr_writers(&bam_list);
-  }
-  }
-  #pragma omp section
-  {
-  // BAM batch writer
-  //struct timeval start_time, end_time;
-  //double writing_time = 0, total_writing_time = 0;
-  cpu_set_t cpu_set;
-  //int id = omp_get_thread_num();
-  CPU_ZERO(&cpu_set);
-  CPU_SET(1, &cpu_set);
-  sched_setaffinity(syscall(SYS_gettid), sizeof(cpu_set), &cpu_set);
-  
-  printf("OMP_THREAD: START WRITER\n");
-  list_item_t *item;
-  //wf_batch_t *wf_batch;
-  size_t num_batches = 0;
-  while ((item = list_remove_item(&bam_list)) != NULL) {
-  //writing_time = 0;
-  //start_timer(start_time);
-  //bam_writer1(item->data_p);
-  //stop_timer(start_time, end_time, writing_time);
-  //total_writing_time += writing_time;
-  bam_writer(item->data_p);
-  list_item_free(item);
-  }
-  printf("OMP_THREAD: END WRITER\n");
-  //printf("Writing time: %0.4f sec\n", total_writing_time / 1000000.0f);
-  }
-  }
-  
-  rewind(f_hc);
-  fastq_list.writers = 1;
-  bam_list.writers  = num_threads;
-  
-  #pragma omp parallel sections num_threads (3)
-  {
-  #pragma omp section
-  {
-  cpu_set_t cpu_set;
-  CPU_ZERO(&cpu_set);
-  CPU_SET(0, &cpu_set);
-  sched_setaffinity(syscall(SYS_gettid), sizeof(cpu_set), &cpu_set);
-
-  printf("OMP_THREAD: START READER\n");
-  //testing_reader(fastq_filename, &reader_input, in);	  
-  // FastQ batch reader
-  //struct timeval start_time, end_time;
-  //double reading_time = 0, total_reading_time = 0;	  
-  list_item_t *item;
-  void *data;
-  size_t num_batches = 0;
-  while (1) {
-  //reading_time = 0;
-  data = file_reader_2(wf_input_file_hc);
-  
-  if ((data) == NULL) break;
-  
-  item = list_item_new(num_batches, 0, data);
-  list_insert_item(item, &fastq_list);
-  num_batches++;
-  }
-  printf("OMP_THREAD: END READER\n");
-  list_decr_writers(&fastq_list);
-  //printf("Reading time: %0.4f sec\n", total_reading_time / 1000000.0f);
-  }
-  #pragma omp section
-  {
-  // batch mapper
-  #pragma omp parallel num_threads(num_threads)
-  {
-  cpu_set_t cpu_set;
-  CPU_ZERO( &cpu_set);
-  int id = omp_get_thread_num() + 2;
-  CPU_SET( cpuArray[ id % num_cpus], &cpu_set);
-  sched_setaffinity(syscall(SYS_gettid), sizeof(cpu_set), &cpu_set);
-  
-  printf("START WORKER: %i\n", omp_get_thread_num());
-  list_item_t *item;
-  while ((item = list_remove_item(&fastq_list)) != NULL) {
-  rna_last_hc_stage(item->data_p);
-  post_pair_stage(item->data_p);
-  list_insert_item(item, &bam_list);
-  }
-  printf("END WORKER %i\n", omp_get_thread_num());
-  list_decr_writers(&bam_list);
-  }
-  }
-  #pragma omp section
-  {
-  // BAM batch writer
-  //struct timeval start_time, end_time;
-  //double writing_time = 0, total_writing_time = 0;
-  cpu_set_t cpu_set;
-  //int id = omp_get_thread_num();
-  CPU_ZERO(&cpu_set);
-  CPU_SET(1, &cpu_set);
-  sched_setaffinity(syscall(SYS_gettid), sizeof(cpu_set), &cpu_set);
-  
-  printf("OMP_THREAD: START WRITER\n");
-  list_item_t *item;
-  //wf_batch_t *wf_batch;
-  size_t num_batches = 0;
-  while ((item = list_remove_item(&bam_list)) != NULL) {
-  //writing_time = 0;
-  //start_timer(start_time);
-  //bam_writer1(item->data_p);
-  //stop_timer(start_time, end_time, writing_time);
-  //total_writing_time += writing_time;
-  bam_writer(item->data_p);
-  list_item_free(item);
-  }
-  printf("OMP_THREAD: END WRITER\n");
-  //printf("Writing time: %0.4f sec\n", total_writing_time / 1000000.0f);
-  }
-  }
-  //Write chromosome avls
-  write_chromosome_avls(extend_filename,
-  exact_filename, genome->num_chromosomes, avls_list);
-  stop_timer(time_start_alig, time_end_alig, time_alig);
-  
-  //}
-  */
 
   if (!options->fast_mode) {
     // free memory
@@ -954,13 +952,17 @@ void rna_aligner(options_t *options) {
   report_optarg_free(report_optarg);
 
 
-  free(log_filename);
+  free(log_filename_input);
+  free(log_filename_output);
   free(output_filename);
   free(exact_filename);
   free(extend_filename);
   linked_list_free(alignments_list, (void *)NULL);
   linked_list_free(buffer, (void *)NULL);
   linked_list_free(buffer_hc, (void *)NULL);
+
+  fclose(fd_log_output);
+  fclose(fd_log_input);
 
 }
 

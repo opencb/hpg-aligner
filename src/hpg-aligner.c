@@ -30,14 +30,48 @@ pthread_mutex_t mutex_sp;
 FILE *fd_log;
 size_t junction_id;
 
+
+
+size_t fd_read_bytes;
+size_t fd_total_bytes;
+int redirect_stdout;
+int gziped_fileds;
+
+st_bwt_t st_bwt;
+int w1_end;
+int w2_end;
+int w3_end;
+
+size_t total_reads_w2, total_reads_w3;
+size_t reads_w2, reads_w3;
 //--------------------------------------------------------------------
 // main parameters support
 //--------------------------------------------------------------------
 int main(int argc, char* argv[]) {
+
+  redirect_stdout = 0;
+  gziped_fileds = 0;
+
+  if (!isatty(fileno(stdout))) {
+    redirect_stdout = 1;
+    fprintf(stderr, "WARNING: The process output is redirect to file, therefore progress bar are disable.\n");
+  }
+
+  st_bwt.multi_alig = 0;
+  st_bwt.single_alig = 0;
+  st_bwt.total_reads = 0;
+  st_bwt.map_bwt = 0;
+
+  st_bwt.map_w1 = 0;
+  st_bwt.map_w2 = 0;
+  st_bwt.map_w3 = 0;
+
+  st_bwt.tot_sj = 0;
+  st_bwt.dif_sj = 0;
+  st_bwt.cannonical_sj = 0;
+  st_bwt.semi_cannonical_sj = 0;
+
   pthread_mutex_init(&mutex_sp, NULL);
-  
-  //memset(tot_cals, 0, sizeof(int)*50);
-  //const char HEADER_FILE[1024] = "Human_NCBI37.hbam\0";
 
   basic_st = basic_statistics_new();
 

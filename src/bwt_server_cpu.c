@@ -362,6 +362,8 @@ int apply_bwt_rna(bwt_server_input_t* input, batch_t *batch) {
   size_t num_anchors;
 
   extern pthread_mutex_t mutex_sp;
+  extern st_bwt_t st_bwt;
+
   //pthread_mutex_lock(&mutex_sp);
   //extern size_t total_reads;
   //total_reads += num_reads;
@@ -378,6 +380,7 @@ int apply_bwt_rna(bwt_server_input_t* input, batch_t *batch) {
 					input->bwt_optarg_p,
 					input->bwt_index_p,
 					list);
+
 
     if (array_list_get_flag(list) != 2) { //If flag 2, the read exceded the max number of mappings
       if (array_list_get_flag(list) == 1) {
@@ -399,6 +402,11 @@ int apply_bwt_rna(bwt_server_input_t* input, batch_t *batch) {
       }else {
 	//Read Map, Metaexon Actualization
 	array_list_set_flag(ALIGNMENTS_FOUND, list);
+
+	pthread_mutex_lock(&mutex_sp);
+	st_bwt.map_bwt++;
+	pthread_mutex_unlock(&mutex_sp);
+
 	for (int i = 0; i < num_mappings; i++) {
 	  alignment_t *alignment = array_list_get(i, list);
 	  metaexon_insert(0, alignment->chromosome,
@@ -437,6 +445,7 @@ int apply_bwt_rna(bwt_server_input_t* input, batch_t *batch) {
       }
     }
   }
+
   // array_list flag: 0 -> Not  BWT Anchors found
   //                  1 -> One  BWT Anchors found
   //                  2 -> Pair BWT Anchors found
