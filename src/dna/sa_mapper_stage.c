@@ -689,11 +689,12 @@ int is_valid_cal_pair(seed_cal_t *cal1, seed_cal_t *cal2,
 void check_pairs(array_list_t **cal_lists, sa_index3_t *sa_index,
 		 sa_mapping_batch_t *batch, cal_mng_t *cal_mng) {
   int found, inserted, max_read_area, read_area;
+  int score, first_score, second_score;
   int distance, valid_pair, list_size, list1_size, list2_size;
   seed_cal_t *cal, *mate_cal, *cal1, *cal2;
   array_list_t *list, *mate_list, *mate1_list, *mate2_list, *list1, *list2;
   fastq_read_t *read, *read1, *read2;
-  size_t num_reads = array_list_size(batch->fq_reads);
+  int num_cals, num_reads = array_list_size(batch->fq_reads);
 
   int min_distance = batch->options->pair_min_distance;
   int max_distance = batch->options->pair_max_distance;
@@ -808,28 +809,72 @@ void check_pairs(array_list_t **cal_lists, sa_index3_t *sa_index,
       continue;
     }
 
+    // check if we have valid pairs
+    score = 0;
+    first_score = 0;
+    second_score = 0;
     valid_pair = 0;
     for (int i1 = 0; i1 < list1_size; i1++) {
       cal1 = array_list_get(i1, list1);
       for (int i2 = 0; i2 < list2_size; i2++) {
 	cal2 = array_list_get(i2, list2);
-	valid_pair = is_valid_cal_pair(cal1, cal2, min_distance, max_distance, &distance);
+	if (is_valid_cal_pair(cal1, cal2, min_distance, max_distance, &distance)) {
+	  // score management
+	  score = cal1->score + cal2->score;
+	  if (score < first_score) {
+	    if (score > second_score) {
+	      second_score = score;
+	    }
+	  } else if (score > first_score) {
+	    if (first_score > 0) {
+	      second_score = first_score;
+	    }
+	    first_score = score;
+	  } else {
+	    second_score = score;
+	  }
+	  
+	  valid_pair++;
+	}
 	//printf(">>>>>>>>>>>>>>>> valid_pair = %i (distance = %i)\n", valid_pair, distance);
-	if (valid_pair) break;
       }
-      if (valid_pair) break;
     }
-    if (valid_pair) continue;
+    if (valid_pair) {
+      cal1 = array_list_get(0, list1);
+      cal2 = array_list_get(0, list2);
+      if (cal1->mapq == 0 && cal2->mapq == 0) {
+	if (first_score > second_score) {
+	  num_cals = array_list_size(list1);
+	  for (int kk = 0; kk < num_cals; kk++) { 
+	    cal = array_list_get(kk, list1);
+	    cal->mapq = 63;
+	  }
+	  num_cals = array_list_size(list2);
+	  for (int kk = 0; kk < num_cals; kk++) { 
+	    cal = array_list_get(kk, list2);
+	    cal->mapq = 63;
+	  }
+	}
+      }
+      continue;
+    }
 
+    // no valid pairs, then search mate by region
     max_read_area = 0;
+    score = 0;
+    first_score = 0;
+    second_score = 0;
+
     mate1_list = array_list_new(10, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
     mate2_list = array_list_new(10, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
+
     /*
     printf("======> list #1 size = %i\n", array_list_size(list1));
     for (int kk = 0; kk < array_list_size(list1); kk++) { seed_cal_print(array_list_get(kk, list1)); }
     printf("======> list #2 size = %i\n", array_list_size(list2));
     for (int kk = 0; kk < array_list_size(list2); kk++) { seed_cal_print(array_list_get(kk, list2)); }
     */
+    int pairs = 0;
     for (int k = 0; k < 2; k++) {
       if  (k == 0) {
 	list_size = list1_size;
@@ -850,10 +895,33 @@ void check_pairs(array_list_t **cal_lists, sa_index3_t *sa_index,
 
 	  for (int jj = 0; jj < array_list_size(mate_list); jj++) { 
 	    mate_cal = array_list_get(jj, mate_list);
+
+	    pairs++;
+	    //int distance = abs(cal->start - mate_cal->start) + 1 + read->length;
+	    //printf("**** >>>>>>>>>> pair %i : distance = %i\n", pairs, distance);
+	    //seed_cal_print(cal);
+	    //seed_cal_print(mate_cal);
+
 	    //printf("----->> found cals for the previous cal:\n");
 	    //seed_cal_print(mate_cal);
+
+	    // score management
+	    score = cal->score + mate_cal->score;
+	    if (score < first_score) {
+	      if (score > second_score) {
+		second_score = score;
+	      }
+	    } else if (score > first_score) {
+	      if (first_score > 0) {
+		second_score = first_score;
+	      }
+	      first_score = score;
+	    } else {
+	      second_score = score;
+	    }
+	    
+	    // read area management
 	    read_area = cal->read_area + mate_cal->read_area;
-	    //printf("----->> read_area = %i, max_read_area = %i\n", read_area, max_read_area);
 	    if (read_area < max_read_area) {
 	      // do nothing
 	      continue;
@@ -954,7 +1022,21 @@ void check_pairs(array_list_t **cal_lists, sa_index3_t *sa_index,
     cal_lists[i] = mate1_list;
     cal_lists[i+1] = mate2_list;
     batch->status[i] = 7; 
-    batch->status[i+1] = 7; 
+    batch->status[i+1] = 7;
+
+    if (first_score > second_score) {
+      num_cals = array_list_size(mate1_list);
+      for (int kk = 0; kk < num_cals; kk++) { 
+	cal = array_list_get(kk, mate1_list);
+	cal->mapq = 62;
+      }
+      num_cals = array_list_size(mate2_list);
+      for (int kk = 0; kk < num_cals; kk++) { 
+	cal = array_list_get(kk, mate2_list);
+	cal->mapq = 62;
+      }
+    }
+
     /*
     printf("======> result: max read area = %i\n", max_read_area);
     printf("=========> mate #1 list size = %i\n", array_list_size(mate1_list));
@@ -2841,7 +2923,7 @@ int sa_pair_mapper(void *data) {
 
   // 2) filter cals by pairs
   filter_cals_by_pair_mode(pair_mode, pair_min_distance, pair_max_distance, 
-			   num_reads, cal_lists);
+  			   num_reads, cal_lists);
   
   check_pairs(cal_lists, sa_index, mapping_batch, cal_mng);
 

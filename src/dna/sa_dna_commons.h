@@ -875,6 +875,7 @@ typedef struct seed_cal {
   int num_extend_gaps;
 
   int mapq;
+  int num_hits;
   float score;
   cigar_t cigar;
 
