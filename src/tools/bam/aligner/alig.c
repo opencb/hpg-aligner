@@ -432,6 +432,7 @@ alig_region_load_reference(alig_context_t *context)
 	size_t aux_pos_begin = SIZE_MAX;
 	size_t aux_pos_end = SIZE_MAX;
 	size_t ref_length = SIZE_MAX;
+	unsigned int chr;
 
 	assert(context);
 
@@ -463,17 +464,25 @@ alig_region_load_reference(alig_context_t *context)
 		//Get last read position + length
 		read = (bam1_t *) array_list_get(array_list_size(context->filtered_list) - 1, context->filtered_list);
 		assert(read);
-		ref_pos_end = (read->core.pos + read->core.l_qseq) + ALIG_REFERENCE_ADDITIONAL_OFFSET;
+		ref_pos_end = read->core.pos + (read->core.l_qseq * 2) + ALIG_REFERENCE_ADDITIONAL_OFFSET;
 
 		//Auxiliar
 		aux_pos_begin = ref_pos_begin + ALIG_REFERENCE_CORRECTION_OFFSET;
 		aux_pos_end = ref_pos_end + ALIG_REFERENCE_CORRECTION_OFFSET;
 
+		flag = (uint32_t) read->core.flag;
+		chr = read->core.tid;
+		if((flag & BAM_FUNMAP) || aux_pos_begin == 0 || aux_pos_end == 0 || context->genome->chr_size[chr] == 0)
+		{
+			//Read is unmapped
+			//LOG_WARN_F("Alignment is unmapped %d:%d-%d, %s\n", read->core.tid + 1, init_pos_ref + 1, end_pos_ref + 1, bam1_qname(read));
+			return ALIG_INVALID_REGION;
+		}
+
 		//Get reference
 		ref_seq = (char *) malloc(((ref_pos_end - ref_pos_begin) + 2) * sizeof(char));
-
 		assert(ref_seq);
-		flag = (uint32_t) read->core.flag;
+
 		genome_read_sequence_by_chr_index(ref_seq, (flag & BAM_FREVERSE) ? 1 : 0, (unsigned int)read->core.tid, &aux_pos_begin, &aux_pos_end, context->genome);
 
 		ref_length = (ref_pos_end - ref_pos_begin);
