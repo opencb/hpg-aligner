@@ -183,8 +183,11 @@ int sa_sam_writer(void *data) {
       }
       #endif
       
-      if (num_mappings == 1) {
+      if (num_mappings > 0) {
 	num_mapped_reads++;
+	if (num_mappings > 1) {
+	  num_multihit_reads++;
+	}
 	for (size_t j = 0; j < num_mappings; j++) {
 	  alig = (alignment_t *) array_list_get(j, mapping_list);
 
@@ -221,6 +224,10 @@ int sa_sam_writer(void *data) {
 	  }
 
 	  num_total_mappings++;
+	  if (num_mappings > 1) {
+	    alig->mapq = 0;
+	  }
+
 	  fprintf(out_file, "%s\t%i\t%s\t%i\t%i\t%s\t%s\t%i\t%i\t%s\t%s\t%s\n", 
 		  read->id,
 		  flag,
@@ -240,6 +247,7 @@ int sa_sam_writer(void *data) {
 	  alignment_free(alig);	 
 	}
       } else {
+	/*
 	if (num_mappings > 0) {
 	  num_multihit_reads++;
 	  for (size_t j = 0; j < num_mappings; j++) {
@@ -247,6 +255,7 @@ int sa_sam_writer(void *data) {
 	    alignment_free(alig);        
 	  }
 	}
+	*/
 	opt_fields = (char *) calloc(100, sizeof(char));
 	sprintf(opt_fields, "XM:i:%i XU:i:%i", num_mappings, mapping_batch->status[i]);
 
@@ -317,8 +326,11 @@ int sa_sam_writer(void *data) {
       }
       #endif
       
-      if (num_mappings == 1) {
+      if (num_mappings > 0) {
 	num_mapped_reads++;
+	if (num_mappings > 1) {
+	  num_multihit_reads++;
+	}
 
 	/*
 	if (num_mappings == 1) {
@@ -402,6 +414,9 @@ int sa_sam_writer(void *data) {
 	  cigar_string = cigar_to_string(cigar);
 	  cigar_M_string = cigar_to_M_string(&num_mismatches, &num_cigar_ops, cigar);
 	  num_total_mappings++;
+	  if (num_mappings > 1) {
+	    cal->mapq = 0;
+	  }
 	  fprintf(out_file, "%s\t%i\t%s\t%i\t%i\t%s\t%s\t%lu\t%i\t%s\t%s\tNH:i:%i\tNM:i:%i\tXC:Z:%s\n", 
 		  read->id,
 		  flag,
@@ -431,6 +446,7 @@ int sa_sam_writer(void *data) {
 	  }
 	}
       } else {
+	/*
 	if (num_mappings > 0) {
 	  num_multihit_reads++;
 	  for (size_t j = 0; j < num_mappings; j++) {
@@ -438,6 +454,7 @@ int sa_sam_writer(void *data) {
 	    seed_cal_free(cal);  
 	  }
 	}
+	*/
 
 	if (read->adapter) {
 	  // sequences and cigar
@@ -575,8 +592,11 @@ int sa_bam_writer(void *data) {
     }
     #endif
 
-    if (num_mappings == 1) {
+    if (num_mappings > 0) {
       num_mapped_reads++;
+      if (num_mappings > 1) {
+	num_multihit_reads++;
+      }
       for (size_t j = 0; j < num_mappings; j++) {
 	alig = (alignment_t *) array_list_get(j, mapping_list);
 
@@ -588,7 +608,11 @@ int sa_bam_writer(void *data) {
 	  alig->mate_strand = 0;
 	}
 
-	alig->map_quality = alig->mapq;
+	if (num_mappings > 1) {
+	  alig->map_quality = 0;
+	} else {
+	  alig->map_quality = alig->mapq;
+	}
 	bam1 = convert_to_bam(alig, 33);
 	bam_fwrite(bam1, out_file);
 	bam_destroy1(bam1);
@@ -596,6 +620,7 @@ int sa_bam_writer(void *data) {
 	num_total_mappings++;
       }
     } else {
+      /*
       if (num_mappings > 0) {
 	num_multihit_reads++;
 	for (size_t j = 0; j < num_mappings; j++) {
@@ -603,6 +628,7 @@ int sa_bam_writer(void *data) {
 	  alignment_free(alig);        
 	}
       }
+      */
       num_unmapped_reads++;
 
       if (read->adapter) {
