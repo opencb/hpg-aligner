@@ -844,8 +844,8 @@ void filter_cals_by_pair_mode(int pair_mode, int pair_min_distance, int pair_max
 	if (pairs == 1) {
 	  //	  if (cal2->num_hits < 100 && cal1->num_hits < 100 && 
 	  if (cal2->mapq == 0 && cal1->mapq == 0) {
-	    cal1->mapq = 61;
-	    cal2->mapq = 61;
+	    cal1->mapq = 0; //0; //61;
+	    cal2->mapq = 0; //0; //61;
 	  }
 	}
       }

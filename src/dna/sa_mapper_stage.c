@@ -853,12 +853,12 @@ void check_pairs(array_list_t **cal_lists, sa_index3_t *sa_index,
 	  num_cals = array_list_size(list1);
 	  for (int kk = 0; kk < num_cals; kk++) { 
 	    cal = array_list_get(kk, list1);
-	    cal->mapq = 63;
+	    cal->mapq = 0; //0; //63;
 	  }
 	  num_cals = array_list_size(list2);
 	  for (int kk = 0; kk < num_cals; kk++) { 
 	    cal = array_list_get(kk, list2);
-	    cal->mapq = 63;
+	    cal->mapq = 0;//0;//63;
 	  }
 	}
       }
@@ -1034,12 +1034,12 @@ void check_pairs(array_list_t **cal_lists, sa_index3_t *sa_index,
       num_cals = array_list_size(mate1_list);
       for (int kk = 0; kk < num_cals; kk++) { 
 	cal = array_list_get(kk, mate1_list);
-	cal->mapq = 62;
+	cal->mapq = 0;//62;
       }
       num_cals = array_list_size(mate2_list);
       for (int kk = 0; kk < num_cals; kk++) { 
 	cal = array_list_get(kk, mate2_list);
-	cal->mapq = 62;
+	cal->mapq = 0;//62;
       }
     }
 
