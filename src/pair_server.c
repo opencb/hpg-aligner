@@ -11,11 +11,6 @@ void prepare_paired_alignments(pair_server_input_t *input, mapping_batch_t *batc
 
 //------------------------------------------------------------------------------------
 
-void filter_alignments(char report_all,
-			      size_t report_n_best, 
-			      size_t report_n_hits,
-			      int report_best,
-			      array_list_t *mapping_list);
 
 //unsigned long alignment_hash_code(void *p);
 //int alignment_compare(void *p1, void *p2);

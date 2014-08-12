@@ -1081,7 +1081,6 @@ sa_index3_t *sa_index3_new(char *sa_index_dirname) {
       }
     }
   }
-
   free(prefix);
 
   // creating the sa_index_t structure
@@ -1102,6 +1101,7 @@ sa_index3_t *sa_index3_new(char *sa_index_dirname) {
 
   return p;
 }
+
 
 //--------------------------------------------------------------------------------------
 

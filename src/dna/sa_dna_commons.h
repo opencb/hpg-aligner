@@ -129,7 +129,9 @@ typedef struct sa_wf_batch {
   sa_index3_t *sa_index;
   batch_writer_input_t *writer_input;
   void *mapping_batch;  
-  void *data;
+  void *data_input;
+  void *data_output;
+  int data_output_size;
 } sa_wf_batch_t;
 
 //--------------------------------------------------------------------
@@ -138,7 +140,7 @@ static inline sa_wf_batch_t *sa_wf_batch_new(options_t *options,
 					     sa_index3_t *sa_index,
 					     batch_writer_input_t *writer_input,
 					     void *mapping_batch,
-					     void *data) {  
+					     void *data_input) {  
   sa_wf_batch_t *p = (sa_wf_batch_t *) malloc(sizeof(sa_wf_batch_t));
 
   p->options = options;
@@ -146,7 +148,7 @@ static inline sa_wf_batch_t *sa_wf_batch_new(options_t *options,
   p->writer_input = writer_input;
 
   p->mapping_batch = mapping_batch;
-  p->data          = data;
+  p->data_input    = data_input;
 
   return p;
 }
@@ -868,6 +870,7 @@ typedef struct seed_cal {
   int num_open_gaps;
   int num_extend_gaps;
 
+  int mapq;
   float score;
   cigar_t cigar;
 
@@ -901,6 +904,7 @@ static inline seed_cal_t *seed_cal_new(const size_t chromosome_id,
   p->num_open_gaps = 0;
   p->num_extend_gaps = 0;
 
+  p->mapq = 0;
   p->score = 0.0f;
   cigar_init(&p->cigar);
 
@@ -927,14 +931,19 @@ static inline void seed_cal_update_info(seed_cal_t *cal) {
     num_mismatches += seed->num_mismatches;
     num_open_gaps += seed->num_open_gaps;
     num_extend_gaps += seed->num_extend_gaps;
-    read_area += (seed->read_end - seed->read_start - num_mismatches - num_open_gaps - num_extend_gaps);
-    
+    read_area = (seed->read_end - seed->read_start > seed->genome_end - seed->genome_end ? 
+		 (seed->read_end - seed->read_start + 1) : 
+		 (seed->genome_end - seed->genome_start + 1));
+    //    read_area += (seed->read_end - seed->read_start - num_mismatches - (2 * num_open_gaps) - (num_extend_gaps));
   }
   cal->num_mismatches = num_mismatches;
   cal->num_open_gaps = num_open_gaps;
   cal->num_extend_gaps = num_extend_gaps;
   cal->num_mismatches = num_mismatches;
   cal->read_area = read_area;
+
+  cal->score = read_area - num_mismatches - num_open_gaps - num_extend_gaps - 
+    (num_mismatches * 4) - (num_open_gaps * 6) - (num_extend_gaps);
 }
 
 //--------------------------------------------------------------------
@@ -950,11 +959,11 @@ static inline void seed_cal_set_cigar_by_seed(seed_t *seed, seed_cal_t *cal) {
 void print_seed(char *msg, seed_t *s);
 
 static inline void seed_cal_print(seed_cal_t *cal) {
-  printf(" CAL (%c)[%lu:%lu-%lu] (%s, x:%i, og:%i, eg:%i) score = %0.2f: (read id %s)\n", 
+  printf(" CAL (%c)[%lu:%lu-%lu] (%s, x:%i, og:%i, eg:%i) area = %i score = %0.2f mapq = %i (invalid = %i): (read id %s)\n", 
 	 (cal->strand == 0 ? '+' : '-'), 
 	 cal->chromosome_id, cal->start, cal->end, cigar_to_string(&cal->cigar), cal->num_mismatches,
-	 cal->num_open_gaps, cal->num_extend_gaps, cal->score,
-	 cal->read->id);
+	 cal->num_open_gaps, cal->num_extend_gaps, cal->read_area, cal->score, cal->mapq,
+	 cal->invalid, cal->read->id);
   printf("\tSEEDS LIST:\n");
   if (cal->seed_list == NULL || cal->seed_list->size == 0) {
     printf("\t\tno seeds\n");
@@ -987,6 +996,8 @@ void filter_cals_by_max_score(float score, array_list_t **list);
 void filter_cals_by_max_num_mismatches(int num_mismatches, array_list_t **list);
 void filter_cals_by_pair_mode(int pair_mode, int pair_min_distance, int pair_max_distance, 
 			      int num_lists, array_list_t **cal_lists);
+
+void select_best_cals(fastq_read_t *read, array_list_t **list);
 
 //--------------------------------------------------------------------
 

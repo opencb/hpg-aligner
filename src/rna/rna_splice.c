@@ -1,11 +1,10 @@
 #include "rna_splice.h"
 
 extern size_t junction_id;
-
+size_t cannonical_sp = 0;
+size_t semi_cannonical_sp = 0;
 size_t total_splice = 0;
 
-extern pthread_mutex_t mutex_sp; 
-extern st_bwt_t st_bwt;
 
 //--------------------------------------------------------------------------------
 
@@ -185,6 +184,10 @@ void load_intron_file(genome_t *genome, char* intron_filename, avls_list_t *avls
 //--------------------------------------------------------------------------------
 
 void splice_end_type_new(char type_sp, char *splice_nt, splice_end_t *splice_end) {
+
+  splice_end->splice_nt = strdup(splice_nt);
+
+  /*
   switch(type_sp) {
   case UNKNOWN_SPLICE:
     splice_end->splice_nt = strdup(splice_nt);
@@ -211,6 +214,7 @@ void splice_end_type_new(char type_sp, char *splice_nt, splice_end_t *splice_end
     splice_end->splice_nt = strdup("NONE");
     break;
   }
+  */
 }
 
 splice_end_t *splice_end_new(size_t end, size_t end_extend, unsigned char type_orig, char type_sp, char *splice_nt) {
@@ -495,7 +499,7 @@ allocate_buffers_t* process_avlnode_ends(avl_node_t *node_val, unsigned char st,
       allocate_batches->write_exact_sp->size += bytes_exact;
       //allocate_batches->write_extend_sp->size += bytes_extend;
       
-      //total_splice += end_sp->reads_number;
+      total_splice += end_sp->reads_number;
       junction_id++;
       //if (end_sp->type_sp >= AT_AC_SPLICE) {
       //semi_cannonical_sp++;
@@ -531,11 +535,11 @@ allocate_buffers_t * process_avlnode(cp_avlnode *node, unsigned char st,
 
 void write_chromosome_avls( char *extend_sp, char *exact_sp, 
 			    size_t num_chromosomes, avls_list_t *avls_list) {
-  junction_id = 0;
   int c, chr;
   unsigned char st;
   allocate_buffers_t *allocate_batches = (allocate_buffers_t *)malloc(sizeof(allocate_buffers_t));
   const int write_size = 5000000;
+
   FILE *fd_exact = fopen(exact_sp, "w");  
   if (!fd_exact) { 
     printf("Imposible to create FILE: %s\n", exact_sp);
@@ -589,7 +593,7 @@ void write_chromosome_avls( char *extend_sp, char *exact_sp,
 
   free(allocate_batches);
 
-  st_bwt.dif_sj = junction_id;
+  //basic_statistics_sp_init(total_splice, cannonical_sp, semi_cannonical_sp, basic_st);
     
 }
 

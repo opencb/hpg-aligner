@@ -39,7 +39,7 @@
 #define DEFAULT_SW_GAP_OPEN		10
 #define DEFAULT_SW_GAP_EXTEND		0.5
 #define DEFAULT_PAIR_MODE	        0
-#define DEFAULT_PAIR_MIN_DISTANCE	50
+#define DEFAULT_PAIR_MIN_DISTANCE	200
 #define DEFAULT_PAIR_MAX_DISTANCE	800
 #define MINIMUM_BATCH_SIZE              10000
 #define DEFAULT_FILTER_READ_MAPPINGS    500
@@ -55,7 +55,7 @@
 //#define BS_MODE  2
 
 
-#define NUM_OPTIONS			29
+#define NUM_OPTIONS			30
 #define NUM_RNA_OPTIONS			 6
 #define NUM_DNA_OPTIONS			 1
 
@@ -109,6 +109,7 @@ typedef struct options {
   int filter_seed_mappings;
   int bs_index;
   int fast_mode;
+  int adapter_length;
   double min_score;
   double match;
   double mismatch;
@@ -124,6 +125,8 @@ typedef struct options {
   char* header_filename;
   char* transcriptome_filename;
   char* intron_filename;
+  char* adapter;
+  char* adapter_revcomp;
   // new variables for bisulphite case
 } options_t;
 
@@ -132,8 +135,6 @@ options_t *options_new(void);
 void options_free(options_t *options);
 
 void options_display(options_t *options);
-
-void options_to_file(options_t *options, FILE *fd);
 
 void usage_cli(int mode);
 
@@ -178,7 +179,7 @@ options_t *read_CLI_options(void **argtable_options, options_t *options);
  */
 int read_config_file(const char *filename, options_t *options);
 
-
+void options_to_file(options_t *options, FILE *fd);
 
 options_t *parse_options(int argc, char **argv);
 

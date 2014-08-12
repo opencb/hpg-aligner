@@ -363,7 +363,6 @@ int apply_bwt_rna(bwt_server_input_t* input, batch_t *batch) {
 
   extern pthread_mutex_t mutex_sp;
   extern st_bwt_t st_bwt;
-
   //pthread_mutex_lock(&mutex_sp);
   //extern size_t total_reads;
   //total_reads += num_reads;
@@ -371,6 +370,10 @@ int apply_bwt_rna(bwt_server_input_t* input, batch_t *batch) {
   
   for (int i = 0; i < num_reads; i++) {
     fastq_read_t *read = array_list_get(i, mapping_batch->fq_batch);
+
+    //Rev-comp
+    fastq_read_revcomp(read);
+
     //printf("BWT: %s\n", read->id);
     list = mapping_batch->mapping_lists[i];    
     
@@ -380,7 +383,6 @@ int apply_bwt_rna(bwt_server_input_t* input, batch_t *batch) {
 					input->bwt_optarg_p,
 					input->bwt_index_p,
 					list);
-
 
     if (array_list_get_flag(list) != 2) { //If flag 2, the read exceded the max number of mappings
       if (array_list_get_flag(list) == 1) {
@@ -409,7 +411,7 @@ int apply_bwt_rna(bwt_server_input_t* input, batch_t *batch) {
 
 	for (int i = 0; i < num_mappings; i++) {
 	  alignment_t *alignment = array_list_get(i, list);
-	  metaexon_insert(0, alignment->chromosome,
+	  metaexon_insert(0/*alignment->seq_strand*/, alignment->chromosome,
 			  alignment->position, alignment->position + read->length, 40,
 			  METAEXON_NORMAL, NULL,
 			  metaexons);
@@ -445,7 +447,6 @@ int apply_bwt_rna(bwt_server_input_t* input, batch_t *batch) {
       }
     }
   }
-
   // array_list flag: 0 -> Not  BWT Anchors found
   //                  1 -> One  BWT Anchors found
   //                  2 -> Pair BWT Anchors found

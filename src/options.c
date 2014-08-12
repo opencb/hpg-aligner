@@ -19,6 +19,7 @@ options_t *options_new(void) {
   options->bam_format = 0;
   options->realignment = 0;
   options->recalibration = 0;
+  options->adapter = NULL;
   //GET Number System Cores
   //----------------------------------------------
   if (num_cores = get_optimal_cpu_num_threads()) {
@@ -66,7 +67,9 @@ options_t *options_new(void) {
   options->min_seed_size = 0;
   options->seed_size = 0;
   options->flank_length = 0;
-  options->fast_mode = 0;
+  options->fast_mode = 1;
+
+  options->adapter_length = 0;
 
   //new variables for bisulphite case in index generation
   options->bs_index = 0;
@@ -84,7 +87,6 @@ void validate_options(options_t *options) {
   int DEFAULT_SEEDS_MAX_DISTANCE;
 
   int mode = options->mode;
-
 
   if (mode == DNA_MODE) {
     strcpy(options->str_mode, "DNA");
@@ -106,7 +108,7 @@ void validate_options(options_t *options) {
     DEFAULT_SEEDS_MAX_DISTANCE = 100;
   }else if (mode == RNA_MODE) {
     strcpy(options->str_mode, "RNA");
-    DEFAULT_READ_BATCH_SIZE = 200000;
+    DEFAULT_READ_BATCH_SIZE = 20000;
     DEFAULT_NUM_SEEDS	= 20;
     DEFAULT_SEED_SIZE = 16;
     DEFAULT_FLANK_LENGTH = 30;
@@ -163,7 +165,6 @@ void validate_options(options_t *options) {
     options->flank_length = DEFAULT_FLANK_LENGTH;
   }
 
-
   if (options->report_best) {
     options->report_all = 0;
     options->report_n_hits = 0;
@@ -186,6 +187,11 @@ void validate_options(options_t *options) {
     options->report_n_hits = 0;    
     options->report_all = 0;
   }
+
+  //if (!options->fast_mode) {
+  //options->bam_format = 1;
+  //}
+
 }
 
 
@@ -198,6 +204,7 @@ void options_free(options_t *options) {
      if (options->genome_filename  != NULL) { free(options->genome_filename); }
      if (options->output_name  != NULL)	{ free(options->output_name); }
      if (options->prefix_name != NULL) { free(options->prefix_name); }
+     if (options->adapter != NULL) { free(options->adapter); }
 
      if (options->mode == RNA_MODE) {
        if (options->transcriptome_filename != NULL) { free(options->transcriptome_filename); }
@@ -243,6 +250,10 @@ void options_display(options_t *options) {
      unsigned int pair_max_distance =  (unsigned int)options->pair_max_distance;
      unsigned int min_intron_length =  (unsigned int)options->min_intron_length;
      unsigned int fast_mode =   (unsigned int)options->fast_mode;
+     char* adapter =  NULL;
+     if (options->adapter) {
+       adapter = strdup(options->adapter);
+     }
 
      //unsigned int gpu_process = (unsigned int)options->gpu_process;
 
@@ -253,9 +264,9 @@ void options_display(options_t *options) {
      float gap_extend =  (float)options->gap_extend;
 
      printf("\n");
-     printf("+---------------------------------------------------------------+\n");
-     printf("|       P A R A M E T E R S    C O N F I G U R A T I O N        |\n");
-     printf("+---------------------------------------------------------------+\n");
+     printf("+===============================================================+\n");
+     printf("|             HPG ALIGNER PARAMETERS CONFIGURATION              |\n");
+     printf("+===============================================================+\n");
      //     printf("Num gpu threads %d\n", num_gpu_threads);
      //     printf("GPU Process: %s\n",  gpu_process == 0 ? "Disable":"Enable");
      printf("General parameters\n");
@@ -269,8 +280,11 @@ void options_display(options_t *options) {
      printf("\tFastQ gzip mode: %s\n", options->gzip == 1 ? "Enable" : "Disable");
      printf("\tIndex directory name: %s\n", bwt_dirname);
      printf("\tOutput directory name: %s\n", output_name);
+          
      printf("\tOutput file format: %s\n", 
-	    (options->bam_format || options->realignment || options->recalibration) ? "SAM" : "BAM");
+	    (options->bam_format || options->realignment || options->recalibration) ? "BAM" : "SAM");
+     printf("\tFastQ gzip mode: %s\n", options->gzip == 1 ? "Enable" : "Disable");
+     printf("\tAdapter: %s\n", (adapter ? adapter : "Not present"));
      printf("\n");
 
      printf("Architecture parameters\n");
@@ -320,7 +334,7 @@ void options_display(options_t *options) {
        }
        printf("\tMax intron length: %d\n", max_intron_length);
        printf("\tMin intron length: %d\n", min_intron_length);
-       printf("\tMin score        : %d\n", min_score);
+       //printf("\tMin score        : %d\n", min_score);
      }
 
      if (options->realignment || options->recalibration) {
@@ -332,14 +346,17 @@ void options_display(options_t *options) {
 	 printf("\tRecalibration\n");
        }
      }
-     printf("+---------------------------------------------------------------+\n");
+     printf("+===============================================================+\n");
      
      free(in_filename);
      if (in_filename2 != NULL) free(in_filename2);
      free(bwt_dirname);
      free(genome_filename);
      free(output_name);
+     if (adapter) free(adapter);
 }
+
+//--------------------------------------------------------------------
 
 void options_to_file(options_t *options, FILE *fd) {
   char* in_filename = strdup(options->in_filename);
@@ -503,9 +520,10 @@ void** argtable_options_new(int mode) {
   argtable[count++] = arg_str0(NULL, "prefix", NULL, "File prefix name");
   argtable[count++] = arg_int0("l", "log-level", NULL, "Log debug level");
   argtable[count++] = arg_lit0("h", "help", "Help option");
-  argtable[count++] = arg_lit0(NULL, "bam-format", "BAM output format (otherwise, SAM format)");
+  argtable[count++] = arg_lit0(NULL, "bam-format", "BAM output format (otherwise, SAM format), this option turn the process slow");
   argtable[count++] = arg_lit0(NULL, "indel-realignment", "Indel-based realignment");
   argtable[count++] = arg_lit0(NULL, "recalibration", "Base quality score recalibration");
+  argtable[count++] = arg_str0("a", "adapter", NULL, "Adapter sequence in the read");
 
   if (mode == DNA_MODE) {
     argtable[count++] = arg_int0(NULL, "num-seeds", NULL, "Number of seeds");
@@ -515,7 +533,7 @@ void** argtable_options_new(int mode) {
     argtable[count++] = arg_int0(NULL, "seed-size", NULL, "Number of nucleotides in a seed");
     argtable[count++] = arg_int0(NULL, "max-intron-size", NULL, "Maximum intron size");
     argtable[count++] = arg_int0(NULL, "min-intron-size", NULL, "Minimum intron size");
-    argtable[count++] = arg_lit0(NULL, "fast-mode", "Fast mode for SA index");
+    argtable[count++] = arg_lit0(NULL, "bwt-mode", "Slow mode for low memory consumption (SA mode pair-mode is not implemented yet)");
   }
 
   argtable[num_options] = arg_end(count);
@@ -594,9 +612,14 @@ options_t *read_CLI_options(void **argtable, options_t *options) {
   if (((struct arg_str*)argtable[++count])->count) { options->prefix_name = strdup(*(((struct arg_str*)argtable[count])->sval)); }
   if (((struct arg_file*)argtable[++count])->count) { options->log_level = *(((struct arg_int*)argtable[count])->ival); }
   if (((struct arg_int*)argtable[++count])->count) { options->help = ((struct arg_int*)argtable[count])->count; }
+
   if (((struct arg_int*)argtable[++count])->count) { options->bam_format = ((struct arg_int*)argtable[count])->count; }
+
   if (((struct arg_int*)argtable[++count])->count) { options->realignment = ((struct arg_int*)argtable[count])->count; }
   if (((struct arg_int*)argtable[++count])->count) { options->recalibration = ((struct arg_int*)argtable[count])->count; }
+  if (((struct arg_str*)argtable[++count])->count) { options->adapter = strdup(*(((struct arg_str*)argtable[count])->sval)); }
+
+  if (options->adapter) options->adapter_length = strlen(options->adapter);
 
   if (options->mode == DNA_MODE) {
     if (((struct arg_int*)argtable[++count])->count) { options->num_seeds = *(((struct arg_int*)argtable[count])->ival); }
@@ -606,10 +629,11 @@ options_t *read_CLI_options(void **argtable, options_t *options) {
     if (((struct arg_int*)argtable[++count])->count) { options->seed_size = *(((struct arg_int*)argtable[count])->ival); }
     if (((struct arg_int*)argtable[++count])->count) { options->max_intron_length = *(((struct arg_int*)argtable[count])->ival); }
     if (((struct arg_int*)argtable[++count])->count) { options->min_intron_length = *(((struct arg_int*)argtable[count])->ival); }
-    if (((struct arg_file*)argtable[++count])->count) { options->fast_mode = (((struct arg_int *)argtable[count])->count); }
+    if (((struct arg_file*)argtable[++count])->count) { options->fast_mode = !(((struct arg_int *)argtable[count])->count); }
   }
 
   return options;
+
 }
 
 

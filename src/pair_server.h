@@ -93,6 +93,15 @@ int prepare_alignments(pair_server_input_t* input, batch_t *batch);
 int prepare_alignments_bs(pair_server_input_t* input, batch_t *batch);
 
 //------------------------------------------------------------------------------------
+
+void filter_alignments_lists(char report_all, 
+			     size_t report_n_best, 
+			     size_t report_n_hits,
+			     int report_best,
+			     size_t num_lists,
+			     array_list_t **mapping_lists);
+
+
 //------------------------------------------------------------------------------------
 
 #endif // PAIR_SERVER_H

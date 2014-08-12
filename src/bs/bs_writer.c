@@ -119,7 +119,7 @@ int bs_writer(void *data) {
   
   if (found) free(found);
 
-  basic_statistics_add(num_reads, num_mapped_reads, total_mappings, basic_st);
+  basic_statistics_add(num_reads, num_mapped_reads, total_mappings, 0, basic_st);
   
   //if (time_on) { stop_timer(start, end, time); timing_add(time, BAM_WRITER, timing); }
 }

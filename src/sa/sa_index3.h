@@ -211,6 +211,7 @@ void sa_index3_build_k18(char *genome_filename, uint k_value, char *sa_index_dir
 
 //--------------------------------------------------------------------------------------
 
+sa_index3_t *sa_index3_parallel_new(char *sa_index_dirname, int num_threads);
 sa_index3_t *sa_index3_new(char *sa_index_dirname);
 void sa_index3_free(sa_index3_t *sa_index);
 
