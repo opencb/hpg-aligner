@@ -3762,7 +3762,7 @@ cigar_code_t *search_left_single_anchor(int gap_close,
 	for (int s = 0; s < array_list_size(final_starts); s++) {
 	  //assert(read_pos + c <= strlen(query_map));
 	  if (read_pos + c > strlen(query_map)) { 
-	    printf("ERROR: %i+%i=%i  vs %i", read_pos, c, read_pos + c, strlen(query_map)); cal_print(cal); 
+	    //printf("ERROR: %i+%i=%i  vs %i", read_pos, c, read_pos + c, strlen(query_map)); cal_print(cal); 
 	    goto free;
 	    //exit(-1); 
 	  }
@@ -3914,7 +3914,7 @@ cigar_code_t *search_left_single_anchor(int gap_close,
 	char str_sp_type[10];
 	if (type == NOT_SPLICE) {
 	  type = UNKNOWN_SPLICE;
-	  sprintf(str_sp_type, "%c%c-%c%c\0", nt_start[0], nt_start[1], nt_end[0], nt_end[1]);
+	  sprintf(str_sp_type, "%c%c-%c%c%c", nt_start[0], nt_start[1], nt_end[0], nt_end[1], '\0');
 	}
 	/*
 	allocate_start_node(cal->chromosome_id - 1,
@@ -4336,7 +4336,7 @@ cigar_code_t *search_right_single_anchor(int gap_close,
 	char str_sp_type[10];
 	if (type == NOT_SPLICE) {
 	  type = UNKNOWN_SPLICE;
-	  sprintf(str_sp_type, "%c%c-%c%c\0", nt_start[0], nt_start[1], nt_end[0], nt_end[1]);
+	  sprintf(str_sp_type, "%c%c-%c%c%c", nt_start[0], nt_start[1], nt_end[0], nt_end[1], '\0');
 	}
 
 	/*
@@ -4764,7 +4764,7 @@ cigar_code_t *search_double_anchors_cal(char *query_map,
 	char str_sp_type[10];
 	if (type == NOT_SPLICE) {
 	  type = UNKNOWN_SPLICE;
-	  sprintf(str_sp_type, "%c%c-%c%c\0", nt_start[0], nt_start[1], nt_end[0], nt_end[1]);
+	  sprintf(str_sp_type, "%c%c-%c%c%c", nt_start[0], nt_start[1], nt_end[0], nt_end[1], '\0');
 	}
 	/*
 	allocate_start_node(first_cal->chromosome_id - 1,

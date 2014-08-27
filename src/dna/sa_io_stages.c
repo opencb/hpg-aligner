@@ -19,9 +19,9 @@ size_t fastq_fread_se_ex(array_list_t *reads, size_t num_reads, fastq_file_t *fq
   fastq_read_t *read;
   
   while (count < num_reads && fgets(header1, MAX_READ_ID_LENGTH, fq_file->fd) != NULL) {
-    fgets(sequence, MAX_READ_SEQUENCE_LENGTH, fq_file->fd);
-    fgets(header2, MAX_READ_ID_LENGTH, fq_file->fd);
-    fgets(qualities, MAX_READ_SEQUENCE_LENGTH, fq_file->fd);
+    char *res = fgets(sequence, MAX_READ_SEQUENCE_LENGTH, fq_file->fd);
+    res = fgets(header2, MAX_READ_ID_LENGTH, fq_file->fd);
+    res = fgets(qualities, MAX_READ_SEQUENCE_LENGTH, fq_file->fd);
     
     header_length = strlen(header1);
     sequence_length = strlen(sequence);
@@ -213,7 +213,7 @@ int sa_sam_writer(void *data) {
 	  }
 
 	  num_total_mappings++;
-	  fprintf(out_file, "%s\t%i\t%s\t%i\t%i\t%s\t%s\t%i\t%i\t%s\t%s\t%s\n", 
+	  fprintf(out_file, "%s\t%lu\t%s\t%i\t%i\t%s\t%s\t%i\t%i\t%s\t%s\t%s\n", 
 		  read->id,
 		  flag,
 		  genome->chrom_names[alig->chromosome],
@@ -239,7 +239,7 @@ int sa_sam_writer(void *data) {
 	  }
 	}
 	char xmi[100];
-	sprintf(xmi, "XM:i:%i", num_mappings);
+	sprintf(xmi, "XM:i:%lu", num_mappings);
 
 	if (read->adapter) {
 	  len = read->length + abs(read->adapter_length);
@@ -391,7 +391,7 @@ int sa_sam_writer(void *data) {
 	  cigar_string = cigar_to_string(cigar);
 	  cigar_M_string = cigar_to_M_string(&num_mismatches, &num_cigar_ops, cigar);
 	  num_total_mappings++;
-	  fprintf(out_file, "%s\t%i\t%s\t%i\t%i\t%s\t%s\t%lu\t%i\t%s\t%s\tNH:i:%i\tNM:i:%i\tXC:Z:%s\n", 
+	  fprintf(out_file, "%s\t%lu\t%s\t%lu\t%i\t%s\t%s\t%lu\t%lu\t%s\t%s\tNH:i:%lu\tNM:i:%i\tXC:Z:%s\n", 
 		  read->id,
 		  flag,
 		  genome->chrom_names[cal->chromosome_id],

@@ -34,7 +34,7 @@ void avl_end_process(cp_avlnode *node) {
   end_data_t *data = avl_node->data;
   for (size_t i = 0; i < array_list_size(data->list_starts); i++) {
     size_t end_sp = (size_t)array_list_get(i, data->list_starts);
-    printf("%i-%i\n", end_sp, avl_node->position);
+    printf("%lu-%lu\n", end_sp, avl_node->position);
   }
   if (node->right) { avl_end_process(node->right); }
   return;
@@ -49,7 +49,7 @@ void avl_process(cp_avlnode *node) {
   start_data_t *data = avl_node->data;
   for (int i = 0; i < array_list_size(data->list_ends); i++) {
     splice_end_t *end_sp = array_list_get(i, data->list_ends);
-    printf("%i-%i\n", avl_node->position, end_sp->end);
+    printf("%lu-%lu\n", avl_node->position, end_sp->end);
   }
   if (node->right) { avl_process(node->right); }
   return;
@@ -130,7 +130,7 @@ void load_intron_file(genome_t *genome, char* intron_filename, avls_list_t *avls
   }
   
   while (!feof(fd_intron)) {
-    fgets(line, max_size, fd_intron);
+    char *res = fgets(line, max_size, fd_intron);
     line_size = strlen(line);
     pos = 0;
     value_pos = 0;

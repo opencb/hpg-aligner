@@ -743,7 +743,7 @@ void workflow_display_timing_SA(workflow_SA_t *wf) {
   printf("\n");
   printf("Num. threads       : %i \n", wf->num_threads);
   printf("Time addition      : %0.4f s\n", total);
-  printf("Scheduling overhead: %0.2f %\n", 100.0 - (100.0 * (total / wf->workflow_time) / wf->num_threads));
+  printf("Scheduling overhead: %0.2f %%\n", 100.0 - (100.0 * (total / wf->workflow_time) / wf->num_threads));
 
 }
 

@@ -365,7 +365,7 @@ int sa_sam_writer_rna(void *data) {
 
 	  int score = ((read->length * 0.5 - alig->map_quality*0.4)*100) / (read->length * 0.5);
 
-	  fprintf(out_file, "%s\t%i\t%s\t%lu\t%i\t%s\t%s\t%lu\t%i\t%s\t%s\t%s\n", 
+	  fprintf(out_file, "%s\t%i\t%s\t%i\t%i\t%s\t%s\t%i\t%i\t%s\t%s\t%s\n", 
 		  alig->query_name,
 		  flag,
 		  genome->chrom_names[alig->chromosome - 1],
@@ -718,14 +718,14 @@ void cal_mng_print(cal_mng_t *p) {
 	linked_list_iterator_init(cal_list, &itr);
 	cal = linked_list_iterator_curr(&itr);
 	while (cal) {
-	  printf(" [%lu-%lu](%i) :\n", cal->start, cal->end, linked_list_size(cal->sr_list));
+	  printf(" [%lu-%lu](%lu) :\n", cal->start, cal->end, linked_list_size(cal->sr_list));
 	  seed_first = linked_list_get_first(cal->sr_list);
 	  seed_last = linked_list_get_last(cal->sr_list);
 
 	  list_item = cal->sr_list->first;
-	  while (list_item) {
+	  while (list_item) { 
 	    seed_first = list_item->item;
-	    printf("\t[%lu|%lu-%lu|%lu] ", seed_first->genome_start, seed_first->read_start, seed_first->read_end, 
+	    printf("\t[%lu|%i-%i|%lu] ", seed_first->genome_start, seed_first->read_start, seed_first->read_end, 
 		   seed_first->genome_end);
 	    list_item = list_item->next;
 	  }
@@ -2061,7 +2061,7 @@ void convert_batch_to_str(sa_wf_batch_t *wf_batch) {
 	    alig_str[0] = '\0';
 
 	    int score = ((read->length * 0.5 - alig->map_quality*0.4)*100) / (read->length * 0.5);	
-	    sprintf(optional_flags, "AS:%i NM:%i NH:%i", score, alig->map_quality, num_mappings);
+	    sprintf(optional_flags, "AS:%i NM:%i NH:%lu", score, alig->map_quality, num_mappings);
 	    
 	    //num_total_mappings++;
 	    sprintf(alig_str, "%s\t%i\t%s\t%i\t%i\t%s\t%s\t%i\t%i\t%s\t%s\t%s\n", 
@@ -2130,12 +2130,12 @@ void convert_batch_to_str(sa_wf_batch_t *wf_batch) {
 	    flag = (alig->seq_strand ? 16 : 0);
 
 	    int score = ((read->length * 0.5 - alig->map_quality*0.4)*100) / (read->length * 0.5);	
-	    sprintf(optional_flags, "AS:%i NM:%i NH:%i", score, alig->map_quality, num_mappings);
+	    sprintf(optional_flags, "AS:%i NM:%i NH:%lu", score, alig->map_quality, num_mappings);
 	
 	    char alig_str[read_size];
 	    alig_str[0] = '\0';
 	
-	    sprintf(alig_str, "%s\t%i\t%s\t%lu\t%i\t%s\t%s\t%i\t%i\t%s\t%s\t%s\n\0", 
+	    sprintf(alig_str, "%s\t%i\t%s\t%i\t%i\t%s\t%s\t%i\t%i\t%s\t%s\t%s\n%c", 
 		    alig->query_name,
 		    flag,
 		    genome->chrom_names[alig->chromosome - 1],
@@ -2148,7 +2148,8 @@ void convert_batch_to_str(sa_wf_batch_t *wf_batch) {
 		    alig->seq_strand ? read->revcomp : read->sequence,
 		    //alig->sequence,
 		    alig->quality,
-		    optional_flags
+		    optional_flags,
+		    '\0'
 		    );
 	
 
@@ -2165,10 +2166,11 @@ void convert_batch_to_str(sa_wf_batch_t *wf_batch) {
 	  char alig_str[read_size];
 	  alig_str[0] = '\0';
       
-	  sprintf(alig_str, "%s\t4\t*\t0\t0\t*\t*\t0\t0\t%s\t%s\n\0", 
+	  sprintf(alig_str, "%s\t4\t*\t0\t0\t*\t*\t0\t0\t%s\t%s\n%c", 
 		  read->id,
 		  read->sequence,
-		  read->quality
+		  read->quality,
+		  '\0'
 		  );
       
 	  assert(buffer_size < buffer_max_size);
@@ -2406,7 +2408,7 @@ int sa_mapped_exact_reads(fastq_read_t *read,
       g_start = sa_index->SA[suff] - sa_index->genome->chrom_offsets[chrom];
       
       char cigar_str[2048];
-      sprintf(cigar_str, "%luM", read->length);     
+      sprintf(cigar_str, "%i%c", read->length, 'M');     
 
       alignment = alignment_new();
       alignment_init_single_end(strdup(read->id), 
@@ -2442,7 +2444,7 @@ int sa_mapped_exact_reads(fastq_read_t *read,
       g_start = sa_index->SA[suff] - sa_index->genome->chrom_offsets[chrom];
       
       char cigar_str[2048];
-      sprintf(cigar_str, "%luM", read->length);
+      sprintf(cigar_str, "%i%c", read->length, 'M');
       
       alignment = alignment_new();
       alignment_init_single_end(strdup(read->id),

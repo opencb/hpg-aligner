@@ -1,5 +1,5 @@
 #include "sa_index3.h"
-
+ 
 #define PROGRESS 1000000
 
 //--------------------------------------------------------------------------------------
@@ -82,7 +82,7 @@ sa_genome3_t *read_genome3(char *filename) {
 	else if (c == 'T' || c == 't') { S[l++] = 'T'; num_T++; chrom_length++; }
 	else if (c == 'N' || c == 'n') { S[l++] = 'N'; num_N++; chrom_length++; }
 	else {
-	  printf("Unknown character %c at %lu position\n", c, process);
+	  printf("Unknown character %c at %i position\n", c, process);
 	}
       } else {
 	if (reading_name) {
@@ -229,9 +229,6 @@ void sa_index3_build(char *genome_filename, uint k_value, char *sa_index_dirname
   gettimeofday(&start, NULL);
   sa_genome3_t *genome = read_genome3(genome_filename);
   gettimeofday(&stop, NULL);
-  printf("end of reading file (%lu items) in %0.2f s\n", 
-	 genome_filename,
-	 (stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);
 
   sa_genome3_display(genome);
 
@@ -371,10 +368,10 @@ void sa_index3_build(char *genome_filename, uint k_value, char *sa_index_dirname
   sprintf(filename_tab, "%s/params.txt", sa_index_dirname);
   f_tab = fopen(filename_tab, "w");
   fprintf(f_tab, "%s\n", prefix);
-  fprintf(f_tab, "%lu\n", k_value);
-  fprintf(f_tab, "%lu\n", pre_length);
-  fprintf(f_tab, "%lu\n", num_suffixes);
-  fprintf(f_tab, "%lu\n", genome->length);
+  fprintf(f_tab, "%i\n", k_value);
+  fprintf(f_tab, "%i\n", pre_length);
+  fprintf(f_tab, "%i\n", num_suffixes);
+  fprintf(f_tab, "%i\n", genome->length);
   fprintf(f_tab, "%lu\n", genome->num_chroms);
   for (size_t i = 0; i < genome->num_chroms; i++) {
     fprintf(f_tab, "%s\t%lu\n", 
@@ -432,9 +429,6 @@ void sa_index3_build_k18(char *genome_filename, uint k_value, char *sa_index_dir
   gettimeofday(&start, NULL);
   sa_genome3_t *genome = read_genome3(genome_filename);
   gettimeofday(&stop, NULL);
-  printf("end of reading file (%lu items) in %0.2f s\n", 
-	 genome_filename,
-	 (stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);
   
   sa_genome3_display(genome);
 
@@ -571,19 +565,19 @@ p      display_prefix(&genome->S[tmp[0][i].value], k_value);
     printf("Error: could not open %s to write\n", filename_tab);
     exit(-1);
   }
-  printf("SA: filename %s, num_suffixes = %lu\n", filename_tab, num_suffixes);
+  printf("SA: filename %s, num_suffixes = %i\n", filename_tab, num_suffixes);
   uint *SA = (uint *) malloc(num_suffixes * sizeof(uint));
   
   printf("\nreading SA table from file %s...\n", filename_tab);
   gettimeofday(&start, NULL);
   uint num_items = fread(SA, sizeof(uint), num_suffixes, f_tab);
   if (num_items != num_suffixes) {
-    printf("Error: (%s) mismatch num_items = %lu vs num_suffixes = %lu\n", 
+    printf("Error: (%s) mismatch num_items = %i vs num_suffixes = %i\n", 
 	   filename_tab, num_items, num_suffixes);
     exit(-1);
   }
   gettimeofday(&stop, NULL);
-  printf("end of reading SA table (%lu num_suffixes) from file %s in %0.2f s\n", 
+  printf("end of reading SA table (%i num_suffixes) from file %s in %0.2f s\n", 
   	 num_suffixes, filename_tab,
 	 (stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);      
   fclose(f_tab);
@@ -658,7 +652,7 @@ p      display_prefix(&genome->S[tmp[0][i].value], k_value);
       }
     } else {
       printf("end of filling sub-matrix (%lu): %lu items. Done !!\n", matrix, matrix_items);
-      printf("\t -----> new matrix due to the value SA[%lu] = %lu -> ", i, value);
+      printf("\t -----> new matrix due to the value SA[%i] = %lu -> ", i, value);
       display_prefix(&genome->S[SA[i]], k_value);
       printf("\n");
       
@@ -785,12 +779,12 @@ p      display_prefix(&genome->S[tmp[0][i].value], k_value);
   sprintf(filename_tab, "%s/params.txt", sa_index_dirname);
   f_tab = fopen(filename_tab, "w");
   fprintf(f_tab, "%s\n", prefix);
-  fprintf(f_tab, "%lu\n", k_value);
-  fprintf(f_tab, "%lu\n", pre_length);
-  fprintf(f_tab, "%lu\n", A_counter);
-  fprintf(f_tab, "%lu\n", IA_counter);
-  fprintf(f_tab, "%lu\n", num_suffixes);
-  fprintf(f_tab, "%lu\n", genome->length);
+  fprintf(f_tab, "%i\n", k_value);
+  fprintf(f_tab, "%i\n", pre_length);
+  fprintf(f_tab, "%i\n", A_counter);
+  fprintf(f_tab, "%i\n", IA_counter);
+  fprintf(f_tab, "%i\n", num_suffixes);
+  fprintf(f_tab, "%i\n", genome->length);
   fprintf(f_tab, "%lu\n", genome->num_chroms);
   for (size_t i = 0; i < genome->num_chroms; i++) {
     fprintf(f_tab, "%s\t%lu\n", 
@@ -815,7 +809,7 @@ p      display_prefix(&genome->S[tmp[0][i].value], k_value);
   sprintf(filename_tab, "%s/index", sa_index_dirname);
   f_tab = fopen(filename_tab, "w");
   for (size_t i = 0; i < genome->num_chroms; i++) {
-    fprintf(f_tab, ">%s %lu %lu\n", 
+    fprintf(f_tab, ">%s %i %lu\n", 
 	   (genome->chrom_names ? genome->chrom_names[i] : "no-name"), 
 	    0,
 	    genome->chrom_lengths[i] - 1);
@@ -843,7 +837,7 @@ sa_index3_t *sa_index3_new(char *sa_index_dirname) {
   PREFIX_TABLE_NT_VALUE['G'] = 2;
   PREFIX_TABLE_NT_VALUE['T'] = 3;
 
-  sprintf(filename_tab, "%s/params.txt", sa_index_dirname, prefix);
+  sprintf(filename_tab, "%s/params.txt", sa_index_dirname);
   //printf("reading %s\n", filename_tab);
 
   f_tab = fopen(filename_tab, "r");
@@ -852,30 +846,31 @@ sa_index3_t *sa_index3_new(char *sa_index_dirname) {
     exit(-1);
   }
 
+  char *res;
   // prefix
-  fgets(line, 1024, f_tab);
+  res = fgets(line, 1024, f_tab);
   line[strlen(line) - 1] = 0;
   prefix = strdup(line);
   // k_value
-  fgets(line, 1024, f_tab);
+  res = fgets(line, 1024, f_tab);
   k_value = atoi(line);
   // pre_length
-  fgets(line, 1024, f_tab);
+  res = fgets(line, 1024, f_tab);
   pre_length = atoi(line);
   // A_items
-  fgets(line, 1024, f_tab);
+  res = fgets(line, 1024, f_tab);
   A_items = atoi(line);
   // IA_items
-  fgets(line, 1024, f_tab);
+  res = fgets(line, 1024, f_tab);
   IA_items = atol(line);
   // num_suffixes
-  fgets(line, 1024, f_tab);
+  res = fgets(line, 1024, f_tab);
   num_suffixes = atoi(line);
   // genome_length
-  fgets(line, 1024, f_tab);
+  res = fgets(line, 1024, f_tab);
   genome_len = atoi(line);
   // num_chroms
-  fgets(line, 1024, f_tab);
+  res = fgets(line, 1024, f_tab);
   num_chroms = atoi(line);
 
   size_t *chrom_lengths = (size_t *) malloc(num_chroms * sizeof(size_t));
@@ -884,7 +879,7 @@ sa_index3_t *sa_index3_new(char *sa_index_dirname) {
   size_t chrom_len;
 		  
   for (int i = 0; i < num_chroms; i++) {
-    fgets(line, 1024, f_tab);
+    res = fgets(line, 1024, f_tab);
     sscanf(line, "%s %lu\n", chrom_name, &chrom_len);
     //printf("chrom_name: %s, chrom_len: %lu\n", chrom_name, chrom_len);
     chrom_names[i] = strdup(chrom_name);
@@ -920,7 +915,7 @@ sa_index3_t *sa_index3_new(char *sa_index_dirname) {
       gettimeofday(&start, NULL);
       num_items = fread(S, sizeof(char), genome_len, f_tab);
       if (num_items != genome_len) {
-	printf("Error: (%s) mismatch num_items = %lu vs length = %lu\n", 
+	printf("Error: (%s) mismatch num_items = %i vs length = %i\n", 
 	       filename_tab, num_items, genome_len);
 	exit(-1);
       }
@@ -949,7 +944,7 @@ sa_index3_t *sa_index3_new(char *sa_index_dirname) {
 	//	printf("\nreading A table (Compression Row Storage) from file %s...\n", filename_tab);
 	gettimeofday(&start, NULL);
 	if ((num_items = fread(A, sizeof(uint), A_items, f_tab)) != A_items) {
-	  printf("Error: (%s) mismatch read num_items = %lu (it must be %lu)\n", 
+	  printf("Error: (%s) mismatch read num_items = %i (it must be %i)\n", 
 		 filename_tab, num_items, A_items);
 	  exit(-1);
 	}
@@ -970,7 +965,7 @@ sa_index3_t *sa_index3_new(char *sa_index_dirname) {
 	//	printf("\nreading IA table (Compression Row Storage) from file %s...\n", filename_tab);
 	gettimeofday(&start, NULL);
 	if ((num_items = fread(IA, sizeof(uint), IA_items, f_tab)) != IA_items) {
-	  printf("Error: (%s) mismatch read num_items = %lu (it must be %lu)\n", 
+	  printf("Error: (%s) mismatch read num_items = %i (it must be %i)\n", 
 		 filename_tab, num_items, IA_items);
 	  exit(-1);
 	}
@@ -1002,7 +997,7 @@ sa_index3_t *sa_index3_new(char *sa_index_dirname) {
       gettimeofday(&start, NULL);
       num_items = fread(SA, sizeof(uint), num_suffixes, f_tab);
       if (num_items != num_suffixes) {
-	printf("Error: (%s) mismatch num_items = %lu vs num_suffixes = %lu\n", 
+	printf("Error: (%s) mismatch num_items = %i vs num_suffixes = %i\n", 
 	       filename_tab, num_items, num_suffixes);
 	exit(-1);
       }
@@ -1026,7 +1021,7 @@ sa_index3_t *sa_index3_new(char *sa_index_dirname) {
       gettimeofday(&start, NULL);
       num_items = fread(CHROM, sizeof(char), num_suffixes, f_tab);
       if (num_items != num_suffixes) {
-	printf("Error: (%s) mismatch num_items = %lu vs num_suffixes = %lu\n", 
+	printf("Error: (%s) mismatch num_items = %i vs num_suffixes = %i\n", 
 	       filename_tab, num_items, num_suffixes);
 	exit(-1);
       }
@@ -1048,7 +1043,7 @@ sa_index3_t *sa_index3_new(char *sa_index_dirname) {
 	//	printf("\nreading PRE table from file %s...\n", filename_tab);
 	gettimeofday(&start, NULL);
 	if (num_items != fread(PRE, sizeof(uint), num_items, f_tab)) {
-	  printf("Error: (%s) mismatch num_items = %lu\n", 
+	  printf("Error: (%s) mismatch num_items = %i\n", 
 		 filename_tab, num_items);
 	  exit(-1);
 	}
@@ -1069,7 +1064,7 @@ sa_index3_t *sa_index3_new(char *sa_index_dirname) {
 	//	printf("\nreading JA table (Compression Row Storage) from file %s...\n", filename_tab);
 	gettimeofday(&start, NULL);
 	if ((num_items = fread(JA, sizeof(unsigned char), A_items, f_tab)) != A_items) {
-	  printf("Error: (%s) mismatch read num_items = %lu (it must be %lu)\n", 
+	  printf("Error: (%s) mismatch read num_items = %i (it must be %i)\n", 
 		 filename_tab, num_items, A_items);
 	  exit(-1);
 	}

@@ -217,7 +217,7 @@ void print_load_progress(float progress, int finish) {
   } else {
     for (int x = 0; x < max - 1; x++)
       printf("|");        
-    printf("] 100%%\n\n\033[F", progress);  
+    printf("] 100%%\n\n\033[F");  
   }
 }
 
@@ -252,7 +252,7 @@ void display_progressX() {
   for (int x = 0; x < max; x++)
     printf("|");        
   
-  printf("] 100%%\n\n\033[F", progress);  
+  printf("] 100%%\n\n\033[F");  
 
 }
 
@@ -284,7 +284,7 @@ void display_progress_2() {
   for (int x = 0; x < max; x++)
     printf("|");        
   
-  printf("] 100%%\n\n\033[F", progress);  
+  printf("] 100%%\n\n\033[F");  
 
 }
 
@@ -312,7 +312,7 @@ void sa_index3_parallel_genome_new(char *sa_index_dirname, int num_threads,
   PREFIX_TABLE_NT_VALUE['G'] = 2;
   PREFIX_TABLE_NT_VALUE['T'] = 3;
 
-  sprintf(filename_tab, "%s/params.txt", sa_index_dirname, prefix);
+  sprintf(filename_tab, "%s/params.txt", sa_index_dirname);
   //printf("reading %s\n", filename_tab);
 
   f_tab = fopen(filename_tab, "r");
@@ -322,29 +322,29 @@ void sa_index3_parallel_genome_new(char *sa_index_dirname, int num_threads,
   }
 
   // prefix
-  fgets(line, 1024, f_tab);
+  char *res = fgets(line, 1024, f_tab);
   line[strlen(line) - 1] = 0;
   prefix = strdup(line);
   // k_value
-  fgets(line, 1024, f_tab);
+  res = fgets(line, 1024, f_tab);
   k_value = atoi(line);
   // pre_length
-  fgets(line, 1024, f_tab);
+  res = fgets(line, 1024, f_tab);
   pre_length = atoi(line);
   // A_items
-  fgets(line, 1024, f_tab);
+  res = fgets(line, 1024, f_tab);
   A_items = atoi(line);
   // IA_items
-  fgets(line, 1024, f_tab);
+  res = fgets(line, 1024, f_tab);
   IA_items = atol(line);
   // num_suffixes
-  fgets(line, 1024, f_tab);
+  res = fgets(line, 1024, f_tab);
   num_suffixes = atoi(line);
   // genome_length
-  fgets(line, 1024, f_tab);
+  res = fgets(line, 1024, f_tab);
   genome_len = atoi(line);
   // num_chroms
-  fgets(line, 1024, f_tab);
+  res = fgets(line, 1024, f_tab);
   num_chroms = atoi(line);
 
   size_t *chrom_lengths = (size_t *) malloc(num_chroms * sizeof(size_t));
@@ -353,7 +353,7 @@ void sa_index3_parallel_genome_new(char *sa_index_dirname, int num_threads,
   size_t chrom_len;
 		  
   for (int i = 0; i < num_chroms; i++) {
-    fgets(line, 1024, f_tab);
+    res = fgets(line, 1024, f_tab);
     sscanf(line, "%s %lu\n", chrom_name, &chrom_len);
     //printf("chrom_name: %s, chrom_len: %lu\n", chrom_name, chrom_len);
     chrom_names[i] = strdup(chrom_name);
@@ -399,7 +399,7 @@ void sa_index3_parallel_genome_new(char *sa_index_dirname, int num_threads,
 	gettimeofday(&start, NULL);
 	num_items = fread(S, sizeof(char), genome_len, f_tab);
 	if (num_items != genome_len) {
-	  printf("Error: (%s) mismatch num_items = %lu vs length = %lu\n", 
+	  printf("Error: (%s) mismatch num_items = %i vs length = %i\n", 
 		 filename_tab, num_items, genome_len);
 	  exit(-1);
 	}
@@ -433,7 +433,7 @@ void sa_index3_parallel_genome_new(char *sa_index_dirname, int num_threads,
 	  //	printf("\nreading A table (Compression Row Storage) from file %s...\n", filename_tab);
 	  gettimeofday(&start, NULL);
 	  if ((num_items = fread(A, sizeof(uint), A_items, f_tab)) != A_items) {
-	    printf("Error: (%s) mismatch read num_items = %lu (it must be %lu)\n", 
+	    printf("Error: (%s) mismatch read num_items = %i (it must be %i)\n", 
 		   filename_tab, num_items, A_items);
 	    exit(-1);
 	  }
@@ -459,7 +459,7 @@ void sa_index3_parallel_genome_new(char *sa_index_dirname, int num_threads,
 	  //	printf("\nreading IA table (Compression Row Storage) from file %s...\n", filename_tab);
 	  gettimeofday(&start, NULL);
 	  if ((num_items = fread(IA, sizeof(uint), IA_items, f_tab)) != IA_items) {
-	    printf("Error: (%s) mismatch read num_items = %lu (it must be %lu)\n", 
+	    printf("Error: (%s) mismatch read num_items = %i (it must be %i)\n", 
 		   filename_tab, num_items, IA_items);
 	    exit(-1);
 	  }
@@ -497,7 +497,7 @@ void sa_index3_parallel_genome_new(char *sa_index_dirname, int num_threads,
 	gettimeofday(&start, NULL);
 	num_items = fread(SA, sizeof(uint), num_suffixes, f_tab);
 	if (num_items != num_suffixes) {
-	  printf("Error: (%s) mismatch num_items = %lu vs num_suffixes = %lu\n", 
+	  printf("Error: (%s) mismatch num_items = %i vs num_suffixes = %i\n", 
 		 filename_tab, num_items, num_suffixes);
 	  exit(-1);
 	}
@@ -526,7 +526,7 @@ void sa_index3_parallel_genome_new(char *sa_index_dirname, int num_threads,
 	gettimeofday(&start, NULL);
 	num_items = fread(CHROM, sizeof(char), num_suffixes, f_tab);
 	if (num_items != num_suffixes) {
-	  printf("Error: (%s) mismatch num_items = %lu vs num_suffixes = %lu\n", 
+	  printf("Error: (%s) mismatch num_items = %i vs num_suffixes = %i\n", 
 		 filename_tab, num_items, num_suffixes);
 	  exit(-1);
 	}
@@ -554,7 +554,7 @@ void sa_index3_parallel_genome_new(char *sa_index_dirname, int num_threads,
 	  //	printf("\nreading PRE table from file %s...\n", filename_tab);
 	  gettimeofday(&start, NULL);
 	  if (num_items != fread(PRE, sizeof(uint), num_items, f_tab)) {
-	    printf("Error: (%s) mismatch num_items = %lu\n", 
+	    printf("Error: (%s) mismatch num_items = %i\n", 
 		   filename_tab, num_items);
 	    exit(-1);
 	  }
@@ -575,7 +575,7 @@ void sa_index3_parallel_genome_new(char *sa_index_dirname, int num_threads,
 	  //	printf("\nreading JA table (Compression Row Storage) from file %s...\n", filename_tab);
 	  gettimeofday(&start, NULL);
 	  if ((num_items = fread(JA, sizeof(unsigned char), A_items, f_tab)) != A_items) {
-	    printf("Error: (%s) mismatch read num_items = %lu (it must be %lu)\n", 
+	    printf("Error: (%s) mismatch read num_items = %i (it must be %i)\n", 
 		   filename_tab, num_items, A_items);
 	    exit(-1);
 	  }

@@ -664,7 +664,7 @@ void display_sequence(uint j, sa_index3_t *index, uint len) {
     printf("%c", *p);
     p++;
   }
-  printf("\t%u\t%s:%u\n", index->SA[j], 
+  printf("\t%u\t%s:%lu\n", index->SA[j], 
 	 index->genome->chrom_names[chrom], index->SA[j] - index->genome->chrom_offsets[chrom]);
 }
 

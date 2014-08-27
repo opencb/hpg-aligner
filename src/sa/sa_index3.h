@@ -100,19 +100,19 @@ static inline void sa_genome3_set_nt_counters(size_t num_A, size_t num_C, size_t
 static inline void sa_genome3_display(sa_genome3_t *p) {
   if (!p) return;
 
-  printf("Genome length: %u\n", p->length);
-  printf("Number of chromosomes: %u\n", p->num_chroms);
+  printf("Genome length: %i\n", p->length);
+  printf("Number of chromosomes: %lu\n", p->num_chroms);
   for (size_t i = 0; i < p->num_chroms; i++) {
-    printf("\tChrom %u: (name, length, offset) = (%s, %u, %u)\n", 
+    printf("\tChrom %lu: (name, length, offset) = (%s, %lu, %lu)\n", 
 	   i, (p->chrom_names ? p->chrom_names[i] : "no-name"), 
 	   p->chrom_lengths[i], p->chrom_offsets[i]);
   }
   printf("Nucleotide counters:\n");
-  printf("\tNumber of A: %u\n", p->num_A);
-  printf("\tNumber of C: %u\n", p->num_C);
-  printf("\tNumber of G: %u\n", p->num_G);
-  printf("\tNumber of T: %u\n", p->num_T);
-  printf("\tNumber of N: %u\n", p->num_N);
+  printf("\tNumber of A: %lu\n", p->num_A);
+  printf("\tNumber of C: %lu\n", p->num_C);
+  printf("\tNumber of G: %lu\n", p->num_G);
+  printf("\tNumber of T: %lu\n", p->num_T);
+  printf("\tNumber of N: %lu\n", p->num_N);
 }
 
 //--------------------------------------------------------------------------------------
@@ -220,11 +220,11 @@ void sa_index3_free(sa_index3_t *sa_index);
 static inline void sa_index3_display(sa_index3_t *p) {
   if (!p) return;
 
-  printf("Num. suffixes          : %lu\n", p->num_suffixes);
-  printf("Prefix table length    : %lu\n", p->prefix_length);
-  printf("Prefix length (k-value): %lu\n", p->k_value);
-  printf("A length (JA length)   : %lu\n", p->A_items);
-  printf("AI length              : %lu\n", p->IA_items);
+  printf("Num. suffixes          : %i\n", p->num_suffixes);
+  printf("Prefix table length    : %i\n", p->prefix_length);
+  printf("Prefix length (k-value): %i\n", p->k_value);
+  printf("A length (JA length)   : %i\n", p->A_items);
+  printf("AI length              : %i\n", p->IA_items);
 
   if (p->genome) sa_genome3_display(p->genome);
 

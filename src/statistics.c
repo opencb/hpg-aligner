@@ -146,16 +146,16 @@ void basic_statistics_display(basic_statistics_t *statistics, int rna_mode, floa
   printf(" Alignment Time (s)    : %.2f (s)\n", alig_time);
   printf(" Total Time (s)        : %.2f (s)\n", load_time + alig_time);
   printf("+===============================================================+\n");
-  printf(" Total Reads Processed : %llu\n", total_reads);
+  printf(" Total Reads Processed : %lu\n", total_reads);
   printf("+===============================================================+\n");
-  printf(" Total Reads Mapped in First State   : %llu (%.2f%)\n", reads_ph1, reads_ph1 * 100.0 / total_reads);
+  printf(" Total Reads Mapped in First State   : %lu (%.2f%%)\n", reads_ph1, reads_ph1 * 100.0 / total_reads);
   printf("+-------------------------------------------+-------------------+\n");
-  printf(" Total Reads Mapped in Second State  : %llu (%.2f%)\n", reads_ph2, reads_ph2 * 100.0 / total_reads);
+  printf(" Total Reads Mapped in Second State  : %lu (%.2f%%)\n", reads_ph2, reads_ph2 * 100.0 / total_reads);
   printf("+-------------------------------------------+-------------------+\n");
-  printf(" Total Reads Mapped                   : %llu (%.2f%)\n", num_mapped_reads, num_mapped_reads * 100.0 / total_reads);
-  printf(" Total Reads Unmapped                 : %llu (%.2f%)\n", total_reads - num_mapped_reads, (total_reads - num_mapped_reads) * 100.0 / total_reads);
-  printf(" Total Reads with one alignment       : %llu (%.2f%)\n", reads_uniq_mappings, (reads_uniq_mappings * 100.0) / total_reads);
-  printf(" Total Reads with multiple alignment  : %llu (%.2f%)\n", total_reads - reads_uniq_mappings, ((total_reads - reads_uniq_mappings) * 100.0) / total_reads);
+  printf(" Total Reads Mapped                   : %lu (%.2f%%)\n", num_mapped_reads, num_mapped_reads * 100.0 / total_reads);
+  printf(" Total Reads Unmapped                 : %lu (%.2f%%)\n", total_reads - num_mapped_reads, (total_reads - num_mapped_reads) * 100.0 / total_reads);
+  printf(" Total Reads with one alignment       : %lu (%.2f%%)\n", reads_uniq_mappings, (reads_uniq_mappings * 100.0) / total_reads);
+  printf(" Total Reads with multiple alignment  : %lu (%.2f%%)\n", total_reads - reads_uniq_mappings, ((total_reads - reads_uniq_mappings) * 100.0) / total_reads);
   printf("+===============================================================+\n");
   
 }

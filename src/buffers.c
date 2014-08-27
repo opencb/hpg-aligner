@@ -189,10 +189,10 @@ unsigned int pack_junction(unsigned int chromosome, unsigned int strand,
   char *chr_p, *p = buffer_p;
   char strand_char[2] = {'+', '-'};
 
-  if (chromosome == 23) { sprintf(str, "%c\0", 'X'); }
-  else if (chromosome == 24) { sprintf(str, "%c\0", 'Y'); }
-  else if (chromosome == 25) { sprintf(str, "%s\0", "MT"); }
-  else { sprintf(str, "%i\0", chromosome); }
+  if (chromosome == 23) { sprintf(str, "%c%c", 'X', '\0'); }
+  else if (chromosome == 24) { sprintf(str, "%c%c", 'Y', '\0'); }
+  else if (chromosome == 25) { sprintf(str, "%s%c", "MT", '\0'); }
+  else { sprintf(str, "%i%c", chromosome, '\0'); }
  
   len = strlen(str);
   memcpy(p, str, len);

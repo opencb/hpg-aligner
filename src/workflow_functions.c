@@ -548,8 +548,8 @@ int sam_writer(void *data) {
       for (size_t j = 0; j < num_mappings; j++) {
 	alig = (alignment_t *) array_list_get(j, mapping_list);
 	flag = (alig->seq_strand ? 16 : 0);
-	fprintf(out_file, "%s\t%i\t%s\t%lu\t%i\t%s\t%s\t%lu\t%i\t%s\t%s\n", 
-		alig->query_name,
+	fprintf(out_file, "%s\t%i\t%s\t%i\t%i\t%s\t%s\t%i\t%i\t%s\t%s\n", 
+		alig->query_name, 
 		flag,
 		genome->chr_name[alig->chromosome],
 		alig->position + 1,
