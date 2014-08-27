@@ -1,6 +1,7 @@
 #include "options.h"
 
 const char DEFAULT_OUTPUT_NAME[30] = "hpg_aligner_output";
+
 //const char SPLICE_EXACT_FILENAME[30]   = "exact_junctions.bed";
 //const char SPLICE_EXTEND_FILENAME[30]  = "extend_junctions.bed";
 //const char INDEX_NAME[30]  = "index";
@@ -16,7 +17,7 @@ options_t *options_new(void) {
   options->log_level = LOG_INFO_LEVEL;
   options->output_name = strdup(DEFAULT_OUTPUT_NAME);
   options->num_gpu_threads = DEFAULT_GPU_THREADS;
-  options->bam_format = 0;
+
   options->realignment = 0;
   options->recalibration = 0;
   options->adapter = NULL;
@@ -67,7 +68,7 @@ options_t *options_new(void) {
   options->min_seed_size = 0;
   options->seed_size = 0;
   options->flank_length = 0;
-  options->fast_mode = 1;
+  options->fast_mode = 0;
 
   options->adapter_length = 0;
 
@@ -328,7 +329,7 @@ void options_display(options_t *options) {
 
      if (options->mode == RNA_MODE) {
        printf("RNA parameters\n");
-       printf("\tMode: %s\n", fast_mode ? "Fast":"Slow");
+       printf("\tMode: %s\n", fast_mode ? "SA":"BWT");
        if (!fast_mode) {
 	 printf("\tSeed size: %d\n",  seed_size);
        }
@@ -485,7 +486,9 @@ void options_to_file(options_t *options, FILE *fd) {
 //--------------------------------------------------------------------
 
 void** argtable_options_new(int mode) {
+
   int num_options = NUM_OPTIONS;
+
   if      (mode == DNA_MODE) num_options += NUM_DNA_OPTIONS;
   else if (mode == RNA_MODE) num_options += NUM_RNA_OPTIONS;
 
@@ -533,7 +536,7 @@ void** argtable_options_new(int mode) {
     argtable[count++] = arg_int0(NULL, "seed-size", NULL, "Number of nucleotides in a seed");
     argtable[count++] = arg_int0(NULL, "max-intron-size", NULL, "Maximum intron size");
     argtable[count++] = arg_int0(NULL, "min-intron-size", NULL, "Minimum intron size");
-    argtable[count++] = arg_lit0(NULL, "bwt-mode", "Slow mode for low memory consumption (SA mode pair-mode is not implemented yet)");
+    argtable[count++] = arg_lit0(NULL, "sa-mode", "SA mode enable, this mode is faster than BWT but the memory consumption is biggest");
   }
 
   argtable[num_options] = arg_end(count);
@@ -584,7 +587,7 @@ int read_config_file(const char *filename, options_t *options) {
  * Initializes the only default options from options_t.
  */
 options_t *read_CLI_options(void **argtable, options_t *options) {	
-
+  int set_bam_format = 0;
   int count = -1;
   if (((struct arg_file*)argtable[++count])->count) { options->in_filename = strdup(*(((struct arg_file*)argtable[count])->filename)); }
   if (((struct arg_file*)argtable[++count])->count) { options->in_filename2 = strdup(*(((struct arg_file*)argtable[count])->filename)); }
@@ -613,7 +616,10 @@ options_t *read_CLI_options(void **argtable, options_t *options) {
   if (((struct arg_file*)argtable[++count])->count) { options->log_level = *(((struct arg_int*)argtable[count])->ival); }
   if (((struct arg_int*)argtable[++count])->count) { options->help = ((struct arg_int*)argtable[count])->count; }
 
-  if (((struct arg_int*)argtable[++count])->count) { options->bam_format = ((struct arg_int*)argtable[count])->count; }
+  if (((struct arg_int*)argtable[++count])->count) { 
+    options->bam_format = ((struct arg_int*)argtable[count])->count; 
+    set_bam_format = 1;
+  }
 
   if (((struct arg_int*)argtable[++count])->count) { options->realignment = ((struct arg_int*)argtable[count])->count; }
   if (((struct arg_int*)argtable[++count])->count) { options->recalibration = ((struct arg_int*)argtable[count])->count; }
@@ -629,7 +635,16 @@ options_t *read_CLI_options(void **argtable, options_t *options) {
     if (((struct arg_int*)argtable[++count])->count) { options->seed_size = *(((struct arg_int*)argtable[count])->ival); }
     if (((struct arg_int*)argtable[++count])->count) { options->max_intron_length = *(((struct arg_int*)argtable[count])->ival); }
     if (((struct arg_int*)argtable[++count])->count) { options->min_intron_length = *(((struct arg_int*)argtable[count])->ival); }
-    if (((struct arg_file*)argtable[++count])->count) { options->fast_mode = !(((struct arg_int *)argtable[count])->count); }
+    if (((struct arg_file*)argtable[++count])->count) { options->fast_mode = (((struct arg_int *)argtable[count])->count); }
+
+    if (!set_bam_format) {
+      if (options->fast_mode) {
+	options->bam_format = 0;
+      } else {
+	options->bam_format = 1;
+      }
+    }
+
   }
 
   return options;

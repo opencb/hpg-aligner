@@ -212,14 +212,15 @@ void dna_aligner(options_t *options) {
     } else {
       stage_functions[0] = sa_pair_mapper;
     }
-    workflow_set_stages(1, &stage_functions, stage_labels, wf);
+    //workflow_set_stages(1, &stage_functions, stage_labels, wf);
+    workflow_set_stages(1, stage_functions, stage_labels, wf);
     
     // optional producer and consumer functions
-    workflow_set_producer(sa_fq_reader, "FastQ reader", wf);
+    workflow_set_producer((workflow_producer_function_t *)sa_fq_reader, "FastQ reader", wf);
     if (bam_format) {
-      workflow_set_consumer(sa_bam_writer, "BAM writer", wf);
+      workflow_set_consumer((workflow_consumer_function_t *)sa_bam_writer, "BAM writer", wf);
     } else {
-      workflow_set_consumer(sa_sam_writer, "SAM writer", wf);
+      workflow_set_consumer((workflow_consumer_function_t *)sa_sam_writer, "SAM writer", wf);
     }
     
     printf("----------------------------------------------\n");

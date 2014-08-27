@@ -37,6 +37,8 @@ void run_index_builder_sa(char *genome_filename, uint k_value,
 
 void help_index_builder();
 
+void run_index_builder(int argc, char **argv, char *mode_str);
+
 //void run_index_builder_bs(char *genome_filename, char *bwt_dirname, int bwt_ratio, char *bases);
 
 

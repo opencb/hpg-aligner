@@ -346,6 +346,8 @@ int apply_bwt(bwt_server_input_t* input, batch_t *batch) {
 // RNA
 //------------------------------------------------------------------------------------
 
+void fastq_read_revcomp(fastq_read_t *read);
+
 int apply_bwt_rna(bwt_server_input_t* input, batch_t *batch) {
 
   LOG_DEBUG("========= APPLY BWT RNA =========\n");
@@ -633,9 +635,9 @@ int apply_bwt_bs(bwt_server_input_t* input, batch_t *batch) {
 	 mapping_batch->mapping_lists2[i]->size)) {
 
       if(array_list_get_flag(mapping_batch->mapping_lists[i]) == 1) {
-	array_list_clear( mapping_batch->mapping_lists[i], bwt_anchor_free);
+	array_list_clear(mapping_batch->mapping_lists[i], (void *)bwt_anchor_free);
       } else if(array_list_get_flag(mapping_batch->mapping_lists2[i]) == 1) {
-	array_list_clear(mapping_batch->mapping_lists2[i], bwt_anchor_free);
+	array_list_clear(mapping_batch->mapping_lists2[i], (void *)bwt_anchor_free);
       }
       array_list_set_flag(ALIGNMENTS_FOUND, mapping_batch->mapping_lists[i]);
       array_list_set_flag(ALIGNMENTS_FOUND, mapping_batch->mapping_lists2[i]);

@@ -13,6 +13,7 @@ char *global_sa_genome;
 
 char *read_s(char *filename, uint *len) {
   // open fasta file
+  /*
   FILE *f = fopen(filename, "r");
   if (f == NULL) {
     printf("Error reading filename %s\n", filename);
@@ -30,6 +31,7 @@ char *read_s(char *filename, uint *len) {
 
   uint skip = 0, l = 0, process = 0, num_n = 0;
   char *c;
+
   while ((c = getc(f)) != EOF) {
     process++;
     if (process % PROGRESS == 0) printf("reading %0.2f %c...\n", 100.0f * process / file_length, '%'); 
@@ -69,6 +71,7 @@ char *read_s(char *filename, uint *len) {
   global_sa_genome = s;
 
   return s;
+  */
 }
 
 //--------------------------------------------------------------------------------------

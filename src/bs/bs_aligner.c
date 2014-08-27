@@ -207,8 +207,8 @@ void run_bs_aligner(options_t *options) {
   workflow_set_stages(7, &stage_functions, stage_labels, wf);
   */
   // optional producer and consumer functions
-  workflow_set_producer(fastq_reader, "FastQ reader", wf);
-  workflow_set_consumer(bs_writer, "BAM BS writer", wf);
+  workflow_set_producer((workflow_producer_function_t *)fastq_reader, "FastQ reader", wf);
+  workflow_set_consumer((workflow_consumer_function_t *)bs_writer, "BAM BS writer", wf);
   
   //if (time_on) {
   start_timer(start);

@@ -104,4 +104,13 @@ void filter_alignments_lists(char report_all,
 
 //------------------------------------------------------------------------------------
 
+void update_mispaired_pair(int pair_num, size_t num_items, array_list_t *list);
+void filter_alignments(char report_all,
+		       size_t report_n_best, 
+		       size_t report_n_hits,
+		       int report_best,
+		       array_list_t *mapping_list);
+void update_mispaired_pairs(size_t num_items1, size_t num_items2,
+			    array_list_t *list1, array_list_t *list2);
+
 #endif // PAIR_SERVER_H

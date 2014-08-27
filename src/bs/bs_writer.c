@@ -1,6 +1,10 @@
 #include "bs_writer.h"
 #include "methylation.h"
 
+void write_mapped_read(array_list_t *array_list, bam_file_t *bam_file);
+void write_unmapped_read(fastq_read_t *fq_read, bam_file_t *bam_file);
+
+
 int bs_writer(void *data) {
 
   struct timeval start, end;

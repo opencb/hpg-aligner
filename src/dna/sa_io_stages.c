@@ -225,7 +225,7 @@ int sa_sam_writer(void *data) {
 		  alig->template_length,
 		  alig->sequence,
 		  alig->quality,
-		  (alig->optional_fields ? alig->optional_fields : "")
+		  (alig->optional_fields ? alig->optional_fields : (uint8_t *)"")
 		  );
 
 	}

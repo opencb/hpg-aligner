@@ -208,7 +208,7 @@ char *new_cigar_code_string(cigar_code_t *p) {
 
   char str[2048] = "\0";
 
-  if (num_ops == 0) { return str; }
+  if (num_ops == 0) { return 0; }
   
   cigar_op_t *op;
   
@@ -1651,7 +1651,7 @@ int metaexon_insert(unsigned int strand, unsigned int chromosome,
       //metaexon = (metaexon_t *)list_item->item;
       //metaexon_merge_breaks(metaexon, metaexon_ref);
       
-      linked_list_item_free(list_item, metaexon_free);
+      linked_list_item_free(list_item, (void *)metaexon_free);
     }
 
     array_list_free(delete_items, (void *)NULL);

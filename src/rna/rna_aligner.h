@@ -16,8 +16,8 @@
 #include "commons/log.h"
 #include "commons/file_utils.h"
 
-#include "rna/workflow_scheduler.h"
-//#include "commons/workflow_scheduler.h"
+#include "rna/workflow_scheduler_SA.h"
+#include "commons/workflow_scheduler.h"
 
 #include "bioformats/fastq/fastq_batch_reader.h"
 

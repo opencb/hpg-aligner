@@ -132,7 +132,8 @@ void display_progress_2_3(int w_id) {
   struct timeval wt_s, wt_e;
   double w_time;
 
-  int total_reads, *actual_reads;
+  int total_reads;
+  size_t *actual_reads;
   int *w_end;
 
   if (w_id == 2) {
@@ -204,19 +205,19 @@ void display_progress_2_3(int w_id) {
 void print_load_progress(float progress, int finish) {
   if (redirect_stdout || gziped_fileds) { return; }
 
-  //printf("Progress %.1f%% [", progress);
+  printf("[");
   if (!finish) {
     int c   = (max * progress) / 100;
     for (int x = 0; x < c; x++)
-      printf("▓");
+      printf("|");
     for (int x = c; x < max; x++)
-      printf("░");
-    printf("  %.1f%%", progress);  
+      printf(" ");
+    printf("] %.1f%%", progress);  
     printf("\n\033[F\033[J");
   } else {
-    for (int x = 0; x < max; x++)
-      printf("▓");        
-    printf("  100%%\n\n\033[F", progress);  
+    for (int x = 0; x < max - 1; x++)
+      printf("|");        
+    printf("] 100%%\n\n\033[F", progress);  
   }
 }
 
@@ -231,26 +232,27 @@ void display_progressX() {
   
   float progress;
 
+  printf("[");
   while (!w1_end) {
     progress = (fd_read_bytes * (size_t)100) / fd_total_bytes;
 
     int c   = (max * progress) / 100;
 
     for (int x = 0; x < c; x++)
-      printf("▓");
+      printf("|");
     for (int x = c; x < max; x++)
-      printf("░");
+      printf(" ");
 
-    printf("  %.1f%%", progress);  
+    printf("] %.1f%%", progress);  
     printf("\n\033[F\033[J");
     
     sleep(2);
   }
   
   for (int x = 0; x < max; x++)
-    printf("▓");        
+    printf("|");        
   
-  printf("  100%%\n\n\033[F", progress);  
+  printf("] 100%%\n\n\033[F", progress);  
 
 }
 
@@ -261,6 +263,7 @@ void display_progress_2() {
   extern size_t reads_ph2;  
   float progress;
 
+  printf("[");
   while (reads_ph2 < total_reads_ph2) {
     
     progress = (reads_ph2 * (size_t)100) / total_reads_ph2;
@@ -268,20 +271,20 @@ void display_progress_2() {
     int c   = (max * progress) / 100;
 
     for (int x = 0; x < c; x++)
-      printf("▓");
+      printf("|");
     for (int x = c; x < max; x++)
-      printf("░");
+      printf(" ");
 
-    printf("  %.1f%%", progress);  
+    printf("] %.1f%%", progress);  
     printf("\n\033[F\033[J");
     
     sleep(2);
   }
   
   for (int x = 0; x < max; x++)
-    printf("▓");        
+    printf("|");        
   
-  printf("  100%%\n\n\033[F", progress);  
+  printf("] 100%%\n\n\033[F", progress);  
 
 }
 
@@ -1278,34 +1281,34 @@ void rna_aligner(options_t *options) {
       sa_wf_input_t *wf_input = sa_wf_input_new(options->bam_format, &reader_input, wf_batch);
       
       // create and initialize workflow
-      workflow_t *wf = workflow_new();      
-      workflow_stage_function_t stage_functions[] = {sa_rna_mapper};
+      workflow_SA_t *wf = workflow_SA_new();      
+      workflow_stage_function_SA_t stage_functions[] = {sa_rna_mapper};
       char *stage_labels[] = {"SA mapper"};
-      workflow_set_stages(1, (workflow_stage_function_t *)&stage_functions, stage_labels, wf);      
+      workflow_set_stages_SA(1, stage_functions, stage_labels, wf);      
       // optional producer and consumer functions
-      workflow_set_producer(sa_fq_reader_rna, "FastQ reader", wf);
+      workflow_set_producer_SA((workflow_producer_function_SA_t *)sa_fq_reader_rna, "FastQ reader", wf);
 
       if (options->bam_format) {
 	//workflow_set_consumer(sa_bam_writer_rna, "BAM writer", wf);
-	workflow_set_consumer(write_to_file, "SAM writer", wf);
+	workflow_set_consumer_SA((workflow_consumer_function_SA_t *)write_to_file, "SAM writer", wf);
       } else {
 	//workflow_set_consumer(sa_sam_writer_rna, "SAM writer", wf);
-	workflow_set_consumer(write_to_file, "SAM writer", wf);
+	workflow_set_consumer_SA((workflow_consumer_function_SA_t *)write_to_file, "SAM writer", wf);
       }
 
       //Create and initialize second workflow
-      workflow_t *wf_last = workflow_new();
-      workflow_stage_function_t stage_functions_last[] = {sa_rna_mapper_last};
+      workflow_SA_t *wf_last = workflow_SA_new();
+      workflow_stage_function_SA_t stage_functions_last[] = {sa_rna_mapper_last};
       char *stage_labels_last[] = {"SA mapper last stage"};
-      workflow_set_stages(1, (workflow_stage_function_t *)&stage_functions_last, stage_labels_last, wf_last);
-      workflow_set_producer(sa_alignments_reader_rna, "FastQ reader", wf_last);
+      workflow_set_stages_SA(1, (workflow_stage_function_SA_t *)&stage_functions_last, stage_labels_last, wf_last);
+      workflow_set_producer_SA((workflow_producer_function_SA_t *)sa_alignments_reader_rna, "FastQ reader", wf_last);
       
       if (options->bam_format) {
 	//workflow_set_consumer(sa_bam_writer_rna, "BAM writer", wf_last);
-	workflow_set_consumer(write_to_file, "SAM writer", wf_last);
+	workflow_set_consumer_SA((workflow_consumer_function_SA_t *)write_to_file, "SAM writer", wf_last);
       } else {
 	//workflow_set_consumer(sa_sam_writer_rna, "SAM writer", wf_last);
-	workflow_set_consumer(write_to_file, "SAM writer", wf_last);
+	workflow_set_consumer_SA((workflow_consumer_function_SA_t *)write_to_file, "SAM writer", wf_last);
       }
 
       //printf("Run workflow with %i threads\n", options->num_cpu_threads);
@@ -1317,7 +1320,7 @@ void rna_aligner(options_t *options) {
           #pragma omp section
           {      
 	    start_timer(time_s1);
-	    workflow_run_with(options->num_cpu_threads, wf_input, wf);
+	    workflow_run_with_SA(options->num_cpu_threads, wf_input, wf);
 	    stop_timer(time_s1, time_e1, time_total_1);
 	    //printf("= = = = T I M I N G    W O R K F L O W    '1' = = = =\n");
 	    //workflow_display_timing(wf);
@@ -1338,7 +1341,7 @@ void rna_aligner(options_t *options) {
           {
 	    start_timer(time_s2);
 	    rewind(f_sa);
-	    workflow_run_with(options->num_cpu_threads, wf_input, wf_last);      
+	    workflow_run_with_SA(options->num_cpu_threads, wf_input, wf_last);      
 	    stop_timer(time_s2, time_e2, time_total_2);      
 	    //printf("= = = = T I M I N G    W O R K F L O W    '2' = = = =\n");
 	    //workflow_display_timing(wf_last);
@@ -1354,8 +1357,8 @@ void rna_aligner(options_t *options) {
       // free memory
       sa_wf_input_free(wf_input);
       sa_wf_batch_free(wf_batch);
-      workflow_free(wf);      
-      workflow_free(wf_last);      
+      workflow_SA_free(wf);      
+      workflow_SA_free(wf_last);      
 
       //printf("\n");
       //for (int x = 0; x <= 10; x++) {
@@ -1369,7 +1372,53 @@ void rna_aligner(options_t *options) {
       basic_statistics_display(basic_st, 1, 
 			       (time_total_1 + time_total_2) / 1000000, 
 			       time_genome / 1000000, total_reads_ph2);  
+      extern st_bwt_t st_bwt;
+
+      printf("|    S P L I C E    J U N C T I O N S    S T A T I S T I C S    |\n");
+      printf("+===============================================================+\n");
+      printf(" Total splice junctions                  :  %lu\n", st_bwt.tot_sj);
+      printf(" Total cannonical splice junctions       :  %lu (%.2f%%)\n", st_bwt.cannonical_sj, (float)(st_bwt.cannonical_sj * 100)/(float)st_bwt.tot_sj);
+      printf(" Total semi-cannonical splice junctions  :  %lu (%.2f%%)\n", st_bwt.semi_cannonical_sj, (float)(st_bwt.semi_cannonical_sj * 100)/(float)st_bwt.tot_sj);
+      printf("+===============================================================+\n");
+
      
+      //Write to file 
+      size_t total_reads         = basic_st->total_reads;
+      size_t num_mapped_reads    = basic_st->num_mapped_reads;
+      size_t total_mappings      = basic_st->total_mappings;
+      size_t reads_uniq_mappings = basic_st->reads_uniq_mappings;
+      size_t total_sp            = basic_st->total_sp;
+      size_t uniq_sp             = basic_st->uniq_sp;
+      size_t reads_ph1           = total_reads - total_reads_ph2;
+
+      fprintf(fd_log_output, "\n= T I M E    S T A T I S T I C S\n");
+      fprintf(fd_log_output, "--------------------------------------------------------------\n");
+      fprintf(fd_log_output, " Loading time                            :  %.2f (s)\n", time_genome / 1000000);
+      fprintf(fd_log_output, " Alignment time                          :  %.2f (s)\n", (time_total_1 + time_total_2) / 1000000);
+      fprintf(fd_log_output, " Total time                              :  %.2f (s)\n", (time_total_1 + time_total_2 + time_genome) / 1000000);
+  
+      fprintf(fd_log_output, "\n= M A P P I N G    S T A T I S T I C S\n");
+      fprintf(fd_log_output, "--------------------------------------------------------------\n");
+      fprintf(fd_log_output, " Total reads process                     :  %lu\n", total_reads);
+      fprintf(fd_log_output, " Total reads mapped                      :  %lu (%.2f%%)\n", num_mapped_reads, num_mapped_reads * 100.0 / total_reads);
+      fprintf(fd_log_output, " Total reads unmapped                    :  %lu (%.2f%%)\n", total_reads - num_mapped_reads, (total_reads - num_mapped_reads) * 100.0 / total_reads);
+      fprintf(fd_log_output, " Reads mapped in First State             :  %lu (%.2f%%)\n", reads_ph1, reads_ph1 * 100.0 / total_reads);
+      fprintf(fd_log_output, " Reads mapped in Second State            :  %lu (%.2f%%)\n", total_reads_ph2, total_reads_ph2 * 100.0 / total_reads);
+      fprintf(fd_log_output, " Reads with a single mapping             :  %lu (%.2f%%)\n", reads_uniq_mappings, (reads_uniq_mappings * 100.0) / total_reads);
+      fprintf(fd_log_output, " Reads with multi mappings               :  %lu (%.2f%%)\n", total_reads - reads_uniq_mappings, ((total_reads - reads_uniq_mappings) * 100.0) / total_reads);
+
+  
+      fprintf(fd_log_output, "\n= S P L I C E    J U N C T I O N S    S T A T I S T I C S\n");
+      fprintf(fd_log_output, "--------------------------------------------------------------\n");
+      fprintf(fd_log_output, " Total splice junctions                  :  %lu\n", st_bwt.tot_sj);
+      fprintf(fd_log_output, " Total cannonical splice junctions       :  %lu (%.2f%%)\n", st_bwt.cannonical_sj, (float)(st_bwt.cannonical_sj * 100)/(float)st_bwt.tot_sj);
+      fprintf(fd_log_output, " Total semi-cannonical splice junctions  :  %lu (%.2f%%)\n", st_bwt.semi_cannonical_sj, (float)(st_bwt.semi_cannonical_sj * 100)/(float)st_bwt.tot_sj);
+      fprintf(fd_log_output, "--------------------------------------------------------------\n\n");
+  
+      fprintf(fd_log_output, "====================================================================================\n");
+      fprintf(fd_log_output, "=                                                                                  =\n");
+      fprintf(fd_log_output, "====================================================================================\n");
+
       //printf("Load Genome Time : %f(s)\n", time_genome / 1000000);
       //printf("         W1 Time : %f(s)\n", time_total_1 / 1000000);
       //printf("         W2 Time : %f(s)\n", time_total_2 / 1000000);

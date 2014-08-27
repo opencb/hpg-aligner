@@ -18,10 +18,22 @@
 // process_right_side & append_seed_linked_list
 //--------------------------------------------------------------------
 
+void cut_adapter(char *adapter, int adapter_length, fastq_read_t *read);
+
+int generate_cals_from_suffixes(int strand, fastq_read_t *read,
+				int read_pos, int suffix_len, size_t low, size_t high, 
+				sa_index3_t *sa_index, cal_mng_t *cal_mng
+                                #ifdef _TIMING
+				, sa_mapping_batch_t *mapping_batch
+                                #endif
+				);
+
+
 void process_right_side(seed_t *new_item, linked_list_t *seed_list) {
   int overlap;
   linked_list_iterator_t* itr = linked_list_iterator_new(seed_list);
-  seed_t *aux_item, *item = (seed_region_t *)linked_list_iterator_curr(itr);
+  seed_t *aux_item;
+  seed_t *item = (seed_t *)linked_list_iterator_curr(itr);
 
   while (item != new_item) {
     //continue loop...
@@ -342,7 +354,7 @@ void cal_mng_simple_clear(cal_mng_t *p) {
 	  item = list->first;
 	  while (item) {
 	    cal = item->item;
-	    linked_list_clear(cal->sr_list, seed_region_simple_free);
+	    linked_list_clear(cal->sr_list, (void *)seed_region_simple_free);
 	    cal_simple_free(cal);
 	    item = item->next;
 	  }
@@ -399,7 +411,7 @@ void cal_mng_update(seed_t *seed, fastq_read_t *read, cal_mng_t *p) {
       } else {
 	// insert (by order)
 	linked_list_iterator_t* itr = linked_list_iterator_new(cal_list);
-	seed_cal_t *item = (cal_t *) linked_list_iterator_curr(itr);
+	seed_cal_t *item = (seed_cal_t *) linked_list_iterator_curr(itr);
 	while (item != NULL) {
 	  #ifdef _VERBOSE
 	  printf("---> merging with this CAL?\n");
@@ -564,7 +576,7 @@ void cal_mng_select_best(int read_area, array_list_t *valid_list, array_list_t *
 //
 //--------------------------------------------------------------------
 
-array_list_t *search_mate_cal_by_prefixes(cal_t *cal, fastq_read_t *read,
+array_list_t *search_mate_cal_by_prefixes(seed_cal_t *cal, fastq_read_t *read,
 					  sa_index3_t *sa_index, sa_mapping_batch_t *batch,
 					  cal_mng_t *cal_mng) {
   array_list_t *cal_list = array_list_new(10, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
@@ -664,7 +676,8 @@ void check_pairs(array_list_t **cal_lists, sa_index3_t *sa_index,
 		 sa_mapping_batch_t *batch, cal_mng_t *cal_mng) {
   int found, inserted, max_read_area, read_area;
   int distance, valid_pair, list_size, list1_size, list2_size;
-  seed_cal_t *cal, *mate_cal, *cal1, *cal2;
+  seed_cal_t *cal, *mate_cal, *cal2, *cal1;
+
   array_list_t *list, *mate_list, *mate1_list, *mate2_list, *list1, *list2;
   fastq_read_t *read, *read1, *read2;
   size_t num_reads = array_list_size(batch->fq_reads);
@@ -1235,7 +1248,7 @@ array_list_t *create_cals(int num_seeds, fastq_read_t *read,
   #endif
 
   double prefix_time, suffix_time;
-  int suffix_len, num_suffixes;
+  size_t suffix_len, num_suffixes;
   char *r_seq = read->sequence;
 
   size_t low, high;
@@ -1989,8 +2002,8 @@ int prepare_sw(fastq_read_t *read,   array_list_t *sw_prepare_list,
 			    0, seed->read_start + SW_RIGHT_FLANK); //query_flank); //SW_RIGHT_FLANK);
       
       sw_prepare = sw_prepare_new(seq, ref, 0, SW_RIGHT_FLANK, FIRST_SW);
-      sw_prepare->seed_region = seed;
-      sw_prepare->cal = cal;
+      sw_prepare->seed_region = (seed_region_t *)seed;
+      sw_prepare->cal = (cal_t *)cal;
       sw_prepare->read = read;
       array_list_insert(sw_prepare, sw_prepare_list);
       num_sw++;
@@ -2109,8 +2122,9 @@ int prepare_sw(fastq_read_t *read,   array_list_t *sw_prepare_list,
       }
       // prepare MIDDLE_SW
       sw_prepare = sw_prepare_new(seq, ref, 0, 0, MIDDLE_SW);
-      sw_prepare->seed_region = seed_count * 2;
-      sw_prepare->cal = cal;
+
+      sw_prepare->seed_region = (seed_region_t *)(seed_count * 2);
+      sw_prepare->cal = (cal_t *)cal;
       sw_prepare->read = read;
       array_list_insert(sw_prepare, sw_prepare_list);
       num_sw++;
@@ -2138,8 +2152,8 @@ int prepare_sw(fastq_read_t *read,   array_list_t *sw_prepare_list,
 			    read->length + SW_LEFT_FLANK - seed->read_end);
 
       sw_prepare = sw_prepare_new(seq, ref, 0, 0, LAST_SW);
-      sw_prepare->seed_region = num_seeds * 2;
-      sw_prepare->cal = cal;
+      sw_prepare->seed_region = (seed_region_t *)(num_seeds * 2);
+      sw_prepare->cal = (cal_t *)cal;
       sw_prepare->read = read;
       array_list_insert(sw_prepare, sw_prepare_list);
       num_sw++;
@@ -2234,7 +2248,7 @@ void execute_sw(array_list_t *sw_prepare_list, sa_mapping_batch_t *mapping_batch
   int left_flank, right_flank, query_start, ref_start;
   for (int i = 0; i < sw_count; i++) {
     sw_prepare = array_list_get(i, sw_prepare_list);
-    cal = sw_prepare->cal;
+    cal = (seed_cal_t *)sw_prepare->cal;
     
     cigarset = cal->cigarset;
     cigar = cigar_new_empty();
@@ -2254,7 +2268,7 @@ void execute_sw(array_list_t *sw_prepare_list, sa_mapping_batch_t *mapping_batch
 
     // check initial positions
     if (sw_prepare->ref_type == FIRST_SW) {
-      seed = sw_prepare->seed_region;
+      seed = (seed_t *)sw_prepare->seed_region;
       if (query_start > 0) {
 	cigar_append_op(query_start, 'S', cigar);
       }
@@ -2343,11 +2357,11 @@ void execute_sw(array_list_t *sw_prepare_list, sa_mapping_batch_t *mapping_batch
     cigar_append_op(op_value, op_name, cigar);
 
 
-    int gap_count = 0;
+    size_t gap_count = 0;
     if (sw_prepare->ref_type == FIRST_SW) {
       gap_count = 0;
     } else {
-      gap_count = (int)sw_prepare->seed_region;
+      gap_count = (size_t)sw_prepare->seed_region;
     }
     cigarset->info[gap_count].active = CIGAR_FROM_GAP;
     cigarset->info[gap_count].cigar = cigar;

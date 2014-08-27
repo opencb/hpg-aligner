@@ -152,9 +152,10 @@ void basic_statistics_display(basic_statistics_t *statistics, int rna_mode, floa
   printf("+-------------------------------------------+-------------------+\n");
   printf(" Total Reads Mapped in Second State  : %llu (%.2f%)\n", reads_ph2, reads_ph2 * 100.0 / total_reads);
   printf("+-------------------------------------------+-------------------+\n");
-  printf(" Total Reads Mapped               : %llu (%.2f%)\n", num_mapped_reads, num_mapped_reads * 100.0 / total_reads);
-  printf(" Total Reads Unmapped             : %llu (%.2f%)\n", total_reads - num_mapped_reads, (total_reads - num_mapped_reads) * 100.0 / total_reads);
-  printf(" Total Reads with one alignment   : %llu (%.2f%)\n", reads_uniq_mappings, (reads_uniq_mappings * 100.0) / total_reads);
+  printf(" Total Reads Mapped                   : %llu (%.2f%)\n", num_mapped_reads, num_mapped_reads * 100.0 / total_reads);
+  printf(" Total Reads Unmapped                 : %llu (%.2f%)\n", total_reads - num_mapped_reads, (total_reads - num_mapped_reads) * 100.0 / total_reads);
+  printf(" Total Reads with one alignment       : %llu (%.2f%)\n", reads_uniq_mappings, (reads_uniq_mappings * 100.0) / total_reads);
+  printf(" Total Reads with multiple alignment  : %llu (%.2f%)\n", total_reads - reads_uniq_mappings, ((total_reads - reads_uniq_mappings) * 100.0) / total_reads);
   printf("+===============================================================+\n");
   
 }

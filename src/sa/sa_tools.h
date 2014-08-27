@@ -2,8 +2,9 @@
 #define SA_TOOLS_H
 
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
-#include "sa_tools.h"
 
 //--------------------------------------------------------------------------------------
 

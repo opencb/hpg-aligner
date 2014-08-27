@@ -87,7 +87,6 @@ int main(int argc, char* argv[]) {
 
   if (!isatty(fileno(stdout))) {
     redirect_stdout = 1;
-    fprintf(stderr, "WARNING: The process output is redirect to file, therefore progress bar are disable.\n");
   }
 
   st_bwt.multi_alig = 0;

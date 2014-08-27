@@ -186,7 +186,7 @@ void cpy_transform_array_bs(array_list_t *src, array_list_t *dest_ct, array_list
 //====================================================================================
 
 void insert_mappings_array(array_list_t **dest, array_list_t **src) {
-  size_t num_reads = array_list_size(src);
+  size_t num_reads = array_list_size(src[0]);
   size_t num_mappings;
   alignment_t *align_tmp;
 
@@ -232,7 +232,7 @@ void insert_regions(array_list_t *dest, array_list_t *src) {
 //====================================================================================
 
 void transform_mappings_array(array_list_t **src){
-  size_t num_reads = array_list_size(src);
+  size_t num_reads = array_list_size(src[0]);
   size_t num_mappings;
   alignment_t *align_tmp;
 

@@ -7419,7 +7419,7 @@ int apply_rna_last(sw_server_input_t* input_p, batch_t *batch) {
 	    //printf("WK_2ph: * * * M E T A    A L I G N M E N T    R E P O R T  [%i:%lu]  %s* * *\n", 
 	    //	   first_cal->chromosome_id, first_cal->start, new_cigar_code_string(cigar_code));
 	  char *cigar_str = cigar_code_find_and_report_sj(start_mapping - 1, cigar_code, first_cal->chromosome_id, 
-							  first_cal->strand, avls_list, metaexons, genome, read);	
+							  first_cal->strand, avls_list, metaexons, genome, fq_read);	
 
 	  alignment_init_single_end(strdup(fq_read->id),
 				    strdup(query)/*match_seq*/,
@@ -8299,7 +8299,7 @@ int apply_rna_last_hc(sw_server_input_t* input_p, batch_t *batch) {
       */
 
       char *cigar_str = cigar_code_find_and_report_sj(start_mapping - 1, cigar_code, first_cal->chromosome_id, 
-						      first_cal->strand, avls_list, metaexons, genome, read);	
+						      first_cal->strand, avls_list, metaexons, genome, fq_read);	
 
       alignment_init_single_end(strdup(fq_read->id),
 				strdup(query)/*match_seq*/,
