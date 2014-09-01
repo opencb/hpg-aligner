@@ -6,9 +6,48 @@
 
 #include "buffers.h"
 
-//#define MAXLINE 2048
-
 //===================================================================================
+
+alignment_data_t *alignment_data_new() {
+  alignment_data_t *t = (alignment_data_t *)malloc(sizeof(alignment_data_t));
+  
+  return t;
+}
+
+void alignment_data_free(alignment_data_t *alignment_data) {
+  if (alignment_data) { free(alignment_data); }
+}
+
+
+sa_alignment_t *sa_alignment_new(array_list_t *cals_list) {
+
+  sa_alignment_t *sa_a = (sa_alignment_t *) malloc(sizeof(sa_alignment_t));
+
+  sa_a->cals_list   = cals_list;
+  sa_a->left_close  = 0;
+  sa_a->right_close = 0;
+  sa_a->c_left  = NULL;
+  sa_a->c_right = NULL;
+  sa_a->c_final = NULL;
+
+  memset(sa_a->sp_middle, 0, 20);
+  sa_a->num_sp = 0;
+  sa_a->complete = 0;
+  sa_a->reported = 0;
+
+  sa_a->left_dsp_w2  = 0;
+  sa_a->right_dsp_w2 = 0;
+
+  return sa_a;
+
+}
+
+
+void sa_alignment_free(sa_alignment_t *sa_alignment) {
+  free(sa_alignment);
+}
+
+
 batch_t *batch_new(bwt_server_input_t *bwt_input,
                    region_seeker_input_t *region_input,
                    cal_seeker_input_t *cal_input,
