@@ -223,10 +223,7 @@ void run_index_builder(int argc, char **argv, char *mode_str) {
     sprintf(binary_filename, "%s/dna_compression.bin", options->index_filename);
     
     LOG_DEBUG("Compressing reference genome...\n");
-    printf("Compressing reference genome...\n");
     generate_codes(binary_filename, options->ref_genome);
-    printf("...done !\n");
-    exit(-1);
     LOG_DEBUG("...done !\n");
     
     LOG_DEBUG("Building BWT index...\n");
