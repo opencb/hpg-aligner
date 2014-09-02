@@ -22,29 +22,31 @@
 #include <libgen.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <omp.h>
+
 #include "aux/aux_library.h"
 #include "aux/timestats.h"
 #include "recalibrate/recal_config.h"
 #include "recalibrate/bam_recal_library.h"
 
 int mymain(	int full,
-			int p1,
-			int p2,
-			int cycles,
-			int threads,
-			const char *reference, 
-			int refcount, 
-			const char *input, 
-			int incount,
-			const char *output, 
-			int outcount,
-			const char *datafile, 
-			int datacount,
-			const char *infofile,
-			int infocount,
-			const char *compfile,
-			int compcount)
-{	
+		int p1,
+		int p2,
+		int cycles,
+		int threads,
+		char *reference, 
+		int refcount, 
+		char *input, 
+		int incount,
+		char *output, 
+		int outcount,
+		char *datafile, 
+		int datacount,
+		char *infofile,
+		int infocount,
+		char *compfile,
+		int compcount) {
+	  
 	recal_info_t *data;
 	char *dir, *base, *inputc, *outputc, *infofilec, *datafilec;
 	char *sched;
@@ -507,22 +509,22 @@ int recalibrate_bam(int argc, char **argv)
 
     /* normal case: take the command line options at face value */
     exitcode = mymain(	full->count,
-						phase1->count,
-						phase2->count,
-						cycles->ival[0],
-						thr,
-						refile->filename[0], 
-						refile->count, 
-						infile->filename[0], 
-						infile->count, 
-						outfile->filename[0], 
-						outfile->count,
-						datafile->filename[0],
-						datafile->count,
-						infofile->filename[0],
-						infofile->count,
-						compfile->filename[0],
-						compfile->count);
+			phase1->count,
+			phase2->count,
+			cycles->ival[0],
+			thr,
+			(char *)refile->filename[0], 
+			refile->count, 
+			(char *)infile->filename[0], 
+			infile->count, 
+			(char *)outfile->filename[0], 
+			outfile->count,
+			(char *)datafile->filename[0],
+			datafile->count,
+			(char *)infofile->filename[0],
+			infofile->count,
+			(char *)compfile->filename[0],
+			compfile->count);
 
     exit:
     /* deallocate each non-null entry in argtable[] */

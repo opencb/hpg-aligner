@@ -19,7 +19,7 @@
 #include <assert.h>
 
 ERROR_CODE
-compare_bams_qual(const char* bamPath0, const char* bamPath1, const int cycles)
+compare_bams_qual(char* bamPath0, char* bamPath1, const int cycles)
 {
 	bam_file_t* bamFile0;
 	bam_file_t* bamFile1;
@@ -29,11 +29,13 @@ compare_bams_qual(const char* bamPath0, const char* bamPath1, const int cycles)
 	alignment_t* aligAlig0;
 	alignment_t* aligAlig1;
 	int diff, i;
-
+ 
 	printf("Opening BAM 1 form \"%s\" ...\n", bamPath0);
-	printf("Opening BAM 2 form \"%s\" ...\n", bamPath1);
+	printf("Opening BAM 2 form \"%s\" ...\n", bamPath1);	
+	
 	bamFile0 = bam_fopen(bamPath0);
 	bamFile1 = bam_fopen(bamPath1);
+	
 	printf("BAM opened!...\n");
 
 
@@ -328,7 +330,7 @@ supress_indels(char *seq, U_CYCLES seq_l, char *cigar_elem, char *cigar_type, ui
 	if(seq == NULL
 		|| cigar_elem == NULL
 		|| cigar_type == NULL
-		|| cigar_type_l == NULL
+		|| cigar_type_l == 0 
 		|| seq_res == NULL
 		|| seq_res_l == NULL)
 	{

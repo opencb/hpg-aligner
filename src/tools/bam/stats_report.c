@@ -187,7 +187,7 @@ void generate_gnuplot_image(report_graph_t *graph, char *data_filename, char *pr
     // build the command line by calling gnuplot followed by is instruction file
     // execute command line: gnuplot filename.gnuplot
     sprintf(line, "gnuplot %s;", gnuplot_filename);
-    system(line);
+    int res = system(line);
 }
 
 //--------------------------------------------------------------------
@@ -211,7 +211,7 @@ void report_summary(char *prefix, stats_counters_t *output) {
   if (output->num_passed != 0 || output->num_passed != 0) {
     fprintf(f, "\tEnabled\n");
     fprintf(f, "\tNumber of alignments in file  : %lu\n", output->num_passed + output->num_failed);
-    fprintf(f, "\tNumber of processed alignments: %lu (%0.2f %)\n", output->num_reads, 
+    fprintf(f, "\tNumber of processed alignments: %lu (%0.2f %%)\n", output->num_reads, 
 	    100.0f * output->num_reads / (output->num_passed + output->num_failed));
   } else {
     fprintf(f, "\tDisabled\n");

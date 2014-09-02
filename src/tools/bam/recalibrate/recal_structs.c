@@ -295,13 +295,13 @@ recal_add_base(recal_info_t *data, const char qual, const U_CYCLES cycle, const 
 	}
 	else
 	{
-		printf("ERROR: unrecognized dinuc Q: %d, C: %d, D: %d, Match: %d\n", qual, cycle, dinuc, match);
+		printf("ERROR: unrecognized dinuc Q: %d, C: %d, D: %d, Match: %f\n", qual, cycle, dinuc, match);
 		return INVALID_INPUT_DINUC;
 	}
 
 	return NO_ERROR;
 }
-
+  
 /**
  * Add recalibration data from vector of bases
  */
@@ -589,7 +589,7 @@ recal_fprint_info(const recal_info_t *data, const char *path)
 	fprintf(fp, "==============================\nQUAL VECTOR:\n");
 	for(i = 0; i < n_quals; i++)
 	{
-		fprintf(fp, "%3d %8.2f %10u %6.2f \n", i + MIN_QUALITY, data->qual_miss[i] /*- SMOOTH_CONSTANT_MISS*/, data->qual_bases[i] /*- SMOOTH_CONSTANT_BASES*/, data->qual_delta[i] /*- SMOOTH_CONSTANT_MISS*/);
+		fprintf(fp, "%3d %8.2f %10lu %6.2f \n", i + MIN_QUALITY, data->qual_miss[i] /*- SMOOTH_CONSTANT_MISS*/, data->qual_bases[i] /*- SMOOTH_CONSTANT_BASES*/, data->qual_delta[i] /*- SMOOTH_CONSTANT_MISS*/);
 	}
 
 	//Print cycle infos
@@ -610,7 +610,7 @@ recal_fprint_info(const recal_info_t *data, const char *path)
 		fprintf(fp, "%d \t", i + MIN_QUALITY);
 		for(j = 0; j < n_cycles; j++)
 		{
-			fprintf(fp, "%u \t", data->qual_cycle_bases[i * n_cycles + j] /*- SMOOTH_CONSTANT_BASES*/);
+			fprintf(fp, "%lu \t", data->qual_cycle_bases[i * n_cycles + j] /*- SMOOTH_CONSTANT_BASES*/);
 		}
 		fprintf(fp, "\n");
 	}
@@ -644,7 +644,7 @@ recal_fprint_info(const recal_info_t *data, const char *path)
 		fprintf(fp, "%d \t", i + MIN_QUALITY);
 		for(j = 0; j < n_dinuc; j++)
 		{
-			fprintf(fp, "%u \t", data->qual_dinuc_bases[i * n_dinuc + j] /*- SMOOTH_CONSTANT_BASES*/);
+			fprintf(fp, "%lu \t", data->qual_dinuc_bases[i * n_dinuc + j] /*- SMOOTH_CONSTANT_BASES*/);
 		}
 		fprintf(fp, "\n");
 	}
@@ -715,37 +715,37 @@ ERROR_CODE
 recal_load_recal_info(const char *path, recal_info_t *data)
 {
 	FILE *fp;
-
+	size_t res;
 	printf("\n----------------\nLoading recalibration data \"%s\"\n----------------\n", path);
 
 	fp = fopen(path, "r");
 
-	fwrite(data, sizeof(U_QUALS), 1, fp);	//min_qual
-	fwrite(data, sizeof(U_QUALS), 1, fp);	//num_quals
-	fwrite(data, sizeof(U_CYCLES), 1, fp);	//num_cycles
-	fwrite(data, sizeof(U_DINUC), 1, fp);	//num_dinuc
+	res = fwrite(data, sizeof(U_QUALS), 1, fp);	//min_qual
+	res = fwrite(data, sizeof(U_QUALS), 1, fp);	//num_quals
+	res = fwrite(data, sizeof(U_CYCLES), 1, fp);	//num_cycles
+	res = fwrite(data, sizeof(U_DINUC), 1, fp);	//num_dinuc
 
 	//Read total counters
-	fread(&data->total_miss, sizeof(double), 1, fp);
-	fread(&data->total_bases, sizeof(U_BASES), 1, fp);
-	fread(&data->total_delta, sizeof(double), 1, fp);
-	fread(&data->total_estimated_Q, sizeof(double), 1, fp);
+	res = fread(&data->total_miss, sizeof(double), 1, fp);
+	res = fread(&data->total_bases, sizeof(U_BASES), 1, fp);
+	res = fread(&data->total_delta, sizeof(double), 1, fp);
+	res = fread(&data->total_estimated_Q, sizeof(double), 1, fp);
 
 	//Read qual counters
-	fread(data->qual_miss, sizeof(double), data->num_quals, fp);
-	fread(data->qual_bases, sizeof(U_BASES), data->num_quals, fp);
-	fread(data->qual_delta, sizeof(double), data->num_quals, fp);
+	res = fread(data->qual_miss, sizeof(double), data->num_quals, fp);
+	res = fread(data->qual_bases, sizeof(U_BASES), data->num_quals, fp);
+	res = fread(data->qual_delta, sizeof(double), data->num_quals, fp);
 
 	//Read cycle counters
-	fread(data->qual_cycle_miss, sizeof(double), data->num_quals * data->num_cycles, fp);
-	fread(data->qual_cycle_bases, sizeof(U_BASES), data->num_quals * data->num_cycles, fp);
-	fread(data->qual_cycle_delta, sizeof(double), data->num_quals * data->num_cycles, fp);
+	res = fread(data->qual_cycle_miss, sizeof(double), data->num_quals * data->num_cycles, fp);
+	res = fread(data->qual_cycle_bases, sizeof(U_BASES), data->num_quals * data->num_cycles, fp);
+	res = fread(data->qual_cycle_delta, sizeof(double), data->num_quals * data->num_cycles, fp);
 
 	//Read dinuc counters
-	fread(data->qual_dinuc_miss, sizeof(double), data->num_quals * data->num_dinuc, fp);
-	fread(data->qual_dinuc_bases, sizeof(U_BASES), data->num_quals * data->num_dinuc, fp);
-	fread(data->qual_dinuc_delta, sizeof(double), data->num_quals * data->num_dinuc, fp);
-
+	res = fread(data->qual_dinuc_miss, sizeof(double), data->num_quals * data->num_dinuc, fp);
+	res = fread(data->qual_dinuc_bases, sizeof(U_BASES), data->num_quals * data->num_dinuc, fp);
+	res = fread(data->qual_dinuc_delta, sizeof(double), data->num_quals * data->num_dinuc, fp);
+ 
 	fclose(fp);
 
 	return NO_ERROR;

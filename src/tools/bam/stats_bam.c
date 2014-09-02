@@ -100,7 +100,12 @@ void bam_stats_wf_batch_free(bam_stats_wf_batch_t *p) {
       }
       array_list_free(p->bam1s, NULL);
     }
-    if (p->bam_stats) bam_stats_free(p->bam_stats);
+
+    if (p->bam_stats) {
+      //TODO: segfault??
+      array_list_free(p->bam_stats, (void *)bam_stats_free);
+    }
+
     if (p->passed_bam1s) array_list_free(p->passed_bam1s, NULL);
     if (p->failed_bam1s) array_list_free(p->failed_bam1s, NULL);    
 
@@ -245,7 +250,7 @@ int bam_stats_consumer(void *data) {
   bam_query_fields_t *fields;
   char* errorMessage;
   khash_t(stats_chunks) *hash;
-  int *sequence_lengths;
+  size_t *sequence_lengths;
   char **sequence_labels;
 
   if (db_on) {
@@ -413,11 +418,11 @@ void stats_bam(stats_options_t *opts) {
 
   workflow_stage_function_t stage_functions[] = {bam_stats_worker};
   char *stage_labels[] = {"BAM stats worker"};
-  workflow_set_stages(1, &stage_functions, stage_labels, wf);
+  workflow_set_stages(1, stage_functions, stage_labels, wf);
   
   // optional producer and consumer functions
-  workflow_set_producer(bam_stats_producer, "BAM stats producer", wf);
-  workflow_set_consumer(bam_stats_consumer, "BAM stats consumer", wf);
+  workflow_set_producer((workflow_producer_function_t *)bam_stats_producer, "BAM stats producer", wf);
+  workflow_set_consumer((workflow_consumer_function_t *)bam_stats_consumer, "BAM stats consumer", wf);
   
   workflow_run_with(opts->num_threads, wf_input, wf);
   

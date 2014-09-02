@@ -21,7 +21,7 @@
  * Recalibrate BAM file from path and store in file.
  */
 ERROR_CODE
-recal_recalibrate_bam_file(const char *orig_bam_path, const recal_info_t *bam_info, const char *recal_bam_path)
+recal_recalibrate_bam_file(char *orig_bam_path, const recal_info_t *bam_info, char *recal_bam_path)
 {
 	bam_file_t *orig_bam_f, *recal_bam_f;
 	bam_header_t *recal_bam_header;
@@ -67,7 +67,7 @@ recal_recalibrate_bam_file(const char *orig_bam_path, const recal_info_t *bam_in
  * Recalibrate BAM file and store in file.
  */
 ERROR_CODE
-recal_recalibrate_bam(const bam_file_t *orig_bam_f, const recal_info_t *bam_info, bam_file_t *recal_bam_f)
+recal_recalibrate_bam(bam_file_t *orig_bam_f, const recal_info_t *bam_info, bam_file_t *recal_bam_f)
 {
 	bam_batch_t *batch;
 	bam_batch_t *rdy_batch;
@@ -95,8 +95,6 @@ recal_recalibrate_bam(const bam_file_t *orig_bam_f, const recal_info_t *bam_info
 	batch->num_alignments = 0;
 	rdy_batch = bam_batch_new(1, MULTIPLE_CHROM_BATCH);
 	rdy_batch->num_alignments = 0;
-
-	printf("---------------------\n", count);
 
 	//Set thread num
 	//omp_set_num_threads(NUM_THREADS);
@@ -254,8 +252,6 @@ recal_recalibrate_bam(const bam_file_t *orig_bam_f, const recal_info_t *bam_info
 	bam_batch_free(batch, 1);
 	bam_batch_free(read_batch, 1);
 
-	printf("\n---------------------\n", count);
-
 	return NO_ERROR;
 }
 
@@ -329,7 +325,7 @@ recal_recalibrate_batch(const bam_batch_t* batch, const recal_info_t *bam_info)
  * Recalibrate alignment and store in file.
  */
 ERROR_CODE
-recal_recalibrate_alignment(const bam1_t* alig, const recal_info_t *bam_info, recal_recalibration_env_t *recalibration_env)
+recal_recalibrate_alignment(bam1_t* alig, const recal_info_t *bam_info, recal_recalibration_env_t *recalibration_env)
 {
 	//Lengths
 	uint32_t bam_seq_l;
@@ -362,7 +358,7 @@ recal_recalibrate_alignment(const bam1_t* alig, const recal_info_t *bam_info, re
 
 //Function for library internal use
 static INLINE void
-recal_recalibrate_alignment_priv(const bam1_t* alig, const recal_info_t *bam_info, recal_recalibration_env_t *recalibration_env)
+recal_recalibrate_alignment_priv(bam1_t* alig, const recal_info_t *bam_info, recal_recalibration_env_t *recalibration_env)
 {
 	U_QUALS qual_index;
 	unsigned int matrix_index;

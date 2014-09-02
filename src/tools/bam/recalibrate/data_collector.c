@@ -27,7 +27,7 @@
  * Get recalibration data from BAM path.
  */
 ERROR_CODE
-recal_get_data_from_file(const char *bam_path, const char *ref_name, const char *ref_path, recal_info_t *out_info)
+recal_get_data_from_file(char *bam_path, char *ref_name, char *ref_path, recal_info_t *out_info)
 {
 	genome_t* ref;
 	bam_file_t *bam_f;
@@ -64,7 +64,7 @@ recal_get_data_from_file(const char *bam_path, const char *ref_name, const char 
  * Get recalibration data from BAM file.
  */
 ERROR_CODE
-recal_get_data_from_bam(const bam_file_t *bam, const genome_t* ref, recal_info_t* output_data)
+recal_get_data_from_bam(bam_file_t *bam, genome_t* ref, recal_info_t* output_data)
 {
 	bam_batch_t *read_batch;
 	bam_batch_t *collect_batch;
@@ -235,15 +235,15 @@ recal_get_data_from_bam(const bam_file_t *bam, const genome_t* ref, recal_info_t
 	}	/* END PARALLEL */
 
 	printf("\n----------------\n%d alignments readed.", count);
-	printf("\n%d alignments processed.", count - unmapped - mapzero - duplicated - notprimary);
-	printf("\n%d alignments duplicated.", duplicated);
+	printf("\n%lu alignments processed.", count - unmapped - mapzero - duplicated - notprimary);
+	printf("\n%lu alignments duplicated.", duplicated);
 	#ifdef NOT_PRIMARY_ALIGNMENT
-		printf("\n%d not primary alignments.", notprimary);
+		printf("\n%lu not primary alignments.", notprimary);
 	#endif
 	#ifdef NOT_MAPPING_QUAL_ZERO
-	printf("\n%d alignments with map quality zero.", mapzero);
+	printf("\n%lu alignments with map quality zero.", mapzero);
 	#endif
-	printf("\n%d alignments unmapped.", unmapped);
+	printf("\n%lu alignments unmapped.", unmapped);
 
 	//Last free
 	free(last_seq);
@@ -258,7 +258,7 @@ recal_get_data_from_bam(const bam_file_t *bam, const genome_t* ref, recal_info_t
  * Get recalibration data from BAM batch of alignments.
  */
 ERROR_CODE
-recal_get_data_from_bam_batch(const bam_batch_t* batch, const genome_t* ref, recal_info_t* output_data)
+recal_get_data_from_bam_batch(bam_batch_t* batch, genome_t* ref, recal_info_t* output_data)
 {
 	int i, j;
 	ERROR_CODE err;
@@ -375,7 +375,7 @@ recal_get_data_from_bam_batch(const bam_batch_t* batch, const genome_t* ref, rec
  * Get recalibration data from alignment.
  */
 ERROR_CODE
-recal_get_data_from_bam_alignment(const bam1_t* alig, const genome_t* ref, recal_info_t* output_data, recal_data_collect_env_t *collect_env)
+recal_get_data_from_bam_alignment(bam1_t* alig, genome_t* ref, recal_info_t* output_data, recal_data_collect_env_t *collect_env)
 {
 	char *ref_seq;
 	char aux_comp[16];
@@ -515,14 +515,14 @@ recal_get_data_from_bam_alignment(const bam1_t* alig, const genome_t* ref, recal
 			//_mm_prefetch(&bam_seq[i + 16], _MM_HINT_T0);
 
 			//Pack sequences
-			v_ref = _mm_load_si128(&ref_seq[i]);
-			v_seq = _mm_load_si128(&bam_seq[i]);
+		        v_ref = _mm_load_si128((__m128i *)&ref_seq[i]);
+			v_seq = _mm_load_si128((__m128i *)&bam_seq[i]);
 
 			//Compare sequences
 			v_comp = _mm_cmpeq_epi8(v_ref, v_seq);
-
+ 
 			//Store comparation values
-			_mm_store_si128(&comp_res[i], v_comp);
+			_mm_store_si128((__m128i *)&comp_res[i], (__m128i)v_comp);
 
 			i += 15;
 		}

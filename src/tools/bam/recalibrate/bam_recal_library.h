@@ -222,7 +222,7 @@ EXTERNC ERROR_CODE recal_get_dinuc(const char A, const char B, U_DINUC *out_dinu
  * \param ref_path Path to reference.
  * \param out_info Data struct to fill.
  */
-EXTERNC ERROR_CODE recal_get_data_from_file(const char *bam_path, const char *ref_name, const char *ref_path, recal_info_t *out_info);
+EXTERNC ERROR_CODE recal_get_data_from_file(char *bam_path, char *ref_name, char *ref_path, recal_info_t *out_info);
 
 /**
  * \brief Get recalibration data from BAM file.
@@ -231,7 +231,7 @@ EXTERNC ERROR_CODE recal_get_data_from_file(const char *bam_path, const char *re
  * \param ref Reference genome struct.
  * \param out_info Data struct to fill.
  */
-EXTERNC ERROR_CODE recal_get_data_from_bam(const bam_file_t *bam, const genome_t* ref, recal_info_t* output_data);
+EXTERNC ERROR_CODE recal_get_data_from_bam(bam_file_t *bam, genome_t* ref, recal_info_t* output_data);
 
 /**
  * \brief Get recalibration data from BAM batch of alignments.
@@ -240,7 +240,7 @@ EXTERNC ERROR_CODE recal_get_data_from_bam(const bam_file_t *bam, const genome_t
  * \param ref Reference genome struct.
  * \param out_info Data struct to fill.
  */
-EXTERNC ERROR_CODE recal_get_data_from_bam_batch(const bam_batch_t* batch, const genome_t* ref, recal_info_t* output_data);
+EXTERNC ERROR_CODE recal_get_data_from_bam_batch(bam_batch_t* batch, genome_t* ref, recal_info_t* output_data);
 
 /**
  * \brief Get recalibration data from alignment.
@@ -250,7 +250,7 @@ EXTERNC ERROR_CODE recal_get_data_from_bam_batch(const bam_batch_t* batch, const
  * \param out_info Data struct to fill.
  * \param collect_env Enviroment struct neccessary for data collection.
  */
-EXTERNC ERROR_CODE recal_get_data_from_bam_alignment(const bam1_t* alig, const genome_t* ref, recal_info_t* output_data, recal_data_collect_env_t *collect_env) __ATTR_HOT;
+EXTERNC ERROR_CODE recal_get_data_from_bam_alignment(bam1_t* alig, genome_t* ref, recal_info_t* output_data, recal_data_collect_env_t *collect_env) __ATTR_HOT;
 
 /***********************************************
  * BAM RECALIBRATION PHASE 2 - RECALIBRATION
@@ -263,7 +263,7 @@ EXTERNC ERROR_CODE recal_get_data_from_bam_alignment(const bam1_t* alig, const g
  * \param bam_info Data struct with recalibration info.
  * \param recal_bam_path Path to output BAM.
  */
-EXTERNC ERROR_CODE recal_recalibrate_bam_file(const char *orig_bam_path, const recal_info_t *bam_info, const char *recal_bam_path);
+EXTERNC ERROR_CODE recal_recalibrate_bam_file(char *orig_bam_path, const recal_info_t *bam_info, char *recal_bam_path);
 
 /**
  * \brief Recalibrate BAM file and store in file.
@@ -272,7 +272,7 @@ EXTERNC ERROR_CODE recal_recalibrate_bam_file(const char *orig_bam_path, const r
  * \param bam_info Data struct with recalibration info.
  * \param recal_bam_f Recalibrated BAM output file struct.
  */
-EXTERNC ERROR_CODE recal_recalibrate_bam(const bam_file_t *orig_bam_f, const recal_info_t *bam_info, bam_file_t *recal_bam_f);
+EXTERNC ERROR_CODE recal_recalibrate_bam(bam_file_t *orig_bam_f, const recal_info_t *bam_info, bam_file_t *recal_bam_f);
 
 /**
  * \brief Recalibrate BAM batch of alignments and store in file.
@@ -291,7 +291,7 @@ EXTERNC ERROR_CODE recal_recalibrate_batch(const bam_batch_t* batch, const recal
  * \param recal_bam_f Recalibrated BAM output file struct.
  * \param recalibration_env Enviroment struct neccessary for data collection.
  */
-EXTERNC ERROR_CODE recal_recalibrate_alignment(const bam1_t* alig, const recal_info_t *bam_info, recal_recalibration_env_t *recalibration_env) __ATTR_HOT;
+EXTERNC ERROR_CODE recal_recalibrate_alignment(bam1_t* alig, const recal_info_t *bam_info, recal_recalibration_env_t *recalibration_env) __ATTR_HOT;
 
 
 /***********************************************

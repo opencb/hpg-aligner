@@ -29,7 +29,7 @@ typedef struct batch_out{
  * Private functions
  */
 
-static INLINE void recal_recalibrate_alignment_priv(const bam1_t* alig, const recal_info_t *bam_info, recal_recalibration_env_t *recalibration_env);
+static INLINE void recal_recalibrate_alignment_priv(bam1_t* alig, const recal_info_t *bam_info, recal_recalibration_env_t *recalibration_env);
 
 
 #endif /* BAM_RECAL_H_ */

@@ -634,7 +634,9 @@ cigar32_to_string(uint32_t *cigar, size_t cigar_l, char* str_cigar)
 {
 	int i, elem, type;
 
-	sprintf(str_cigar, "");
+	//sprintf(str_cigar, "\0");
+	str_cigar = "\0";
+
 	for(i = 0; i < cigar_l; i++)
 	{
 		elem = cigar[i] >> BAM_CIGAR_SHIFT;	//Get number of bases from cigar
@@ -844,7 +846,7 @@ cigar32_from_haplo(uint32_t *cigar, size_t cigar_l, aux_indel_t *haplo, size_t r
 	//Indel
 	int indel_size;
 	int indel_type;
-	int disp_to_indel;
+	size_t disp_to_indel;
 
 	//Generated cigar
 	uint32_t gen_cigar[MAX_CIGAR_LENGTH];

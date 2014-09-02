@@ -342,7 +342,7 @@ alig_region_next(alig_context_t *context)
 	{
 		//Logging
 		LOG_INFO("************************************\n");
-		sprintf(log_msg, "INTERVAL %d - %d\n", context->region.start_pos + 1, context->region.end_pos + 1);
+		sprintf(log_msg, "INTERVAL %lu - %lu\n", context->region.start_pos + 1, context->region.end_pos + 1);
 		LOG_INFO(log_msg);
 
 		//Save interval reads in filtered list
@@ -1303,7 +1303,7 @@ alig_get_scores(alig_context_t *context)
 
 					if(read_seq_ref_l != read->core.l_qseq)
 					{
-						sprintf(log_msg, "Read-Ref: %d, Read: %d\n", read_seq_ref_l, read->core.l_qseq);
+						sprintf(log_msg, "Read-Ref: %lu, Read: %d\n", read_seq_ref_l, read->core.l_qseq);
 						LOG_ERROR(log_msg);
 					}
 					//assert(read_seq_ref_l == read->core.l_qseq);
@@ -1537,7 +1537,7 @@ alig_indel_realign_from_haplo(alig_context_t *context, size_t alt_haplo_index)
 
 	//Logging
 	cigar32_to_string(&haplo->indel, 1, aux_msg);
-	sprintf(log_msg, "Realign, alternative haplotype = %s:%d, %d reads\n", aux_msg, haplo->ref_pos + 1, array_list_size(list));
+	sprintf(log_msg, "Realign, alternative haplotype = %s:%lu, %lu reads\n", aux_msg, haplo->ref_pos + 1, array_list_size(list));
 	LOG_INFO("************************************\n");
 	LOG_INFO(log_msg);
 	if(context->flags & ALIG_ORIGINAL_PRIORITY)

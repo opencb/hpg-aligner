@@ -15,6 +15,7 @@
 #include "commons/argtable/argtable2.h"
 
 #include "bioformats/features/region/region_table.h"
+#include "bioformats/features/region/region_table_utils.h"
 #include "bioformats/bam/bam_file.h"
 
 //------------------------------------------------------------------------

@@ -92,7 +92,7 @@ void sort_options_validate(sort_options_t *opts) {
   }
 
   if (opts->max_memory < 0) {
-    printf("\nError: Invalid maximum memory (%i), it must be greater than 0 !\n\n",
+    printf("\nError: Invalid maximum memory (%lu), it must be greater than 0 !\n\n",
 	   opts->max_memory);
     usage_sort_options(opts);
   }
