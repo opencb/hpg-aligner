@@ -1582,7 +1582,6 @@ int metaexon_insert(unsigned int strand, unsigned int chromosome,
 	  if (metaexon_ref->end >= metaexon->end) {
 	    metaexons->bypass_pointer[chromosome][ck_end].last = list_item_ref;
 	  }
-
 	}
       
 	for (int ck2 = loop_start; ck2 <= loop_end; ck2++) {

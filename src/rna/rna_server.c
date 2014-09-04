@@ -203,6 +203,7 @@ char *cigar_code_find_and_report_sj(size_t start_map, cigar_code_t *cigar_code,
       
       //sj_strand = strand;
       report = 0;
+
       report = 0;
       if ((sj_ref[0] == 'C' && sj_ref[1] == 'T' && sj_ref[3] == 'A' && sj_ref[4] == 'C') ||
 	  (sj_ref[0] == 'G' && sj_ref[1] == 'T' && sj_ref[3] == 'A' && sj_ref[4] == 'T') || 

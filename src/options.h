@@ -55,7 +55,7 @@
 //#define BS_MODE  2
 
 
-#define NUM_OPTIONS			30
+#define NUM_OPTIONS			29
 #define NUM_RNA_OPTIONS			 6
 #define NUM_DNA_OPTIONS			 1
 

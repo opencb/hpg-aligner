@@ -14,10 +14,10 @@ double avx1_matrix_t = 0.0f, avx1_tracking_t = 0.0f;
 // constants
 //--------------------------------------------------------------------
 
-#define OPTIONS 			30
+#define OPTIONS 		       29
 #define MIN_ARGC  			5
 #define NUM_SECTIONS_STATISTICS 	5
-#define NUM_SECTIONS_STATISTICS_SB	21
+#define NUM_SECTIONS_STATISTICS_SB     21
 
 //--------------------------------------------------------------------
 // global variables for timing and capacity meausures
@@ -35,7 +35,7 @@ size_t reads_no_map = 0;
 
 size_t total_sw = 0;
 
-
+unsigned char mute;
 
 double time_write = 0;
 double time_free = 0;

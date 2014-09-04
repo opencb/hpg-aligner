@@ -644,6 +644,7 @@ void sa_index3_parallel_genome_new(char *sa_index_dirname, int num_threads,
   }
 }
 
+//--------------------------------------------------------------------------------------
 
 void rna_aligner(options_t *options) {
   //End fill 
@@ -692,10 +693,10 @@ void rna_aligner(options_t *options) {
     strcat(exact_junctions, "_exact_junctions.bed");
  
   } else {
-    if (!options->fast_mode) {
+    if (options->bam_format) {
       strcat(reads_results, "/alignments.bam");
     } else {
-      strcat(reads_results, "/alignments.sam");
+      strcat(reads_results, "/alignments.sam");    
     }
     strcat(log_input, "/hpg-aligner_input.log");
     strcat(log_output, "/hpg-aligner_output.log");
@@ -819,6 +820,7 @@ void rna_aligner(options_t *options) {
     ///////////////// LOAD SA INDEX ////////////////////// 
 
     LOG_DEBUG("Load SA State");
+
     //sa_index = sa_index3_new(options->bwt_dirname);
     start_timer(time_genome_s);
     sa_index3_parallel_genome_new(options->bwt_dirname, options->num_cpu_threads, &sa_index, &genome);
@@ -1057,7 +1059,6 @@ void rna_aligner(options_t *options) {
   double time_total_1, time_total_2;
   struct timeval time_s1, time_e1, time_s2, time_e2;
 
-
   for (int f = 0; f < num_files1; f++) {
     file1 = array_list_get(f, files_fq1);
 
@@ -1276,7 +1277,7 @@ void rna_aligner(options_t *options) {
       sa_rna.file1 = f_sa;
       sa_rna.file2 = f_hc;
       sa_rna.pair_input = &pair_input;
-      
+
       sa_wf_batch_t *wf_batch = sa_wf_batch_new(NULL, (void *)sa_index, &writer_input, NULL, &sa_rna);
       sa_wf_input_t *wf_input = sa_wf_input_new(options->bam_format, &reader_input, wf_batch);
       
@@ -1286,6 +1287,7 @@ void rna_aligner(options_t *options) {
       char *stage_labels[] = {"SA mapper"};
       workflow_set_stages_SA(1, stage_functions, stage_labels, wf);      
       // optional producer and consumer functions
+
       workflow_set_producer_SA((workflow_producer_function_SA_t *)sa_fq_reader_rna, "FastQ reader", wf);
 
       if (options->bam_format) {
@@ -1424,8 +1426,6 @@ void rna_aligner(options_t *options) {
       //printf("         W2 Time : %f(s)\n", time_total_2 / 1000000);
       //printf("         W TOTAL : %f(s)\n", (time_total_1 + time_total_2) / 1000000);
       //printf("         TOTAL   : %f(s)\n", (time_genome + time_total_1 + time_total_2) / 1000000);
-     
-
     }
 
     if (file1) { free(file1); }

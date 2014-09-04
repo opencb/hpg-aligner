@@ -1165,6 +1165,7 @@ void sa_file_write_partial_alignments(fastq_read_t *fq_read, array_list_t *items
   size_t tot_len = 0;
   
   simple_alignment_t simple_alignment[num_items];
+  
   simple_alignment_t *simple_a;
   
   //unsigned char type = MENTA_TYPE;

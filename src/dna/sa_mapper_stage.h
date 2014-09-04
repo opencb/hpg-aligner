@@ -7,6 +7,8 @@
 #include "dna/sa_dna_commons.h"
 #include "dna/doscadfun.h"
 
+#include "dna/suffix_mng.h"
+
 //--------------------------------------------------------------------
 // cal_mng_t struct
 //--------------------------------------------------------------------
@@ -20,6 +22,9 @@ typedef struct cal_mng {
   size_t high_prefix[MAX_NUM_SUFFIXES];
   size_t low_suffix[MAX_NUM_SUFFIXES];
   size_t high_suffix[MAX_NUM_SUFFIXES];
+
+  suffix_mng_t *suffix_mng;
+
   linked_list_t **cals_lists;
 } cal_mng_t;
 
