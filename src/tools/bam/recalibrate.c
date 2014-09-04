@@ -318,7 +318,7 @@ int recalibrate_bam(int argc, char **argv)
 	/* Incorrect case: No cycles*/
     if (cycles->count == 0)
     {
-		printf("Please, specify number of cycles with -c.\n");
+		printf("Please, specify number of cycles with --cycles.\n");
 		exitcode = 1;
 		goto exit;
 	}

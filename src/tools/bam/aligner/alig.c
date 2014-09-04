@@ -27,7 +27,7 @@ typedef struct {
 	omp_lock_t writer;
 	omp_lock_t reader;
 	int end_condition;
-} circular_buffer_t __ATTR_DEPRECATED;
+} circular_buffer_t /* DEPRECATED */;
 
 uint64_t cigar_changed = 0;
 
@@ -39,8 +39,8 @@ char aux_msg[512];
  */
 static inline ERROR_CODE alig_region_filter_read(bam1_t *read, array_list_t *list, alig_context_t *context) __ATTR_HOT __ATTR_INLINE;
 
-static inline ERROR_CODE alig_aux_write_to_disk(array_list_t *write_buffer, bam_file_t *output_bam_f, uint8_t force) __ATTR_DEPRECATED;
-static inline ERROR_CODE alig_aux_read_from_disk(circular_buffer_t *read_buffer, bam_file_t *input_bam_f) __ATTR_DEPRECATED;
+static inline ERROR_CODE alig_aux_write_to_disk(array_list_t *write_buffer, bam_file_t *output_bam_f, uint8_t force) /* DEPRECATED */;
+static inline ERROR_CODE alig_aux_read_from_disk(circular_buffer_t *read_buffer, bam_file_t *input_bam_f) /* DEPRECATED */;
 
 /**
  * CONTEXT

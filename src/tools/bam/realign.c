@@ -28,7 +28,7 @@ int alig_bam(int argc, char **argv)
 {
 	char *refc, *bamc, *outputc, *statsc;
 
-	struct arg_file *recal = arg_lit0(NULL,"recalibrate","performs a base quality recalibration");
+	struct arg_lit *recal = arg_lit0(NULL,"recalibrate","performs a base quality recalibration");
     struct arg_file *refile = arg_file0("r",NULL,"<reference>","reference genome compressed file (dna_compression.bin)");
     struct arg_file *infile = arg_file0("b",NULL,"<input>","input BAM file");
     struct arg_file *outfile = arg_file0("o",NULL,"<output>","output processed BAM file");

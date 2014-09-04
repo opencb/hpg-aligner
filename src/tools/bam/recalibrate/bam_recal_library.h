@@ -305,7 +305,7 @@ EXTERNC ERROR_CODE recal_recalibrate_batch(const bam_batch_t* batch, const recal
  * \param recal_bam_f Recalibrated BAM output file struct.
  * \param recalibration_env Enviroment struct neccessary for data collection.
  */
-EXTERNC ERROR_CODE recal_recalibrate_alignment(const bam1_t* alig, const recal_info_t *bam_info, recal_recalibration_env_t *recalibration_env) __ATTR_HOT;
+EXTERNC ERROR_CODE recal_recalibrate_alignment(bam1_t* alig, const recal_info_t *bam_info, recal_recalibration_env_t *recalibration_env) __ATTR_HOT;
 
 
 /***********************************************
