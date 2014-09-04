@@ -111,10 +111,12 @@ size_t num_unmapped_reads_by_cigar_length = 0;
 // SAM writer
 //--------------------------------------------------------------------
 
+#define HPG_ALIGNER_VERSION "2.0.0"
+
 void *write_sam_header(sa_genome3_t *genome, FILE *f) {
-  fprintf(f, "@PG\tID:HPG-Aligner\tVN:2.0\n");
+  fprintf(f, "@PG\tID:HPG-Aligner\tVN:%s\n", HPG_ALIGNER_VERSION);
   for (int i = 0; i < genome->num_chroms; i++) {
-    fprintf(f, "@SQ\tSN:%s\tLN:%lu\n", genome->chrom_names[i], genome->chrom_lengths[i] + 1);
+    fprintf(f, "@SQ\tSN:%s\tLN:%lu\n", genome->chrom_names[i], genome->chrom_lengths[i]);
   }
 }
 
@@ -500,9 +502,12 @@ bam_header_t *create_bam_header(sa_genome3_t *genome) {
   bam_header->target_len = (uint32_t*) calloc(num_targets, sizeof(uint32_t));
   for (int i = 0; i < num_targets; i++) {
     bam_header->target_name[i] = strdup(genome->chrom_names[i]);
-    bam_header->target_len[i] = genome->chrom_lengths[i] + 1;
+    bam_header->target_len[i] = genome->chrom_lengths[i];
   }
-  bam_header->text = strdup("@PG\tID:HPG-Aligner\tVN:1.0\n");
+
+  char pg[1024];
+  sprintf(pg, "@PG\tID:HPG-Aligner\tVN:%s\n", HPG_ALIGNER_VERSION);
+  bam_header->text = strdup(pg);
   bam_header->l_text = strlen(bam_header->text);
 
   return bam_header;

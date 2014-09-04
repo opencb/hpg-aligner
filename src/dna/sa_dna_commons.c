@@ -588,13 +588,16 @@ void create_alignments(array_list_t *cal_list, fastq_read_t *read,
       p += 3;
       memcpy(p, &cal->num_mismatches, sizeof(int));
       p += sizeof(int);
-
+      /*
       sprintf(p, "XCZ");
       p += 3;
       memcpy(p, cigar_string, len);
       p += len;
+      */
+      optional_fields_length = p - optional_fields;
     } else {
-      sprintf(optional_fields, "NM:i:%i\tXC:Z:%s", num_mismatches, cigar_string);
+      sprintf(optional_fields, "NM:i:%i", num_mismatches);
+      //sprintf(optional_fields, "NM:i:%i\tXC:Z:%s", num_mismatches, cigar_string);
     }
     
     free(cigar_string);
