@@ -23,6 +23,21 @@
 #include <bioformats/bam/alignment.h>
 #include <aligners/bwt/genome.h>
 #include "aux/aux_common.h"
+#include "bfwork/bfwork.h"
+
+#define RECAL_REFERENCE_CORRECTION_OFFSET 1
+
+/**
+ * RECALIBRATION FLAGS
+ */
+#define RECALIBRATE_COLLECT 			0x01
+#define RECALIBRATE_RECALIBRATE 	0x02
+
+//VERSION
+#define RECAL_VER_CURRENT		"1"
+#define RECAL_VER_REVISION		"1"
+#define RECAL_VER_AGE			"1"
+#define RECAL_VER 			RECAL_VER_CURRENT"."RECAL_VER_REVISION"."RECAL_VER_AGE
 
 /**
  * \brief Recalibration data storage.
@@ -96,7 +111,6 @@ typedef enum DINUC
 	d_X = 16	/* Not a dinucleotide. For example "NT" or "NN".*/
 } DINUCLEOTIDE;
 
-
 /***********************************************
  * DATA MANAGEMENT
  **********************************************/
@@ -107,7 +121,7 @@ typedef enum DINUC
  * \param cycles Number of maximum cycles to stat.
  * \param out_info Previously allocated info struct to initialize.
  */
-EXTERNC ERROR_CODE recal_init_info(const U_CYCLES cycles, recal_info_t **out_data);
+EXTERNC ERROR_CODE recal_init_info(const U_CYCLES cycles, recal_info_t *out_data);
 
 /**
  * \brief Free all resources of recalibration.
@@ -116,7 +130,7 @@ EXTERNC ERROR_CODE recal_init_info(const U_CYCLES cycles, recal_info_t **out_dat
  *
  * \param data Data struct to free
  */
-EXTERNC ERROR_CODE recal_destroy_info(recal_info_t **data);
+EXTERNC ERROR_CODE recal_destroy_info(recal_info_t *data);
 
 /**
  * \brief Reduce data.
@@ -171,7 +185,7 @@ EXTERNC ERROR_CODE recal_recalibration_destroy_env(recal_recalibration_env_t *re
  * \param dinuc Dinucleotide to add.
  * \param match Indicate if match(!=0) or not (0)
  */
-EXTERNC ERROR_CODE recal_add_base(recal_info_t *data, const char qual, const U_CYCLES cycle, const char dinuc, const double match) __ATTR_HOT;
+EXTERNC ERROR_CODE recal_add_base(recal_info_t *data, const char qual, const U_CYCLES cycle, const char dinuc, const char miss) __ATTR_HOT;
 
 /**
  * \brief Add recalibration data from vector of bases.
@@ -186,7 +200,7 @@ EXTERNC ERROR_CODE recal_add_base(recal_info_t *data, const char qual, const U_C
  * \param dinuc Vector of dinucleotides to add.
  * \param matches Vector of match(!=0) or not (0)
  */
-EXTERNC ERROR_CODE recal_add_base_v(recal_info_t *data, const char *seq, const char *quals, const U_CYCLES init_cycle, const U_CYCLES num_cycles, const char *dinuc, const char *matches) __ATTR_HOT;
+EXTERNC ERROR_CODE recal_add_base_v(recal_info_t *data, const char *seq, const char *quals, const U_CYCLES init_cycle, const U_CYCLES num_cycles, const char *dinuc, const char *misses, const char *mask) __ATTR_HOT;
 
 /**
  * \brief Compute deltas from bases and misses.
@@ -222,7 +236,7 @@ EXTERNC ERROR_CODE recal_get_dinuc(const char A, const char B, U_DINUC *out_dinu
  * \param ref_path Path to reference.
  * \param out_info Data struct to fill.
  */
-EXTERNC ERROR_CODE recal_get_data_from_file(char *bam_path, char *ref_name, char *ref_path, recal_info_t *out_info);
+EXTERNC ERROR_CODE recal_get_data_from_file(const char *bam_path, const char *ref_name, const char *ref_path, recal_info_t *out_info) __ATTR_DEPRECATED;
 
 /**
  * \brief Get recalibration data from BAM file.
@@ -231,7 +245,7 @@ EXTERNC ERROR_CODE recal_get_data_from_file(char *bam_path, char *ref_name, char
  * \param ref Reference genome struct.
  * \param out_info Data struct to fill.
  */
-EXTERNC ERROR_CODE recal_get_data_from_bam(bam_file_t *bam, genome_t* ref, recal_info_t* output_data);
+EXTERNC ERROR_CODE recal_get_data_from_bam(const bam_file_t *bam, const genome_t* ref, recal_info_t* output_data);
 
 /**
  * \brief Get recalibration data from BAM batch of alignments.
@@ -240,7 +254,7 @@ EXTERNC ERROR_CODE recal_get_data_from_bam(bam_file_t *bam, genome_t* ref, recal
  * \param ref Reference genome struct.
  * \param out_info Data struct to fill.
  */
-EXTERNC ERROR_CODE recal_get_data_from_bam_batch(bam_batch_t* batch, genome_t* ref, recal_info_t* output_data);
+EXTERNC ERROR_CODE recal_get_data_from_bam_batch(const bam_batch_t* batch, const genome_t* ref, recal_info_t* output_data);
 
 /**
  * \brief Get recalibration data from alignment.
@@ -250,7 +264,7 @@ EXTERNC ERROR_CODE recal_get_data_from_bam_batch(bam_batch_t* batch, genome_t* r
  * \param out_info Data struct to fill.
  * \param collect_env Enviroment struct neccessary for data collection.
  */
-EXTERNC ERROR_CODE recal_get_data_from_bam_alignment(bam1_t* alig, genome_t* ref, recal_info_t* output_data, recal_data_collect_env_t *collect_env) __ATTR_HOT;
+EXTERNC ERROR_CODE recal_get_data_from_bam_alignment(const bam1_t* alig, const genome_t* ref, recal_info_t* output_data, recal_data_collect_env_t *collect_env) __ATTR_HOT;
 
 /***********************************************
  * BAM RECALIBRATION PHASE 2 - RECALIBRATION
@@ -263,7 +277,7 @@ EXTERNC ERROR_CODE recal_get_data_from_bam_alignment(bam1_t* alig, genome_t* ref
  * \param bam_info Data struct with recalibration info.
  * \param recal_bam_path Path to output BAM.
  */
-EXTERNC ERROR_CODE recal_recalibrate_bam_file(char *orig_bam_path, const recal_info_t *bam_info, char *recal_bam_path);
+EXTERNC ERROR_CODE recal_recalibrate_bam_file(const char *orig_bam_path, const recal_info_t *bam_info, const char *recal_bam_path) __ATTR_DEPRECATED;
 
 /**
  * \brief Recalibrate BAM file and store in file.
@@ -272,7 +286,7 @@ EXTERNC ERROR_CODE recal_recalibrate_bam_file(char *orig_bam_path, const recal_i
  * \param bam_info Data struct with recalibration info.
  * \param recal_bam_f Recalibrated BAM output file struct.
  */
-EXTERNC ERROR_CODE recal_recalibrate_bam(bam_file_t *orig_bam_f, const recal_info_t *bam_info, bam_file_t *recal_bam_f);
+EXTERNC ERROR_CODE recal_recalibrate_bam(const bam_file_t *orig_bam_f, const recal_info_t *bam_info, bam_file_t *recal_bam_f);
 
 /**
  * \brief Recalibrate BAM batch of alignments and store in file.

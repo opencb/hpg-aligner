@@ -22,33 +22,34 @@
 #include <libgen.h>
 #include <unistd.h>
 #include <sys/stat.h>
-#include <omp.h>
-
 #include "aux/aux_library.h"
 #include "aux/timestats.h"
-#include "recalibrate/recal_config.h"
-#include "recalibrate/bam_recal_library.h"
+//#include "bfwork/bfwork.h"
+//#include "recalibrate/recal_config.h"
+//#include "recalibrate/recal_structs.h"
+//#include "recalibrate/bam_recal_library.h"
+#include "bfwork/bam_file_ops.h"
 
 int mymain(	int full,
-		int p1,
-		int p2,
-		int cycles,
-		int threads,
-		char *reference, 
-		int refcount, 
-		char *input, 
-		int incount,
-		char *output, 
-		int outcount,
-		char *datafile, 
-		int datacount,
-		char *infofile,
-		int infocount,
-		char *compfile,
-		int compcount) {
-	  
-	recal_info_t *data;
-	char *dir, *base, *inputc, *outputc, *infofilec, *datafilec;
+			int p1,
+			int p2,
+			int cycles,
+			int threads,
+			const char *reference, 
+			int refcount, 
+			const char *input, 
+			int incount,
+			const char *output, 
+			int outcount,
+			const char *datafile, 
+			int datacount,
+			const char *infofile,
+			int infocount,
+			const char *stats,
+			int statscount
+			)
+{	
+	char *refc, *inputc, *outputc, *infofilec, *datafilec, *statsc;
 	char *sched;
 	char cwd[1024];
 	
@@ -90,9 +91,9 @@ int mymain(	int full,
 	}
 	
 	//Default case: No phase selected
-    if (!full && !p1 && !p2 && !compcount)
+    if (!full && !p1 && !p2)
     {
-		printf("No recalibration phase specified or comparation, executing full recalibration.\n");
+		printf("No recalibration phase specified, executing full recalibration.\n");
 		full = 1;
 	}
 
@@ -129,58 +130,6 @@ int mymain(	int full,
 	//Set schedule if not defined
 	setenv("OMP_SCHEDULE", "static", 0);
 	sched = getenv("OMP_SCHEDULE");
-
-	//Time measures
-	#ifdef D_TIME_DEBUG
-
-	char filename[100];
-	char intaux[20];
-
-		//Initialize stats
-		if(time_new_stats(20, &TIME_GLOBAL_STATS))
-		{
-			printf("ERROR: FAILED TO INITIALIZE TIME STATS\n");
-		}
-
-
-		if (getcwd(cwd, sizeof(cwd)) != NULL)
-		{
-			printf("Current working dir: %s\n", cwd);
-		}
-		else
-		{
-			perror("WARNING: getcwd() dont work\n");
-		}
-
-		strcpy(filename, cwd);
-		strcat(filename,"/stats/");
-		if(sched)
-			strcat(filename,sched);
-		else
-		{
-			printf("ERROR: Obtaining OMP_SCHEDULE environment value\n");
-		}
-
-		//Create stats directory
-		mkdir(filename, S_IRWXU);
-
-		strcat(filename,"_");
-		sprintf(intaux, "%d", MAX_BATCH_SIZE);
-		strcat(filename, intaux);
-		strcat(filename, "_");
-		sprintf(intaux, "%d", threads);
-		strcat(filename, intaux);
-		strcat(filename, "_.stats");
-
-		//Initialize stats file output
-		if(time_set_output_file(filename, TIME_GLOBAL_STATS))
-		{
-			printf("ERROR: FAILED TO INITIALIZE TIME STATS FILE OUTPUT\n");
-		}
-
-		printf("STATISTICS ACTIVATED, output file: %s\n\n", filename);
-
-	#endif
 	
 	//Printf proc caps
 	printf_proc_features();
@@ -198,197 +147,75 @@ int mymain(	int full,
 	#endif
 
 	init_log();
+	LOG_FILE("recalibration.log","w");
+	LOG_VERBOSE(1);
+	LOG_LEVEL(LOG_WARN_LEVEL);
 
 	//Set num of threads
-	omp_set_num_threads(threads);
-	printf("Threading with %d threads and %s schedule\n", threads, sched);
+	//omp_set_num_threads(threads);
+	printf("Threading with %d threads and %s schedule\n", omp_get_max_threads(), sched);
 
-	//Execute phase 1
-	if (p1)
-	{
-		printf("\n===================\nExecuting phase 1.\n===================\n\n");
+	//Obtain reference filename and dirpath from full path
+	refc = NULL;
+	if(refcount > 0)
+		refc = strdup(reference);
 
-		//Create new data
-		printf("cycles: %d\n",cycles);
-		recal_init_info(cycles, &data);
-		
-		//Obtain reference filename and dirpath from full path
-		dir = strdup(reference);
-		dir = dirname(dir);
-		base = strrchr(reference, '/');
-		
-		//Obtain data from bam
-		inputc = strdup(input);
-		printf("Reference dir: %s\n", dir);
-		printf("Reference name: %s\n", base);
-		recal_get_data_from_file(inputc, base, dir, data);
-		free(inputc);
-		
-		//Delta processing
-		recal_calc_deltas(data);
-		
-		//Print data
-		if(infocount > 0)
-		{
-			infofilec = strdup(infofile);
-			recal_fprint_info(data, infofilec);
-			free(infofilec);
-		}
-		
-		//Save data file
-		if(datacount > 0)
-		{
-			datafilec = strdup(datafile);
-			recal_save_recal_info(data, datafilec);
-			free(datafilec);
-		}
-	}
+	//Print data
+	infofilec = NULL;
+	if(infocount > 0)
+		infofilec = strdup(infofile);
 	
-	//Execute phase 2
-	if (p2)
-	{
-		printf("\n===================\nExecuting phase 2.\n===================\n\n");
-		
-		if (!p1)
-		{
-			//New data
-			recal_init_info(cycles, &data);
-			
-			//Load data
-			recal_load_recal_info(datafile, data);
-		}
-		
+	//Save data file
+	datafilec = NULL;
+	if(datacount > 0)
+		datafilec = strdup(datafile);
 
+	//Input BAM
+	inputc = NULL;
+	if(incount > 0)
 		inputc = strdup(input);
+
+	//Output BAM
+	outputc = NULL;
+	if(outcount > 0)
 		outputc = strdup(output);
 
-		//Recalibrate bam
-		recal_recalibrate_bam_file(inputc, data, outputc);
-		free(inputc);
-		free(outputc);
-	}
-	
-	
-	//Print times
-	#ifdef D_TIME_DEBUG
-		double min, max, mean;
+	//Stats path
+	statsc = NULL;
+	if(statscount > 0)
+		statsc = strdup(stats);
 
-		//Print time stats
-		printf("----------------------------\nTIME STATS: \n");
-			
-		//Times from phase 1
-		if (p1)
-		{	
-			printf("\n-------\n");
-			printf("PHASE 1\n");
-			printf("-------\n");
-
-			printf("\n====== Total time to collect ======\n");
-			time_get_min_slot(D_SLOT_PH1_COLLECT_BAM, TIME_GLOBAL_STATS, &min);
-			printf("TIME USED FOR BAM COLLECTION -> %.2f s\n", min);
-
-			printf("\n====== Deltas proccess ======\n");
-			time_get_min_slot(D_SLOT_PROCCESS_DELTAS, TIME_GLOBAL_STATS, &min);
-			printf("Time used for deltas proccess -> %.2f ms\n", min*1000.0);
-
-			printf("\n====== Batch iteration ======\n");
-			time_get_mean_slot(D_SLOT_PH1_ITERATION, TIME_GLOBAL_STATS, &mean);
-			time_get_min_slot(D_SLOT_PH1_ITERATION, TIME_GLOBAL_STATS, &min);
-			time_get_max_slot(D_SLOT_PH1_ITERATION, TIME_GLOBAL_STATS, &max);
-			printf("Time used for iteration (mean) -> %.2f ms - min/max = %.2f/%.2f\n",
-					mean*1000.0, min*1000.0, max*1000.0);
-
-			printf("\n====== Inside iteration ======\n");
-			time_get_mean_slot(D_SLOT_PH1_READ_BATCH, TIME_GLOBAL_STATS, &mean);
-			time_get_min_slot(D_SLOT_PH1_READ_BATCH, TIME_GLOBAL_STATS, &min);
-			time_get_max_slot(D_SLOT_PH1_READ_BATCH, TIME_GLOBAL_STATS, &max);
-			printf("(P) Time used for batch read (mean) -> %.2f ms - min/max = %.2f/%.2f\n",
-					mean*1000.0, min*1000.0, max*1000.0);
-
-			time_get_mean_slot(D_SLOT_PH1_COLLECT_BATCH, TIME_GLOBAL_STATS, &mean);
-			time_get_min_slot(D_SLOT_PH1_COLLECT_BATCH, TIME_GLOBAL_STATS, &min);
-			time_get_max_slot(D_SLOT_PH1_COLLECT_BATCH, TIME_GLOBAL_STATS, &max);
-			printf("(P) Time used for batch collect (mean) -> %.2f ms - min/max = %.2f/%.2f\n",
-					mean*1000.0, min*1000.0, max*1000.0);
-
-			time_get_mean_slot(D_SLOT_PH1_COLLECT_REDUCE_DATA, TIME_GLOBAL_STATS, &mean);
-			time_get_min_slot(D_SLOT_PH1_COLLECT_REDUCE_DATA, TIME_GLOBAL_STATS, &min);
-			time_get_max_slot(D_SLOT_PH1_COLLECT_REDUCE_DATA, TIME_GLOBAL_STATS, &max);
-			printf("Time used for reduce data (mean) -> %.2f micros - min/max = %.2f/%.2f\n",
-					mean*1000000.0, min*1000000.0, max*1000000.0);
-
-			printf("\n====== Alignment ======\n");
-			time_get_mean_slot(D_SLOT_PH1_COLLECT_ALIG, TIME_GLOBAL_STATS, &mean);
-			time_get_min_slot(D_SLOT_PH1_COLLECT_ALIG, TIME_GLOBAL_STATS, &min);
-			time_get_max_slot(D_SLOT_PH1_COLLECT_ALIG, TIME_GLOBAL_STATS, &max);
-			printf("Time used for alig collect (mean) -> %.2f micros - min/max = %.2f/%.2f\n",
-					mean*1000000.0, min*1000000.0, max*1000000.0);
-		}	
-		
-		if (p2)
-		{
-			printf("\n-------\n");
-			printf("PHASE 2\n");
-			printf("-------\n");
-
-			printf("\n====== Total time to recalibrate ======\n");
-			time_get_min_slot(D_SLOT_PH2_RECALIBRATE, TIME_GLOBAL_STATS, &min);
-			printf("TIME USED FOR BAM RECALIBRATION -> %.2f s\n", min);
-
-			printf("\n====== Batch iteration ======\n");
-			time_get_mean_slot(D_SLOT_PH2_ITERATION, TIME_GLOBAL_STATS, &mean);
-			time_get_min_slot(D_SLOT_PH2_ITERATION, TIME_GLOBAL_STATS, &min);
-			time_get_max_slot(D_SLOT_PH2_ITERATION, TIME_GLOBAL_STATS, &max);
-			printf("Time used for iteration (mean) -> %.2f ms - min/max = %.2f/%.2f\n",
-					mean*1000.0, min*1000.0, max*1000.0);
-
-			printf("\n====== Inside iteration ======\n");
-			time_get_mean_slot(D_SLOT_PH2_READ_BATCH, TIME_GLOBAL_STATS, &mean);
-			time_get_min_slot(D_SLOT_PH2_READ_BATCH, TIME_GLOBAL_STATS, &min);
-			time_get_max_slot(D_SLOT_PH2_READ_BATCH, TIME_GLOBAL_STATS, &max);
-			printf("(P) Time used for batch read (mean) -> %.2f ms - min/max = %.2f/%.2f\n",
-								mean*1000.0, min*1000.0, max*1000.0);
-
-			time_get_mean_slot(D_SLOT_PH2_PROCCESS_BATCH, TIME_GLOBAL_STATS, &mean);
-			time_get_min_slot(D_SLOT_PH2_PROCCESS_BATCH, TIME_GLOBAL_STATS, &min);
-			time_get_max_slot(D_SLOT_PH2_PROCCESS_BATCH, TIME_GLOBAL_STATS, &max);
-			printf("(P) Time used for batch proccess (mean) -> %.2f ms - min/max = %.2f/%.2f\n",
-								mean*1000.0, min*1000.0, max*1000.0);
-
-			time_get_mean_slot(D_SLOT_PH2_WRITE_BATCH, TIME_GLOBAL_STATS, &mean);
-			time_get_min_slot(D_SLOT_PH2_WRITE_BATCH, TIME_GLOBAL_STATS, &min);
-			time_get_max_slot(D_SLOT_PH2_WRITE_BATCH, TIME_GLOBAL_STATS, &max);
-			printf("(P) Time used for batch write (mean) -> %.2f ms - min/max = %.2f/%.2f\n",
-								mean*1000.0, min*1000.0, max*1000.0);
-
-			printf("\n====== Alignment proccess ======\n");
-			//Print recalibrate stats
-			time_get_mean_slot(D_SLOT_PH2_RECAL_ALIG, TIME_GLOBAL_STATS, &mean);
-			time_get_min_slot(D_SLOT_PH2_RECAL_ALIG, TIME_GLOBAL_STATS, &min);
-			time_get_max_slot(D_SLOT_PH2_RECAL_ALIG, TIME_GLOBAL_STATS, &max);
-			printf("Time used for alig recalibration (mean) -> %.2f micros - min/max = %.2f/%.2f\n",
-					mean*1000000.0, min*1000000.0, max*1000000.0);
-		}
-			
-		//Free memory from stats
-		//time_destroy_stats(&TIME_GLOBAL_STATS);
-	#endif
-	
-	//Compare
-	if(compcount)
+	//Recalibrate
+	if(p1 && p2)
 	{
-		if(p1 || p2)
+		printf("Full recalibration\n");
+		recal_bam_file(RECALIBRATE_COLLECT | RECALIBRATE_RECALIBRATE, inputc, refc, datafilec, infofilec, outputc, cycles, statsc);
+	}
+	else
+	{
+		if(p1)
 		{
-			compare_bams_qual(output, compfile, 76);
+			printf("Phase 1 recalibration\n");
+			recal_bam_file(RECALIBRATE_COLLECT, inputc, refc, datafilec, infofilec, outputc, cycles, statsc);
 		}
 		else
 		{
-			compare_bams_qual(input, compfile, 76);
+			printf("Phase 2 recalibration\n");
+			recal_bam_file(RECALIBRATE_RECALIBRATE, inputc, refc, datafilec, infofilec, outputc, cycles, statsc);
 		}
 	}
-	
-	//Free data memory	
-	recal_destroy_info(&data);
+	if(inputc)
+		free(inputc);
+	if(outputc)
+		free(outputc);
+	if(refc)
+		free(refc);
+	if(datafilec)
+		free(datafilec);
+	if(infofilec)
+		free(infofilec);
+	if(statsc)
+		free(statsc);
 	
 	stop_log();
 
@@ -417,13 +244,13 @@ int recalibrate_bam(int argc, char **argv)
     struct arg_file *outfile = arg_file0("o",NULL,"<output>","output recalibrated BAM file, default:\"output.bam\"");
     struct arg_file *datafile = arg_file0("d",NULL,"<data>","data file containing recalibration information");
     struct arg_file *infofile = arg_file0("i",NULL,"<info>","info file (human readable) containing recalibration information");
-    struct arg_file *compfile = arg_file0("c",NULL,"<compfile>","bam file to compare with recalibrated bam");
+    struct arg_file *stats = arg_file0("s",NULL,"<stats>","folder to store timing stats");
     struct arg_lit  *help    = arg_lit0("h","help","print this help and exit");
     struct arg_lit  *version = arg_lit0(NULL,"version","print version information and exit");
     struct arg_end  *end     = arg_end(20);
     
-    void* argtable[] = {full,phase1,phase2,cycles,threads,refile,infile,outfile,datafile,infofile,compfile,help,version,end};
-    const char* progname = "hpg-bam recalibrate";
+    void* argtable[] = {full,phase1,phase2,cycles,threads,refile,infile,outfile,datafile,infofile,stats,help,version,end};
+    const char* progname = "hpg-bam recalibrate v"RECAL_VER;
     int nerrors;
     int exitcode=0;
 
@@ -437,7 +264,7 @@ int recalibrate_bam(int argc, char **argv)
     }
     
     /* set any command line default values prior to parsing */
-    outfile->filename[0]="output.bam";
+    outfile->filename[0]=NULL;
     
     /* Parse the command line as defined by argtable[] */
     nerrors = arg_parse(argc,argv,argtable);
@@ -491,7 +318,7 @@ int recalibrate_bam(int argc, char **argv)
 	/* Incorrect case: No cycles*/
     if (cycles->count == 0)
     {
-		printf("Please, specify number of cycles with -c.\n");
+		printf("Please, specify number of cycles with --cycles.\n");
 		exitcode = 1;
 		goto exit;
 	}
@@ -509,22 +336,23 @@ int recalibrate_bam(int argc, char **argv)
 
     /* normal case: take the command line options at face value */
     exitcode = mymain(	full->count,
-			phase1->count,
-			phase2->count,
-			cycles->ival[0],
-			thr,
-			(char *)refile->filename[0], 
-			refile->count, 
-			(char *)infile->filename[0], 
-			infile->count, 
-			(char *)outfile->filename[0], 
-			outfile->count,
-			(char *)datafile->filename[0],
-			datafile->count,
-			(char *)infofile->filename[0],
-			infofile->count,
-			(char *)compfile->filename[0],
-			compfile->count);
+						phase1->count,
+						phase2->count,
+						cycles->ival[0],
+						thr,
+						refile->filename[0], 
+						refile->count, 
+						infile->filename[0], 
+						infile->count, 
+						outfile->filename[0], 
+						outfile->count,
+						datafile->filename[0],
+						datafile->count,
+						infofile->filename[0],
+						infofile->count,
+						stats->filename[0],
+						stats->count
+						);
 
     exit:
     /* deallocate each non-null entry in argtable[] */

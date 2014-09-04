@@ -30,6 +30,7 @@
 //Bioinfo libs
 #include "bioformats/bam/samtools/bam.h"
 #include "bioformats/bam/bam_file.h"
+#include "aligners/bwt/genome.h"
 
 //Common
 #include "aux_common.h"

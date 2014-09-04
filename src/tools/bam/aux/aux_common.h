@@ -20,6 +20,8 @@
 
 #include <stdint.h>
 
+#include "aux/timestats.h"
+
 #ifdef __MMX__
 #include <mmintrin.h>
 #endif
@@ -91,6 +93,7 @@ typedef uint8_t U_DINUC;
 #define __ATTR_HOT __attribute__((hot))
 #define __ATTR_COLD __attribute__((cold))
 #define __ATTR_INLINE __attribute__((always_inline));
+#define __ATTR_DEPRECATED __attribute__ ((deprecated));
 
 /**
  * ASSERTIONS
@@ -136,10 +139,42 @@ enum ERROR_C {
 	ALIG_INVALID_REFERENCE,
 	ALIG_INVALID_SCORES,
 	ALIG_INVALID_HAPLOTYPE,
+	ALIG_PAST_INTERVAL,
+	ALIG_INCOMPLETE_INTERVAL,
+
+	//Wanderer specific
+	WANDER_WINDOW_BUFFER_FULL = 5000,
+	WANDER_REGION_CHANGED,
+	WANDER_READ_FILTERED,
+	WANDER_READ_EOF,
+	WANDER_READ_TRUNCATED,
+	WANDER_READ_BUFFER_FULL,
+	WANDER_PROC_FUNC_FULL,
 
 	//CIGAR
 	CIGAR_INVALID_INDEL
 };
 typedef enum ERROR_C ERROR_CODE;
+
+/**
+ * Time measures
+ */
+#ifdef D_TIME_DEBUG
+	enum fwork_slots {
+		//GENERAL
+		D_FWORK_TOTAL = 0,
+		D_FWORK_INIT,
+
+		//FRAMEWORK
+		D_FWORK_READ,
+		D_FWORK_PROC,
+		D_FWORK_WRITE,
+
+		//PROCESS
+		D_FWORK_WANDER_FUNC,
+		D_FWORK_PROC_FUNC
+	};
+#endif
+
 
 #endif /* AUX_COMMON_H_ */

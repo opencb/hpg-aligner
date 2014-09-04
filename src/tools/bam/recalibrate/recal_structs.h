@@ -7,7 +7,6 @@
 #include "recalibrate/recal_config.h"
 #include "bam_recal_library.h"
 
-
 struct data_collect_env {
 
 	//Sequence storage
@@ -32,7 +31,6 @@ struct recalibration_env {
 	U_CYCLES bam_seq_max_l;
 
 };
-
 
 /**
  * PRIVATE FUNCTIONS

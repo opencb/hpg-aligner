@@ -17,10 +17,30 @@
 
 #include "alig.h"
 
+typedef struct {
+	bam1_t **buffer;
+	size_t head_idx;
+	size_t readed;
+	size_t processed;
+	size_t size;
+	omp_lock_t lock;
+	omp_lock_t writer;
+	omp_lock_t reader;
+	int end_condition;
+} circular_buffer_t /* DEPRECATED */;
+
 uint64_t cigar_changed = 0;
 
 char log_msg[1024];
 char aux_msg[512];
+
+/**
+ * PRIVATE INLINE FUNCTIONS
+ */
+static inline ERROR_CODE alig_region_filter_read(bam1_t *read, array_list_t *list, alig_context_t *context) __ATTR_HOT __ATTR_INLINE;
+
+static inline ERROR_CODE alig_aux_write_to_disk(array_list_t *write_buffer, bam_file_t *output_bam_f, uint8_t force) /* DEPRECATED */;
+static inline ERROR_CODE alig_aux_read_from_disk(circular_buffer_t *read_buffer, bam_file_t *input_bam_f) /* DEPRECATED */;
 
 /**
  * CONTEXT
@@ -30,19 +50,17 @@ char aux_msg[512];
  * Initialize empty realignment data structure.
  */
 ERROR_CODE
-alig_init(alig_context_t *context, linked_list_t *in_list, genome_t *genome, uint8_t flags)
+alig_init(alig_context_t *context, genome_t *genome, uint8_t flags)
 {
 	ERROR_CODE err;
 
 	assert(context);
-	assert(in_list);
 	assert(genome);
 
 	//Set all to 0 / NULL
 	memset(context, 0, sizeof(alig_context_t));
 
 	//Set fields
-	context->in_list = in_list;
 	context->genome = genome;
 
 	//Create filtered list
@@ -120,7 +138,7 @@ alig_destroy(alig_context_t *context)
 		}
 
 		//Free list
-		array_list_free(context->haplo_list, free);
+		array_list_free(context->haplo_list, NULL);
 	}
 
 	//Free reference
@@ -132,8 +150,8 @@ alig_destroy(alig_context_t *context)
 	//Free scores
 	if(context->scores.m_positions)
 		free(context->scores.m_positions);
-	if(context->scores.m_positions)
-		free(context->scores.m_positions);
+	if(context->scores.m_scores)
+		free(context->scores.m_scores);
 
 	//Set all to NULL
 	memset(context, 0, sizeof(alig_context_t));
@@ -150,8 +168,6 @@ alig_validate(alig_context_t *context)
 	if(context == NULL)
 		return ALIG_INVALID_CONTEXT;
 
-	if(context->in_list == NULL)
-		return INVALID_INPUT_BAM;
 	if(context->genome == NULL)
 		return INVALID_GENOME;
 
@@ -186,23 +202,24 @@ alig_validate(alig_context_t *context)
  * Get next region of reads to process.
  */
 ERROR_CODE
-alig_region_next(alig_context_t *context)
+alig_region_next(bam1_t **v_bams, size_t v_bams_l, int force_incomplete, alig_context_t *context)
 {
-	ERROR_CODE err;
+	ERROR_CODE err, ret = NO_ERROR;
 	int i;
 
 	//List
-	linked_list_iterator_t *it;
-	array_list_t *aux_list;
-	size_t aux_list_l;
+	size_t list_l;
 
 	//Read
+	size_t reads;
 	bam1_t* read = NULL;
 	int32_t read_pos;
-	int32_t last_read_chrom = -1;
 	size_t indels;
 	size_t interval_read_begin;
 	size_t interval_read_end;
+
+	//Aux list
+	array_list_t *aux_list = NULL;
 
 	assert(context);
 
@@ -213,85 +230,155 @@ alig_region_next(alig_context_t *context)
 		return err;
 	}
 
-	//Create list
-	aux_list = array_list_new(ALIG_LIST_NEXT_SIZE, 1.5, COLLECTION_MODE_SYNCHRONIZED);
-
 	//Set last readed to 0
 	context->last_readed_count = 0;
-
-	//Get first read
-	it = linked_list_iterator_new(context->in_list);
-	assert(it);
-	read = (bam1_t *)linked_list_iterator_curr(it);
-	if(read == NULL)
-	{
-		//No more input reads
-		linked_list_iterator_free(it);
-		return NO_ERROR;
-	}
-
-	last_read_chrom = read->core.tid;
 
 	//Reset interval
 	memset(&context->region, 0, sizeof(alig_region_t));
 
+	//Init aux list
+	aux_list = array_list_new(ALIG_LIST_NEXT_SIZE, 1.2f, 0);
+	array_list_clear(aux_list, NULL);
+
 	//Read alignments until interval reached
-	while(read != NULL)
+	list_l = v_bams_l;
+	reads = 0;
+	for(i = 0; i < list_l; i++)
 	{
-		//FILTERS: MAP QUALITY = 0, BAM_FUNMAP | BAM_FSECONDARY | BAM_FQCFAIL | BAM_FDUP, DIFFERENT MATE CHROM, 1 INDEL, CIGAR PRESENT
-		if( read->core.qual != 0
-			&& !(read->core.flag & BAM_DEF_MASK)
-			&& read->core.mtid == read->core.tid
-			&& read->core.n_cigar != 0
-			)
+		//Get next read
+		read = v_bams[i];
+		assert(read);
+
+		//Filter read to obtain regions
+		err = alig_region_filter_read(read, aux_list, context);
+		if(err)
 		{
-			//Count indels
-			cigar32_count_indels(bam1_cigar(read), read->core.n_cigar, &indels);
-
-			//Check if chrom is different
-			if(last_read_chrom != read->core.tid)
+			if(err == ALIG_PAST_INTERVAL)
 			{
-				//Interval end!
-
-				//Skip while
+				//Interval obtained
 				break;
 			}
-
-			//Get read position
-			read_pos = read->core.pos;
-
-			//Cases
-			if(context->region.valid == 0)
+			else
 			{
-				//NO INTERVAL CASE
-
-				//Get interval for this alignment
-				err = region_get_from_bam1(read, &interval_read_begin, &interval_read_end);
-				if(err)
-				{
-					sprintf(log_msg, "Trying to get region from invalid read: %s\n", bam1_qname(read));
-					LOG_ERROR(log_msg);
-					return INVALID_INPUT_BAM;
-				}
-
-				//This alignment have an interval?
-				if(interval_read_begin != SIZE_MAX)
-				{
-					//Interval found
-					//Set interval values
-					context->region.start_pos = interval_read_begin;
-					context->region.end_pos = interval_read_end;
-					context->region.chrom = read->core.tid;
-					context->region.valid = 1;
-
-					assert(context->region.start_pos <= context->region.end_pos);
-				}
-
+				//Error
+				LOG_ERROR("Failed to filter read in context");
+				return err;
 			}
-			else if (context->region.end_pos > read_pos)
-			{
-				//ALIGNMENT INSIDE INTERVAL CASE
+		}
 
+		//Increment counter
+		reads++;
+	}
+
+	//Interval is found?
+	if(err != ALIG_PAST_INTERVAL)
+	{
+		if(force_incomplete == 0)
+		{
+			//Incomplete or inexistent interval
+			return ALIG_INCOMPLETE_INTERVAL;
+		}
+
+		//Set return
+		ret = ALIG_INCOMPLETE_INTERVAL;
+	}
+
+	//Update progress
+	context->read_count += reads;
+	context->last_readed_count = reads;
+
+	//There is an valid interval?
+	if(context->region.valid)
+	{
+		//Logging
+		LOG_INFO("************************************\n");
+		sprintf(log_msg, "INTERVAL %d - %d\n", context->region.start_pos + 1, context->region.end_pos + 1);
+		LOG_INFO(log_msg);
+
+		//Save interval reads in filtered list
+		list_l = array_list_size(aux_list);
+		for(i = 0; i < list_l; i++)
+		{
+			//Get read
+			read = array_list_get(i, aux_list);
+			assert(read);
+
+			if(region_bam_overlap(read, &context->region))
+			{
+				//Logging
+				sprintf(log_msg, "%s \t%d:%d\n", bam1_qname(read), read->core.tid + 1, read->core.pos + 1);
+				LOG_INFO(log_msg);
+
+				//Add to filtered read list
+				array_list_insert(read, context->filtered_list);
+			}
+		} //For
+	} //Valid region if
+
+	//Destroy auxiliar list
+	array_list_free(aux_list, NULL);
+
+	return ret;
+}
+
+static inline ERROR_CODE
+alig_region_filter_read(bam1_t *read, array_list_t *list, alig_context_t *context)
+{
+	int err;
+
+	assert(read);
+	assert(context);
+
+	//Read
+	int32_t read_pos;
+	size_t interval_read_begin;
+	size_t interval_read_end;
+
+	//FILTERS: MAP QUALITY = 0, BAM_FUNMAP | BAM_FSECONDARY | BAM_FQCFAIL | BAM_FDUP, DIFFERENT MATE CHROM, 1 INDEL, CIGAR PRESENT
+	if( read->core.qual != 0
+		&& !(read->core.flag & BAM_DEF_MASK)
+		&& read->core.mtid == read->core.tid
+		&& read->core.n_cigar != 0
+		)
+	{
+		//Get read position
+		read_pos = read->core.pos;
+
+		//Cases
+		if(context->region.valid == 0)
+		{
+			//NO INTERVAL CASE
+
+			//Get interval for this alignment
+			err = region_get_from_bam1(read, &interval_read_begin, &interval_read_end);
+			if(err)
+			{
+				sprintf(log_msg, "Trying to get region from invalid read: %s\n", bam1_qname(read));
+				LOG_ERROR(log_msg);
+				return INVALID_INPUT_BAM;
+			}
+
+			//This alignment have an interval?
+			if(interval_read_begin != SIZE_MAX)
+			{
+				//Interval found
+				//Set interval values
+				context->region.start_pos = interval_read_begin;
+				context->region.end_pos = interval_read_end;
+				context->region.chrom = read->core.tid;
+				context->region.valid = 1;
+
+				assert(context->region.start_pos <= context->region.end_pos);
+			}
+
+		}
+		else
+		{
+			//INTERVAL CASE
+
+			//Is alignment inside interval?
+			if (context->region.end_pos > read_pos && context->region.chrom == read->core.tid)
+			{
 				//Get interval for this alignment
 				region_get_from_bam1(read, &interval_read_begin, &interval_read_end);
 
@@ -311,63 +398,17 @@ alig_region_next(alig_context_t *context)
 					assert(context->region.start_pos <= context->region.end_pos);
 				}
 			}
-			else //if (context->region.end_pos < read_pos)
+			else //Alignment past interval
 			{
-				//ALIGNMENT PAST INTERVAL
 				//Interval end!
-
-				//Filter out of region reads
-				break;
-
-			}	//Cases if
-
-			//Save last read chrom
-			last_read_chrom = read->core.tid;
-
-			//Add filtered read to list
-			array_list_insert(read, aux_list);
-
-		}	// Filters if
-
-		//Increment progress
-		context->read_count++;
-		context->last_readed_count++;
-
-		//Read next alignment
-		read = (bam1_t *)linked_list_iterator_next(it);
-	}
-
-	//There is an valid interval?
-	if(context->region.valid)
-	{
-		//Logging
-		LOG_INFO("************************************\n");
-		sprintf(log_msg, "INTERVAL %lu - %lu\n", context->region.start_pos + 1, context->region.end_pos + 1);
-		LOG_INFO(log_msg);
-
-		//Save interval reads in filtered list
-		aux_list_l = array_list_size(aux_list);
-		for(i = 0; i < aux_list_l; i++)
-		{
-			//Get read
-			read = array_list_get(i, aux_list);
-
-			if(region_bam_overlap(read, &context->region))
-			{
-				//Logging
-				sprintf(log_msg, "%s \t%d:%d\n", bam1_qname(read), read->core.tid + 1, read->core.pos + 1);
-				LOG_INFO(log_msg);
-
-				//Add to filtered read list
-				array_list_insert(read, context->filtered_list);
+				return ALIG_PAST_INTERVAL;
 			}
-		}
+		}//Cases if
 
-	}
+		//Insert to list
+		array_list_insert(read, list);
 
-	//Free
-	linked_list_iterator_free(it);
-	array_list_free(aux_list, NULL);
+	}	// Filters if
 
 	return NO_ERROR;
 }
@@ -391,6 +432,7 @@ alig_region_load_reference(alig_context_t *context)
 	size_t aux_pos_begin = SIZE_MAX;
 	size_t aux_pos_end = SIZE_MAX;
 	size_t ref_length = SIZE_MAX;
+	unsigned int chr;
 
 	assert(context);
 
@@ -422,20 +464,25 @@ alig_region_load_reference(alig_context_t *context)
 		//Get last read position + length
 		read = (bam1_t *) array_list_get(array_list_size(context->filtered_list) - 1, context->filtered_list);
 		assert(read);
-		ref_pos_end = (read->core.pos + read->core.l_qseq) + ALIG_REFERENCE_ADDITIONAL_OFFSET;
+		ref_pos_end = read->core.pos + (read->core.l_qseq * 2) + ALIG_REFERENCE_ADDITIONAL_OFFSET;
 
 		//Auxiliar
-		aux_pos_begin = ref_pos_begin + 1;
-		aux_pos_end = ref_pos_end + 1;
-		//MANEJAR ALINEAMIENTOS CON MEMORIA!!!!!
-		//Get reference
-#ifdef __SSE2__
-		ref_seq = (char *) _mm_malloc(((ref_pos_end - ref_pos_begin) + 2) * sizeof(char), MEM_ALIG_SSE_SIZE);
-#else
-		ref_seq = (char *) malloc(((ref_pos_end - ref_pos_begin) + 2) * sizeof(char));
-#endif
-		assert(ref_seq);
+		aux_pos_begin = ref_pos_begin + ALIG_REFERENCE_CORRECTION_OFFSET;
+		aux_pos_end = ref_pos_end + ALIG_REFERENCE_CORRECTION_OFFSET;
+
 		flag = (uint32_t) read->core.flag;
+		chr = read->core.tid;
+		if((flag & BAM_FUNMAP) || aux_pos_begin == 0 || aux_pos_end == 0 || context->genome->chr_size[chr] == 0)
+		{
+			//Read is unmapped
+			//LOG_WARN_F("Alignment is unmapped %d:%d-%d, %s\n", read->core.tid + 1, init_pos_ref + 1, end_pos_ref + 1, bam1_qname(read));
+			return ALIG_INVALID_REGION;
+		}
+
+		//Get reference
+		ref_seq = (char *) malloc(((ref_pos_end - ref_pos_begin) + 2) * sizeof(char));
+		assert(ref_seq);
+
 		genome_read_sequence_by_chr_index(ref_seq, (flag & BAM_FREVERSE) ? 1 : 0, (unsigned int)read->core.tid, &aux_pos_begin, &aux_pos_end, context->genome);
 
 		ref_length = (ref_pos_end - ref_pos_begin);
@@ -444,11 +491,7 @@ alig_region_load_reference(alig_context_t *context)
 		if(context->reference.reference)
 		{
 			//Free previous reference
-#ifdef __SSE2__
 			free(context->reference.reference);
-#else
-			_mm_free(context->reference.reference);
-#endif
 		}
 		context->reference.position = ref_pos_begin;
 		context->reference.length = ref_length;
@@ -533,13 +576,8 @@ alig_region_haplotype_process(alig_context_t *context)
 				//Convert read sequence and qualities to string
 				read_seq_l = read->core.l_qseq;
 
-#ifdef __SSE2__
-				read_seq = (char *) _mm_malloc((read_seq_l + 1) * sizeof(char), MEM_ALIG_SSE_SIZE);
-				comp_seq = (char *) _mm_malloc((read_seq_l + 1) * sizeof(char), MEM_ALIG_SSE_SIZE);
-#else
 				read_seq = (char *) malloc((read_seq_l + 1) * sizeof(char));
 				comp_seq = (char *) malloc((read_seq_l + 1) * sizeof(char));
-#endif
 
 				assert(read);
 				new_sequence_from_bam_ref(read, read_seq, read_seq_l + 1);
@@ -554,10 +592,10 @@ alig_region_haplotype_process(alig_context_t *context)
 
 				//Get raw missmatch
 				//nucleotide_compare(ref_seq + read_disp_ref, read_seq, read_seq_l, comp_seq, &ref_miss);
-				ref_miss = 1;
+				//ref_miss = 1;
 
 				//If match reference perfectly, realign to reference and extract from process list
-				if(ref_miss == 0)
+				/*if(ref_miss == 0)
 				{
 					//Count unclipped bases
 					cigar32_count_nucleotides_not_clip(read_cigar, read->core.n_cigar, &read_bases);
@@ -573,10 +611,10 @@ alig_region_haplotype_process(alig_context_t *context)
 					cigar32_replace(read, aux_cigar, aux_cigar_l);
 
 					//Logging
-					//sprintf(log_msg, "%s \t%d:%d match reference perfectly\n", bam1_qname(read), read->core.tid + 1, read->core.pos + 1);
-					//LOG_INFO(log_msg);
+					sprintf(log_msg, "%s \t%d:%d match reference perfectly\n", bam1_qname(read), read->core.tid + 1, read->core.pos + 1);
+					LOG_INFO(log_msg);
 				}
-				else
+				else*/
 				{
 					//Obtain haplotypes
 
@@ -636,19 +674,31 @@ alig_region_haplotype_process(alig_context_t *context)
 				}//Match reference if
 
 				//Free
-#ifdef __SSE2__
-				_mm_free(read_seq);
-				_mm_free(comp_seq);
-#else
 				free(read_seq);
 				free(comp_seq);
-#endif
 
 			} //Valid cigar end if
 
 		} //Haplotypes while
 
 	} //Region if
+
+	//Print info
+	/*{
+	  	printf("-----------\n");
+		printf("Haplotypes in region: %d:%d\n", context->region.chrom, context->region.start_pos);
+		static char str[20];
+		int h;
+		haplo_l = array_list_size(context->haplo_list);
+		for(h = 0; h < haplo_l; h++)
+		{
+			aux_haplo = array_list_get(h, context->haplo_list);
+			assert(aux_haplo);
+
+			cigar32_to_string(&aux_haplo->indel, 1, str);
+			printf("Pos:%d,  Indel:%s\n", aux_haplo->ref_pos, str);
+		}
+	}*/
 
 	return NO_ERROR;
 }
@@ -709,6 +759,7 @@ alig_region_indel_realignment(alig_context_t *context)
 		return ALIG_INVALID_SCORES;
 	}
 
+	//Get best haplotype (alternative to H0)
 	alig_get_alternative_haplotype(context, &alt_haplo_index, &alt_haplo_score, &ref_haplo_score);
 
 	//Improvement
@@ -745,6 +796,9 @@ alig_region_clear(alig_context_t *context)
 
 	assert(context);
 
+	//Set last region
+	context->last_region = context->region;
+
 	//Clear region
 	memset(&context->region, 0, sizeof(alig_region_t));
 
@@ -758,11 +812,7 @@ alig_region_clear(alig_context_t *context)
 	//Clear reference
 	if(context->reference.reference)
 	{
-#ifdef __SSE2__
-		_mm_free(context->reference.reference);
-#else
 		free(context->reference.reference);
-#endif
 	}
 	memset(&context->reference, 0, sizeof(alig_reference_t));
 
@@ -779,15 +829,23 @@ alig_region_clear(alig_context_t *context)
 	return NO_ERROR;
 }
 
+//Private function
+static int compare_pos(const void *item1, const void *item2) {
+	const bam1_t *read1 = *(const bam1_t **)item1;
+	const bam1_t *read2 = *(const bam1_t **)item2;
+
+	return (int) (read1->core.pos - read2->core.pos);
+}
+
 /**
  * Indel realign one file.
  */
 ERROR_CODE
-alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
+alig_bam_file_old(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 {
 	ERROR_CODE err;
 	//	unsigned char outbam[30] = "output.bam";
-	int i;
+	int i, it;
 
 	//Files
 	bam_file_t *bam_f;
@@ -795,30 +853,36 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 	genome_t* ref;
 	int bytes;
 
-#ifdef D_TIME_DEBUG
-	double init_time, end_time;
-#endif
-
 	//Read
 	bam1_t *read;
+	size_t bam_processed = 0;
+	bam1_t **v_reads;
+	size_t v_reads_l;
 
 	//Lists
-	linked_list_t *in_list;
+	array_list_t *swap_buffer_ptr;
+	array_list_t *write_buffer;
+	array_list_t *proc_buffer;
+	array_list_t *read_buffer;
 	size_t list_l;
+
+	//Input circular buffer
+	circular_buffer_t in_buffer;
 
 	//Alignment context
 	alig_context_t context;
 
 	//aux
 	int aux_count = 0;
+	int filled = 0;
 
 	assert(bam_path);
 	assert(ref_name);
 	assert(ref_path);
 
-#ifdef D_TIME_DEBUG
-    init_time = omp_get_wtime();
-#endif
+	//Multhread info
+	printf("Using %d threads\n", omp_get_max_threads());
+
 	//Open bam
 	{
 		printf("Opening BAM from \"%s\" ...\n", bam_path);
@@ -846,50 +910,30 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 		printf("New BAM initialized!...\n");
 	}
 
-#ifdef D_TIME_DEBUG
-	end_time = omp_get_wtime();
-	time_add_time_slot(D_SLOT_INIT, TIME_GLOBAL_STATS, end_time - init_time);
-#endif
-
 	//Flush
 	fflush(stdout);
 
-	//Create input list
-	in_list = linked_list_new(0);
-	assert(in_list);
+	//Create buffer for write to disk
+	write_buffer = array_list_new(ALIG_LIST_NEXT_SIZE, 1.2, 0);
+	proc_buffer = array_list_new(ALIG_LIST_NEXT_SIZE, 1.2, 0);
+	read_buffer = array_list_new(ALIG_LIST_NEXT_SIZE, 1.2, 0);
+	assert(write_buffer);
+	assert(proc_buffer);
+	assert(read_buffer);
 
-	//Fill input list
-#ifdef D_TIME_DEBUG
-    init_time = omp_get_wtime();
-#endif
-	bytes = 1;
-	for(i = 0; i < ALIG_LIST_IN_SIZE && bytes > 0; i++)
-	{
-		//Get next read from disk
-		read = bam_init1();
-		bytes = bam_read1(bam_f->bam_fd, read);
-
-		if(bytes > 0 && read)
-		{
-			linked_list_insert_last(read, in_list);
-		}
-		else
-		{
-			//Destroy empty last read
-			bam_destroy1(read);
-		}
-	}
-#ifdef D_TIME_DEBUG
-	end_time = omp_get_wtime();
-	list_l = linked_list_size(in_list);
-	if(list_l > 0)
-		time_add_time_slot(D_SLOT_READ, TIME_GLOBAL_STATS, (double)(end_time - init_time)/(double)list_l);
-#endif
+	//Init input buffer
+	memset(&in_buffer, 0, sizeof(circular_buffer_t));
+	in_buffer.buffer = (bam1_t **)malloc(ALIG_LIST_IN_SIZE * sizeof(bam1_t *));
+	in_buffer.size = ALIG_LIST_IN_SIZE;
+	omp_init_lock(&in_buffer.lock);
+	omp_init_lock(&in_buffer.writer);
+	omp_init_lock(&in_buffer.reader);
+	omp_set_lock(&in_buffer.writer);
 
 	//Create context
 	//printf("Creating context...\n");
 	fflush(stdout);
-	alig_init(&context, in_list, ref, ALIG_LEFT_ALIGN | ALIG_REFERENCE_PRIORITY);
+	alig_init(&context, ref, ALIG_LEFT_ALIGN | ALIG_REFERENCE_PRIORITY);
 
 	//Validate context
 	err = alig_validate(&context);
@@ -897,173 +941,215 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 	{
 		fprintf(stderr, "ERROR: Error creating alignment context, error code = %d\n", err);
 		fflush(stdout);
-		return err;
 	}
 
-	//Get next reads
-#ifdef D_TIME_DEBUG
-    init_time = omp_get_wtime();
-#endif
-	err = alig_region_next(&context);
-	if(err)
+	//Init vars
+	it = 0;
+
+	//Init multithreading
+	omp_set_dynamic(1);
+	omp_set_nested(1);
+	if(omp_get_max_threads() < 3)
 	{
-		fprintf(stderr, "ERROR: Cannot obtain next region, error code = %d\n", err);
-		fflush(stdout);
-		return err;
+		//Only 1 available thread
+		//printf("Minimum threads required is 3, setting number of threads to 3\n");
+		omp_set_num_threads(3);
 	}
-#ifdef D_TIME_DEBUG
-	end_time = omp_get_wtime();
-	time_add_time_slot(D_SLOT_NEXT, TIME_GLOBAL_STATS, (double)(end_time - init_time)/(double)context.last_readed_count);
-#endif
-
-	//Iterate
-	while(context.last_readed_count > 0)
+	#pragma omp parallel private(i, bytes, read, v_reads, v_reads_l, list_l, filled, err)
 	{
-		//Load reference
-#ifdef D_TIME_DEBUG
-		init_time = omp_get_wtime();
-#endif
-		err = alig_region_load_reference(&context);
-		if(err)
-		{
-			fprintf(stderr, "ERROR: Failed to load reference for a region, error code = %d\n", err);
-			fflush(stdout);
-			return err;
-		}
-#ifdef D_TIME_DEBUG
-		end_time = omp_get_wtime();
-		time_add_time_slot(D_SLOT_REFERENCE_LOAD, TIME_GLOBAL_STATS, (double)(end_time - init_time)/(double)context.last_readed_count);
-#endif
-
-		//Generate haplotype list
-#ifdef D_TIME_DEBUG
-		init_time = omp_get_wtime();
-#endif
-		err = alig_region_haplotype_process(&context);
-		if(err)
-		{
-			fprintf(stderr, "ERROR: Failed to get haplotype list, error code = %d\n", err);
-			fflush(stdout);
-			return err;
-		}
-#ifdef D_TIME_DEBUG
-		end_time = omp_get_wtime();
-		list_l = array_list_size(context.filtered_list);
-		time_add_time_slot(D_SLOT_HAPLO_GET, TIME_GLOBAL_STATS, (double)(end_time - init_time)/(double)list_l);
-#endif
-
-		//Realign
-#ifdef D_TIME_DEBUG
-		init_time = omp_get_wtime();
-#endif
-		err = alig_region_indel_realignment(&context);
-		if(err)
-		{
-			fprintf(stderr, "ERROR: Cannot align region, error code = %d\n", err);
-			fflush(stdout);
-			return err;
-		}
-#ifdef D_TIME_DEBUG
-		end_time = omp_get_wtime();
-		list_l = array_list_size(context.realign_list);
-		if(list_l > 0)
-		{
-			end_time = (double)(end_time - init_time)/(double)list_l;
-			list_l = array_list_size(context.haplo_list);
-			if(list_l > 0)
-				time_add_time_slot(D_SLOT_REALIG_PER_HAPLO, TIME_GLOBAL_STATS, end_time/(double)list_l);
-		}
-#endif
-
-		//Print progress
-		if(context.read_count / 10000 > aux_count)
-		{
-			aux_count = context.read_count / 10000;
-			printf("Total alignments readed: %d\r", (int)context.read_count);
-			fflush(stdout);
-		}
-
-		//Write processed to disk
-#ifdef D_TIME_DEBUG
-		init_time = omp_get_wtime();
-#endif
-		list_l = context.last_readed_count;
-		for(i = 0; i < list_l; i++)
-		{
-			//Get read
-			read = linked_list_get_first(in_list);
-			assert(read);
-
-			//Write to disk
-			bam_write1(out_bam_f->bam_fd, read);
-
-			//Free read
-			bam_destroy1(read);
-
-			//Update input list
-			linked_list_remove_first(in_list);
-		}
-#ifdef D_TIME_DEBUG
-		end_time = omp_get_wtime();
-		time_add_time_slot(D_SLOT_WRITE, TIME_GLOBAL_STATS, (double)(end_time - init_time)/(double)list_l);
-#endif
-
-		//Refill buffer
-#ifdef D_TIME_DEBUG
-		init_time = omp_get_wtime();
-#endif
-		list_l = linked_list_size(in_list);
-
-		//Especial case: List is empty
-		if(list_l == 0)
-		{
-			linked_list_clear(in_list, NULL);
-		}
-
-		//Fill list
-		for(i = list_l; i < ALIG_LIST_IN_SIZE && bytes > 0; i++)
-		{
-			read = bam_init1();
-			bytes = bam_read1(bam_f->bam_fd, read);
-
-			if(bytes > 0 && read)
+			#pragma omp  sections
 			{
-				linked_list_insert_last(read, in_list);
-			}
-			else
-			{
-				//Destroy empty last read
-				bam_destroy1(read);
-			}
-		}
-#ifdef D_TIME_DEBUG
-		end_time = omp_get_wtime();
-		list_l = linked_list_size(in_list) - list_l;
-		if(list_l > 0)
-			time_add_time_slot(D_SLOT_READ, TIME_GLOBAL_STATS, (double)(end_time - init_time)/(double)list_l);
-#endif
+				//Read section
+				#pragma omp section
+				{
+					do
+					{
+						//Fill in_list
+						alig_aux_read_from_disk(&in_buffer, bam_f);
 
-		//Clear context
-		alig_region_clear(&context);
+						//Clear context
+						alig_region_clear(&context);
 
-		//Get next reads
-#ifdef D_TIME_DEBUG
-		init_time = omp_get_wtime();
-#endif
-		err = alig_region_next(&context);
-		if(err)
-		{
-			fprintf(stderr, "ERROR: Cannot obtain next region, error code = %d\n", err);
-			fflush(stdout);
-			return err;
-		}
+						//Load next reads until chrom change
+						array_list_clear(read_buffer, NULL);
+						filled = in_buffer.readed - in_buffer.processed;
+						int32_t chrom;
+						int chrom_changed = 0;
+						int force_region = 0;
+						chrom = in_buffer.buffer[(in_buffer.head_idx + in_buffer.processed) % in_buffer.size]->core.tid;
+						for(i = 0; i < filled; i++)
+						{
+							//Get read
+							read = in_buffer.buffer[(in_buffer.head_idx + in_buffer.processed + i) % in_buffer.size];
 
-#ifdef D_TIME_DEBUG
-		end_time = omp_get_wtime();
-		if(context.last_readed_count > 0)
-			time_add_time_slot(D_SLOT_NEXT, TIME_GLOBAL_STATS, (double)(end_time - init_time)/(double)context.last_readed_count);
-#endif
-	}
+							//Check if chrom changed
+							if(chrom == read->core.tid)
+							{
+								//Same chrom so continue
+								array_list_insert(read, read_buffer);
+							}
+							else
+							{
+								//Chrom changed!
+								chrom_changed = 1;
+								break;
+							}
+						}
+
+						//Load next region
+						v_reads = (bam1_t **)read_buffer->items;
+						v_reads_l = read_buffer->size;
+						err = alig_region_next(v_reads, v_reads_l, 1, &context);
+						if(err)
+						{
+							if(err != ALIG_INCOMPLETE_INTERVAL)
+							{
+								LOG_ERROR("Cannot obtain next region\n");
+								fprintf(stderr, "ERROR: Cannot obtain next region in buffer of size %d, error code = %d\n", err);
+								fflush(stdout);
+								omp_set_lock(&in_buffer.lock);
+								in_buffer.end_condition = 1;
+								omp_unset_lock(&in_buffer.lock);
+								break;
+							}
+							else
+							{
+								//Provoked by chrom change or end contition?
+								if(chrom_changed == 0 && in_buffer.end_condition == 0)
+								{
+									//Blocked
+									printf("Forcing region extraction on whole input buffer, i need bigger input buffer!\n");
+									LOG_WARN("Forcing region extraction on whole input buffer, i need bigger input buffer!\n");
+								}
+							}
+						}
+
+						while(context.last_readed_count != 0)
+						{
+							//printf("Realigning %d\n", context.last_readed_count);
+							//Load reference
+							err = alig_region_load_reference(&context);
+							if(!err)
+							{
+								//Generate haplotype list
+								err = alig_region_haplotype_process(&context);
+								if(!err)
+								{
+									//Realign
+									err = alig_region_indel_realignment(&context);
+									if(err)
+									{
+										fprintf(stderr, "ERROR: Cannot align region, error code = %d\n", err);
+										fflush(stdout);
+									}
+								}
+								else
+								{
+									fprintf(stderr, "ERROR: Failed to get haplotype list, error code = %d\n", err);
+									fflush(stdout);
+								}
+							}
+							else
+							{
+								fprintf(stderr, "ERROR: Failed to load reference for a region, error code = %d\n", err);
+								fflush(stdout);
+							}
+
+							//Update buffer
+							in_buffer.processed += context.last_readed_count;
+
+							//Update buffer pointer
+							v_reads += context.last_readed_count;
+							v_reads_l -= context.last_readed_count;
+
+							//Clear context
+							alig_region_clear(&context);
+
+							//Get next region
+							err = alig_region_next(v_reads, v_reads_l, chrom_changed || in_buffer.end_condition, &context);
+							if(err)
+							{
+								if(err != ALIG_INCOMPLETE_INTERVAL)
+								{
+									LOG_ERROR("Cannot obtain next region\n");
+									fprintf(stderr, "ERROR: Cannot obtain next region in buffer of size %d, error code = %d\n", err);
+									fflush(stdout);
+									omp_set_lock(&in_buffer.lock);
+									in_buffer.end_condition = 1;
+									omp_unset_lock(&in_buffer.lock);
+									break;
+								}
+							}
+						}//last_readed != 0 while
+
+						//Get processed number
+						list_l = in_buffer.processed;
+
+						//Fill write buffer
+						if(list_l > 0)
+						{
+							//Bound list
+							for(i = 0; i < list_l; i++)
+							{
+								//Get next read
+								//omp_set_lock(&in_buffer.lock);
+								read = in_buffer.buffer[(in_buffer.head_idx + i) % in_buffer.size];
+								//omp_unset_lock(&in_buffer.lock);
+								assert(read);
+
+								//Add to write list
+								array_list_insert(read, proc_buffer);
+							}
+
+							//Update counters
+							bam_processed += list_l;
+
+							//Update buffer
+							in_buffer.head_idx = (in_buffer.head_idx + list_l) % in_buffer.size;
+							in_buffer.readed -= list_l;
+							in_buffer.processed = 0;
+						} //Fill write buffer
+
+						omp_set_lock(&in_buffer.reader);
+						swap_buffer_ptr = write_buffer;
+						write_buffer = proc_buffer;
+						proc_buffer = swap_buffer_ptr;
+						omp_unset_lock(&in_buffer.writer);
+					} while(in_buffer.end_condition == 0 || in_buffer.readed > 0);
+				}//Read section
+
+				//Write section
+				#pragma omp section
+				{
+					do
+					{
+						omp_set_lock(&in_buffer.writer);
+						alig_aux_write_to_disk(write_buffer, out_bam_f, 1);
+
+						//Print progress
+						if(bam_processed / 10000 > aux_count)
+						{
+							aux_count = bam_processed / 10000;
+							printf("Total alignments readed: %d\r", bam_processed);
+							fflush(stdout);
+						}
+						it++;
+
+						//Accept more
+						omp_unset_lock(&in_buffer.reader);
+					}while(in_buffer.end_condition == 0 || in_buffer.readed > 0);//Write section
+				}
+
+			}//OMP SECTIONS
+
+	}//OMP PARALLEL
+
+	//Write last reads
+	alig_aux_write_to_disk(write_buffer, out_bam_f, 1);
+
+	//Info
+	printf("\nReads processed from original BAM: %d\n", bam_processed);
+	printf("Iterations: %d\n", it);
 
 	//Free context
 	printf("\nDestroying context...\n");
@@ -1084,7 +1170,17 @@ alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 
 	printf("Realignment around indels DONE.\n");
 
-	return NO_ERROR;
+	//Free
+	array_list_free(write_buffer, NULL);
+	array_list_free(proc_buffer, NULL);
+	array_list_free(read_buffer, NULL);
+	omp_destroy_lock(&in_buffer.lock);
+	free(in_buffer.buffer);
+
+	if(err)
+		return err;
+	else
+		return NO_ERROR;
 }
 
 
@@ -1106,48 +1202,23 @@ alig_get_scores(alig_context_t *context)
 
 	//Reads
 	bam1_t *read;
-	size_t read_l;
-	size_t indels;
-	size_t bases;
-	char *read_seq;
-	char *comp_seq;
-	char *read_quals;
-	uint32_t *read_cigar;
-	uint32_t read_left_cigar[MAX_CIGAR_LENGTH];
-	size_t read_left_cigar_l;
-	size_t read_disp_ref = SIZE_MAX;
-	size_t read_disp_clip;
-
-	//Haplotypes
-	aux_indel_t *haplo;
-	size_t haplo_list_l;
-
-	//Reference
-	char *ref_seq;
-	size_t ref_pos_begin;
-	size_t ref_pos_end;
-
-	//Compare
-	char *read_seq_ref;
-	size_t read_seq_ref_l;
-	uint32_t aux_cigar[MAX_CIGAR_LENGTH];
-	size_t aux_cigar_l;
-	uint32_t misses;
-	uint32_t misses_sum;
-	size_t best_pos;
-	size_t curr_pos;
-	int64_t init_pos;
-	int64_t end_pos;
-
-	//Lists
-	array_list_t *read_list;
-	size_t read_list_l;
+	size_t index;
 
 	//Matrix
 	uint32_t *m_scores;
 	size_t *m_positions;
 	size_t m_total;
 	size_t m_ldim;
+
+	//Lists
+	array_list_t *read_list;
+	size_t read_list_l;
+	size_t haplo_list_l;
+
+	//Score vector
+	uint32_t *v_scores;
+	size_t *v_positions;
+	size_t v_total;
 
 	assert(context);
 
@@ -1165,18 +1236,13 @@ alig_get_scores(alig_context_t *context)
 	haplo_list_l = array_list_size(context->haplo_list);
 	read_list_l = array_list_size(read_list);
 
-	//Reference
-	ref_seq = context->reference.reference;
-	ref_pos_begin = context->reference.position;
-	ref_pos_end = ref_pos_begin + context->reference.length;
-
 	//Free previous scores matrix
 	if(context->scores.m_total != 0)
 	{
 		if(context->scores.m_positions)
 			free(context->scores.m_positions);
-		if(context->scores.m_positions)
-			free(context->scores.m_positions);
+		if(context->scores.m_scores)
+			free(context->scores.m_scores);
 	}
 	memset(&context->scores, 0, sizeof(alig_scores_t));
 
@@ -1201,90 +1267,257 @@ alig_get_scores(alig_context_t *context)
 	}
 
 	//Iterate reads
-	for(i = 0; i < read_list_l; i++)
+	//#pragma omp parallel private(read, err, j, i, v_total, v_positions, v_scores, index) firstprivate(read_list_l)
 	{
-		//Get read
-		read = array_list_get(i, read_list);
-		assert(read);
-		read_cigar = bam1_cigar(read);
-		assert(read_cigar);
+		//Allocate new scores
+		v_total = context->scores.m_ldim;
+		v_positions = (size_t *)malloc(v_total * sizeof(size_t));
+		v_scores = (uint32_t *)malloc(v_total * sizeof(uint32_t));
 
-		//Convert read sequence to string
-#ifdef __SSE2__
-		read_seq = (char *) _mm_malloc((read->core.l_qseq + 1) * sizeof(char), MEM_ALIG_SSE_SIZE);
-		comp_seq = (char *) _mm_malloc((read->core.l_qseq + 1) * sizeof(char), MEM_ALIG_SSE_SIZE);
-		read_seq_ref = (char *) _mm_malloc((read->core.l_qseq + 1) * sizeof(char), MEM_ALIG_SSE_SIZE);
-		read_quals = (char *) _mm_malloc((read->core.l_qseq + 1) * sizeof(char), MEM_ALIG_SSE_SIZE);
-#else
-		read_seq = (char *) malloc((read->core.l_qseq + 1) * sizeof(char));
-		comp_seq = (char *) malloc((read->core.l_qseq + 1) * sizeof(char));
-		read_seq_ref = (char *) malloc((read->core.l_qseq + 1) * sizeof(char));
-		read_quals = (char *) malloc((read->core.l_qseq + 1) * sizeof(char));
-#endif
-		new_sequence_from_bam_ref(read, read_seq, read->core.l_qseq + 1);
+		//#pragma omp for
+		for(i = 0; i < read_list_l; i++)
+		{
+			//Get read
+			read = array_list_get(i, read_list);
+			assert(read);
 
-		//Get qualities
-		new_quality_from_bam_ref(read, 0, read_quals, read->core.l_qseq + 1);
+			//Get scores
+			err = alig_get_scores_from_read(read, context, v_scores, v_positions);
 
-		//Get initial clip displacement
-		cigar32_count_clip_displacement(read_cigar, read->core.n_cigar, &read_disp_clip);
-		cigar32_count_nucleotides_not_clip(read_cigar, read->core.n_cigar, &read_l);
+			//Merge scores
+			index = i * v_total;
+			memcpy((uint32_t*)m_scores + index, v_scores, v_total * sizeof(uint32_t));
+			memcpy((size_t*)m_positions + index, v_positions, v_total * sizeof(size_t));
 
+		}//FOR reads
+
+		//Free
+		free(v_scores);
+		free(v_positions);
+	}
+
+	//Print table
+	/*{
+		int r, h;
+		char indel[10];
+		aux_indel_t *haplo;
+		printf("------------------\n");
+		printf("Table for region %d:%d:%d\n", context->region.chrom + 1, context->region.start_pos + 1, context->region.end_pos + 1);
+
+		//Print haplos
+		printf("%20s %10s ", " ", "H0");
+		haplo_list_l = array_list_size(context->haplo_list);
+		for(h = 0; h < haplo_list_l; h++)
+		{
+			haplo = array_list_get(h, context->haplo_list);
+			assert(haplo);
+			cigar32_to_string(&haplo->indel, 1, indel);
+			printf("%10s ", indel);
+		}
+		printf("\n");
+
+		//Print scores
+		read_list_l = array_list_size(context->realign_list);
+		for(r = 0; r < read_list_l; r++)
+		{
+			read = array_list_get(r, read_list);
+			assert(read);
+			printf("%20s ", bam1_qname(read));
+			for(h = 0; h < haplo_list_l + 1; h++)
+			{
+				index = r * context->scores.m_ldim;
+				printf("%10d ", m_scores[index + h]);
+			}
+			printf("\n");
+		}
+
+		//Print positions
+		printf("---\n");
+		read_list_l = array_list_size(context->realign_list);
+		for(r = 0; r < read_list_l; r++)
+		{
+			read = array_list_get(r, read_list);
+			assert(read);
+			printf("%20s ", bam1_qname(read));
+			for(h = 0; h < haplo_list_l + 1; h++)
+			{
+				index = r * context->scores.m_ldim;
+				printf("%10d ", m_positions[index + h]);
+			}
+			printf("\n");
+		}
+	}*/
+
+	return NO_ERROR;
+}
+
+/**
+ * PRIVATE FUNCTION.Obtain score tables from read.
+ */
+static ERROR_CODE
+alig_get_scores_from_read(bam1_t *read, alig_context_t *context, uint32_t *v_scores, size_t *v_positions)
+{
+	int i, err;
+
+	//Reads
+	char *read_seq;
+	char *comp_seq;
+	char *quals_seq;
+	size_t read_l;
+	size_t indels;
+	size_t bases;
+	size_t read_disp_ref;
+	size_t read_disp_clip;
+
+	//Compare
+	char *read_seq_ref;
+	size_t read_seq_ref_l;
+	uint32_t misses;
+	uint32_t misses_sum;
+	size_t best_pos;
+	size_t curr_pos;
+	int64_t init_pos;
+	int64_t end_pos;
+
+	//Cigars
+	uint32_t *read_cigar;
+	uint32_t *read_left_cigar;
+	size_t read_left_cigar_l;
+	uint32_t *aux_cigar;
+	size_t aux_cigar_l;
+
+	//Haplotype
+	aux_indel_t *haplo;
+	size_t haplo_list_l;
+
+	//Reference
+	alig_reference_t *reference;
+	char *ref_seq;
+	size_t ref_pos_begin;
+	size_t ref_pos_end;
+
+	//Score vector
+	size_t v_total;
+
+	assert(read);
+	assert(context);
+
+	//Lengths
+	haplo_list_l = array_list_size(context->haplo_list);
+
+	//Get read
+	read_cigar = bam1_cigar(read);
+	assert(read_cigar);
+
+	//Get reference
+	reference = &context->reference;
+	ref_seq = reference->reference;
+	ref_pos_begin = reference->position;
+	ref_pos_end = ref_pos_begin + reference->length;
+
+	//Allocate new read
+	read_l = read->core.l_qseq;
+	read_seq = (char *) malloc((read_l + 1) * sizeof(char));
+	comp_seq = (char *) malloc((read_l + 1) * sizeof(char));
+	read_seq_ref = (char *) malloc((read_l + 1) * sizeof(char));
+	quals_seq = (char *) malloc((read_l + 1) * sizeof(char));
+
+	//Allocate cigars
+	aux_cigar = (uint32_t *)malloc(MAX_CIGAR_LENGTH * sizeof(uint32_t));
+	read_left_cigar = (uint32_t *)malloc(MAX_CIGAR_LENGTH * sizeof(uint32_t));
+
+	//Init scores
+	v_total = context->scores.m_ldim;
+	for(i = 0; i < v_total; i++)
+	{
+		*((size_t*)v_positions + i) = SIZE_MAX;
+		*((uint32_t*)v_scores + i) = UINT32_MAX;
+	}
+
+	//Convert read sequence to string
+	new_sequence_from_bam_ref(read, read_seq, read_l + 1);
+
+	//Get qualities
+	new_quality_from_bam_ref(read, 0, quals_seq, read->core.l_qseq + 1);
+
+	//Get initial clip displacement
+	cigar32_count_clip_displacement(read_cigar, read->core.n_cigar, &read_disp_clip);
+	cigar32_count_nucleotides_not_clip(read_cigar, read->core.n_cigar, &read_l);
+
+	//Get read displacement to reference
+	read_disp_ref = read->core.pos  - reference->position;
+
+	//Get clean read
+	read_left_cigar[0] = (read_l << BAM_CIGAR_SHIFT) + BAM_CMATCH;
+	cigar32_reclip(bam1_cigar(read), read->core.n_cigar, read_left_cigar, 1, aux_cigar, &aux_cigar_l);
+	cigar32_create_ref(aux_cigar, aux_cigar_l,
+			ref_seq + read_disp_ref, context->reference.length - read_disp_ref,
+			read_seq, read->core.l_qseq,
+			read_seq_ref, &read_seq_ref_l, NULL);
+
+	//Get raw score with reference
+	nucleotide_miss_qual_sum(read_seq_ref, read_seq, quals_seq, read_l, comp_seq, &misses, &misses_sum);
+	v_scores[0] = misses_sum;
+	v_positions[0] = read->core.pos;
+
+	//Dont iterate haplotypes if perfect reference match
+	//printf("%s - %d - %d\n", bam1_qname(read), misses, misses_sum);
+	if(misses != 0)
+	{
 		//Leftalign cigar
-		read_disp_ref = read->core.pos - context->reference.position;
-		cigar32_leftmost(context->reference.reference + read_disp_ref, context->reference.length - read_disp_ref,
+		cigar32_leftmost(reference->reference + read_disp_ref, reference->length - read_disp_ref,
 				read_seq, read->core.l_qseq, bam1_cigar(read), read->core.n_cigar,
 				read_left_cigar, &read_left_cigar_l);
 
-		//Get raw score with reference
-		nucleotide_miss_qual_sum(ref_seq + read_disp_ref, read_seq + read_disp_clip, read_quals + read_disp_clip, read_l, comp_seq, &misses, &misses_sum);
-		m_scores[i * m_ldim] = misses_sum;
-		m_positions[i * m_ldim] = read->core.pos;
-
-		//Dont iterate haplotypes if perfect reference match
-		if(misses != 0)
+		//Iterate haplotypes
+		for(i = 0; i < haplo_list_l; i++)
 		{
-			//Iterate haplotypes
-			for(j = 0; j < haplo_list_l; j++)
+			//Get haplotype
+			haplo = array_list_get(i, context->haplo_list);
+			assert(haplo);
+
+			//Get initial position to iterate
+			read_disp_ref = SIZE_MAX;
+			init_pos = haplo->ref_pos - read->core.l_qseq;
+
+			//Initial position must be inside reference range
+			if(init_pos < ref_pos_begin)
+				init_pos = ref_pos_begin;
+
+			//Initial position must not overlap last region
+			if(init_pos < context->last_region.end_pos)
+				init_pos = context->last_region.end_pos;
+
+			//Get end pos
+			end_pos = ref_pos_end - read->core.l_qseq;
+			if(end_pos < init_pos)	//Check valid range
+				end_pos = init_pos;
+
+			//Iterate positions
+			for(curr_pos = init_pos; curr_pos < end_pos; curr_pos++)
 			{
-				//Get haplotype
-				haplo = array_list_get(j, context->haplo_list);
-				assert(haplo);
-
-				//Get initial position to iterate
-				read_disp_ref = SIZE_MAX;
-				init_pos = haplo->ref_pos - read->core.l_qseq;
-
-				//Initial position must be inside reference range
-				if(init_pos < ref_pos_begin)
-					init_pos = ref_pos_begin;
-
-				//Get end pos
-				end_pos = ref_pos_end - read->core.l_qseq;
-				if(end_pos < init_pos)	//Check valid range
-					end_pos = init_pos;
-
-				//Iterate positions
-				for(curr_pos = init_pos; curr_pos < end_pos; curr_pos++)
+				//Create cigar for this haplotype
+				err = cigar32_from_haplo(read_cigar, read->core.n_cigar, haplo, curr_pos, aux_cigar, &aux_cigar_l);
+				if(err)
 				{
-					//Create cigar for this haplotype
-					err = cigar32_from_haplo(read_cigar, read->core.n_cigar, haplo, curr_pos, aux_cigar, &aux_cigar_l);
-					if(err)
+					if(err == CIGAR_INVALID_INDEL)
 					{
-						if(err == CIGAR_INVALID_INDEL)
+						//Haplotype is invalid
+						#pragma omp critical
 						{
-							//Haplotype is invalid
-							sprintf(log_msg, "Invalid haplotype %d\n", j + 1);
+							sprintf(log_msg, "Invalid haplotype %d\n", i + 1);
 							LOG_ERROR(log_msg);
-							break;
 						}
-						else
-						{
-							//Cant displace anymore
-							break;
-						}
+						break;
 					}
-
+					else
+					{
+						//Cant displace anymore
+						break;
+					}
+				}
+				else
+				{
 					//Get relative displacement from reference
 					if(curr_pos < haplo->ref_pos)
 					{
@@ -1299,24 +1532,28 @@ alig_get_scores(alig_context_t *context)
 					cigar32_create_ref(aux_cigar, aux_cigar_l,
 							ref_seq + read_disp_ref, context->reference.length - read_disp_ref,
 							read_seq, read->core.l_qseq,
-							read_seq_ref, &read_seq_ref_l);
+							read_seq_ref, &read_seq_ref_l, NULL);
 
 					if(read_seq_ref_l != read->core.l_qseq)
 					{
-						sprintf(log_msg, "Read-Ref: %lu, Read: %d\n", read_seq_ref_l, read->core.l_qseq);
-						LOG_ERROR(log_msg);
+						#pragma omp critical
+						{
+							sprintf(log_msg, "Read-Ref: %d, Read: %d\n", read_seq_ref_l, read->core.l_qseq);
+							LOG_ERROR(log_msg);
+						}
 					}
 					//assert(read_seq_ref_l == read->core.l_qseq);
 
 					//Compare and miss with haplotype
-					nucleotide_miss_qual_sum(read_seq, read_seq_ref, read_quals, read_seq_ref_l, comp_seq, &misses, &misses_sum);
+					nucleotide_miss_qual_sum(read_seq, read_seq_ref, quals_seq, read_seq_ref_l, comp_seq, &misses, &misses_sum);
 
 					//Better?
-					if(m_scores[(i * m_ldim) + (j+1)] > misses_sum)
+					if(v_scores[i+1] > misses_sum)
 					{
+						//printf("%s - %d - %d\n", bam1_qname(read), misses, misses_sum);
 						//Update scores
-						m_scores[(i * m_ldim) + (j+1)] = misses_sum;
-						m_positions[(i * m_ldim) + (j+1)] = curr_pos;
+						v_scores[i+1] = misses_sum;
+						v_positions[i+1] = curr_pos;
 					}
 
 					//Perfect match?
@@ -1324,24 +1561,18 @@ alig_get_scores(alig_context_t *context)
 					{
 						break;
 					}
-				} //Iterate positions
-			} //Iterate haplotypes
-		} //Scores != 0 if
+				}
+			} //Iterate positions
+		} //Iterate haplotypes
+	} //Misses != 0 if
 
-		//Free
-#ifdef __SSE2__
-		_mm_free(read_seq);
-		_mm_free(comp_seq);
-		_mm_free(read_seq_ref);
-		_mm_free(read_quals);
-#else
-		free(read_seq);
-		free(comp_seq);
-		free(read_seq_ref);
-		free(read_quals);
-#endif
-
-	}
+	//Free
+	free(read_seq);
+	free(comp_seq);
+	free(read_seq_ref);
+	free(quals_seq);
+	free(read_left_cigar);
+	free(aux_cigar);
 
 	return NO_ERROR;
 }
@@ -1537,7 +1768,7 @@ alig_indel_realign_from_haplo(alig_context_t *context, size_t alt_haplo_index)
 
 	//Logging
 	cigar32_to_string(&haplo->indel, 1, aux_msg);
-	sprintf(log_msg, "Realign, alternative haplotype = %s:%lu, %lu reads\n", aux_msg, haplo->ref_pos + 1, array_list_size(list));
+	sprintf(log_msg, "Realign, alternative haplotype = %s:%d, %d reads\n", aux_msg, haplo->ref_pos + 1, array_list_size(list));
 	LOG_INFO("************************************\n");
 	LOG_INFO(log_msg);
 	if(context->flags & ALIG_ORIGINAL_PRIORITY)
@@ -1547,6 +1778,10 @@ alig_indel_realign_from_haplo(alig_context_t *context, size_t alt_haplo_index)
 
 	//Iterate list to realign
 	list_l = array_list_size(list);
+	#pragma omp parallel for default(none) \
+	shared(stderr) \
+	firstprivate(list, list_l, m_ldim, haplo, ref_seq, ref_length, m_scores, m_positions, alt_haplo_index, context, log_level) \
+	private(err, read, read_indels, ref_score, h_score, read_seq, read_seq_ref, read_seq_ref_l, comp_aux, read_quals, read_disp_ref, misses_sum, misses, min_score, log_msg, bases, best_cigar, best_cigar_l, best_pos)
 	for(i = 0; i < list_l; i++)
 	{
 		//Get read
@@ -1579,7 +1814,7 @@ alig_indel_realign_from_haplo(alig_context_t *context, size_t alt_haplo_index)
 			read_disp_ref = read->core.pos - context->reference.position;
 
 			//Get haplotype reference transform
-			cigar32_create_ref(bam1_cigar(read), read->core.n_cigar, ref_seq + read_disp_ref, ref_length - read_disp_ref, read_seq, read->core.l_qseq, read_seq_ref, &read_seq_ref_l);
+			cigar32_create_ref(bam1_cigar(read), read->core.n_cigar, ref_seq + read_disp_ref, ref_length - read_disp_ref, read_seq, read->core.l_qseq, read_seq_ref, &read_seq_ref_l, NULL);
 			assert(read_seq_ref_l == read->core.l_qseq);
 
 			//Compare and miss with haplotype
@@ -1673,4 +1908,113 @@ alig_indel_realign_from_haplo(alig_context_t *context, size_t alt_haplo_index)
 	return NO_ERROR;
 }
 
+/**
+ * PRIVATE INLINE FUNCTIONS
+ */
+static inline ERROR_CODE
+alig_aux_write_to_disk(array_list_t *write_buffer, bam_file_t *output_bam_f, uint8_t force)
+{
+	int i;
+	size_t write_buffer_l;
+	bam1_t *read;
+	static size_t last_index = 0;
 
+	//Timing
+	double time_w;
+
+	//Get list length
+	write_buffer_l = array_list_size(write_buffer);
+	if(write_buffer_l == 0)
+	{
+		return NO_ERROR;
+	}
+
+	//Is empty?
+	if(force || write_buffer_l > ALIG_LIST_COUNT_THRESHOLD_TO_WRITE)
+	{
+		//Sort buffer
+		array_list_qsort(write_buffer, compare_pos);
+
+		//Write processed to disk
+		for(i = 0; i < write_buffer_l; i++)
+		{
+			//Get read
+			read = array_list_get(i, write_buffer);
+			assert(read);
+
+			//Write to disk
+			bam_write1(output_bam_f->bam_fd, read);
+
+			//Free read
+			bam_destroy1(read);
+		}
+
+		//Clear buffer
+		array_list_clear(write_buffer, NULL);
+		last_index = 0;
+	} //If write_buffer_l > 0
+
+	return NO_ERROR;
+}
+
+static inline ERROR_CODE
+alig_aux_read_from_disk(circular_buffer_t *read_buffer, bam_file_t *input_bam_f)
+{
+	int i, cond;
+	ssize_t bytes;
+	size_t filled;
+	size_t buffer_l;
+	bam1_t *bam;
+
+	//Timing
+	double time_r;
+
+	//More reads?
+	omp_set_lock(&read_buffer->lock);
+	cond = read_buffer->end_condition;
+	omp_unset_lock(&read_buffer->lock);
+	if(cond)
+		return NO_ERROR;
+
+	//Get buffer free length
+	omp_set_lock(&read_buffer->lock);
+	buffer_l = read_buffer->size - read_buffer->readed;
+	omp_unset_lock(&read_buffer->lock);
+
+	//Fill buffer
+	bytes = 1;
+	filled = 0;
+	for(i = 0; i < buffer_l; i++)
+	{
+		bam = bam_init1();
+		bytes = bam_read1(input_bam_f->bam_fd, bam);
+
+		//Valid read?
+		if(bytes > 0)
+		{
+			assert(bam);
+
+			//Add read to buffer
+			omp_set_lock(&read_buffer->lock);
+			read_buffer->buffer[(read_buffer->head_idx + read_buffer->readed) % read_buffer->size] = bam;
+			read_buffer->readed++;
+			omp_unset_lock(&read_buffer->lock);
+
+			filled++;
+		}
+		else
+		{
+			//Destroy empty last read
+			bam_destroy1(bam);
+
+			//No more reads
+			omp_set_lock(&read_buffer->lock);
+			read_buffer->end_condition = 1;
+			omp_unset_lock(&read_buffer->lock);
+
+			break;
+		}
+	}
+
+	return NO_ERROR;
+}

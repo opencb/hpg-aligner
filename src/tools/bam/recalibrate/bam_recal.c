@@ -17,18 +17,19 @@
 
 #include "bam_recal.h"
 
+
 /**
  * Recalibrate BAM file from path and store in file.
  */
 ERROR_CODE
-recal_recalibrate_bam_file(char *orig_bam_path, const recal_info_t *bam_info, char *recal_bam_path)
+recal_recalibrate_bam_file(const char *orig_bam_path, const recal_info_t *bam_info, const char *recal_bam_path)
 {
 	bam_file_t *orig_bam_f, *recal_bam_f;
 	bam_header_t *recal_bam_header;
 
 	//Open bam
 	printf("Opening BAM from \"%s\" to being recalibrated ...\n", orig_bam_path);
-	orig_bam_f = bam_fopen(orig_bam_path);
+	orig_bam_f = bam_fopen((char *)orig_bam_path);
 	printf("BAM opened!...\n");
 
 	//Allocate
@@ -37,19 +38,13 @@ recal_recalibrate_bam_file(char *orig_bam_path, const recal_info_t *bam_info, ch
 	//Create new bam
 	printf("Creating new bam file in \"%s\"...\n", recal_bam_path);
 	//init_empty_bam_header(orig_bam_f->bam_header_p->n_targets, recal_bam_header);
-	recal_bam_f = bam_fopen_mode(recal_bam_path, orig_bam_f->bam_header_p, "w");
+	recal_bam_f = bam_fopen_mode((char *)recal_bam_path, orig_bam_f->bam_header_p, "w");
 	bam_fwrite_header(recal_bam_f->bam_header_p, recal_bam_f);
 	recal_bam_f->bam_header_p = NULL;
 	printf("New BAM initialized!...\n");
 
 	//Recalibrate bams
-	#ifdef D_TIME_DEBUG
-		time_init_slot(D_SLOT_PH2_RECALIBRATE, TIME_GLOBAL_STATS);
-	#endif
 	recal_recalibrate_bam(orig_bam_f, bam_info, recal_bam_f);
-	#ifdef D_TIME_DEBUG
-		time_set_slot(D_SLOT_PH2_RECALIBRATE, TIME_GLOBAL_STATS);
-	#endif
 
 	//Memory free
 	printf("Closing \"%s\" BAM file...\n", recal_bam_path);
@@ -67,18 +62,13 @@ recal_recalibrate_bam_file(char *orig_bam_path, const recal_info_t *bam_info, ch
  * Recalibrate BAM file and store in file.
  */
 ERROR_CODE
-recal_recalibrate_bam(bam_file_t *orig_bam_f, const recal_info_t *bam_info, bam_file_t *recal_bam_f)
+recal_recalibrate_bam(const bam_file_t *orig_bam_f, const recal_info_t *bam_info, bam_file_t *recal_bam_f)
 {
 	bam_batch_t *batch;
 	bam_batch_t *rdy_batch;
 	bam_batch_t *read_batch;
 	int count = 0, countb = 0;
 	ERROR_CODE err;
-
-	//Measures
-	double init_read = 0.0, init_recal = 0.0, init_write = 0.0;
-	double end_read = 0.0, end_recal = 0.0, end_write = 0.0;
-	double init_it = 0.0, end_it = 0.0;
 
 	//Thread output
 	//pthread_t out_thread;
@@ -110,32 +100,18 @@ recal_recalibrate_bam(bam_file_t *orig_bam_f, const recal_info_t *bam_info, bam_
 
 		do
 		{
-
-			#ifdef D_TIME_DEBUG
-				#pragma omp single
-				init_it = omp_get_wtime();
-			#endif
-
 			#pragma omp sections
 			{
 
 				//Read batch
 				#pragma omp section
 				{
-					#ifdef D_TIME_DEBUG
-					init_read = omp_get_wtime();
-					#endif
-
 					//Free memory and take a new batch
 					//bam_batch_free(batch, 1);
 					read_batch = bam_batch_new(MAX_BATCH_SIZE, MULTIPLE_CHROM_BATCH);
 
 					//Read batch
-					bam_fread_max_size(read_batch, MAX_BATCH_SIZE, 0, orig_bam_f);
-
-					#ifdef D_TIME_DEBUG
-					end_read = omp_get_wtime();
-					#endif
+					bam_fread_max_size(read_batch, MAX_BATCH_SIZE, 0, (bam_file_t *)orig_bam_f);
 				}
 
 				//Recalibrate batch
@@ -144,17 +120,9 @@ recal_recalibrate_bam(bam_file_t *orig_bam_f, const recal_info_t *bam_info, bam_
 					//Recalibrate batch
 					if(batch->num_alignments != 0)
 					{
-						#ifdef D_TIME_DEBUG
-							init_recal = omp_get_wtime();
-						#endif
-
 						err = recal_recalibrate_batch(batch, bam_info);
 						if(err)
 							printf("ERROR (recal_recalibrate_batch): %d\n", err);
-
-						#ifdef D_TIME_DEBUG
-							end_recal = omp_get_wtime();
-						#endif
 					}
 				}
 
@@ -166,9 +134,6 @@ recal_recalibrate_bam(bam_file_t *orig_bam_f, const recal_info_t *bam_info, bam_
 					{
 						if(rdy_batch->num_alignments != 0)
 						{
-							#ifdef D_TIME_DEBUG
-								init_write = omp_get_wtime();
-							#endif
 
 							bam_fwrite_batch(rdy_batch, recal_bam_f);
 
@@ -181,10 +146,6 @@ recal_recalibrate_bam(bam_file_t *orig_bam_f, const recal_info_t *bam_info, bam_
 							//Show total progress
 							printf("Total alignments recalibrated: %d\r", count);
 							fflush(stdout);
-
-							#ifdef D_TIME_DEBUG
-								end_write = omp_get_wtime();
-							#endif
 						}
 
 						//Free batch
@@ -198,36 +159,6 @@ recal_recalibrate_bam(bam_file_t *orig_bam_f, const recal_info_t *bam_info, bam_
 
 			#pragma omp single
 			{
-				#ifdef D_TIME_DEBUG
-					#ifdef D_TIME_OPENMP_VERBOSE
-						fflush(stdout);
-						printf("Times:\n");
-						printf("Read %.2f ms\n", (end_read - init_read) * 1000.0);
-						printf("Recal %.2f ms\n", (end_recal - init_recal) * 1000.0);
-						printf("Write %.2f ms\n", (end_write - init_write) * 1000.0);
-						printf("NEW ITERATION\n");
-						fflush(stdout);
-					#endif
-
-					end_it = omp_get_wtime();
-
-					//Add times
-					if(end_read != 0.0) time_add_time_slot(D_SLOT_PH2_READ_BATCH, TIME_GLOBAL_STATS, end_read - init_read);
-					if(end_recal != 0.0) time_add_time_slot(D_SLOT_PH2_PROCCESS_BATCH, TIME_GLOBAL_STATS, end_recal - init_recal);
-					if(end_write != 0.0) time_add_time_slot(D_SLOT_PH2_WRITE_BATCH, TIME_GLOBAL_STATS, end_write - init_write);
-
-					time_add_time_slot(D_SLOT_PH2_ITERATION, TIME_GLOBAL_STATS, end_it - init_it);
-
-					//Reset counters to avoid resample
-					init_read = 0.0;
-					end_read = 0.0;
-					init_recal = 0.0;
-					end_recal = 0.0;
-					init_write = 0.0;
-					end_write = 0.0;
-
-				#endif
-
 				//Setup next iteration
 				rdy_batch = batch;
 				batch = read_batch;
@@ -298,20 +229,10 @@ recal_recalibrate_batch(const bam_batch_t* batch, const recal_info_t *bam_info)
 				fflush(stdout);
 			}*/
 
-			#ifdef D_TIME_DEBUG
-			init_time = omp_get_wtime();
-			#endif
-
 			//Process every alignment
 			/*err = */recal_recalibrate_alignment_priv(batch->alignments_p[i], bam_info, recalibration_env);
 			//if(err)
 			//	printf("ERROR (recal_recalibrate_alignment): %d\n", err);
-
-			#ifdef D_TIME_DEBUG
-			end_time = omp_get_wtime();
-			#pragma omp critical
-				time_add_time_slot(D_SLOT_PH2_RECAL_ALIG, TIME_GLOBAL_STATS, end_time - init_time);
-			#endif
 		}
 
 		//Destroy environment
@@ -406,13 +327,14 @@ recal_recalibrate_alignment_priv(bam1_t* alig, const recal_info_t *bam_info, rec
 	ASSERT(bam_seq_l != 0);
 
 	//Get sequence
-	bam_seq = new_sequence_from_bam(alig);
+	bam_seq = new_sequence_from_bam((bam1_t *)alig);
 
 	//Get quals
-	new_quality_from_bam_ref(alig, 0, bam_quals, bam_seq_max_l);
+	new_quality_from_bam_ref((bam1_t *)alig, 0, bam_quals, bam_seq_max_l);
 
 	//Allocate for result
 	res_quals = (char *)malloc(bam_seq_l * sizeof(char));
+	memcpy(res_quals, bam_quals, bam_seq_l * sizeof(char));
 
 	//Iterates nucleotides in this read
 	dinuc = 0;
@@ -450,10 +372,10 @@ recal_recalibrate_alignment_priv(bam1_t* alig, const recal_info_t *bam_info, rec
 				double res = bam_info->total_estimated_Q + bam_info->total_delta + delta_r + delta_rc + delta_rd;
 				res_quals[i] = (char)res;
 			}
-			else
+			/*else
 			{
 				res_quals[i] = (char)calidad;
-			}
+			}*/
 		}
 	}
 

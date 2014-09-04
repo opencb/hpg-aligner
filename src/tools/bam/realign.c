@@ -16,21 +16,28 @@
 #include <errno.h>
 
 #include "aux/timestats.h"
-#include "aligner/alig.h"
+#include "aux/aux_common.h"
+#include "bfwork/bam_file_ops.h"
+//#include "bfwork/bfwork.h"
+//#include "aligner/alig.h"
 
-int align_launch(char *reference, char *bam, char *output, int threads);
+int align_launch(const char *reference, const char *bam, const char *output, const char *stats_path, int recalibration);
+//ERROR_CODE wander_bam_file(char *bam_path, char *ref_path, char *outbam);
 
 int alig_bam(int argc, char **argv)
 {
+	char *refc, *bamc, *outputc, *statsc;
 
+	struct arg_lit *recal = arg_lit0(NULL,"recalibrate","performs a base quality recalibration");
     struct arg_file *refile = arg_file0("r",NULL,"<reference>","reference genome compressed file (dna_compression.bin)");
     struct arg_file *infile = arg_file0("b",NULL,"<input>","input BAM file");
-    struct arg_file *outfile = arg_file0("o",NULL,"<output>","output recalibrated BAM file, default:\"output.bam\"");
+    struct arg_file *outfile = arg_file0("o",NULL,"<output>","output processed BAM file");
+    struct arg_file *stats = arg_file0("s",NULL,"<stats>","folder to store timing stats");
     struct arg_lit  *help    = arg_lit0("h","help","print this help and exit");
     struct arg_lit  *version = arg_lit0(NULL,"version","print version information and exit");
     struct arg_end  *end     = arg_end(20);
 
-    void* argtable[] = {refile,infile,outfile,help,version,end};
+    void* argtable[] = {recal,refile,infile,outfile,stats,help,version,end};
     const char* progname = "hpg-bam realign v"ALIG_VER;
     int nerrors;
     int exitcode=0;
@@ -45,7 +52,7 @@ int alig_bam(int argc, char **argv)
     }
 
     /* set any command line default values prior to parsing */
-    outfile->filename[0]="output.bam";
+    outfile->filename[0]=NULL;
 
     /* Parse the command line as defined by argtable[] */
     nerrors = arg_parse(argc,argv,argtable);
@@ -149,10 +156,35 @@ int alig_bam(int argc, char **argv)
 		}
 	}
 
+	bamc = NULL;
+	if(infile->count > 0)
+		bamc = strdup(infile->filename[0]);
+
+	outputc = NULL;
+	if(outfile->count > 0)
+		outputc = strdup(outfile->filename[0]);
+
+	refc = NULL;
+	if(refile->count > 0)
+		refc = strdup(refile->filename[0]);
+
+	statsc = NULL;
+	if(stats->count > 0)
+		statsc = strdup(stats->filename[0]);
+
     /* normal case: realignment */
 	{
-		exitcode = align_launch((char *)refile->filename[0], (char *)infile->filename[0], (char *)outfile->filename[0], 1);
+		exitcode = align_launch(	refc, bamc, outputc, statsc,recal->count);
 	}
+
+	if(bamc)
+		free(bamc);
+	if(outputc)
+		free(outputc);
+	if(refc)
+		free(refc);
+	if(statsc)
+		free(statsc);
 
     exit:
     /* deallocate each non-null entry in argtable[] */
@@ -162,83 +194,24 @@ int alig_bam(int argc, char **argv)
 }
 
 int
-align_launch(char *reference, char *bam, char *output, int threads)
+align_launch(const char *reference, const char *bam, const char *output, const char *stats_path, int recalibration)
 {
-	char *dir, *base, *bamc, *outputc, *infofilec, *datafilec, *sched;
-	int err;
+	int err, threads;
+	char *sched;
 	double init_time, end_time;
 
 	assert(reference);
 	assert(bam);
-	assert(output);
 
 	init_log();
 	LOG_FILE("realign.log","w");
-	LOG_LEVEL(LOG_ERROR_LEVEL);
+	LOG_VERBOSE(1);
+	LOG_LEVEL(LOG_WARN_LEVEL);
 
 	//Set schedule if not defined
 	setenv("OMP_SCHEDULE", "static", 0);
 	sched = getenv("OMP_SCHEDULE");
-
-	//Time measures
-#ifdef D_TIME_DEBUG
-
-	char filename[100];
-	char intaux[20];
-	char cwd[1024];
-
-	//Initialize stats
-	if(time_new_stats(20, &TIME_GLOBAL_STATS))
-	{
-		printf("ERROR: FAILED TO INITIALIZE TIME STATS\n");
-	}
-
-
-	if (getcwd(cwd, sizeof(cwd)) != NULL)
-	{
-		printf("Current working dir: %s\n", cwd);
-	}
-	else
-	{
-		perror("WARNING: getcwd() dont work");
-	}
-
-	strcpy(filename, cwd);
-	strcat(filename,"/stats/");
-	/*if(sched)
-		strcat(filename,sched);
-	else
-	{
-		printf("ERROR: Obtaining OMP_SCHEDULE environment value\n");
-	}*/
-
-	//Create stats directory
-	printf("Creating stats directory: %s\n", filename);
-	err = mkdir(filename, S_IRWXU);
-	if(err != 0 && errno != EEXIST)
-	{
-		perror("WARNING: failed to create stats directory");
-	}
-	else
-	{
-		//strcat(filename,"_");
-		//sprintf(intaux, "%d", MAX_BATCH_SIZE);
-		//strcat(filename, intaux);
-		strcat(filename, "_");
-		sprintf(intaux, "%d", threads);
-		strcat(filename, intaux);
-		strcat(filename, "_.stats");
-
-		//Initialize stats file output
-		if(time_set_output_file(filename, TIME_GLOBAL_STATS))
-		{
-			printf("ERROR: FAILED TO INITIALIZE TIME STATS FILE OUTPUT\n");
-		}
-
-		printf("STATISTICS ACTIVATED, output file: %s\n\n", filename);
-	}
-
-#endif
+	threads = omp_get_max_threads();
 
 	//System info
 	printf("------------\n");
@@ -251,91 +224,160 @@ align_launch(char *reference, char *bam, char *output, int threads)
 #endif
 	printf("------------\n");
 
-	//Obtain reference filename and dirpath from full path
-	dir = strdup(reference);
-	dir = dirname(dir);
-	base = strrchr(reference, '/');
+	if(recalibration)
+	{
+		printf("Executing realign and recalibration\n");
 
-	//Obtain data from bam
-	bamc = strdup(bam);
-	printf("Reference dir: %s\n", dir);
-	printf("Reference name: %s\n", base);
-#ifdef D_TIME_DEBUG
-	init_time = omp_get_wtime();
-#endif
-	alig_bam_file(bamc, base, dir, output);
-#ifdef D_TIME_DEBUG
-	end_time = omp_get_wtime();
-	time_add_time_slot(D_SLOT_TOTAL, TIME_GLOBAL_STATS, end_time - init_time);
-#endif
-	free(bamc);
-	free(dir);
+		//Realign and recalibration
+		alig_recal_bam_file(bam, reference, NULL, NULL, output, 200, NULL);
+	}
+	else
+	{
+		printf("Executing realign\n");
 
-	//Print times
-#ifdef D_TIME_DEBUG
-	double min, max, mean;
-
-	//Print time stats
-	printf("----------------------------\nTIME STATS: \n");
-
-	printf("\n====== General times ======\n");
-	time_get_mean_slot(D_SLOT_TOTAL, TIME_GLOBAL_STATS, &mean);
-	time_get_min_slot(D_SLOT_TOTAL, TIME_GLOBAL_STATS, &min);
-	time_get_max_slot(D_SLOT_TOTAL, TIME_GLOBAL_STATS, &max);
-	printf("Total time to realign -> %.2f s - min/max = %.2f/%.2f\n",
-			mean, min, max);
-
-	time_get_mean_slot(D_SLOT_INIT, TIME_GLOBAL_STATS, &mean);
-	time_get_min_slot(D_SLOT_INIT, TIME_GLOBAL_STATS, &min);
-	time_get_max_slot(D_SLOT_INIT, TIME_GLOBAL_STATS, &max);
-	printf("Time used to initialize aligner -> %.2f s - min/max = %.2f/%.2f\n",
-			mean, min, max);
-
-	/*time_get_mean_slot(D_SLOT_PROCCESS, TIME_GLOBAL_STATS, &mean);
-	time_get_min_slot(D_SLOT_PROCCESS, TIME_GLOBAL_STATS, &min);
-	time_get_max_slot(D_SLOT_PROCCESS, TIME_GLOBAL_STATS, &max);
-	printf("Time used to proccess every read -> %.2f us - min/max = %.2f/%.2f\n",
-			mean*1000000.0, min*1000000.0, max*1000000.0);*/
-
-	printf("\n====== Haplotype ======\n");
-	time_get_mean_slot(D_SLOT_NEXT, TIME_GLOBAL_STATS, &mean);
-	time_get_min_slot(D_SLOT_NEXT, TIME_GLOBAL_STATS, &min);
-	time_get_max_slot(D_SLOT_NEXT, TIME_GLOBAL_STATS, &max);
-	printf("Time used for read region extraction -> %.2f us - min/max = %.2f/%.2f\n",
-				mean*1000000.0, min*1000000.0, max*1000000.0);
-
-	time_get_mean_slot(D_SLOT_HAPLO_GET, TIME_GLOBAL_STATS, &mean);
-	time_get_min_slot(D_SLOT_HAPLO_GET, TIME_GLOBAL_STATS, &min);
-	time_get_max_slot(D_SLOT_HAPLO_GET, TIME_GLOBAL_STATS, &max);
-	printf("Time used for read haplotype extraction -> %.2f us - min/max = %.2f/%.2f\n",
-			mean*1000000.0, min*1000000.0, max*1000000.0);
-
-	time_get_mean_slot(D_SLOT_REALIG_PER_HAPLO, TIME_GLOBAL_STATS, &mean);
-	time_get_min_slot(D_SLOT_REALIG_PER_HAPLO, TIME_GLOBAL_STATS, &min);
-	time_get_max_slot(D_SLOT_REALIG_PER_HAPLO, TIME_GLOBAL_STATS, &max);
-	printf("Time used for read realign per haplotype -> %.2f us - min/max = %.2f/%.2f\n",
-			mean*1000000.0, min*1000000.0, max*1000000.0);
-
-
-	printf("\n====== I/O ======\n");
-	time_get_mean_slot(D_SLOT_READ, TIME_GLOBAL_STATS, &mean);
-	time_get_min_slot(D_SLOT_READ, TIME_GLOBAL_STATS, &min);
-	time_get_max_slot(D_SLOT_READ, TIME_GLOBAL_STATS, &max);
-	printf("Time used for read alignment (mean) -> %.2f us - min/max = %.2f/%.2f\n",
-			mean*1000000.0, min*1000000.0, max*1000000.0);
-
-	time_get_mean_slot(D_SLOT_WRITE, TIME_GLOBAL_STATS, &mean);
-	time_get_min_slot(D_SLOT_WRITE, TIME_GLOBAL_STATS, &min);
-	time_get_max_slot(D_SLOT_WRITE, TIME_GLOBAL_STATS, &max);
-	printf("Time used for write alignment (mean) -> %.2f us - min/max = %.2f/%.2f\n",
-			mean*1000000.0, min*1000000.0, max*1000000.0);
-
-#endif
+		//Only realign
+		alig_bam_file(bam, reference, output, stats_path);
+	}
 
 	stop_log();
 
 	return 0;
 }
 
+/*int
+dummy_processor(bam_fwork_t *fwork, bam_region_t *region)
+{
+	int i;
 
+	assert(fwork);
+	assert(region);
+
+	LOG_INFO_F("Processing over region %d:%d-%d with %d reads\n", region->chrom + 1, region->init_pos + 1, region->end_pos +1, region->size);
+
+	for(i = 0; i < region->size; i++)
+	{
+		assert(region->reads[i]);
+	}
+
+	//Update user data
+	size_t *reads;
+	bfwork_lock_user_data(fwork, (void **)&reads);
+	*reads += region->size;
+	bfwork_unlock_user_data(fwork);
+
+	//Get local user data
+	size_t *regions;
+	bfwork_local_user_data(fwork, (void **)&regions);
+	if(regions == NULL)
+	{
+		//Local data is not initialized
+		regions = (size_t *)malloc(sizeof(size_t));
+		*regions = 0;
+		//printf("%d - POP\n", omp_get_thread_num());
+
+		//Set local data
+		bfwork_local_user_data_set(fwork, regions);
+	}
+
+	//Increase local user data
+	*regions += 1;
+
+	//usleep(10 * region->size); //1 us per alignment
+
+	return NO_ERROR;
+}
+*/
+/*void
+reduce_reads_dummy(void *data, void *dest)
+{
+	size_t *s_data, *s_dest;
+	assert(data);
+	assert(dest);
+
+	//Cast pointers
+	s_data = (size_t *)data;
+	s_dest = (size_t *)dest;
+
+	//Add
+	*s_dest += *s_data;
+}*/
+
+/*static inline ERROR_CODE
+wander_bam_file_dummy(bam_fwork_t *fwork, const char *in, const char *out, const char *ref)
+{
+	bfwork_context_t context;
+	size_t reads_proc = 0;
+	size_t regions_proc = 0;
+
+	assert(fwork);
+	assert(in);
+	assert(out);
+	assert(ref);
+
+	//Init wandering
+	bfwork_init(fwork);
+
+	//Create realigner context
+	bfwork_context_init(&context,
+			(int (*)(void *, bam_region_t *, bam1_t *))realign_wanderer,
+			(int (*)(void *, bam_region_t *))dummy_processor);
+
+#ifdef D_TIME_DEBUG
+	//Init timing
+	bfwork_context_init_timing(&context, "dummy");
+#endif
+
+	//Set context user data
+	bfwork_context_set_user_data(&context, &reads_proc);
+
+	//Configure wanderer
+	bfwork_configure(fwork, in, out, ref, &context);
+
+	//Run wander
+	bfwork_run(fwork);
+
+	//Print user data
+	printf("\nREDUCED DATA, Reads processed: %d\n", reads_proc);
+
+	//Print reduced local user data
+	bfwork_context_local_user_data_reduce(&context, &regions_proc, reduce_reads_dummy);
+	printf("\nREDUCED LOCAL DATA, Regions processed: %d\n", regions_proc);
+
+	//Free local user data
+	bfwork_context_local_user_data_free(&context, NULL);
+
+#ifdef D_TIME_DEBUG
+	//Print times
+	bfwork_context_print_times(&context);
+
+	//Destroy wanderer time
+	bfwork_context_destroy_timing(&context);
+#endif
+
+	//Destroy wanderer
+	bfwork_destroy(fwork);
+
+	//Destroy context
+	bfwork_context_destroy(&context);
+
+	return NO_ERROR;
+}*/
+
+/*ERROR_CODE
+wander_bam_file(char *bam_path, char *ref_path, char *outbam)
+{
+	//Times
+	double times;
+
+	//Wanderer
+	bam_fwork_t fwork;
+
+	assert(bam_path);
+	assert(ref_path);
+
+	//Dummy wandering
+	//wander_bam_file_dummy(&fwork, bam_path, outbam, ref_path);
+
+	return NO_ERROR;
+}*/
 

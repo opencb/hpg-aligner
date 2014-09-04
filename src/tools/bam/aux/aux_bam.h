@@ -120,6 +120,6 @@ EXTERNC ERROR_CODE batch_split_by_chrom(bam_batch_t *batch, bam_batch_t *v_batch
  * NOT USABLE
  */
 
-EXTERNC ERROR_CODE compare_bams_qual(char* bamPath0, char* bamPath1, const int cycles);
+EXTERNC ERROR_CODE compare_bams_qual(const char* bamPath0, const char* bamPath1, const int cycles);
 
 #endif /* AUX_BAM_H_ */

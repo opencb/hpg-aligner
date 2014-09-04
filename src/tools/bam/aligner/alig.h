@@ -24,6 +24,7 @@
 #include <stdint.h>
 #include <limits.h>
 #include <stddef.h>
+#include <unistd.h>
 
 #include <omp.h>
 
@@ -33,53 +34,29 @@
 #include "aux/aux_common.h"
 #include "aux/aux_library.h"
 #include "aux/timestats.h"
+#include "bfwork/bfwork.h"
 #include "alig_region.h"
 
 //VERSION
-#define ALIG_VER_CURRENT		"0"
-#define ALIG_VER_REVISION		"4"
-#define ALIG_VER_AGE			"0"
+#define ALIG_VER_CURRENT		"1"
+#define ALIG_VER_REVISION		"1"
+#define ALIG_VER_AGE			"1"
 #define ALIG_VER 			ALIG_VER_CURRENT"."ALIG_VER_REVISION"."ALIG_VER_AGE
 
 //OPTIONS
 #define ALIG_LIST_IN_SIZE	10000
 #define ALIG_LIST_NEXT_SIZE 1000
-#define ALIG_LIST_COUNT_THRESHOLD_TO_WRITE 1000
+#define ALIG_LIST_COUNT_THRESHOLD_TO_WRITE 500
 
 #define ALIG_REFERENCE_ADDITIONAL_OFFSET 100
+#define ALIG_REFERENCE_CORRECTION_OFFSET 1
 
 #define ALIG_IMPROVEMENT_THREHOLD 0.0
 
-//FLAGS
+//REALIGNER FLAGS
 #define ALIG_LEFT_ALIGN 0x01	//Left align cigars?
 #define ALIG_REFERENCE_PRIORITY 0x02	//Reference haplotype have priority over alternative? (if equals case)
 #define ALIG_ORIGINAL_PRIORITY 0x04	//Original cigar have preference over realigned one? (if equals case)
-
-/**
- * Time measures
- */
-//#define D_TIME_DEBUG
-#ifdef D_TIME_DEBUG
-	enum alig_slots {
-		//GENERAL
-		D_SLOT_TOTAL,
-		D_SLOT_PROCCESS,
-		D_SLOT_INIT,
-
-		//BAM I/0
-		D_SLOT_READ,
-		D_SLOT_WRITE,
-
-		//REALIGN
-		D_SLOT_NEXT,
-		D_SLOT_REFERENCE_LOAD,
-		D_SLOT_HAPLO_GET,
-		D_SLOT_REALIG_PER_HAPLO,
-		D_SLOT_NUCLEO_CMP
-	};
-
-#endif
-
 
 /**
  * REALIGNMENT REFERENCE SEQUENCE
@@ -111,9 +88,6 @@ typedef struct {
  * REALIGNER CONTEXT
  */
 typedef struct {
-	//Input list
-	linked_list_t *in_list;
-
 	//Reference genome
 	genome_t *genome;
 
@@ -130,6 +104,9 @@ typedef struct {
 
 	//Current region
 	alig_region_t region;
+
+	//Last region
+	alig_region_t last_region;
 
 	//Current reference
 	alig_reference_t reference;
@@ -163,7 +140,7 @@ typedef enum {
  * \param[in] genome Context containing reference genome.
  * \param[in] flags Flags to configure realigner behavior. Can be ALIG_LEFT_ALIGN, ALIG_REFERENCE_PRIORITY and ALIG_ORIGINAL_PRIORITY.
  */
-EXTERNC ERROR_CODE alig_init(alig_context_t *context, linked_list_t *in_list, genome_t *genome, uint8_t flags);
+EXTERNC ERROR_CODE alig_init(alig_context_t *context, genome_t *genome, uint8_t flags);
 
 /**
  * \brief Free resources from realigner.
@@ -186,9 +163,12 @@ EXTERNC ERROR_CODE alig_validate(alig_context_t *context);
 /**
  * \brief Get next region of reads to process.
  *
+ * \param[in] v_bams Vector containing input bams.
+ * \param[in] v_bams_l Length of input vector.
+ * \param[in] force_incomplete Force region complete even if last input bam is inside the region.
  * \param[in] context Context to process.
  */
-EXTERNC ERROR_CODE alig_region_next(alig_context_t *context);
+EXTERNC ERROR_CODE alig_region_next(bam1_t **v_bams, size_t v_bams_l, int force_incomplete, alig_context_t *context);
 
 /**
  * \brief Load reference sequence for present region in context.
@@ -219,26 +199,35 @@ EXTERNC ERROR_CODE alig_region_indel_realignment(alig_context_t *context);
 EXTERNC ERROR_CODE alig_region_clear(alig_context_t *context);
 
 /**
- * \brief Indel realign one file.
+ * \brief Indel realign one file. DEPRECATED
  *
  * \param[in] bam_path Path to the input BAM file.
  * \param[in] ref_name Reference file name (not including path).
  * \param[in] ref_path Path to reference file (not including name).
  * \param[in] outbam Path to output BAM file.
  */
-EXTERNC ERROR_CODE alig_bam_file(char *bam_path, char *ref_name, char *ref_path, char *outbam);
-
+EXTERNC ERROR_CODE alig_bam_file_old(char *bam_path, char *ref_name, char *ref_path, char *outbam) __ATTR_DEPRECATED;
 
 /**
  * PRIVATE FUNCTIONS
  */
 
 /**
- * \brief PRIVATE FUNCTION. Obtain score tables from present region.
+ * \brief PRIVATE FUNCTION.Obtain score tables from present region.
  *
  * \param[in] context Context to process.
  */
-static ERROR_CODE alig_get_scores(alig_context_t *context);
+static ERROR_CODE alig_get_scores(alig_context_t *context) __ATTR_HOT;
+
+/**
+ * \brief PRIVATE FUNCTION.Obtain score tables from read.
+ *
+ *	\param[in] read Read to process.
+ * \param[in] context Context to process.
+ * \param[out] v_scores Best score vector for every haplotype (index).
+ * \param[out] v_positions Best score position vector for every haplotype (index).
+ */
+static ERROR_CODE alig_get_scores_from_read(bam1_t *read, alig_context_t *context, uint32_t *v_scores, size_t *v_positions) __ATTR_HOT;
 
 /**
  * \brief PRIVATE FUNCTION. Obtain alternative haplotype from generated score tables.
