@@ -991,7 +991,10 @@ static inline void seed_cal_print(seed_cal_t *cal) {
 // utils
 //--------------------------------------------------------------------
 
-float get_max_score(array_list_t *cal_list);
+float get_max_score(array_list_t *cal_list,
+		    float match_score, float mismatch_penalty,
+		    float gap_open_penalty, float gap_extend_penalty);
+
 int get_min_num_mismatches(array_list_t *cal_list);
 int get_max_read_area(array_list_t *cal_list);
 

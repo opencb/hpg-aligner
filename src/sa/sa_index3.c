@@ -389,7 +389,7 @@ void sa_index3_build(char *genome_filename, uint k_value, char *sa_index_dirname
 void sa_index3_build_k18(char *genome_filename, uint k_value, char *sa_index_dirname) {
 
   k_value = 18;
-  printf("\n***************** K value = 18 ***************************\n");
+  //printf("\n***************** K value = 18 ***************************\n");
 
   const size_t value4M = 4194304; // 4 M
   const size_t value16M = 16777216; // 16 M
@@ -645,7 +645,7 @@ p      display_prefix(&genome->S[tmp[0][i].value], k_value);
   memset(M, 255, M_bytes);
 
   // start filling matrix
-  printf("filling matrix (%lu)...\n", matrix);
+  //printf("filling matrix (%lu)...\n", matrix);
   for (uint i = 0; i < num_suffixes; i++) {
     value = compute_prefix_value(&genome->S[SA[i]], k_value);
     //printf("value = %lu, (i = %i, j = %i)\n", value, i, j);
@@ -657,13 +657,13 @@ p      display_prefix(&genome->S[tmp[0][i].value], k_value);
 	matrix_items++;
       }
     } else {
-      printf("end of filling sub-matrix (%lu): %lu items. Done !!\n", matrix, matrix_items);
-      printf("\t -----> new matrix due to the value SA[%lu] = %lu -> ", i, value);
-      display_prefix(&genome->S[SA[i]], k_value);
-      printf("\n");
+      // printf("end of filling sub-matrix (%lu): %lu items. Done !!\n", matrix, matrix_items);
+      //printf("\t -----> new matrix due to the value SA[%lu] = %lu -> ", i, value);
+      //display_prefix(&genome->S[SA[i]], k_value);
+      //printf("\n");
       
       // read matrix and creating A, IA and JA vectors
-      printf("reading matrix %lu and updating CRS vectors...\n", matrix);
+      //printf("reading matrix %lu and updating CRS vectors...\n", matrix);
       for (row = 0; row < value16M; row++) {
 	first_in_row = 1;
 	for (col = 0; col < 256; col++) {
@@ -703,7 +703,7 @@ p      display_prefix(&genome->S[tmp[0][i].value], k_value);
 	}
       }
 
-      printf("end of reading matrix %lu and updating CRS vectors. Done !!\n", matrix);
+      //printf("end of reading matrix %lu and updating CRS vectors. Done !!\n", matrix);
       //	exit(-1);
 
       // initialize matrix to re-fill it
@@ -711,14 +711,14 @@ p      display_prefix(&genome->S[tmp[0][i].value], k_value);
       matrix_items = 0;
       memset(M, 255, M_bytes);
       
-      printf("init and filling matrix (%lu)...\n", matrix);
+      //printf("init and filling matrix (%lu)...\n", matrix);
       M[value % M_items] = i;
       matrix_items++;
     }
   }
 
   // read matrix and creating A, IA and JA vectors
-  printf("reading matrix %lu and updating CRS vectors...\n", matrix);
+  //printf("reading matrix %lu and updating CRS vectors...\n", matrix);
   for (row = 0; row < value16M; row++) {
     first_in_row = 1;
     for (col = 0; col < 256; col++) {
@@ -754,7 +754,7 @@ p      display_prefix(&genome->S[tmp[0][i].value], k_value);
     }
   }
 
-  printf("end of reading matrix %lu and updating CRS vectors. Done !!\n", matrix);
+  //printf("end of reading matrix %lu and updating CRS vectors. Done !!\n", matrix);
 
   printf("A length = %u, IA length = %u (num. prefixes = %lu)\n", A_counter, IA_counter, num_prefixes);
   fclose(f_A);

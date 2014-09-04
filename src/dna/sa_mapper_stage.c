@@ -2755,6 +2755,12 @@ int sa_single_mapper(void *data) {
   int max_read_area, min_num_mismatches;
   float max_score;
 
+  // smith-waterman parameters
+  float match_score = wf_batch->options->match;
+  float mismatch_penalty = wf_batch->options->mismatch;
+  float gap_open_penalty = -1.0f * wf_batch->options->gap_open;
+  float gap_extend_penalty = -1.0f * wf_batch->options->gap_extend;
+  
   // CAL management
   size_t num_cals;
   seed_cal_t *cal;
@@ -2847,7 +2853,8 @@ int sa_single_mapper(void *data) {
       #ifdef _TIMING
       gettimeofday(&start, NULL);
       #endif
-      max_score = get_max_score(cal_list);
+      max_score = get_max_score(cal_list, match_score, mismatch_penalty,
+				gap_open_penalty, gap_extend_penalty);
       #ifdef _VERBOSE
       printf("\n******* after SW> max. score = %0.2f (read %s)\n", max_score, read->id);
       #endif
@@ -2928,6 +2935,12 @@ int sa_pair_mapper(void *data) {
   size_t num_reads = mapping_batch->num_reads;
   int max_read_area, min_num_mismatches;
   float max_score;
+
+  // smith-waterman parameters
+  float match_score = wf_batch->options->match;
+  float mismatch_penalty = wf_batch->options->mismatch;
+  float gap_open_penalty = -1.0f * wf_batch->options->gap_open;
+  float gap_extend_penalty = -1.0f * wf_batch->options->gap_extend;
 
   // CAL management
   size_t num_cals;
@@ -3043,7 +3056,8 @@ int sa_pair_mapper(void *data) {
       #ifdef _TIMING
       gettimeofday(&start, NULL);
       #endif
-      max_score = get_max_score(cal_list);
+      max_score = get_max_score(cal_list, match_score, mismatch_penalty,
+				gap_open_penalty, gap_extend_penalty);
       #ifdef _VERBOSE
       printf("\n******* after SW> max. score = %0.2f (read %s)\n", max_score, read->id);
       #endif

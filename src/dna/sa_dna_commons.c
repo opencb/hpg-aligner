@@ -61,7 +61,9 @@ void init_func_names() {
 
 //--------------------------------------------------------------------
 
-float get_max_score(array_list_t *cal_list) {
+float get_max_score(array_list_t *cal_list,
+		    float match_score, float mismatch_penalty,
+		    float gap_open_penalty, float gap_extend_penalty) {
   seed_cal_t *cal;
   int num_matches, num_mismatches, num_open_gaps, num_extend_gaps;
   int num_cals = array_list_size(cal_list);
@@ -70,7 +72,9 @@ float get_max_score(array_list_t *cal_list) {
   for (int j = 0; j < num_cals; j++) {
     cal = array_list_get(j, cal_list);
 
-    cal->score = cigar_compute_score(5.0f, -4.0f, -10.0f, -0.05f, &cal->cigar);
+    cal->score = cigar_compute_score(match_score, mismatch_penalty, 
+				     gap_open_penalty, gap_extend_penalty, &cal->cigar);
+    //cal->score = cigar_compute_score(5.0f, -4.0f, -10.0f, -0.05f, &cal->cigar);
     cal->cigar_len = cigar_get_length(&cal->cigar);
 
     //    printf("(invalid, read length, cigar_len, score) = (%i, %i, %i, %0.2f)\n",
