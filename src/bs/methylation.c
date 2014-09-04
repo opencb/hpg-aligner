@@ -186,7 +186,7 @@ void cpy_transform_array_bs(array_list_t *src, array_list_t *dest_ct, array_list
 //====================================================================================
 
 void insert_mappings_array(array_list_t **dest, array_list_t **src) {
-  size_t num_reads = array_list_size(src);
+  size_t num_reads = array_list_size(src[0]);
   size_t num_mappings;
   alignment_t *align_tmp;
 
@@ -232,7 +232,7 @@ void insert_regions(array_list_t *dest, array_list_t *src) {
 //====================================================================================
 
 void transform_mappings_array(array_list_t **src){
-  size_t num_reads = array_list_size(src);
+  size_t num_reads = array_list_size(src[0]);
   size_t num_mappings;
   alignment_t *align_tmp;
 
@@ -1768,9 +1768,10 @@ int encode_context(char* filename, char* directory) {
   cont  = 0;
   cont2 = 0;
 
+  char *res;
   // descartar la primera linea
   do {
-    fgets(line1, 512, f1);
+    res = fgets(line1, 512, f1);
   } while(line1[0] == '>');
   
   
@@ -1973,18 +1974,18 @@ int load_encode_context(char* directory, unsigned long long **valuesCT, unsigned
     return -1;
   }
 
-  fscanf(f4, "%i\n", &chromosome);
+  int res = fscanf(f4, "%i\n", &chromosome);
   //printf("chromosomes %2i\n", chromosome);
 
   for (i = 0; i < chromosome; i++) {
-    fscanf(f4, "%lu\n", &size);
+    res = fscanf(f4, "%lu\n", &size);
     //printf("\tchromosome %2i (%10lu)\n", i, size);
 
     valuesCT[i] = (unsigned long long *)calloc(size, sizeof(unsigned long long));
-    fread (valuesCT[i], sizeof(unsigned long long), size, f2);
+    res = fread (valuesCT[i], sizeof(unsigned long long), size, f2);
 
     valuesGA[i] = (unsigned long long *)calloc(size, sizeof(unsigned long long));
-    fread (valuesGA[i], sizeof(unsigned long long), size, f3);
+    res = fread (valuesGA[i], sizeof(unsigned long long), size, f3);
   }
 
   free(tmp);

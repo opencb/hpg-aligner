@@ -113,7 +113,7 @@ int region_get_from_batch(const bam_batch_t* batch, alig_region_table_t *region_
  *
  * \param[in] bam_path Path to input BAM file.
  */
-int region_get_from_file(const char *bam_path);
+int region_get_from_file(char *bam_path);
 
 /**
  * \brief Get if BAM read overlaps a region.

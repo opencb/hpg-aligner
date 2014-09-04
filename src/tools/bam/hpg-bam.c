@@ -21,6 +21,11 @@
 #include "index_options.h"
 #include "sort_options.h"
 
+
+bam_index_t *bam_index_core(bamFile fp);
+void bam_index_save(const bam_index_t *idx, FILE *fp);
+void bam_sort_core_ext(int is_by_qname, const char *fn, const char *prefix, size_t max_mem, int is_stdout);
+
 //------------------------------------------------------------------------
 
 int recalibrate_bam(int argc, char **argv);
@@ -235,14 +240,14 @@ int main (int argc, char *argv[]) {
 
     // set parameters
     int is_by_qname = 0, is_stdout = 0;
-    char *sorted_filename[strlen(opts->in_filename)];
-    char *path[strlen(opts->out_dirname) + strlen(opts->in_filename) + 100];
+    char sorted_filename[strlen(opts->in_filename)];
+    char path[strlen(opts->out_dirname) + strlen(opts->in_filename) + 100];
 
     strcpy(sorted_filename, opts->in_filename);
     char *ext = strstr(sorted_filename, ".bam");
     if (ext) {
       *ext = 0;
-    }
+    } 
     sprintf(path, "%s/%s.sorted", opts->out_dirname, sorted_filename);
 
     if (strcmp("name", opts->criteria) == 0) {

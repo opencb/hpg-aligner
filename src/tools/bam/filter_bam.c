@@ -237,11 +237,11 @@ void filter_bam(filter_options_t *opts) {
   
   workflow_stage_function_t stage_functions[] = {bam_filter_worker};
   char *stage_labels[] = {"BAM filter worker"};
-  workflow_set_stages(1, &stage_functions, stage_labels, wf);
+  workflow_set_stages(1, stage_functions, stage_labels, wf);
   
   // optional producer and consumer functions
-  workflow_set_producer(bam_filter_producer, "BAM filter producer", wf);
-  workflow_set_consumer(bam_filter_consumer, "BAM filter consumer", wf);
+  workflow_set_producer((workflow_producer_function_t *)bam_filter_producer, "BAM filter producer", wf);
+  workflow_set_consumer((workflow_consumer_function_t *)bam_filter_consumer, "BAM filter consumer", wf);
   
   workflow_run_with(opts->num_threads, wf_input, wf);
 

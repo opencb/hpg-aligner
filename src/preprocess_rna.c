@@ -42,7 +42,7 @@ void preprocess_data_free(preprocess_data_t *preprocess_data) {
 
 
 void print_cal(cal_t *cal){
-  printf("chr:%i<->strand:(%i) <-> genome:[%lu-%lu] <-> seeds:%i\n", cal->chromosome_id, 
+  printf("chr:%lu<->strand:(%i) <-> genome:[%lu-%lu] <-> seeds:%lu\n", cal->chromosome_id, 
 	 cal->strand, cal->start, cal->end, cal->num_seeds);
 }
 
@@ -59,7 +59,7 @@ void show_cals_list(array_list_t* cals_list) {
 
 void show_cals_associate(unsigned char *associate_list, size_t n_cals) {
   size_t i = 0;
-  printf("ASOCIATE LIST (%i):\n", n_cals);
+  printf("ASOCIATE LIST (%lu):\n", n_cals);
   
   for (i = 0; i < n_cals; i++) { 
     printf("%i,", associate_list[i]);

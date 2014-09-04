@@ -29,24 +29,20 @@
 //====================================================================================
 
 struct batch_writer_input {
-  char* match_filename;
-  char* mismatch_filename;
-
-  char* splice_exact_filename;
-  char* splice_extend_filename;
-  
-  //  char* header_filename;
-  genome_t* genome;
-
-  linked_list_t* list_p;
-
-  // internal
-  bam_file_t *bam_file;
   size_t total_batches;
   size_t total_reads;
   size_t total_mappings;
   size_t num_mapped_reads;
   size_t limit_print;
+  int bam_format;
+
+  bam_file_t *bam_file;
+  char* match_filename;
+  char* mismatch_filename;
+  char* splice_exact_filename;
+  char* splice_extend_filename;
+  genome_t* genome;
+  linked_list_t* list_p;
 
   // for methylation only
   metil_file_t *metil_file;
@@ -54,9 +50,12 @@ struct batch_writer_input {
 
 //------------------------------------------------------------------------------------
 
-void batch_writer_input_init(char* match_filename, char* splice_exact_filename, 
-			     char* splice_extend_filename, linked_list_t* list_p, 
-			     genome_t* genome, batch_writer_input_t* input);
+void batch_writer_input_init(char* match_filename, 
+			     char* splice_exact_filename, 
+			     char* splice_extend_filename, 
+			     linked_list_t* list_p, 
+			     genome_t* genome,
+			     batch_writer_input_t* input);
 
 //====================================================================================
 

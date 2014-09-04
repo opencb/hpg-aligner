@@ -27,10 +27,10 @@ size_t search_prefix(char *sequence, size_t *low, size_t *high,
   }
   
   size_t row2 = row + 1;
-  //if (row2 >= sa_index->IA_items) {
-  //row2 = sa_index->IA_items;
-  //ia2 = sa_index->A_items;
-  //} else {
+  if (row2 >= sa_index->IA_items) {
+    row2 = sa_index->IA_items;
+    ia2 = sa_index->A_items;
+  } else {
     while ((ia2 = sa_index->IA[row2]) == max_uint) {
       row2++;
       if (row2 >= sa_index->IA_items) {
@@ -40,7 +40,8 @@ size_t search_prefix(char *sequence, size_t *low, size_t *high,
 	break;
       }
     }
-    //}
+  }
+  //}
   //  printf("\tfrom IA[%lu] = %lu to IA[%lu] = %lu -> num. columns = %lu\n", row, ia1, row2, ia2, ia2 - ia1);
   
   found_ja = 0;
@@ -48,7 +49,7 @@ size_t search_prefix(char *sequence, size_t *low, size_t *high,
   int idx, size = ia2 - ia1;
   for (ia = ia1; ia < ia2; ia++) {
     a1 = sa_index->A[ia];
-    ja = sa_index->JA[ia];
+    //ja = sa_index->JA[ia];
     //      printf("\t\tA[%lu] = %lu\t JA[%lu] = %lu\n", 
     //      	     ia, a1, ia, ja);
     if (sa_index->JA[ia] == col) {
@@ -141,35 +142,34 @@ size_t search_suffix(char *seq, uint len, int max_num_suffixes,
       }
       *high = *low;
       *suffix_len = matched + sa_index->k_value;
-      return num_prefixes;
-    }
-
-    
-    for (size_t i = *low; i < *high; i++) {
-      query = seq + sa_index->k_value;
-      ref = &sa_index->genome->S[sa_index->SA[i]] + sa_index->k_value;
-      matched = 0;
-      while (query[matched] == ref[matched]) {
-	matched++;
+      num_suffixes = num_prefixes;
+    } else {
+      for (size_t i = *low; i < *high; i++) {
+	query = seq + sa_index->k_value;
+	ref = &sa_index->genome->S[sa_index->SA[i]] + sa_index->k_value;
+	matched = 0;
+	while (query[matched] == ref[matched]) {
+	  matched++;
+	}
+	if (matched > max_matched) {
+	  first = i;
+	  last = i;
+	  max_matched = matched;
+	  //	break;
+	} else if (matched == max_matched) {
+	  last = i;
+	} else {
+	  break;
+	}
       }
-      if (matched > max_matched) {
-	first = i;
-	last = i;
-	max_matched = matched;
-	//	break;
-      } else if (matched == max_matched) {
-	last = i;
-      } else {
-	break;
+      
+      
+      if (first <= last) {
+	*low = first;
+	*high = last;
+	*suffix_len = max_matched + sa_index->k_value;
+	num_suffixes = last - first + 1;
       }
-    }
-    
-
-    if (first <= last) {
-      *low = first;
-      *high = last;
-      *suffix_len = max_matched + sa_index->k_value;
-      num_suffixes = last - first + 1;
     }
 
     #ifdef _TIMING
@@ -177,10 +177,11 @@ size_t search_suffix(char *seq, uint len, int max_num_suffixes,
     *suffix_time = ((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);  
     #endif
   }
-  
+
+  //  printf("\t\tnum_prefixes = %i, (num_suffixes = %i, length = %i)\n",
+  //	 num_prefixes, num_suffixes, *suffix_len);
   return num_suffixes;
 }
-
 
 //--------------------------------------------------------------------
 //--------------------------------------------------------------------

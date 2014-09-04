@@ -323,7 +323,7 @@ int apply_seeding(region_seeker_input_t* input, batch_t *batch) {
 	    //}
 	  
 	    //printf("Seeding between anchors... gap=%i\n", big_gap);
-	    printf("11 bwt_map_exact_seeds_between_coords --> searching from %li to %li\n", start_search, end_search);
+	    printf("11 bwt_map_exact_seeds_between_coords --> searching from %i to %i\n", start_search, end_search);
 	    /*
 	    num_mappings = bwt_map_exact_seeds_between_coords(start_search,
 							      end_search,
@@ -487,7 +487,7 @@ int apply_seeding_bs(region_seeker_input_t* input, batch_t *batch) {
   //if (batch->mapping_mode == BS_MODE) {
   for (size_t i = 0; i < num_targets; i++) {
     //Delete....
-    printf("=============================READ %i=========================\n", i);
+    printf("=============================READ %lu=========================\n", i);
     array_list_t *list  = mapping_batch->mapping_lists[targets[i]];
     array_list_t *list2 = mapping_batch->mapping_lists2[targets[i]];
 
@@ -496,13 +496,13 @@ int apply_seeding_bs(region_seeker_input_t* input, batch_t *batch) {
     printf("mappings_list:\n");
     for (int j = 0; j < list->size; j++) {
       cal_t *cal = array_list_get(j, list);
-      printf("\tANCHOR BWT%i: [%i:%lu-%lu]\n", j, cal->chromosome_id, cal->start, cal->end);
+      printf("\tANCHOR BWT%i: [%lu:%lu-%lu]\n", j, cal->chromosome_id, cal->start, cal->end);
     }
 
     printf("mappings_list2:\n");
     for (int j = 0; j < list2->size; j++) {
       cal_t *cal = array_list_get(j, list2);
-      printf("\tANCHOR BWT%i: [%i:%lu-%lu]\n", j, cal->chromosome_id, cal->start, cal->end);
+      printf("\tANCHOR BWT%i: [%lu:%lu-%lu]\n", j, cal->chromosome_id, cal->start, cal->end);
     }
 
     printf("=================================================================\n");

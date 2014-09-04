@@ -8,6 +8,8 @@ extern int num_total_dup_reads;
 
 extern size_t num_mapped_reads;
 extern size_t num_unmapped_reads;
+extern size_t num_multihit_reads;
+extern size_t num_total_mappings;
 extern size_t num_unmapped_reads_by_invalid_cal;
 extern size_t num_unmapped_reads_by_cigar_length;
 
@@ -17,8 +19,36 @@ extern size_t num_unmapped_reads_by_cigar_length;
 
 int counters[NUM_COUNTERS];
 
-void dna_aligner(options_t *options) {
+#include "adapter.h"
 
+void dna_aligner(options_t *options) {
+  /*
+  {
+    int num_reads, eof = 0;
+    fastq_read_t *read;
+    fastq_file_t *fq_file = fastq_fopen(options->in_filename);
+    array_list_t *reads;
+    while (1) {
+      reads = array_list_new(options->batch_size, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
+      num_reads = fastq_fread_se(reads, options->batch_size, fq_file);
+      if (num_reads == 0) {
+	break;
+      }
+      for (int i = 0; i < num_reads; i++) {
+	read = array_list_get(i, reads);
+
+	cut_adapter(options->adapter, options->adapter_length, read);
+	if (i > 100) {
+	  abort();
+	}
+      }
+      array_list_free(reads, (void *) fastq_read_free);
+    }
+    
+    fastq_fclose(fq_file);
+    exit(-1);
+  }
+  */
   for (int i = 0; i < NUM_COUNTERS; i++) {
     counters[i] = 0;
   }
@@ -59,6 +89,12 @@ void dna_aligner(options_t *options) {
   } else {
     strcat(out_filename, "out.sam");
   }
+
+
+  options->report_best = 1;
+  options->report_n_best = 0;
+  options->report_n_hits = 0;
+  options->report_all = 0;
 
   // load SA index
   struct timeval stop, start;
@@ -176,14 +212,15 @@ void dna_aligner(options_t *options) {
     } else {
       stage_functions[0] = sa_pair_mapper;
     }
-    workflow_set_stages(1, &stage_functions, stage_labels, wf);
+    //workflow_set_stages(1, &stage_functions, stage_labels, wf);
+    workflow_set_stages(1, stage_functions, stage_labels, wf);
     
     // optional producer and consumer functions
-    workflow_set_producer(sa_fq_reader, "FastQ reader", wf);
+    workflow_set_producer((workflow_producer_function_t *)sa_fq_reader, "FastQ reader", wf);
     if (bam_format) {
-      workflow_set_consumer(sa_bam_writer, "BAM writer", wf);
+      workflow_set_consumer((workflow_consumer_function_t *)sa_bam_writer, "BAM writer", wf);
     } else {
-      workflow_set_consumer(sa_sam_writer, "SAM writer", wf);
+      workflow_set_consumer((workflow_consumer_function_t *)sa_sam_writer, "SAM writer", wf);
     }
     
     printf("----------------------------------------------\n");
@@ -206,6 +243,9 @@ void dna_aligner(options_t *options) {
 	   num_mapped_reads + num_unmapped_reads,
 	   num_mapped_reads, 100.0f * num_mapped_reads / (num_mapped_reads + num_unmapped_reads),
 	   num_unmapped_reads, 100.0f * num_unmapped_reads / (num_mapped_reads + num_unmapped_reads));
+    printf("\n");
+    printf("Num. mappings      : %lu\n", num_total_mappings);
+    printf("Num. multihit reads: %lu\n", num_multihit_reads);
     printf("----------------------------------------------\n");
 
 

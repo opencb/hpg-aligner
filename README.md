@@ -40,12 +40,12 @@ DOWNLOAD and BUILDING
     Resolving deltas: 100% (4430/4430), done.
     Submodule path 'lib/hpg-libs': checked out '962f531ef0ffa2a6a665ae6fba8bc2337c4351a9'
 
-  For the most recent HPG Aligner version, choose the 'develop' Git branch (both for the hpg-libs and the HPG Aligner):
+  For the most recent HPG Aligner version, choose the 'master' Git branch (both for the hpg-libs and the HPG Aligner):
 
     $ cd lib/hpg-libs
-    $ git checkout develop
+    $ git checkout master
     $ cd ../..
-    $ git checkout develop
+    $ git checkout master
 
 
   Before you can build HPG Aligner, you must install on your system:
@@ -100,16 +100,89 @@ RUNNING
 
   In order to map RNA sequences:
 
-    1) Create the HPG Aligner index based on Burrows-Wheeler Transform by invoking:
+    A) Map Based on Burrows-Wheeler Transform method for slow memory consumption
+       1) Create the BWT HPG Aligner index
 
-      $ ./bin/hpg-aligner build-bwt-index -g <ref-genome-fasta-file> -i <index-directory> -r <compression-ratio>
+         $ ./bin/hpg-aligner build-bwt-index -g <ref-genome-fasta-file> -i <index-directory> -r <compression-ratio>
+	 
+	 Example:
 
-    2) Map by invoking:
+	 $ ./bin/hpg-aligner build-bwt-index -g /home/user/Homo_sapiens.fa -i /home/user/INDEX/  -r 8
 
-      $ ./bin/hpg-aligner rna -i <index-directory> -f <fastq-file> -o <output-directory>
+       2) Map by invoking:
 
+         $ ./bin/hpg-aligner rna -i <index-directory> -f <fastq-file> -o <output-directory>
 
+         Example:
 
+         $ ./bin/hpg-aligner rna -i /home/user/INDEX/ -f reads.fq
+         +===============================================================+
+         |                           RNA MODE                            |
+         +===============================================================+
+         |      ___  ___  ___                                            |
+         |    \/ H \/ P \/ G \/                                          |
+      	 |    /\___/\___/\___/\                                          |
+         |      ___  ___  ___  ___  ___  ___  ___                        |
+         |    \/ A \/ L \/ I \/ G \/ N \/ E \/ R \/                      |
+         |    /\___/\___/\___/\___/\___/\___/\___/\                      |
+         |                                                               |
+         +===============================================================+
+
+         WORKFLOW 1
+         [|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||]  100%
+
+         WORKFLOW 2
+         [|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||]  100%
+
+         WORKFLOW 3
+         [|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||]  100%
+
+         +===============================================================+
+         |        H P G - A L I G N E R    S T A T I S T I C S           |
+         +===============================================================+
+         |              T I M E    S T A T I S T I C S                   |
+         +---------------------------------------------------------------+
+          Loading time                            :  5.69 (s)
+          Alignment time                          :  438.09 (s)
+          Total time                              :  443.79 (s)
+         +---------------------------------------------------------------+
+         |            M A P P I N G    S T A T I S T I C S               |
+         +---------------------------------------------------------------+
+          Total reads process                     :  10000000
+          Total reads mapped                      :  9977505 (99.78%)
+          Total reads unmapped                    :  22495 (0.22%)
+          Reads with a single mapping             :  9532383 (95.32%)
+          Reads with multi mappings               :  445122 (4.45%)
+          Reads mapped with BWT phase             :  6441691 (64.42%)
+          Reads mapped in workflow 1              :  9737937 (97.38%)
+          Reads mapped in workflow 2              :  149381 (1.49%)
+          Reads mapped in workflow 3              :  90187 (0.90%)
+         +---------------------------------------------------------------+
+         |    S P L I C E    J U N C T I O N S    S T A T I S T I C S    |
+         +---------------------------------------------------------------+
+          Total splice junctions                  :  2556653
+          Total cannonical splice junctions       :  2535847 (99.19%)
+          Total semi-cannonical splice junctions  :  20806 (0.81%)
+         +---------------------------------------------------------------+
+
+    B) Map Based on SA method for more speed
+
+       1) Create the SA HPG Aligner index
+
+         $ ./bin/hpg-aligner build-sa-index -g <ref-genome-fasta-file> -i <index-directory>
+	 
+	 Example:
+
+	 $./bin/hpg-aligner build-sa-index  -g /home/user/Homo_sapiens.fa -i /home/user/INDEX/
+
+       2) Map by invoking:
+
+         $ ./bin/hpg-aligner rna -i <index-directory> -f <fastq-file> -o <output-directory> --sa-mode
+
+         Example:
+
+         $ ./bin/hpg-aligner rna  -i /home/user/INDEX/ -f reads.fq -o /home/user/sa_output --sa-mode
+    
 
 DOCUMENTATION
 -------------

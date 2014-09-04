@@ -288,7 +288,7 @@ region_get_from_batch(const bam_batch_t* batch, alig_region_table_t *region_tabl
  * Get region table from BAM file.
  */
 int
-region_get_from_file(const char *bam_path)
+region_get_from_file(char *bam_path)
 {
 	bam_file_t *bam_f = NULL;
 	bam_batch_t *batch = NULL;
@@ -333,9 +333,9 @@ region_get_from_file(const char *bam_path)
 			{
 				//Print region
 				if(region->start_pos != region->end_pos)
-					printf("%d:%d-%d\n", region->chrom + 1,  region->start_pos, region->end_pos);
+					printf("%d:%lu-%lu\n", region->chrom + 1,  region->start_pos, region->end_pos);
 				else
-					printf("%d:%d\n", region->chrom + 1, region->start_pos);
+					printf("%d:%lu\n", region->chrom + 1, region->start_pos);
 
 				//Get next region
 				region = (alig_region_t *)linked_list_iterator_prev(region_it);

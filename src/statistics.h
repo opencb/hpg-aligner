@@ -8,6 +8,24 @@
 
 #include "timing.h"
 
+typedef struct st_bwt {
+  size_t multi_alig;
+  size_t single_alig;
+  size_t total_reads;
+  size_t map_bwt;
+  
+  size_t map_w1;
+  size_t map_w2;
+  size_t map_w3;
+
+  size_t tot_sj;
+  size_t dif_sj;
+  size_t cannonical_sj;
+  size_t semi_cannonical_sj;
+
+} st_bwt_t;
+
+
 typedef struct statistics{
   int num_sections;
   int num_subsections;
@@ -22,6 +40,7 @@ typedef struct basic_statistics {
   size_t total_reads;
   size_t num_mapped_reads;
   size_t total_mappings;
+  size_t reads_uniq_mappings;
   size_t total_sp;
   size_t uniq_sp;
   pthread_mutex_t mutex;
@@ -48,7 +67,7 @@ void statistics_add(unsigned int section, unsigned int subsection, size_t value,
 
 void statistics_display(statistics_t* statistics_p);
 
-void basic_statistics_display(basic_statistics_t *statistics, int rna_mode, float alig_time, float load_time);
+void basic_statistics_display(basic_statistics_t *statistics, int rna_mode, float alig_time, float load_time, size_t reads_ph2);
 
 void basic_statistics_init(size_t total_reads, size_t num_mapped_reads, size_t total_mappings, basic_statistics_t *statistics);
 
@@ -57,7 +76,7 @@ void basic_statistics_sp_init(size_t total_sp, size_t uniq_sp, basic_statistics_
 void timing_and_statistics_display(statistics_t* statistics_p, 
 				   timing_t* timing_p);
 
-void basic_statistics_add(size_t total_reads, size_t num_mapped_reads, size_t total_mappings, basic_statistics_t *basic);
+void basic_statistics_add(size_t total_reads, size_t num_mapped_reads, size_t total_mappings, size_t reads_uniq_mappings, basic_statistics_t *basic);
 
 basic_statistics_t *basic_statistics_new();
 

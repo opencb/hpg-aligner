@@ -25,7 +25,7 @@ if int(ARGUMENTS.get('debug', '0')) == 1:
     env['CFLAGS'] += ' -O0 -g'
 else:
     debug = 0
-    env['CFLAGS'] += ' -O3 -g'
+    env['CFLAGS'] += ' -O3'
 
 if int(ARGUMENTS.get('verbose', '0')) == 1:
     env['CFLAGS'] += ' -D_VERBOSE'

@@ -346,6 +346,8 @@ int apply_bwt(bwt_server_input_t* input, batch_t *batch) {
 // RNA
 //------------------------------------------------------------------------------------
 
+void fastq_read_revcomp(fastq_read_t *read);
+
 int apply_bwt_rna(bwt_server_input_t* input, batch_t *batch) {
 
   LOG_DEBUG("========= APPLY BWT RNA =========\n");
@@ -362,6 +364,7 @@ int apply_bwt_rna(bwt_server_input_t* input, batch_t *batch) {
   size_t num_anchors;
 
   extern pthread_mutex_t mutex_sp;
+  extern st_bwt_t st_bwt;
   //pthread_mutex_lock(&mutex_sp);
   //extern size_t total_reads;
   //total_reads += num_reads;
@@ -369,6 +372,10 @@ int apply_bwt_rna(bwt_server_input_t* input, batch_t *batch) {
   
   for (int i = 0; i < num_reads; i++) {
     fastq_read_t *read = array_list_get(i, mapping_batch->fq_batch);
+
+    //Rev-comp
+    fastq_read_revcomp(read);
+
     //printf("BWT: %s\n", read->id);
     list = mapping_batch->mapping_lists[i];    
     
@@ -399,6 +406,11 @@ int apply_bwt_rna(bwt_server_input_t* input, batch_t *batch) {
       }else {
 	//Read Map, Metaexon Actualization
 	array_list_set_flag(ALIGNMENTS_FOUND, list);
+
+	pthread_mutex_lock(&mutex_sp);
+	st_bwt.map_bwt++;
+	pthread_mutex_unlock(&mutex_sp);
+
 	for (int i = 0; i < num_mappings; i++) {
 	  alignment_t *alignment = array_list_get(i, list);
 	  metaexon_insert(0/*alignment->seq_strand*/, alignment->chromosome,
@@ -566,7 +578,7 @@ int apply_bwt_bs(bwt_server_input_t* input, batch_t *batch) {
     bwt_map_inexact_read_bs(fq_read,
 			    input->bwt_optarg_p, input->bwt_index2_p,
 			    mapping_batch->mapping_lists[i], 1);
-    printf("Search 1 end! with flag %i | items %i\n", mapping_batch->mapping_lists[i]->flag,
+    printf("Search 1 end! with flag %i | items %lu\n", mapping_batch->mapping_lists[i]->flag,
 	   mapping_batch->mapping_lists[i]->size);
     //if (array_list_get_flag(mapping_batch->mapping_lists[i]) == 0 && 
     //	items_list2->size > 0) {
@@ -582,7 +594,7 @@ int apply_bwt_bs(bwt_server_input_t* input, batch_t *batch) {
       bwt_map_inexact_read_bs(fq_read,
 			      input->bwt_optarg_p, input->bwt_index_p,
 			      mapping_batch->mapping_lists[i], 0);
-      printf("Search 2 end! with flag %i | items %i\n", mapping_batch->mapping_lists[i]->flag,
+      printf("Search 2 end! with flag %i | items %lu\n", mapping_batch->mapping_lists[i]->flag,
 	     mapping_batch->mapping_lists[i]->size);
     }
 
@@ -592,7 +604,7 @@ int apply_bwt_bs(bwt_server_input_t* input, batch_t *batch) {
     bwt_map_inexact_read_bs(fq_read,
 			    input->bwt_optarg_p, input->bwt_index_p,
 			    mapping_batch->mapping_lists2[i], 1);
-    printf("Search 3 end! with flag %i | items %i\n", mapping_batch->mapping_lists2[i]->flag, 
+    printf("Search 3 end! with flag %i | items %lu\n", mapping_batch->mapping_lists2[i]->flag, 
 	   mapping_batch->mapping_lists2[i]->size);
     // transform the mappings of search 4 to the reverse strand
     //if (array_list_get_flag(mapping_batch->mapping_lists2[i]) == 0 && 
@@ -607,12 +619,12 @@ int apply_bwt_bs(bwt_server_input_t* input, batch_t *batch) {
       bwt_map_inexact_read_bs(fq_read,
 			      input->bwt_optarg_p, input->bwt_index2_p,
 			      mapping_batch->mapping_lists2[i], 0);
-      printf("Search 4 end! with flag %i | items %i\n", mapping_batch->mapping_lists2[i]->flag,
+      printf("Search 4 end! with flag %i | items %lu\n", mapping_batch->mapping_lists2[i]->flag,
 	     	   mapping_batch->mapping_lists2[i]->size);
     }
 
-    printf("NUM ITEMS LIST   = %i\n", mapping_batch->mapping_lists[i]->size);
-    printf("NUM ITEMS LIST 2 = %i\n", mapping_batch->mapping_lists2[i]->size);
+    printf("NUM ITEMS LIST   = %lu\n", mapping_batch->mapping_lists[i]->size);
+    printf("NUM ITEMS LIST 2 = %lu\n", mapping_batch->mapping_lists2[i]->size);
     //Flag 0 --> Read mapped!
     //Flag 1 --> Read with anchors!
     //Flag 2 --> Read with mappings exceded!
@@ -675,8 +687,8 @@ int apply_bwt_bs(bwt_server_input_t* input, batch_t *batch) {
 	//printf("-read %lu not mapped\n%s\n\n", i, fq_read->sequence);
       }
     }
-    printf("------------NUM ITEMS LIST   = %i\n", mapping_batch->mapping_lists[i]->size);
-    printf("------------NUM ITEMS LIST 2 = %i\n", mapping_batch->mapping_lists2[i]->size);
+    printf("------------NUM ITEMS LIST   = %lu\n", mapping_batch->mapping_lists[i]->size);
+    printf("------------NUM ITEMS LIST 2 = %lu\n", mapping_batch->mapping_lists2[i]->size);
   }
 
   /*
