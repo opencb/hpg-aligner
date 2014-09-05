@@ -31,23 +31,22 @@
 #include "bfwork/bam_file_ops.h"
 
 int mymain(	int full,
-			int p1,
-			int p2,
-			int cycles,
-			int threads,
-			const char *reference, 
-			int refcount, 
-			const char *input, 
-			int incount,
-			const char *output, 
-			int outcount,
-			const char *datafile, 
-			int datacount,
-			const char *infofile,
-			int infocount,
-			const char *stats,
-			int statscount
-			)
+					int p1,
+					int p2,
+					int cycles,
+					int threads,
+					const char *reference,
+					int refcount,
+					const char *input,
+					int incount,
+					const char *output,
+					int outcount,
+					const char *datafile,
+					int datacount,
+					const char *infofile,
+					int infocount,
+					const char *stats,
+					int statscount)
 {	
 	char *refc, *inputc, *outputc, *infofilec, *datafilec, *statsc;
 	char *sched;
