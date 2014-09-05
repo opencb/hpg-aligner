@@ -405,7 +405,7 @@ recal_get_data_from_bam_alignment(const bam1_t* read, const genome_t* ref, recal
 		LOG_WARN_F("Alignment with sequence length zero: %s\n", bam1_qname(read));
 		return NO_ERROR;
 	}
-	init_pos = read->core.pos - 100;
+	init_pos = read->core.pos; //- 100;
 	if(init_pos < 0)
 		init_pos = 0;
 	end_pos = read->core.pos + (bam_seq_l  * 2) + 100;

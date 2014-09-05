@@ -32,8 +32,10 @@ compare_bams_qual(const char* bamPath0, const char* bamPath1, const int cycles)
 
 	printf("Opening BAM 1 form \"%s\" ...\n", bamPath0);
 	printf("Opening BAM 2 form \"%s\" ...\n", bamPath1);
+
 	bamFile0 = bam_fopen((char *)bamPath0);
 	bamFile1 = bam_fopen((char *)bamPath1);
+
 	printf("BAM opened!...\n");
 
 

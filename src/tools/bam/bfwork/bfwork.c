@@ -139,6 +139,12 @@ bfwork_configure(bam_fwork_t *fwork, const char *in_file, const char *out_file, 
 
 	//Logging
 	LOG_INFO("Framework configured\n");
+	if(fwork->input_file_str)
+		LOG_INFO_F("Input file: %s\n", fwork->input_file_str);
+	if(fwork->output_file_str)
+		LOG_INFO_F("Output file: %s\n", fwork->output_file_str);
+	if(fwork->reference_str)
+		LOG_INFO_F("Reference file: %s\n", fwork->reference_str);
 
 	return NO_ERROR;
 }
