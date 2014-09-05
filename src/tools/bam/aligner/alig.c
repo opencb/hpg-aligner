@@ -455,6 +455,15 @@ alig_region_load_reference(alig_context_t *context)
 		//Get first read position
 		read = (bam1_t *)array_list_get(0, context->filtered_list);
 		assert(read);
+
+		//This read have a valid position?
+		if(read->core.pos < 0)
+		{
+			LOG_WARN("First read position is minor than zero when loading reference");
+			return ALIG_INVALID_REGION;
+		}
+
+		//Get reference first position
 		ref_pos_begin = (read->core.pos - ALIG_REFERENCE_ADDITIONAL_OFFSET);
 		if(ref_pos_begin < 0)
 		{
@@ -479,9 +488,19 @@ alig_region_load_reference(alig_context_t *context)
 			return ALIG_INVALID_REGION;
 		}
 
+		//Check reference length is not minor than 1
+		if((ref_pos_end - ref_pos_begin) <= 0)
+		{
+			LOG_WARN("Error loading reference, length is minor than 1");
+			return ALIG_INVALID_REGION;
+		}
+
 		//Get reference
 		ref_seq = (char *) malloc(((ref_pos_end - ref_pos_begin) + 2) * sizeof(char));
-		assert(ref_seq);
+		if(ref_seq == NULL)
+		{
+			LOG_FATAL("Cannot allocate memory");
+		}
 
 		genome_read_sequence_by_chr_index(ref_seq, (flag & BAM_FREVERSE) ? 1 : 0, (unsigned int)read->core.tid, &aux_pos_begin, &aux_pos_end, context->genome);
 
