@@ -267,6 +267,15 @@ char *cigar_code_find_and_report_sj(size_t start_map, cigar_code_t *cigar_code,
 			exon_start, exon_end, 40,
 			METAEXON_LEFT_END, node_avl_end,
 			metaexons);
+	/*
+	size_t lim_inf = 423376;
+	size_t lim_sup = 829272;
+	if ((lim_inf - 2 <= sj_start && sj_start <= lim_inf + 2) &&
+	    (lim_sup - 2 <= sj_end && sj_end <= lim_sup + 2)) {
+	  printf("%s : %s, %lu, %i\n", read->id, cigar_str, start_map, chromosome);
+
+	}
+	*/
 	
       }
 
@@ -3258,6 +3267,7 @@ int search_simple_splice_junction(seed_region_t *s_prev, seed_region_t *s_next,
   int read_end     = s_next->read_start;
   int intron_size = 0;
 
+  
   //printf("START READ START %i/%lu READ END %i/%lu\n", read_start, s_prev->genome_end, 
   //	 read_end, s_next->genome_start);
 
@@ -3314,6 +3324,7 @@ int search_simple_splice_junction(seed_region_t *s_prev, seed_region_t *s_next,
 
   LOG_DEBUG_F("LEFT EXON  (%lu-%lu): %s\n", genome_start, genome_end, left_exon);
 
+  //printf("LEFT EXON  (%lu-%lu): %s\n", genome_start, genome_end, left_exon);
   genome_start = genome_start_aux - gap_read - FLANK;
   genome_end   = genome_start_aux - 1;
   
@@ -3322,6 +3333,7 @@ int search_simple_splice_junction(seed_region_t *s_prev, seed_region_t *s_next,
 				    &genome_start, &genome_end, genome);		  
 
   LOG_DEBUG_F("RIGHT EXON (%lu-%lu): %s\n", genome_start, genome_end, right_exon);
+  //printf("RIGHT EXON (%lu-%lu): %s\n", genome_start, genome_end, right_exon);
 
   size_t dsp_l, dsp_r, type;
 
@@ -3422,7 +3434,7 @@ int search_simple_splice_junction(seed_region_t *s_prev, seed_region_t *s_next,
 
     read_pos = read_start + 1;
     for (int c_l = 0; c_l < limit_left; c_l++) {
-      //printf("l: %c == %c\n", left_exon[c_l], sequence[c_l]);
+      //printf("l: %c == %c\n", left_exon[c_l], sequence[read_pos]);
       if (read_pos >= seq_len) { goto exit; }
 
       if (left_exon[c_l] == sequence[read_pos++]) {
@@ -3433,6 +3445,7 @@ int search_simple_splice_junction(seed_region_t *s_prev, seed_region_t *s_next,
 
     }
 
+    //printf("matches=%i - mismatches=%i\n", matches[sp_pos], mismatches[sp_pos]);
     read_pos = read_end - 1;
     genome_pos = strlen(right_exon) - 1;
 

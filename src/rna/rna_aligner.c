@@ -748,6 +748,36 @@ void rna_aligner(options_t *options) {
 
   //validate_options(options);
   // display selected options
+
+  //time_on =  (unsigned int) options->timming;
+  //statistics_on =  (unsigned int) options->statistics;
+
+  struct timeval time_genome_s, time_genome_e;
+  double time_genome;
+
+  metaexons_t *metaexons;
+  genome_t *genome;
+  
+  bwt_index_t *bwt_index;
+  sa_index3_t *sa_index;
+  int num_chromosomes;
+  // load index for dna/rna or for bisulfite case
+
+  options->fast_mode = 0;
+  //Select mode
+  DIR *d;
+  struct dirent *dir;
+  d = opendir(options->bwt_dirname);
+  if (d) {
+    while ((dir =readdir(d)) != NULL) {
+      if (strstr(dir->d_name, "SA")) {
+	options->fast_mode = 1;
+	break;
+      }
+    }
+    closedir(d);
+  }
+
   LOG_DEBUG("Displaying options...\n");
   options_display(options);
 
@@ -788,19 +818,6 @@ void rna_aligner(options_t *options) {
     fprintf(stderr, "WARNING: The files input are gziped compressed, therefore the details of process are disable.\n");
   }
 
-  //time_on =  (unsigned int) options->timming;
-  //statistics_on =  (unsigned int) options->statistics;
-
-  struct timeval time_genome_s, time_genome_e;
-  double time_genome;
-
-  metaexons_t *metaexons;
-  genome_t *genome;
-  
-  bwt_index_t *bwt_index;
-  sa_index3_t *sa_index;
-  int num_chromosomes;
-  // load index for dna/rna or for bisulfite case
 
   start_timer(time_genome_s);
 
