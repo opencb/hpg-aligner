@@ -1061,10 +1061,10 @@ bfwork_region_insert(bam_fwork_t *fwork, bam_region_t *region)
 	linked_list_insert_last(region, list);
 
 	omp_set_lock(&region->lock);
-	LOG_INFO_F("Inserting region %d:%d-%d with %d reads\n",
+	LOG_INFO_F("Inserting region %d:%lu-%lu with %d reads\n",
 				region->chrom + 1, region->init_pos + 1,
 				region->end_pos + 1, region->size);
-	LOG_INFO_F("Regions to process %d\n", linked_list_size(list));
+	LOG_INFO_F("Regions to process %lu\n", linked_list_size(list));
 	omp_unset_lock(&region->lock);
 
 	omp_unset_lock(&fwork->regions_lock);
