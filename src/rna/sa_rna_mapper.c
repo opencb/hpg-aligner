@@ -1,7 +1,43 @@
 #include "sa_rna_mapper.h"
 
 #define MAX_DEPTH 4
-#define DEBUG 1
+//#define DEBUG 1
+
+
+const int min_score = 60;
+
+
+int get_score (cigar_code_t *cc, fastq_read_t *read, float match, float mismatch, float gap_open, float gap_extend) {
+  //Smith-Waterman score
+  int tot_match = read->length - cc->distance;
+  int tot_gap_open = 0;
+  int tot_indel_extend = 0;
+  int tot_indel = 0;
+  for (int i = 0; i < cc->ops->size; i++) {
+    cigar_op_t *op = array_list_get(i, cc->ops);
+    if (op->name == 'I' || op->name == 'D') {
+      tot_gap_open++;
+      tot_indel_extend += op->number - 1;
+      tot_indel += op->number;
+    }
+  }
+  
+  int tot_mismatch = cc->distance - tot_indel;
+  if (tot_mismatch < 0) {
+    tot_mismatch = 0;
+  }
+
+  float score = tot_match * match + tot_mismatch * mismatch - tot_indel_extend * gap_extend - tot_gap_open * gap_open;
+  int score_f = score * 100 / (read->length * match);
+
+  //printf("%s, score = (%i * %f + %i * %f + %i * %f + %i * %f)= %f/%i\n", read->id, tot_match, match, tot_mismatch, mismatch, tot_indel_extend, gap_extend, tot_gap_open, gap_open, score, score_f);
+
+  return score_f;
+
+}
+
+//#define SCORE(X, Y) ((X * 0.5 - Y*0.4)*100) / (X * 0.5);
+
 
 const int MAX_INTRON_SIZE = 500000;
 const int MIN_INTRON_SIZE = 40;
@@ -61,12 +97,6 @@ cigar_code_t* search_splice_junction(sw_optarg_t *sw_optarg,
 				     int *sp_type,
 				     int *distance);
 
-
-void SA_DEBUG(char *msg, ...) {
-  if (DEBUG) {
-    printf("%s", msg);
-  }
-}
 
 //Sa Mappings Reader, 2nd round
 void *sa_alignments_reader_rna(void *input) {
@@ -1941,6 +1971,7 @@ void convert_batch_to_str(sa_wf_batch_t *wf_batch) {
   //sa_rna_input_t *sa_rna = wf_batch->data;
   //pair_server_input_t *pair_input = sa_rna->pair_input;
 
+  wf_batch->data_output_size = 0;
 
   num_reads = sa_batch->num_reads;
   if (!num_reads) { return; }
@@ -2356,7 +2387,9 @@ extern inline void parse_alignment_data(array_list_t *list, fastq_read_t *fq_rea
 
 int sa_mapped_exact_reads(fastq_read_t *read, 
 			  sa_index3_t *sa_index,
-			  array_list_t *alignments_list) {
+			  array_list_t *alignments_list,
+			  float match, float mismatch, 
+			  float gap_open, float gap_extend) {
 
   size_t low_p, high_p, suffix_len_p;
   size_t low_n, high_n, suffix_len_n;  
@@ -2380,6 +2413,7 @@ int sa_mapped_exact_reads(fastq_read_t *read,
 				 MAX_NUM_SUFFIXES, sa_index, 
 				 &low_n, &high_n, &suffix_len_n);
     
+
   // exact search for exact reads
   if (suffix_len_p == read->length) {
     //Report Exact Maps! (+)
@@ -2389,24 +2423,30 @@ int sa_mapped_exact_reads(fastq_read_t *read,
     if (n_alig > MAX_ALIG) {
       n_alig = MAX_ALIG;
     }
-
+    
     size_t suff = low_p;
     for (size_t a = 0; a < n_alig; a++, suff++) {
       chrom = sa_index->CHROM[suff];	
       g_start = sa_index->SA[suff] - sa_index->genome->chrom_offsets[chrom];
       
-      char cigar_str[2048];
-      sprintf(cigar_str, "%i%c", read->length, 'M');     
-
+      //char cigar_str[2048];
+      //sprintf(cigar_str, "%i%c", read->length, 'M');     
       alignment = alignment_new();
+      alignment->mapq = 0;
+      cigar_code_t *cc = cigar_code_new();
+      array_list_insert(cigar_op_new(read->length, 'M'), cc->ops);
+      int score = get_score(cc, read, match, mismatch, gap_open, gap_extend);
+
       alignment_init_single_end(strdup(read->id), 
 				strdup(read->sequence), 
 				strdup(read->quality), 
 				0, chrom + 1,
 				g_start,
-				strdup(cigar_str), 
-				1, 0, 1, (n_alig > 1),
+				NULL, 
+				1, 
+				score, 1, (n_alig > 1),
 				0, 0, alignment);
+      alignment->alig_data = cc;
 
       array_list_insert(alignment, alignments_list);
     }
@@ -2415,7 +2455,7 @@ int sa_mapped_exact_reads(fastq_read_t *read,
   if (suffix_len_n == read->length) {
     //Report Exact Map! (-)
     alignment_t *alignment;
-    
+
     int n_alig = high_n - low_n + 1;
     if (n_alig > MAX_ALIG) {
       n_alig = MAX_ALIG;
@@ -2427,27 +2467,32 @@ int sa_mapped_exact_reads(fastq_read_t *read,
     
     size_t suff = low_n;
     for (size_t a = 0; a < n_alig; a++, suff++) {
-      
       chrom = sa_index->CHROM[suff];
       g_start = sa_index->SA[suff] - sa_index->genome->chrom_offsets[chrom];
       
-      char cigar_str[2048];
-      sprintf(cigar_str, "%i%c", read->length, 'M');
-      
+      //char cigar_str[2048];
+      //sprintf(cigar_str, "%i%c", read->length, 'M');
       alignment = alignment_new();
+      alignment->mapq = 0;
+      cigar_code_t *cc = cigar_code_new();
+      array_list_insert(cigar_op_new(read->length, 'M'), cc->ops);
+      int score = get_score(cc, read, match, mismatch, gap_open, gap_extend);
+
       alignment_init_single_end(strdup(read->id),
 				strdup(read->revcomp), 
 				strdup(read->rev_quality),
 				1, chrom + 1,
 				g_start, 
-				strdup(cigar_str), 
-				1, 0, 1, (n_alig > 1),
+				NULL,
+				1, score, 1, (n_alig > 1),
 				0, 0, alignment);
-      
+      alignment->alig_data = cc;
+
       array_list_insert(alignment, alignments_list);
     }
   }
   
+
   return array_list_size(alignments_list);
 
 }
@@ -2507,6 +2552,7 @@ int sa_generate_cals(fastq_read_t *read,
 	for (size_t suff = low; suff <= high; suff++) {	
 	  chrom = sa_index->CHROM[suff];
 	  g_start = sa_index->SA[suff] - sa_index->genome->chrom_offsets[chrom] + 1;
+	  
 	  //printf("\tSTORE SEED %i:[%lu|%i-%i|%lu]\n", chrom, g_start, read_pos, read_pos + suffix_len - 1, g_start + suffix_len - 1);
 	  generate_cals(chrom + 1, s, 
 			g_start, g_start + suffix_len - 1, 
@@ -3120,9 +3166,44 @@ void sa_complete_pairs(sa_wf_batch_t *wf_batch) {
 }
 
 //--------------------------------------------------------------------
+
+cal_mng_t * cal_rna_mng_new(sa_genome3_t *genome) {
+
+  int num_chroms = genome->num_chroms;
+
+  linked_list_t **cals_lists = (linked_list_t **) malloc (sizeof(linked_list_t *) * num_chroms);
+  for (unsigned int i = 0; i < num_chroms; i++) {
+    cals_lists[i] = linked_list_new(COLLECTION_MODE_ASYNCHRONIZED);
+  }
+
+  cal_mng_t *p = (cal_mng_t *) calloc(1, sizeof(cal_mng_t));
+  p->read_length = 10;
+  p->min_read_area = 100;
+  p->max_read_area = 0;
+  p->num_chroms = num_chroms;
+  p->cals_lists = cals_lists;
+
+  return p;
+}
+
+
 //--------------------------------------------------------------------
 
+void cal_rna_mng_free(cal_mng_t *p) {
+  if (p) {
+    if (p->cals_lists) {
+      for (unsigned int i = 0; i < p->num_chroms; i++) {
+	if (p->cals_lists[i]) {
+	  linked_list_free(p->cals_lists[i], (void *)seed_cal_free);
+	}
+      }
+      free(p->cals_lists);
+    }
+    free(p);
+  }
+}
 
+//--------------------------------------------------------------------
 
 int sa_rna_mapper(void *data) {
   sa_wf_batch_t *wf_batch = (sa_wf_batch_t *) data;
@@ -3142,7 +3223,12 @@ int sa_rna_mapper(void *data) {
   size_t num_reads = sa_batch->num_reads;
   int max_read_area, min_num_mismatches;
   float max_score;
-
+  
+  float gap_open = sw_optarg->gap_open;
+  float gap_extend = sw_optarg->gap_extend;
+  float match = sw_optarg->subst_matrix['A']['A'];
+  float mismatch = sw_optarg->subst_matrix['A']['C'];
+  
   // CAL management
   //size_t num_cals;
   //seed_cal_t *cal;
@@ -3155,11 +3241,11 @@ int sa_rna_mapper(void *data) {
   int seed_size = 18;
   //Function old Seeding vars
   int len_seq;
-
+  
   const int MAX_SUFFIXES    = 50;
   const int MIN_SEED_SIZE   = 30;
   const int MIN_COVER       = len_seq * MIN_SEED_SIZE / 100;
-
+  
   double prefix_time, suffix_time;
   int suffix_len0, suffix_len1, num_suffixes, num_suffixes_start, num_suffixes_end;
   size_t low0, high0, low1, high1;
@@ -3172,8 +3258,8 @@ int sa_rna_mapper(void *data) {
   size_t g_start, g_end;
   seed_region_t *seed_region;
 
-  cal_mng_t * cal_mng_p = cal_mng_new(sa_index->genome); //(+)
-  cal_mng_t * cal_mng_n = cal_mng_new(sa_index->genome); //(-)
+  cal_mng_t * cal_mng_p = cal_rna_mng_new(sa_index->genome); //(+)
+  cal_mng_t * cal_mng_n = cal_rna_mng_new(sa_index->genome); //(-)
 
   size_t low_p, high_p, suffix_len_p;
   size_t low_n, high_n, suffix_len_n;  
@@ -3227,6 +3313,8 @@ int sa_rna_mapper(void *data) {
     delete_targets[r] = 0;
     read = array_list_get(r, sa_batch->fq_reads);
     
+    //printf("READ %s\n", read->id);
+
     //Rev-comp
     fastq_read_revcomp(read);
     
@@ -3239,7 +3327,9 @@ int sa_rna_mapper(void *data) {
 
     int tot_mappings = sa_mapped_exact_reads(read, 
 					     sa_index,
-					     alignments_list);
+					     alignments_list,
+					     match, mismatch,
+					     gap_open, gap_extend);
 
     if (tot_mappings) {
       continue;
@@ -3560,8 +3650,8 @@ int sa_rna_mapper(void *data) {
 	  
 	//Report Aligment
 	cal = array_list_get(0, merge_cals);	      
-	char *cigar_str = cigar_code_find_and_report_sj(cal->start - 1, sa_alignment->c_final, cal->chromosome_id, 
-							cal->strand, avls_list, metaexons, genome, read);	
+	//char *cigar_str = cigar_code_find_and_report_sj(cal->start - 1, sa_alignment->c_final, cal->chromosome_id, 
+	//						cal->strand, avls_list, metaexons, genome, read);	
 
 	char *quality_tmp;
 	if (cal->strand) {
@@ -3573,10 +3663,10 @@ int sa_rna_mapper(void *data) {
 	  quality_tmp = read->quality;
 	}
 	
-	
-	int score = ((read->length * 0.5 - sa_alignment->c_final->distance*0.4)*100) / (read->length * 0.5);	
+	//int score = SCORE(read->length, sa_alignment->c_final->distance);	
+	int score = get_score (sa_alignment->c_final, read, match, mismatch, gap_open, gap_extend);
 
-	if (score > 60) {
+	if (score > min_score) {
 	  alignment_t *alignment = alignment_new();
 	  alignment_init_single_end(strdup(read->id), 
 				    strdup(read->sequence), 
@@ -3584,12 +3674,13 @@ int sa_rna_mapper(void *data) {
 				    cal->strand, 
 				    cal->chromosome_id,
 				    cal->start - 1,        
-				    cigar_str, 
+				    NULL, 
 				    sa_alignment->c_final->ops->size, 
 				    score, 1, 0,
 				    0, 0, alignment);
 
 	  alignment->mapq = sa_alignment->c_final->distance;
+	  alignment->alig_data = cigar_code_dup(sa_alignment->c_final);
 
 	  //Report SJ	
 	  array_list_insert(alignment, alignments_list);
@@ -3599,76 +3690,6 @@ int sa_rna_mapper(void *data) {
       }      
     }
     
-
-    /*
-    if (array_list_size(alignments_list)) {
-      //Report Other mappings
-      num_sa_alignments = array_list_size(sa_alignments_list[r]);      
-      for (int n_sa = 0; n_sa < num_sa_alignments; n_sa++) {
-	sa_alignment_t *sa_alignment = array_list_get(n_sa, sa_alignments_list[r]);
-	//Complete Cigar
-	if  (!sa_alignment->reported && 
-	     cals_score[n_sa] > 60) {
-	  merge_cals = sa_alignment->cals_list;
-	  cal = array_list_get(0, merge_cals);
-
-	  seed_prev = linked_list_get_first(cal->sr_list);
-	  seed_next = linked_list_get_last(cal->sr_list);
-	  
-	  //cigar_code_t *c_aux = sa_alignment->c_final;
-	  if (seed_prev->read_start != 0) {
-	    cigar_op_t *op_new = cigar_op_new(seed_prev->read_start, 'S');
-	    array_list_insert_at(0, op_new, sa_alignment->c_final->ops);
-	  }
-	  
-	  if (seed_next->read_end != read->length - 1) {
-	    cigar_op_t *op_new = cigar_op_new(read->length - seed_next->read_end - 1, 'S');
-	    array_list_insert(op_new, sa_alignment->c_final->ops);
-	  }
-
-	  if (cigar_code_validate_(read, sa_alignment->c_final)) {	     
-	    //char cigar_str[2048] = "\0";
-	    //for (int k = 0; k < sa_alignment->c_final->ops->size; k++) {
-	    //cigar_op_t *op = array_list_get(k, sa_alignment->c_final->ops);	      
-	    //sprintf(cigar_str, "%s%i%c", cigar_str, op->number, op->name);
-	    //}
-
-	    //printf("XXXX-XXXXX-Cigar (%s): %s\n", read->id, cigar_str);
-
-	    char *cigar_str = cigar_code_find_and_report_sj(cal->start - 1, sa_alignment->c_final, cal->chromosome_id, 
-							    cal->strand, avls_list, metaexons, genome, read);	
-
-	    char *quality_tmp;
-	    if (cal->strand) {
-	      if (!read_quality_rev) {
-		read_quality_rev = str_reverse(read->quality);
-	      }
-	      quality_tmp = read_quality_rev;
-	    } else {
-	      quality_tmp = read->quality;
-	    }
-
-	    alignment_t *alignment = alignment_new();
-	    alignment_init_single_end(strdup(read->id), 
-				      strdup(read->sequence), 
-				      strdup(quality_tmp),
-				      cal->strand, 
-				      cal->chromosome_id,
-				      cal->start - 1,
-				      cigar_str,				      
-				      sa_alignment->c_final->ops->size, 
-				      sa_alignment->c_final->distance, 
-				      1, 0,
-				      0, 0, alignment);
-	    
-	    //Report SJ
-	    array_list_insert(alignment, alignments_list);	  
-	  }
-	}
-      }
-    }
-    */
-
     //printf("::::::: %i && %i(for)\n", array_list_size(alignments_list), num_sa_alignments);
     if (!array_list_size(alignments_list)) {
       delete_targets[r] = 1;
@@ -3685,36 +3706,15 @@ int sa_rna_mapper(void *data) {
 	array_list_insert(sa_partial, alignments_list);
 	//array_list_insert(sa_alignment, write_alignments);      
       }
-    } //else {
-      //printf("read-pos : %i\n", r);
-    //}
-    
-    //if (!array_list_size(alignments_list) && array_list_size(write_alignments)) {
-    //Not Perfect Mappings, sa_alignments will be store in file
-    //file_write_sa_alignments(read, sa_alignments_list[r], file1);      
-    //delete_targets[r] = 1;      
-    //extern pthread_mutex_t mutex_sp;
-    //pthread_mutex_lock(&mutex_sp);
-    //sa_file_write_items(read, write_alignments, file1);
-    //pthread_mutex_unlock(&mutex_sp);
-    //} else if (!array_list_size(alignments_list)) {//array_list_size(sa_alignments_list[r]) && 
-    //Write alignments to file
-    //delete_targets[r] = 1;      
-    //extern pthread_mutex_t mutex_sp;
-    //pthread_mutex_lock(&mutex_sp);
-    //sa_file_write_items(read, write_alignments, file1);
-    //pthread_mutex_unlock(&mutex_sp);
-    //}
+    }
     
     num_sa_alignments = array_list_size(sa_alignments_list[r]);
     for (int n_sa = 0; n_sa < num_sa_alignments; n_sa++) {
-      sa_alignment_t *sa_alignment = array_list_get(n_sa, sa_alignments_list[r]);
-      
+      sa_alignment_t *sa_alignment = array_list_get(n_sa, sa_alignments_list[r]);      
       merge_cals = sa_alignment->cals_list;
       int num_cals = array_list_size(merge_cals);
       cal_t *cal_aux = array_list_get(0, merge_cals);
       assert(cal_aux != NULL);
-
       //Free sa_alignments
       for (int k = 0; k < num_cals; k++) {
 	cal = array_list_get(k, merge_cals);
@@ -3728,24 +3728,19 @@ int sa_rna_mapper(void *data) {
 	  }
 	  item = item->next;
 	}
-      }
-      
+      }      
       if (sa_alignment->c_left) {
 	cigar_code_free(sa_alignment->c_left);
       }
-
       if (sa_alignment->c_right) {
 	cigar_code_free(sa_alignment->c_right);
-      }
-      
+      }      
       if (sa_alignment->c_final) {
 	array_list_clear(sa_alignment->c_final->ops, (void *)cigar_op_free);
 	cigar_code_free(sa_alignment->c_final);	
       }
-
       array_list_free(merge_cals, (void *)NULL);
-      sa_alignment_free(sa_alignment);
-      
+      sa_alignment_free(sa_alignment);      
     }
 
   cal_mng:
@@ -3861,19 +3856,72 @@ int sa_rna_mapper(void *data) {
 
   sw_multi_output_free(output);
 
-  if (pair_mode != SINGLE_END_MODE) {
+  if (pair_mode != SINGLE_END_MODE) { 
+    array_list_t *mapping_list;
+    for (int r = 0; r < sa_batch->num_reads; r++) {
+      mapping_list = sa_batch->mapping_lists[r];
+      size_t n_alig = array_list_size(mapping_list);
+      for (int a = 0; a < n_alig; a++) {
+	alignment_t *alig = array_list_get(a, mapping_list);
+	alig->cigar = new_cigar_code_string(alig->alig_data);
+      }
+    }
+
     sa_complete_pairs(wf_batch);
-  } else { 
 
-    filter_alignments_lists(report_optarg->all, 
-			    report_optarg->n_best, 
-			    report_optarg->n_hits,
-			    report_optarg->best,
-			    array_list_size(sa_batch->fq_reads),
-			    sa_batch->mapping_lists);
+    for (int r = 0; r < sa_batch->num_reads; r++) {
+      mapping_list = sa_batch->mapping_lists[r];
+      
+      //Insert Data in metaexon and free cigars
+      size_t n_alig = array_list_size(mapping_list);
+      for (int a = 0; a < n_alig; a++) {
+	alignment_t *alig = array_list_get(a, mapping_list);
+	read = array_list_get(r, sa_batch->fq_reads);
+	//printf("%s: \n", read->id);
+	if (alig->alig_data == NULL) { printf("\tAlignment data NULL\n"); exit(-1); }
 
-  }
+	cigar_code_find_and_report_sj(alig->position, alig->alig_data, alig->chromosome, 
+				      alig->seq_strand, avls_list, metaexons, genome, read, 0);
+	
+	cigar_code_t *c = alig->alig_data;
+	array_list_clear(c->ops, (void *)cigar_op_free);
+	cigar_code_free(c);
+	alig->alig_data = NULL;
 
+      }
+    }        
+
+  } else {
+    array_list_t *mapping_list;
+    for (int r = 0; r < sa_batch->num_reads; r++) {
+      mapping_list = sa_batch->mapping_lists[r];
+      filter_alignments(report_optarg->all, 
+			report_optarg->n_best, 
+			report_optarg->n_hits,
+			report_optarg->best,
+			mapping_list);
+      
+      //Insert Data in metaexon and free cigars
+      size_t n_alig = array_list_size(mapping_list);
+      for (int a = 0; a < n_alig; a++) {
+	alignment_t *alig = array_list_get(a, mapping_list);
+	read = array_list_get(r, sa_batch->fq_reads);
+	//printf("%s: \n", read->id);
+	if (alig->alig_data == NULL) { printf("\tAlignment data NULL\n"); exit(-1); }
+
+	alig->cigar = cigar_code_find_and_report_sj(alig->position, alig->alig_data, alig->chromosome, 
+						    alig->seq_strand, avls_list, metaexons, genome, read, 1);
+	
+	cigar_code_t *c = alig->alig_data;
+	array_list_clear(c->ops, (void *)cigar_op_free);
+	cigar_code_free(c);
+	alig->alig_data = NULL;
+
+      }
+    }        
+  } 
+  
+  
   convert_batch_to_str(wf_batch);
   
   return -1;
@@ -3898,10 +3946,15 @@ int sa_rna_mapper_last(void *data) {
   int pair_mode = pair_input->pair_mng->pair_mode;
   report_optarg_t *report_optarg = pair_input->report_optarg;
 
+  float gap_open = sw_optarg->gap_open;
+  float gap_extend = sw_optarg->gap_extend;
+  float match = sw_optarg->subst_matrix['A']['A'];
+  float mismatch = sw_optarg->subst_matrix['A']['C'];
+
   char *query;
   //size_t num_reads = sa_batch->num_reads;
   //array_list_t *sa_list;
-  int min_score = 80;
+  //int min_score = 80;
   array_list_t *alignments_list;
   sw_multi_output_t *output = sw_multi_output_new(MAX_DEPTH);
   sa_sw_depth_t sw_depth;
@@ -4063,22 +4116,6 @@ int sa_rna_mapper_last(void *data) {
 	}
       }
 
-      //printf("seed_region_r = %s\n", new_cigar_code_string(seed_region_r->info));
-      //if (seed_region_r->info == NULL) {
-      //seed_region_r->info = cigar_code_new();
-      //cigar_code_append_new_op(100, "S", seed_region_r->info);	
-      //} 
-      //printf("\tCAL %i/%i = %i:%lu|%i-%i|%lu, (%s)\n", i + 1, num_items, cal->chromosome_id, region->genome_start, 
-      //region->read_start, region->read_end, region->genome_end, new_cigar_code_string(sa_alignment->c_final));      
-      //printf("SA close [Left %i][Right %i]\n", sa_alignment->left_close, sa_alignment->right_close);
-
-      //if (!sa_alignment->left_close) {
-      //SW...
-      //}
-
-      //if (!sa_alignment->right_close) {
-      //SW...
-      //}
     }
     //array_list_clear(sa_list, (void *)NULL);
   }
@@ -4159,15 +4196,7 @@ int sa_rna_mapper_last(void *data) {
 
       int read_score = cigar_code_score(c_final, read->length);  
 
-      //if (!cigar_code_validate_(read, sa_alignment->c_final)) {
-      //extern pthread_mutex_t mutex_sp;
-      //pthread_mutex_lock(&mutex_sp);
-      //printf("%s : %s (%i score)\n", read->id, new_cigar_code_string(sa_alignment->c_final), read_score);	
-      //pthread_mutex_unlock(&mutex_sp);
-      //}
-
-      if (cigar_code_validate_(read, sa_alignment->c_final) && 
-	  read_score > min_score) {
+      if (cigar_code_validate_(read, sa_alignment->c_final)) {
 	//Cigar generator, generate score
 	//printf("Data: \n");
 	//printf("\trl = %i - num_ops = %i\n", read->length, sa_alignment->c_final->ops->size );
@@ -4194,8 +4223,8 @@ int sa_rna_mapper_last(void *data) {
 	op = array_list_get(array_list_size(sa_alignment->c_final->ops) - 1, sa_alignment->c_final->ops);
 	if (op && op->name == 'H') { op->name = 'S'; }
 
-	char *cigar_str = cigar_code_find_and_report_sj(cal->start - 1, sa_alignment->c_final, cal->chromosome_id, 
-							cal->strand, avls_list, metaexons, genome, read);	
+	//char *cigar_str = cigar_code_find_and_report_sj(cal->start - 1, sa_alignment->c_final, cal->chromosome_id, 
+	//						cal->strand, avls_list, metaexons, genome, read);	
 
 	char *quality_tmp;
 	if (cal->strand) {
@@ -4207,22 +4236,30 @@ int sa_rna_mapper_last(void *data) {
 	  quality_tmp = read->quality;
 	}
 
-	alignment_t *alignment = alignment_new();
-	alignment_init_single_end(strdup(read->id), 
-				  strdup(read->sequence), 
-				  strdup(quality_tmp),
-				  cal->strand, 
-				  cal->chromosome_id,
-				  cal->start - 1,
-				  cigar_str, 
-				  sa_alignment->c_final->ops->size, 
-				  sa_alignment->c_final->distance, 1, 0,
-				  0, 0, alignment);
-	
-	//Report SJ
+	//int score = SCORE(read->length, sa_alignment->c_final->distance);	
+	int score = get_score (sa_alignment->c_final, read, match, mismatch, gap_open, gap_extend);
 
-	array_list_insert(alignment, alignments_list_aux);
-	  
+	if (score > min_score) {
+	  alignment_t *alignment = alignment_new();
+	  alignment_init_single_end(strdup(read->id), 
+				    strdup(read->sequence), 
+				    strdup(quality_tmp),
+				    cal->strand, 
+				    cal->chromosome_id,
+				    cal->start - 1,
+				    NULL,
+				    sa_alignment->c_final->ops->size, 
+				    score,
+				    1, 0,
+				    0, 0, alignment);
+	
+
+	  alignment->mapq = sa_alignment->c_final->distance;
+	  alignment->alig_data = cigar_code_dup(sa_alignment->c_final);
+	  //Report SJ
+
+	  array_list_insert(alignment, alignments_list_aux);
+	}	  
       }
 
       //-------------- Free sa alignments -------------------------
@@ -4322,8 +4359,8 @@ int sa_rna_mapper_last(void *data) {
 	      op = array_list_get(array_list_size(cc_aux->ops) - 1, cc_aux->ops);
 	      if (op && op->name == 'H') { op->name = 'S'; }
 
-	      char *cigar_str = cigar_code_find_and_report_sj(cal_tmp->start, cc_aux, cal_tmp->chromosome_id, 
-							      cal_tmp->strand, avls_list, metaexons, genome, read);	
+	      //char *cigar_str = cigar_code_find_and_report_sj(cal_tmp->start, cc_aux, cal_tmp->chromosome_id, 
+	      //					      cal_tmp->strand, avls_list, metaexons, genome, read);	
 
 	      char *quality_tmp;
 	      if (cal_tmp->strand) {
@@ -4335,22 +4372,30 @@ int sa_rna_mapper_last(void *data) {
 		quality_tmp = read->quality;
 	      }
 
-	      alignment_t *alignment = alignment_new();
-	      alignment_init_single_end(strdup(read->id), 
-					strdup(read->sequence), 
-					strdup(quality_tmp),
-					cal_tmp->strand, 
-					cal_tmp->chromosome_id,
-					cal_tmp->start,
-					cigar_str,
-					cc_aux->ops->size, 
-					cc_aux->distance,
-					1, 0,
-					0, 0, alignment);
-	      
-	      //Report SJ	      
-	      array_list_insert(alignment, alignments_list_aux); 
+	      //int score = SCORE(read->length, cc_aux->distance);	
+	      int score = get_score (cc_aux, read, match, mismatch, gap_open, gap_extend);
 
+	      if (score > min_score) {
+		alignment_t *alignment = alignment_new();
+		alignment_init_single_end(strdup(read->id), 
+					  strdup(read->sequence), 
+					  strdup(quality_tmp),
+					  cal_tmp->strand, 
+					  cal_tmp->chromosome_id,
+					  cal_tmp->start,
+					  //cigar_str,
+					  NULL,
+					  cc_aux->ops->size, 
+					  score,
+					  1, 0,
+					  0, 0, alignment);
+	      
+		alignment->mapq = cc_aux->distance;
+		alignment->alig_data = cigar_code_dup(cc_aux);
+
+		//Report SJ	      
+		array_list_insert(alignment, alignments_list_aux); 
+	      }
 	    }
 	    array_list_clear(cc_aux->ops, (void *)cigar_op_free);
 	    cigar_code_free(cc_aux);
@@ -4406,8 +4451,8 @@ int sa_rna_mapper_last(void *data) {
 	      op = array_list_get(array_list_size(cc_aux->ops) - 1, cc_aux->ops);
 	      if (op && op->name == 'H') { op->name = 'S'; }
 	      
-	      char *cigar_str = cigar_code_find_and_report_sj(cal_tmp->start, cc_aux, cal_tmp->chromosome_id, 
-							      cal_tmp->strand, avls_list, metaexons, genome, read);	
+	      //char *cigar_str = cigar_code_find_and_report_sj(cal_tmp->start, cc_aux, cal_tmp->chromosome_id, 
+	      //					      cal_tmp->strand, avls_list, metaexons, genome, read);	
 
 	      char *quality_tmp;
 	      if (cal_tmp->strand) {
@@ -4419,22 +4464,30 @@ int sa_rna_mapper_last(void *data) {
 		quality_tmp = read->quality;
 	      }
 
-	      alignment_t *alignment = alignment_new();
-	      alignment_init_single_end(strdup(read->id), 
-					strdup(read->sequence), 
-					strdup(quality_tmp),
-					cal_tmp->strand, 
-					cal_tmp->chromosome_id,
-					cal_tmp->start,
-					cigar_str,
-					cc_aux->ops->size, 
-					cc_aux->distance, 
-					1, 0,
-					0, 0, alignment);
+	      //int score = SCORE(read->length, cc_aux->distance);	
+	      int score = get_score (cc_aux, read, match, mismatch, gap_open, gap_extend);
+
+	      if (score > min_score) {
+		alignment_t *alignment = alignment_new();
+		alignment_init_single_end(strdup(read->id), 
+					  strdup(read->sequence), 
+					  strdup(quality_tmp),
+					  cal_tmp->strand, 
+					  cal_tmp->chromosome_id,
+					  cal_tmp->start,
+					  //cigar_str,
+					  NULL,
+					  cc_aux->ops->size, 
+					  score, 
+					  1, 0,
+					  0, 0, alignment);
 	      
-	      //Report SJ
+		alignment->mapq = cc_aux->distance;
+		alignment->alig_data = cigar_code_dup(cc_aux);
+		//Report SJ
 	      
-	      array_list_insert(alignment, alignments_list_aux);
+		array_list_insert(alignment, alignments_list_aux);
+	      }
 	    }
 	    array_list_clear(cc_aux->ops, (void *)cigar_op_free);
 	    cigar_code_free(cc_aux);
@@ -4452,8 +4505,8 @@ int sa_rna_mapper_last(void *data) {
       //fprintf(stderr, "XXX@@@XXX-3: %s\n", read->id);
       array_list_t *sa_alignments_list = array_list_new(10, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
 
-      cal_mng_t * cal_mng_p = cal_mng_new(sa_index->genome); //(+)
-      cal_mng_t * cal_mng_n = cal_mng_new(sa_index->genome); //(-)
+      cal_mng_t * cal_mng_p = cal_rna_mng_new(sa_index->genome); //(+)
+      cal_mng_t * cal_mng_n = cal_rna_mng_new(sa_index->genome); //(-)
       cal_mng_t * cal_mng, *p;
 
       linked_list_t *cal_list;
@@ -4673,6 +4726,7 @@ int sa_rna_mapper_last(void *data) {
       n_report = report_tmp;
       
       /*
+      printf("Read : %s\n", read->id);
       printf("========================= (%i) =============================\n", n_report);
       for (int i = 0; i < n_report; i++) {
 	merge_cals = array_list_get(i, target_cals);
@@ -4799,28 +4853,27 @@ int sa_rna_mapper_last(void *data) {
 	  //seed_region_l->info = c_left;
 	  
 	  //c_left = NULL;
-	  if (1) {// || !c_left) {
-	    pthread_mutex_lock(&mutex_sp);
-	    total_sw++;
-	    pthread_mutex_unlock(&mutex_sp);
+	  pthread_mutex_lock(&mutex_sp);
+	  total_sw++;
+	  pthread_mutex_unlock(&mutex_sp);
 	    
-	    char reference_sw[2048];
-	    size_t genome_start = region->genome_start - region->read_start;
-	    size_t genome_end   = region->genome_start - 1;
+	  char reference_sw[2048];
+	  size_t genome_start = region->genome_start - region->read_start;
+	  size_t genome_end   = region->genome_start - 1;
 	    
-	    genome_read_sequence_by_chr_index(reference_sw, 0, cal_prev->chromosome_id - 1,
-					      &genome_start, &genome_end, genome);
+	  genome_read_sequence_by_chr_index(reference_sw, 0, cal_prev->chromosome_id - 1,
+					    &genome_start, &genome_end, genome);
 	    
-	    char query_sw[2048];
-	    memcpy(query_sw, &query[0], region->read_start);
-	    query_sw[region->read_start] = '\0';
+	  char query_sw[2048];
+	  memcpy(query_sw, &query[0], region->read_start);
+	  query_sw[region->read_start] = '\0';
 	    
-	    //printf("(%i)l-Query: %s\n", strlen(query_sw), query_sw);
-	    //printf("(%i)l-Refer: %s\n", strlen(reference_sw), reference_sw);
+	  //printf("(%i)l-Query: %s\n", strlen(query_sw), query_sw);
+	  //printf("(%i)l-Refer: %s\n", strlen(reference_sw), reference_sw);
 	    
-	    sw_insert_item(query_sw, reference_sw, FIRST_SW, seed_region_l,
-			   sw_optarg, output, &sw_depth);	
-	  }
+	  sw_insert_item(query_sw, reference_sw, FIRST_SW, seed_region_l,
+			 sw_optarg, output, &sw_depth);	
+	  
 	  
 	  //printf("seed_region_l = %s\n", new_cigar_code_string(seed_region_l->info));
 	  //if (seed_region_l->info == NULL) {
@@ -4857,38 +4910,37 @@ int sa_rna_mapper_last(void *data) {
 	  //seed_region_r->info = c_right;
 	  linked_list_insert_last(seed_region_r, cal->sr_list);
 	  
-	  if (1){ //&& !c_right) {
-	    pthread_mutex_lock(&mutex_sp);
-	    total_sw++;
-	    pthread_mutex_unlock(&mutex_sp);
+
+	  pthread_mutex_lock(&mutex_sp);
+	  total_sw++;
+	  pthread_mutex_unlock(&mutex_sp);
 	    
-	    char reference_sw[2048];
-	    size_t genome_start = region->genome_end + 1;
-	    size_t genome_end   = genome_start + gap_len;
+	  char reference_sw[2048];
+	  size_t genome_start = region->genome_end + 1;
+	  size_t genome_end   = genome_start + gap_len;
 	    
-	    genome_read_sequence_by_chr_index(reference_sw, 0, cal->chromosome_id - 1,
-					      &genome_start, &genome_end, genome);
+	  genome_read_sequence_by_chr_index(reference_sw, 0, cal->chromosome_id - 1,
+					    &genome_start, &genome_end, genome);
 	    
-	    char query_sw[2048];
-	    memcpy(query_sw, &query[region->read_end + 1], gap_len);
-	    query_sw[gap_len] = '\0';
+	  char query_sw[2048];
+	  memcpy(query_sw, &query[region->read_end + 1], gap_len);
+	  query_sw[gap_len] = '\0';
 	    
-	    //printf("r-Query: %s\n", query_sw, strlen(query_sw));
-	    //printf("r-Refer: %s\n", reference_sw, strlen(reference_sw));
-	    
-	    sw_insert_item(query_sw, reference_sw, LAST_SW, seed_region_r,
-			   sw_optarg, output, &sw_depth);
-	    
-	  }
+	  //printf("r-Query: %s\n", query_sw, strlen(query_sw));
+	  //printf("r-Refer: %s\n", reference_sw, strlen(reference_sw));
+	  
+	  sw_insert_item(query_sw, reference_sw, LAST_SW, seed_region_r,
+			 sw_optarg, output, &sw_depth);
+	  
 	}
-      }      
+      }
       
       //printf("*************** FINAL CALS ******************\n");
       
       sw_insert_item(NULL, NULL, 0, NULL, 
 		     sw_optarg, output, &sw_depth);
-
-
+      
+      
       //Merge cigars      
       for (int i = 0; i < array_list_size(sa_alignments_list); i++) {	
 	sa_alignment_t *sa_alignment = array_list_get(i, sa_alignments_list);
@@ -4901,15 +4953,6 @@ int sa_rna_mapper_last(void *data) {
 	seed_first = cal_prev->sr_list->first->item;
 	seed_last  = cal_next->sr_list->last->item;
 
-	/*
-	printf("--- Merge \%i (CALs %i): ---\n", i, array_list_size(merge_cals));
-	for (int j = 0; j < array_list_size(merge_cals); j++) {
-	  cal = array_list_get(j, merge_cals);
-	  cal_print(cal);
-	}
-	printf("---       ####          ---\n");
-	*/
-
 	if ((sa_alignment->left_dsp_w2   && seed_first->info == NULL) || 
 	    (sa_alignment->right_dsp_w2  && seed_last->info == NULL)) {
 	  
@@ -4920,15 +4963,25 @@ int sa_rna_mapper_last(void *data) {
 	    while (item != NULL) {
 	      sr = item->item;
 	      cigar_code_t *cc = sr->info;
-	      cigar_code_free(cc);
+	      if (cc) {
+		array_list_clear(cc->ops, (void *)cigar_op_free);
+		cigar_code_free(cc);
+	      }
 	      item = item->next;
 	    }
 	  }
 
 	  array_list_free(merge_cals, (void *)NULL);
-	  sa_alignment_free(sa_alignment);
+	  cigar_code_free(sa_alignment->c_final);
 
-	  //printf("Continue\n");
+	  if (sa_alignment->num_sp > 0) {
+	    for (int x = 0; x < sa_alignment->num_sp; x++) {
+	      array_list_clear(((cigar_code_t *)sa_alignment->cigar_middle[x])->ops, (void *)cigar_op_free);
+	      cigar_code_free(sa_alignment->cigar_middle[x]);
+	    }
+	  }
+	  
+	  sa_alignment_free(sa_alignment);
 	  
 	  continue; 
 	}
@@ -4956,10 +5009,8 @@ int sa_rna_mapper_last(void *data) {
 	  }
 	}
 
-
 	int sp_pos = 0;
-	
-		
+			
 	for (int c = 0; c < array_list_size(merge_cals); c++) {
 	  cal_t *cal = array_list_get(c, merge_cals);
 	  linked_list_item_t *item = cal->sr_list->first;
@@ -5015,8 +5066,8 @@ int sa_rna_mapper_last(void *data) {
 	  op = array_list_get(array_list_size(sa_alignment->c_final->ops) - 1, sa_alignment->c_final->ops);
 	  if (op && op->name == 'H') { op->name = 'S'; }
 
-	  char *cigar_str = cigar_code_find_and_report_sj(cal_prev->start - 1, sa_alignment->c_final, cal_prev->chromosome_id, 
-							  cal_prev->strand, avls_list, metaexons, genome, read);	
+	  //char *cigar_str = cigar_code_find_and_report_sj(cal_prev->start - 1, sa_alignment->c_final, cal_prev->chromosome_id, 
+	  //						  cal_prev->strand, avls_list, metaexons, genome, read);	
 
 	  char *quality_tmp;
 	  if (cal_prev->strand) {
@@ -5028,22 +5079,29 @@ int sa_rna_mapper_last(void *data) {
 	    quality_tmp = read->quality;
 	  }
 
-	  alignment_t *alignment = alignment_new();
-	  alignment_init_single_end(strdup(read->id), 
-				    strdup(read->sequence), 
-				    strdup(quality_tmp),
-				    cal_prev->strand,
-				    cal_prev->chromosome_id,
-				    cal_prev->start - 1,
-				    cigar_str,
-				    sa_alignment->c_final->ops->size, 
-				    sa_alignment->c_final->distance, 
-				    1, 0,
-				    0, 0, alignment);
+	  //int score = SCORE(read->length, sa_alignment->c_final->distance);	
+	  int score = get_score (sa_alignment->c_final, read, match, mismatch, gap_open, gap_extend);
+
+	  if (score > min_score) {
+	    alignment_t *alignment = alignment_new();
+	    alignment_init_single_end(strdup(read->id), 
+				      strdup(read->sequence), 
+				      strdup(quality_tmp),
+				      cal_prev->strand,
+				      cal_prev->chromosome_id,
+				      cal_prev->start - 1,
+				      NULL,
+				      sa_alignment->c_final->ops->size, 
+				      score,
+				      1, 0,
+				      0, 0, alignment);
 	  
-	  //Report SJ
-	  
-	  array_list_insert(alignment, alignments_list_aux);
+	    alignment->mapq = sa_alignment->c_final->distance;
+	    alignment->alig_data = cigar_code_dup(sa_alignment->c_final);
+
+	    //Report SJ	  
+	    array_list_insert(alignment, alignments_list_aux);
+	  }
 	}
 	
 	//-------------- Free sa alignments -------------------------
@@ -5054,9 +5112,12 @@ int sa_rna_mapper_last(void *data) {
 	//if (sa_alignment->c_final) {
 	//array_list_clear(sa_alignment->c_final->ops, (void *)cigar_op_free);
 	//cigar_code_free(sa_alignment->c_final);	
-	//}
-	
+	//}	
+
 	array_list_free(merge_cals, (void *)NULL);
+	
+	array_list_clear(sa_alignment->c_final->ops, (void *)cigar_op_free);
+	cigar_code_free(sa_alignment->c_final);	
 	sa_alignment_free(sa_alignment);
 	
       }
@@ -5073,6 +5134,7 @@ int sa_rna_mapper_last(void *data) {
     }
     
 
+    array_list_set_flag(array_list_get_flag(sa_batch->mapping_lists[r]), alignments_list_aux);
     array_list_free(sa_batch->mapping_lists[r], (void *)NULL);
     sa_batch->mapping_lists[r] = alignments_list_aux;
 
@@ -5085,16 +5147,82 @@ int sa_rna_mapper_last(void *data) {
   sw_multi_output_free(output);
 
   if (pair_mode != SINGLE_END_MODE) {
+    array_list_t *mapping_list;
+    for (int r = 0; r < sa_batch->num_reads; r++) {
+      mapping_list = sa_batch->mapping_lists[r];
+      if (array_list_get_flag(mapping_list) != SA_PARTIAL_TYPE) { continue; }
+
+      size_t n_alig = array_list_size(mapping_list);
+      for (int a = 0; a < n_alig; a++) {
+	alignment_t *alig = array_list_get(a, mapping_list);
+	alig->cigar = new_cigar_code_string(alig->alig_data);
+      }
+    }
+
+    for (int r = 0; r < sa_batch->num_reads; r++) {
+      mapping_list = sa_batch->mapping_lists[r];      
+      size_t n_alig = array_list_size(mapping_list);
+      for (int a = 0; a < n_alig; a++) {
+	alignment_t *alig = array_list_get(a, mapping_list);
+	if (alig->cigar == NULL) {
+	  printf("%i - %i, %p\n", array_list_get_flag(mapping_list), SA_PARTIAL_TYPE, alig->alig_data);
+	  exit(-1);
+	}
+      }
+    }
+
+
     sa_complete_pairs(wf_batch);
+
+    for (int r = 0; r < sa_batch->num_reads; r++) {
+      mapping_list = sa_batch->mapping_lists[r];
+
+      //Insert Data in metaexon and free cigars
+      size_t n_alig = array_list_size(mapping_list);
+      for (int a = 0; a < n_alig; a++) {
+	alignment_t *alig = array_list_get(a, mapping_list);
+	if (alig->alig_data == NULL) { 
+	  alig->alig_data = cigar_code_new_by_string(alig->cigar);
+	}
+
+	fastq_read_t *read = array_list_get(r, sa_batch->fq_reads);
+	cigar_code_find_and_report_sj(alig->position, alig->alig_data, alig->chromosome, 
+				      alig->seq_strand, avls_list, metaexons, genome, read, 0);	
+
+	cigar_code_t *c = alig->alig_data;
+	array_list_clear(c->ops, (void *)cigar_op_free);
+	cigar_code_free(c);
+	alig->alig_data = NULL;
+      }
+    }
+
   } else {
-    /*
-    filter_alignments_lists(report_optarg->all, 
-			    report_optarg->n_best, 
-			    report_optarg->n_hits,
-			    report_optarg->best,
-			    array_list_size(sa_batch->fq_reads),
-    			    sa_batch->mapping_lists);
-    */
+    array_list_t *mapping_list;
+    for (int r = 0; r < sa_batch->num_reads; r++) {
+      mapping_list = sa_batch->mapping_lists[r];
+      filter_alignments(report_optarg->all, 
+			report_optarg->n_best, 
+			report_optarg->n_hits,
+			report_optarg->best,
+			mapping_list);
+      
+      //Insert Data in metaexon and free cigars
+      size_t n_alig = array_list_size(mapping_list);
+      for (int a = 0; a < n_alig; a++) {
+	alignment_t *alig = array_list_get(a, mapping_list);
+	if (alig->alig_data == NULL) { printf("Alignment NULL\n"); exit(-1); }
+
+	fastq_read_t *read = array_list_get(r, sa_batch->fq_reads);
+	alig->cigar = cigar_code_find_and_report_sj(alig->position, alig->alig_data, alig->chromosome, 
+						    alig->seq_strand, avls_list, metaexons, genome, read, 1);
+	
+	cigar_code_t *c = alig->alig_data;
+	array_list_clear(c->ops, (void *)cigar_op_free);
+	cigar_code_free(c);
+	alig->alig_data = NULL;
+
+      }      
+    }
   }
 
   convert_batch_to_str(wf_batch);
@@ -5102,44 +5230,6 @@ int sa_rna_mapper_last(void *data) {
   return -1;
 
 }
-
-
-/*
-  list_item = cal_prev->sr_list->first;
-  seed_prev = NULL;
-  while (list_item != NULL) {
-  seed_next = (seed_region_t *)list_item->item;
-  
-  if (seed_prev != NULL) {
-  printf("***********************========*************************\n");
-  size_t gap_read = seed_next->read_start - seed_prev->read_end  - 1;
-  size_t gap_genome = seed_next->genome_start - seed_prev->genome_end  - 1; 
-  int gap = gap_genome - gap_read;
-  if (gap > min_intron_size) {
-  cigar_code_t *cc_sj = search_splice_junction(sw_optarg,
-  seed_prev, 
-  seed_next,
-  cal_prev->chromosome_id,
-  cal_prev->strand,
-  query, genome, 
-  &sp_start, 
-  &sp_end,
-  &sp_type,
-  &distance);
-  if (cc_sj == NULL) {
-  fprintf(stderr, "Read: %s\n", read->id);
-  //exit(-1);
-  }
-  seed_prev->info = cc_sj;
-  printf("[%lu-%lu] Cigar %s\n", sp_start, sp_end, new_cigar_code_string(cc_sj));
-  printf("***********************========*************************\n");
-  }
-  }
-  seed_prev      = seed_next;
-  list_item_prev = list_item;
-  list_item      = list_item->next;	    
-  }
-*/
 
 
 //FOR SEARCH CANNONICAL SPLICE JUNCTION WITHOUT SMITH-WATERMAN ALGORITHM
@@ -5265,81 +5355,8 @@ cigar_code_t* search_splice_junction(sw_optarg_t *sw_optarg,
     }
   }
 
-  /*
-  if (found_starts == 0) {
-    s_prev->read_end     -= SEQURITY_FLANK_2;
-    assert(s_prev->read_end > 0);
-    s_prev->genome_end   -= SEQURITY_FLANK_2;
-
-
-    genome_start = s_prev->genome_end + 1;
-    genome_end   = s_prev->genome_end + gap_read + FLANK + SEQURITY_FLANK_2;
-    assert(genome_end - genome_start < 2048);
-    
-    genome_read_sequence_by_chr_index(left_exon, 0, 
-				      chromosome_id - 1, 
-				      &genome_start, &genome_end, genome);
-    
-    end_search = strlen(left_exon) - 1;
-    for (c_s = 0; c_s < end_search; c_s++) {
-      if (left_exon[c_s] == 'G' && left_exon[c_s + 1] == 'T') {
-	type_starts[found_starts] = GT_AG_SPLICE;
-	breaks_starts[found_starts++] = c_s;
-	//printf("S.FOUND GT (%i)\n", c_s);
-      } else if (left_exon[c_s] == 'C' && left_exon[c_s + 1] == 'T') {
-	type_starts[found_starts] = CT_AC_SPLICE;
-	breaks_starts[found_starts++] = c_s;
-	//printf("S.FOUND CT (%i)\n", c_s);
-      }
-    }
-    
-  }
-*/
-
-  /*
-
-  if (found_ends == 0) {
-    s_next->read_start   += SEQURITY_FLANK_2;    
-    s_next->genome_start += SEQURITY_FLANK_2;
-
-    genome_start = s_next->genome_start - gap_read - FLANK - SEQURITY_FLANK_2;
-    genome_end   = s_next->genome_start - 1;
-    assert(genome_end - genome_start < 2048);
-    
-    genome_read_sequence_by_chr_index(right_exon, 0, 
-				      chromosome_id - 1, 
-				      &genome_start, &genome_end, genome);		  
-
-    for (c_e = strlen(right_exon) - 1; c_e > 0; c_e--) {
-      if (right_exon[c_e] == 'G' && right_exon[c_e - 1] == 'A') {
-	type_ends[found_ends] = GT_AG_SPLICE;
-	breaks_ends[found_ends++] = strlen(right_exon) - c_e - 1;
-	//printf("E.FOUND AG (%i)\n", strlen(right_exon) - c_e - 1);
-      } else if (right_exon[c_e] == 'C' && right_exon[c_e - 1] == 'A') {
-	type_ends[found_ends] = CT_AC_SPLICE;
-	breaks_ends[found_ends++] = strlen(right_exon) - c_e - 1;
-	//printf("E.FOUND AC (%i)\n", strlen(right_exon) - c_e - 1);
-      }      
-    }
-
-  }
-  */
-
   //Not found any splice junction
   if (found_starts == 0 || found_ends == 0) {
-    //printf("%i - %i - 1 = %i\n", read_end, read_start, gap_read);
-    //printf("START READ START %i/%lu READ END %i/%lu\n", read_start, s_prev->genome_end, 
-    //	   read_end, s_next->genome_start);
-    //printf("FOUND STARTS %i, FOUND ENDS %i\n", found_starts, found_ends);
-    //printf("Left  exon: %s\n", left_exon);
-    //printf("Right exon: %s\n", right_exon);
-    //printf("RIGHT->%i:%lu-%lu\n", chromosome_id, genome_start, genome_end);
-
-    //genome_start = s_prev->genome_end + 1;
-    //genome_end   = s_prev->genome_end + gap_read + FLANK;
-    //printf("LEFT->%i:%lu-%lu\n", chromosome_id, genome_start, genome_end);
-    //exit(-1);
-
     return NULL;
   } 
 
@@ -5433,10 +5450,7 @@ cigar_code_t* search_splice_junction(sw_optarg_t *sw_optarg,
       sj_select = i;
     }
     
-    //printf("norm_score = %f\n", norm_score);
-    
-    free(query_p[i]);
-    free(ref_p[i]);
+    //printf("norm_score = %f\n", norm_score);   
         
   }
 
@@ -5457,8 +5471,8 @@ cigar_code_t* search_splice_junction(sw_optarg_t *sw_optarg,
     free(output->query_map_p[i]);
     free(output->ref_map_p[i]);
     
-    //free(query_p[i]);
-    //free(ref_p[i]);
+    free(query_p[i]);
+    free(ref_p[i]);
 
     output->query_map_p[i] = NULL;
     output->ref_map_p[i] = NULL;

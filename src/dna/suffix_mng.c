@@ -590,7 +590,8 @@ void suffix_mng_search_read_cals(fastq_read_t *read, int num_seeds,
 				 sa_index3_t *sa_index, array_list_t *cal_list, 
 				 suffix_mng_t *suffix_mng) {
   int max_suffixes = MAX_NUM_SUFFIXES;
-  int chrom, num_suffixes, suffix_len;
+  int chrom, num_suffixes;
+  size_t suffix_len;
   size_t low, high, r_start_suf, r_end_suf, g_start_suf, g_end_suf;
 
   int read_pos, read_inc = read->length / num_seeds;

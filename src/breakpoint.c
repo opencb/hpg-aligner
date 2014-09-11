@@ -39,6 +39,18 @@ cigar_code_t *cigar_code_new() {
   return p;
 }
 
+cigar_code_t *cigar_code_dup(cigar_code_t *c) {
+  cigar_code_t *p = cigar_code_new();
+  size_t num_ops = array_list_size(c->ops);
+  
+  for (int i = 0; i < num_ops; i++) {
+    cigar_op_t *op = array_list_get(i, c->ops);
+    array_list_insert(cigar_op_new(op->number, op->name), p->ops);
+  }
+
+  return p;
+
+}
 
 cigar_code_t *cigar_code_new_by_string(char *cigar_str) {
   cigar_code_t *p = cigar_code_new();

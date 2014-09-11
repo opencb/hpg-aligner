@@ -109,6 +109,7 @@ typedef struct options {
   int filter_seed_mappings;
   int bs_index;
   int fast_mode;
+  int set_bam_format;
   int adapter_length;
   double min_score;
   double match;

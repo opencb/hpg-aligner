@@ -16,7 +16,9 @@ typedef unsigned char Uchar;
 typedef unsigned int Uint;
 typedef signed int Sint;
 
-#define BOOL char
+#ifndef BOOL
+    #define BOOL char
+#endif
 //typedef unsigned char BOOL;
 
 #define True 1

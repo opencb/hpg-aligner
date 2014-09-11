@@ -13,6 +13,7 @@
 
 #include "dna/sa_dna_commons.h"
 #include "dna/doscadfun.h"
+#include "sa/sa_search.h"
 
 //--------------------------------------------------------------------
 // suffix_mng_t struct
@@ -26,7 +27,20 @@ typedef struct suffix_mng {
 } suffix_mng_t;
 
 suffix_mng_t *suffix_mng_new(sa_genome3_t *genome);
+
 void suffix_mng_free(suffix_mng_t *p);
+
+void suffix_mng_search_read_cals(fastq_read_t *read, int num_seeds, 
+				 sa_index3_t *sa_index, array_list_t *cal_list, 
+				 suffix_mng_t *suffix_mng);
+
+void suffix_mng_search_read_cals_by_region(fastq_read_t *read, int num_seeds, 
+					   sa_index3_t *sa_index, 
+					   int strand, int chromosome, 
+					   size_t start, size_t end, 
+					   array_list_t *cal_list, 
+					   suffix_mng_t *suffix_mng);
+
 void suffix_mng_clear(suffix_mng_t *p);
 
 void suffix_mng_update(int chrom, size_t read_start, size_t read_end, 

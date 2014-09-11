@@ -73,6 +73,7 @@ options_t *options_new(void) {
   options->adapter_length = 0;
 
   options->adapter_length = 0;
+  options->set_bam_format = 0;
 
   //new variables for bisulphite case in index generation
   options->bs_index = 0;
@@ -372,6 +373,7 @@ void options_to_file(options_t *options, FILE *fd) {
   if (options->genome_filename != NULL) {
     genome_filename =  strdup(options->genome_filename);
   }
+
   unsigned int  report_all = (unsigned int)options->report_all;
   unsigned int  report_n_best = (unsigned int)options->report_n_best;
   unsigned int  report_n_hits = (unsigned int)options->report_n_hits;
@@ -483,6 +485,20 @@ void options_to_file(options_t *options, FILE *fd) {
     fprintf(fd, "= Min score        : %d\n", min_score);
   }
   fprintf(fd, "\n");
+
+  free(in_filename);
+  free(bwt_dirname);
+
+  if (options->in_filename2 != NULL) {
+    free(in_filename2);
+  }
+
+  if (options->genome_filename != NULL) {
+    free(genome_filename);
+  }
+
+  free(output_name);
+  
 }
 
 //--------------------------------------------------------------------
@@ -589,7 +605,6 @@ int read_config_file(const char *filename, options_t *options) {
  * Initializes the only default options from options_t.
  */
 options_t *read_CLI_options(void **argtable, options_t *options) {	
-  int set_bam_format = 0;
   int count = -1;
   if (((struct arg_file*)argtable[++count])->count) { options->in_filename = strdup(*(((struct arg_file*)argtable[count])->filename)); }
   if (((struct arg_file*)argtable[++count])->count) { 
@@ -623,7 +638,7 @@ options_t *read_CLI_options(void **argtable, options_t *options) {
 
   if (((struct arg_int*)argtable[++count])->count) { 
     options->bam_format = ((struct arg_int*)argtable[count])->count; 
-    set_bam_format = 1;
+    options->set_bam_format = 1;
   }
 
   if (((struct arg_int*)argtable[++count])->count) { options->realignment = ((struct arg_int*)argtable[count])->count; }
@@ -643,6 +658,7 @@ options_t *read_CLI_options(void **argtable, options_t *options) {
 
     if (((struct arg_file*)argtable[++count])->count) { options->fast_mode = (((struct arg_int *)argtable[count])->count); }
 
+    /*
     if (!set_bam_format) {
       if (options->fast_mode) {
 	options->bam_format = 0;
@@ -650,6 +666,7 @@ options_t *read_CLI_options(void **argtable, options_t *options) {
 	options->bam_format = 1;
       }
     }
+    */
   }
 
   return options;
