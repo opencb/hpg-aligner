@@ -340,6 +340,24 @@ void dna_aligner(options_t *options) {
   char *aux = out_filename;
   char realig_filename[len], recal_filename[len];
   if (options->realignment) {
+    // first, sort
+    printf("-----------------------------------\nSorting before re-aligning...\n");
+    char sorted_filename[len];
+    sorted_filename[0] = 0;
+    strcat(sorted_filename, (options->output_name ? options->output_name : "."));
+    strcat(sorted_filename, "/");
+    if (options->prefix_name) {
+      strcat(sorted_filename, options->prefix_name);
+      strcat(sorted_filename, "_");
+    }
+    strcat(sorted_filename, "sorted_out");
+
+    // run sort
+    bam_sort_core_ext(0, out_filename, sorted_filename, 500000000, 0);
+    printf("Done!\n");
+
+    // and then, re-align
+    strcat(sorted_filename, ".bam");
     printf("-----------------------------------\nRealigning...\n");
     realig_filename[0] = 0;
     strcat(realig_filename, (options->output_name ? options->output_name : "."));
@@ -350,10 +368,16 @@ void dna_aligner(options_t *options) {
     }
     strcat(realig_filename, "realigned_out.bam");
 
-    char ref_filename[512] = "";
+    char ref_filename[strlen(sa_dirname) + 100];
+    ref_filename[0] = 0;
     strcpy(ref_filename, sa_dirname);
-    strcat(ref_filename, "dna_compression.bin");
-    alig_bam_file(aux, ref_filename, realig_filename, NULL);
+    strcat(ref_filename, "/dna_compression.bin");
+
+    printf("sorted_filename = %s\n", sorted_filename);
+    printf("ref_filename = %s\n", ref_filename);
+    printf("realig_filename = %s\n", realig_filename);
+
+    alig_bam_file(sorted_filename, ref_filename, realig_filename, NULL);
     aux = realig_filename;
     printf("Realigned file     : %s\n", realig_filename);
   }
@@ -373,9 +397,10 @@ void dna_aligner(options_t *options) {
       strcat(recal_filename, "recalibrated_out.bam");
     }
 
-    char ref_filename[512] = "";
-	strcpy(ref_filename, sa_dirname);
-	strcat(ref_filename, "dna_compression.bin");
+    char ref_filename[strlen(sa_dirname) + 100];
+    ref_filename[0] = 0;
+    strcpy(ref_filename, sa_dirname);
+    strcat(ref_filename, "/dna_compression.bin");
 
     /*recal_info_t *recal_info;
     recal_info = (recal_info_t *)malloc(sizeof(recal_info_t));
