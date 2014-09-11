@@ -586,7 +586,6 @@ int sam_writer(void *data) {
   if (batch) batch_free(batch);
 
   basic_statistics_add(num_reads, num_mapped_reads, total_mappings, 0, basic_st);
-
 }
 
 int bam_writer(void *data) {
@@ -630,7 +629,6 @@ int bam_writer(void *data) {
   extern st_bwt_t st_bwt;
   st_bwt.total_reads += num_reads_b;
 
-
   free(mapping_batch->histogram_sw);
   //
   // DNA/RNA mode
@@ -649,6 +647,7 @@ int bam_writer(void *data) {
       }	 
     } else {
       num_mapped_reads++;
+
       if (array_list_size(mapping_batch->mapping_lists[i]) == 1) {
 	st_bwt.single_alig++;
       } else {
@@ -666,7 +665,6 @@ int bam_writer(void *data) {
   if (batch) batch_free(batch);
   
   basic_statistics_add(num_reads_b, num_mapped_reads, total_mappings, 0, basic_st);
-     
 }
 
 void write_mapped_read(array_list_t *array_list, bam_file_t *bam_file) {

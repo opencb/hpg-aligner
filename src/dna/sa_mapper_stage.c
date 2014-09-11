@@ -304,6 +304,9 @@ cal_mng_t * cal_mng_new(sa_genome3_t *genome) {
   p->max_read_area = 0;
   p->num_chroms = num_chroms;
   p->cals_lists = cals_lists;
+
+  p->suffix_mng = suffix_mng_new(genome);
+
   return p;
 }
 
@@ -319,6 +322,8 @@ void cal_mng_free(cal_mng_t *p) {
       }
       free(p->cals_lists);
     }
+    if (p->suffix_mng) suffix_mng_free(p->suffix_mng);
+
     free(p);
   }
 }
@@ -421,16 +426,19 @@ void cal_mng_update(seed_t *seed, fastq_read_t *read, cal_mng_t *p) {
 	  //printf("checking cal\n");
 	  //seed_cal_print(item);
 	  s_last = linked_list_get_last(item->seed_list);
-	  r_gap = abs(seed->read_start - s_last->read_end);
-	  g_gap = abs(seed->genome_start - s_last->genome_end);
-	  if (g_gap <= read->length && r_gap <= read->length) {
-	    if (abs(r_gap - g_gap) < 200) {
-	      //print_seed("-----> inserting this seed: ", seed);
-	      //seed_cal_print(item);
-	      append_seed_linked_list(item, seed);
-	      //printf("after inserting\n");
-	      //seed_cal_print(item);
-	      break;
+	  if (s_last->suf_read_start != seed->suf_read_start &&
+	      s_last->suf_read_end != seed->suf_read_end) {
+	    r_gap = abs(seed->read_start - s_last->read_end);
+	    g_gap = abs(seed->genome_start - s_last->genome_end);
+	    if (g_gap <= read->length && r_gap <= read->length) {
+	      if (abs(r_gap - g_gap) < 200) {
+		//print_seed("-----> inserting this seed: ", seed);
+		//seed_cal_print(item);
+		append_seed_linked_list(item, seed);
+		//printf("after inserting\n");
+		//seed_cal_print(item);
+		break;
+	      }
 	    }
 	  }
 	  if (seed->genome_start < item->start) {
@@ -581,9 +589,12 @@ array_list_t *search_mate_cal_by_prefixes(seed_cal_t *cal, fastq_read_t *read,
 					  cal_mng_t *cal_mng) {
   array_list_t *cal_list = array_list_new(10, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
   char *seq;
+
   int chromosome, start, end;
   int read_pos, read_inc, read_end_pos;
-  
+
+  int mapq = cal->mapq;
+
   int num_seeds = batch->options->num_seeds;
 
   int min_distance = batch->options->pair_min_distance;
@@ -604,7 +615,8 @@ array_list_t *search_mate_cal_by_prefixes(seed_cal_t *cal, fastq_read_t *read,
   size_t g_start_suf, g_end_suf;
   int chrom;
 
-  //  printf("\tregion: %i:%lu-%lu\n", chromosome, start, end);
+  //  printf("\tsearch at region: %i:%lu-%lu\n", chromosome, start, end);
+
   for (read_pos = 0; read_pos < read_end_pos; read_pos += read_inc)  {	
 
     num_prefixes = search_prefix(&seq[read_pos], &low, &high, sa_index, 0);
@@ -617,7 +629,8 @@ array_list_t *search_mate_cal_by_prefixes(seed_cal_t *cal, fastq_read_t *read,
 	g_end_suf = g_start_suf + sa_index->k_value - 1;
 	
 	if (start <= g_start_suf && end >= g_end_suf) {
-	  //	  printf("\t\tfound at %i:%i-%i\n", chrom, g_start_suf, g_end_suf);
+	  //printf("\t\t%c reas_pos = %i, found at %i:%i-%i\n", 
+	  //	 (1 - cal->strand == 0 ? '+' : '-'), read_pos, chrom, g_start_suf, g_end_suf);
 	  generate_cals_from_suffixes(1 - cal->strand, read, read_pos,
 				      sa_index->k_value, i, i,
 				      sa_index, cal_mng
@@ -632,10 +645,32 @@ array_list_t *search_mate_cal_by_prefixes(seed_cal_t *cal, fastq_read_t *read,
 
   cal_mng_to_array_list(read->length / 3, cal_list, cal_mng);
 
-  //  printf("***********   from search_mate_cal_by_prefixes   *************\n");
+  //  printf("generate_cals_from_suffixes (read %s)...\n", read->id);
+  //  for (int kk = 0; kk < array_list_size(cal_list); kk++) { seed_cal_print(array_list_get(kk, cal_list)); }
 
-  select_best_cals(read, &cal_list);
+  //  printf("*********** from search_mate_cal_by_prefixes   (num. cals = %i) *************\n", array_list_size(cal_list));
 
+
+  if (array_list_size(cal_list) > 0) {
+    //printf(">>>>> search_mate_cal_by_prefixes: (mapq = %i) num. cals = %i\n", mapq, array_list_size(cal_list));
+    select_best_cals(read, &cal_list);
+    if (array_list_size(cal_list) <= 0) {
+      suffix_mng_search_read_cals_by_region(read, num_seeds, sa_index, 1 - cal->strand,
+					  chromosome, start, end, cal_list, cal_mng->suffix_mng);
+      //printf(">>>>> search_mate_cal_by_prefixes: after calling suffix_mng_search_read_cals_by_region (%i:%lu-%lu), num. cals = %i\n", chromosome, start, end, array_list_size(cal_list));
+      if (array_list_size(cal_list) > 0) {
+	select_best_cals(read, &cal_list);
+      }
+    }
+
+    for (int kk = 0; kk < array_list_size(cal_list); kk++) { 
+      cal = array_list_get(kk, cal_list);
+      if (cal->mapq > 0) {
+	cal->mapq = mapq;
+      }
+    }
+  }
+  
   /*
   int max_read_area = get_max_read_area(cal_list);
   if (max_read_area > read->length) max_read_area = read->length;
@@ -643,7 +678,6 @@ array_list_t *search_mate_cal_by_prefixes(seed_cal_t *cal, fastq_read_t *read,
   int min_num_mismatches = get_min_num_mismatches(cal_list);
   filter_cals_by_max_num_mismatches(min_num_mismatches, &cal_list);
   */
-
 
   //  printf("======> after search_mate_cal_by_prefixes: list size = %i\n", array_list_size(cal_list));
   //  for (int kk = 0; kk < array_list_size(cal_list); kk++) { seed_cal_print(array_list_get(kk, cal_list)); }
@@ -675,12 +709,13 @@ int is_valid_cal_pair(seed_cal_t *cal1, seed_cal_t *cal2,
 void check_pairs(array_list_t **cal_lists, sa_index3_t *sa_index,
 		 sa_mapping_batch_t *batch, cal_mng_t *cal_mng) {
   int found, inserted, max_read_area, read_area;
-  int distance, valid_pair, list_size, list1_size, list2_size;
-  seed_cal_t *cal, *mate_cal, *cal2, *cal1;
 
+  int score, first_score, second_score;
+  int distance, valid_pair, list_size, list1_size, list2_size;
+  seed_cal_t *cal, *mate_cal, *cal1, *cal2;
   array_list_t *list, *mate_list, *mate1_list, *mate2_list, *list1, *list2;
   fastq_read_t *read, *read1, *read2;
-  size_t num_reads = array_list_size(batch->fq_reads);
+  size_t num_cals, num_reads = array_list_size(batch->fq_reads);
 
   int min_distance = batch->options->pair_min_distance;
   int max_distance = batch->options->pair_max_distance;
@@ -694,17 +729,20 @@ void check_pairs(array_list_t **cal_lists, sa_index3_t *sa_index,
 
     list1_size = array_list_size(list1);
     list2_size = array_list_size(list2);
+
     /*
     list = list1;
     printf("======> list #1 size = %i\n", array_list_size(list));
-    for (int kk = 0; kk < array_list_size(list); kk++) { seed_cal_print(array_list_get(kk, list)); }
+    //for (int kk = 0; kk < array_list_size(list); kk++) { seed_cal_print(array_list_get(kk, list)); }
     list = list2;
     printf("======> list #2 size = %i\n", array_list_size(list));
-    for (int kk = 0; kk < array_list_size(list); kk++) { seed_cal_print(array_list_get(kk, list)); }
+    //for (int kk = 0; kk < array_list_size(list); kk++) { seed_cal_print(array_list_get(kk, list)); }
     */
     if (list1_size == 0 && list2_size == 0) continue;
+
     // no mate #1
     if (list1_size == 0) {
+      /*
       continue;
       array_list_clear(list2, (void *) seed_cal_free);
       continue;
@@ -712,10 +750,13 @@ void check_pairs(array_list_t **cal_lists, sa_index3_t *sa_index,
 	array_list_clear(list2, (void *) seed_cal_free);
 	continue;
       }
+      */
       // search mate by prefixes
       array_list_t *new_list = array_list_new(10, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
       for (int i2 = 0; i2 < list2_size; i2++) {
 	cal2 = array_list_get(i2, list2);
+	if (i2 == 0 && cal2->mapq < 10) break;
+
 	//printf("mate #1, not found for, cal %i of %i\n", i2, list2_size);
 	//seed_cal_print(cal2);
 	list = search_mate_cal_by_prefixes(cal2, read1, sa_index, batch, cal_mng);
@@ -723,18 +764,19 @@ void check_pairs(array_list_t **cal_lists, sa_index3_t *sa_index,
 	if (array_list_size(list) > 0) {
 	  for (int kk = 0; kk < array_list_size(list); kk++) { 
 	    cal = array_list_get(kk, list); 
-	    //seed_cal_print(cal);
+	    //	    seed_cal_print(cal);
 	    if (is_valid_cal_pair(cal1, cal, min_distance, max_distance, &distance)) {
 	      array_list_insert(cal, new_list);
 	      array_list_set(kk, NULL, list);
-	      //printf("\t\tpair found: distance = %i\n", distance);
-	      //} else {
-	      //printf("\t\tno pair found!!\n");
+	      //	      printf("\t\tpair found: distance = %i\n", distance);
+	      //	      } else {
+	      //	      printf("\t\tno pair found!!\n");
 	    }
 	  }
 	}
       }
       if (array_list_size(new_list) > 0) {
+	batch->status[i] = 5; // found mate #2 from mate #1
 	cal_lists[i] = new_list;
 	array_list_free(list1, (void *) NULL);
       } else {
@@ -745,6 +787,7 @@ void check_pairs(array_list_t **cal_lists, sa_index3_t *sa_index,
 
     // no mate #2
     if (list2_size == 0) {
+      /*
       continue;
       array_list_clear(list1, (void *) seed_cal_free);
       continue;
@@ -752,10 +795,12 @@ void check_pairs(array_list_t **cal_lists, sa_index3_t *sa_index,
 	array_list_clear(list1, (void *) seed_cal_free);
 	continue;
       }
+      */
       // search mate by prefixes
       array_list_t *new_list = array_list_new(10, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
       for (int i1 = 0; i1 < list1_size; i1++) {
 	cal1 = array_list_get(i1, list1);
+	if (i1 == 0 && cal1->mapq < 10) break;
 	//printf("mate #2, not found for, cal %i of %i\n", i1, list1_size);
 	//seed_cal_print(cal1);
 	list = search_mate_cal_by_prefixes(cal1, read2, sa_index, batch, cal_mng);
@@ -776,6 +821,7 @@ void check_pairs(array_list_t **cal_lists, sa_index3_t *sa_index,
 	array_list_free(list, (void *) seed_cal_free);
       }
       if (array_list_size(new_list) > 0) {
+	batch->status[i+1] = 6; // found mate #1 from mate #2
 	cal_lists[i+1] = new_list;
 	array_list_free(list2, (void *) NULL);
       } else {
@@ -784,28 +830,73 @@ void check_pairs(array_list_t **cal_lists, sa_index3_t *sa_index,
       continue;
     }
 
+    // check if we have valid pairs
+    score = 0;
+    first_score = 0;
+    second_score = 0;
     valid_pair = 0;
     for (int i1 = 0; i1 < list1_size; i1++) {
       cal1 = array_list_get(i1, list1);
       for (int i2 = 0; i2 < list2_size; i2++) {
 	cal2 = array_list_get(i2, list2);
-	valid_pair = is_valid_cal_pair(cal1, cal2, min_distance, max_distance, &distance);
-	//	printf(">>>>>>>>>>>>>>>> valid_pair = %i (distance = %i)\n", valid_pair, distance);
-	if (valid_pair) break;
+	if (is_valid_cal_pair(cal1, cal2, min_distance, max_distance, &distance)) {
+	  // score management
+	  score = cal1->score + cal2->score;
+	  if (score < first_score) {
+	    if (score > second_score) {
+	      second_score = score;
+	    }
+	  } else if (score > first_score) {
+	    if (first_score > 0) {
+	      second_score = first_score;
+	    }
+	    first_score = score;
+	  } else {
+	    second_score = score;
+	  }
+	  
+	  valid_pair++;
+	}
+	//printf(">>>>>>>>>>>>>>>> valid_pair = %i (distance = %i)\n", valid_pair, distance);
       }
-      if (valid_pair) break;
     }
-    if (valid_pair) continue;
+    if (valid_pair) {
+      cal1 = array_list_get(0, list1);
+      cal2 = array_list_get(0, list2);
+      if (cal1->mapq == 0 && cal2->mapq == 0) {
+	if (first_score > second_score) {
+	  num_cals = array_list_size(list1);
+	  for (int kk = 0; kk < num_cals; kk++) { 
+	    cal = array_list_get(kk, list1);
+	    cal->mapq = 0; //0; //63;
+	  }
+	  num_cals = array_list_size(list2);
+	  for (int kk = 0; kk < num_cals; kk++) { 
+	    cal = array_list_get(kk, list2);
+	    cal->mapq = 0;//0;//63;
+	  }
+	}
+      }
+      continue;
+    }
 
+    // no valid pairs, then search mate by region
     max_read_area = 0;
+    score = 0;
+    first_score = 0;
+    second_score = 0;
+
     mate1_list = array_list_new(10, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
     mate2_list = array_list_new(10, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
+
     /*
     printf("======> list #1 size = %i\n", array_list_size(list1));
     for (int kk = 0; kk < array_list_size(list1); kk++) { seed_cal_print(array_list_get(kk, list1)); }
     printf("======> list #2 size = %i\n", array_list_size(list2));
     for (int kk = 0; kk < array_list_size(list2); kk++) { seed_cal_print(array_list_get(kk, list2)); }
     */
+    int pairs = 0;
+
     for (int k = 0; k < 2; k++) {
       if  (k == 0) {
 	list_size = list1_size;
@@ -826,11 +917,34 @@ void check_pairs(array_list_t **cal_lists, sa_index3_t *sa_index,
 
 	  for (int jj = 0; jj < array_list_size(mate_list); jj++) { 
 	    mate_cal = array_list_get(jj, mate_list);
-	    //	    mate_cal->mapq = 1;
+
+	    pairs++;
+	    //int distance = abs(cal->start - mate_cal->start) + 1 + read->length;
+	    //printf("**** >>>>>>>>>> pair %i : distance = %i\n", pairs, distance);
+	    //seed_cal_print(cal);
+	    //seed_cal_print(mate_cal);
+
 	    //printf("----->> found cals for the previous cal:\n");
 	    //seed_cal_print(mate_cal);
+
+	    // score management
+	    score = cal->score + mate_cal->score;
+	    if (score < first_score) {
+	      if (score > second_score) {
+		second_score = score;
+	      }
+	    } else if (score > first_score) {
+	      if (first_score > 0) {
+		second_score = first_score;
+	      }
+	      first_score = score;
+	    } else {
+	      second_score = score;
+	    }
+	    
+	    // read area management
 	    read_area = cal->read_area + mate_cal->read_area;
-	    //printf("----->> read_area = %i, max_read_area = %i\n", read_area, max_read_area);
+
 	    if (read_area < max_read_area) {
 	      // do nothing
 	      continue;
@@ -853,13 +967,13 @@ void check_pairs(array_list_t **cal_lists, sa_index3_t *sa_index,
 		}
 		array_list_insert(mate_cal, mate1_list);
 	      }
-
-	      //printf("\t------ best read area = %i (before = %i)\n", read_area, max_read_area);
-	      //printf("list for mate #1\n");
-	      //for (int kk = 0; kk < array_list_size(mate1_list); kk++) { seed_cal_print(array_list_get(kk, mate1_list)); }
-	      //printf("list for mate #2\n");
-	      //for (int kk = 0; kk < array_list_size(mate2_list); kk++) { seed_cal_print(array_list_get(kk, mate2_list)); }
-
+	      /*
+	      printf("\t------ best read area = %i (before = %i)\n", read_area, max_read_area);
+	      printf("list for mate #1\n");
+	      for (int kk = 0; kk < array_list_size(mate1_list); kk++) { seed_cal_print(array_list_get(kk, mate1_list)); }
+	      printf("list for mate #2\n");
+	      for (int kk = 0; kk < array_list_size(mate2_list); kk++) { seed_cal_print(array_list_get(kk, mate2_list)); }
+	      */
 	      // update max read area
 	      max_read_area = read_area;	      
 	    } else {
@@ -930,12 +1044,29 @@ void check_pairs(array_list_t **cal_lists, sa_index3_t *sa_index,
     cal_lists[i] = mate1_list;
     cal_lists[i+1] = mate2_list;
 
-    //printf("======> result: max read area = %i\n", max_read_area);
-    //printf("=========> mate #1 list size = %i\n", array_list_size(mate1_list));
-    //for (int kk = 0; kk < array_list_size(mate1_list); kk++) { seed_cal_print(array_list_get(kk, mate1_list)); }
-    //printf("=========> mate #2 list size = %i\n", array_list_size(mate2_list));
-    //for (int kk = 0; kk < array_list_size(mate2_list); kk++) { seed_cal_print(array_list_get(kk, mate2_list)); }
+    batch->status[i] = 7; 
+    batch->status[i+1] = 7;
 
+    if (first_score > second_score) {
+      num_cals = array_list_size(mate1_list);
+      for (int kk = 0; kk < num_cals; kk++) { 
+	cal = array_list_get(kk, mate1_list);
+	cal->mapq = 0;//62;
+      }
+      num_cals = array_list_size(mate2_list);
+      for (int kk = 0; kk < num_cals; kk++) { 
+	cal = array_list_get(kk, mate2_list);
+	cal->mapq = 0;//62;
+      }
+    }
+
+    /*
+    printf("======> result: max read area = %i\n", max_read_area);
+    printf("=========> mate #1 list size = %i\n", array_list_size(mate1_list));
+    for (int kk = 0; kk < array_list_size(mate1_list); kk++) { seed_cal_print(array_list_get(kk, mate1_list)); }
+    printf("=========> mate #2 list size = %i\n", array_list_size(mate2_list));
+    for (int kk = 0; kk < array_list_size(mate2_list); kk++) { seed_cal_print(array_list_get(kk, mate2_list)); }
+    */
   }
 }
 
@@ -959,6 +1090,18 @@ void generate_cals_from_exact_read(int strand, fastq_read_t *read,
     chrom = sa_index->CHROM[suff];
     g_start = sa_index->SA[suff] - sa_index->genome->chrom_offsets[chrom];
     g_end = g_start + read->length - 1;
+
+    /*
+    {
+      size_t r_start_suf = 0;
+      size_t r_end_suf = read->length - 1;
+      size_t g_start_suf = g_start;
+      size_t g_end_suf = g_end;
+      printf("%s\t%c\tread\t%i\t%lu\t%lu\t%lu\t%lu\t%i\n",
+	     read->id, (strand == 0 ? '+' : '-'), chrom, r_start_suf, r_end_suf, g_start_suf, g_end_suf, read->length);
+    }
+    */
+
     //    seed_list = linked_list_new(COLLECTION_MODE_ASYNCHRONIZED);
     seed = seed_new(0, read->length - 1, g_start, g_end);
     seed->chromosome_id = chrom;
@@ -1030,6 +1173,13 @@ int generate_cals_from_suffixes(int strand, fastq_read_t *read,
     
     g_start_suf = sa_index->SA[suff] - sa_index->genome->chrom_offsets[chrom];
     g_end_suf = g_start_suf + suffix_len - 1;
+
+    /*
+    {
+      printf("%s\t%c\tread\t%i\t%lu\t%lu\t%lu\t%lu\t%i\n",
+	     read->id, (strand == 0 ? '+' : '-'), chrom, r_start_suf, r_end_suf, g_start_suf, g_end_suf, suffix_len);
+    }
+    */
 
     #ifdef _TIMING
     gettimeofday(&stop, NULL);
@@ -1330,6 +1480,8 @@ array_list_t *create_cals(int num_seeds, fastq_read_t *read,
       #ifdef _VERBOSE	  
       printf("\t\tnum. suffixes = %lu (suffix length = %lu)\n", num_suffixes, suffix_len);
       #endif
+      //      printf("\t\tread pos. = %i -> num. suffixes = %lu (suffix length = %lu)\n", 
+      //      	     read_pos, num_suffixes, suffix_len);
       if (num_suffixes < MAX_NUM_SUFFIXES && suffix_len) {
         #ifdef _VERBOSE	  
 	//display_suffix_mappings(strand, read_pos, suffix_len, low, high, sa_index);
@@ -1368,7 +1520,7 @@ array_list_t *create_cals(int num_seeds, fastq_read_t *read,
       read_pos += read_inc;
     } // end of for read_pos
     
-    if (extra_seed) {
+    if (suffix_len != read->length && extra_seed) {
       read_pos = read->length - sa_index->k_value;
       #ifdef _VERBOSE	  
       printf("\tread pos. = %lu\n", read_pos);
@@ -1943,6 +2095,7 @@ int prepare_sw(fastq_read_t *read,   array_list_t *sw_prepare_list,
   seed_t *prev_seed, *seed;
   int gap_len;
   int gap_read_len, gap_genome_len;
+  size_t start, end;
   size_t gap_read_start, gap_read_end;
   size_t gap_genome_start, gap_genome_end;
 
@@ -2036,6 +2189,12 @@ int prepare_sw(fastq_read_t *read,   array_list_t *sw_prepare_list,
       #ifdef _VERBOSE
       print_seed("-------> after updating middle right-side seed: ", prev_seed);
       #endif
+
+      if (prev_seed->read_end <= prev_seed->read_start) {
+	cal->invalid = 1;
+	break;
+      }
+
       #ifdef _VERBOSE
       print_seed("-----> before updating middle left-side seed: ", seed);
       #endif
@@ -2044,6 +2203,10 @@ int prepare_sw(fastq_read_t *read,   array_list_t *sw_prepare_list,
       print_seed("-------> after updating middle left-side seed: ", seed);
       #endif
 
+      if (seed->read_end <= seed->read_start) {
+	cal->invalid = 1;
+	break;
+      }
 
       gap_read_start = prev_seed->read_end + 1;
       gap_read_end = seed->read_start - 1;
@@ -2052,6 +2215,29 @@ int prepare_sw(fastq_read_t *read,   array_list_t *sw_prepare_list,
       gap_genome_start = prev_seed->genome_end + 1;
       gap_genome_end = seed->genome_start - 1;
       gap_genome_len = gap_genome_end - gap_genome_start + 1;
+
+      /*
+	printf("read gap (start, end, len) = (%i, %i, %i)\n", gap_read_start, gap_read_end, gap_read_len);
+	printf("genome gap (start, end, len) = (%i, %i, %i)\n", gap_genome_start, gap_genome_end, gap_genome_len);
+	printf("get read sequence (%i - %i)\n", 
+	       gap_read_start - SW_LEFT_FLANK - abs(gap_read_len), 
+	       gap_read_len + SW_LEFT_FLANK + SW_RIGHT_FLANK + (2*abs(gap_read_len)));
+	printf("get genome sequence (%i - %i)\n", 
+	       gap_genome_start - SW_LEFT_FLANK - abs(gap_read_len), 
+	       gap_genome_end + SW_RIGHT_FLANK + abs(gap_read_len));
+      */
+      /*
+      if (gap_read_len < 0 && gap_genome_len < 0) {
+	printf("read gap (start, end, len) = (%i, %i, %i)\n", gap_read_start, gap_read_end, gap_read_len);
+	printf("genome gap (start, end, len) = (%i, %i, %i)\n", gap_genome_start, gap_genome_end, gap_genome_len);
+	printf("get read sequence (%i - %i)\n", 
+	       gap_read_start - SW_LEFT_FLANK - abs(gap_read_len), 
+	       gap_read_len + SW_LEFT_FLANK + SW_RIGHT_FLANK + (2*abs(gap_read_len)));
+	printf("get genome sequence (%i - %i)\n", 
+	       gap_genome_start - SW_LEFT_FLANK - abs(gap_read_len), 
+	       gap_genome_end + SW_RIGHT_FLANK + abs(gap_read_len));
+      }
+      */
 
       //printf("\n");
       //print_seed("prev: ", prev_seed);
@@ -2067,14 +2253,26 @@ int prepare_sw(fastq_read_t *read,   array_list_t *sw_prepare_list,
 	//	cal->num_extend_gaps += (gap_genome_len - 1);
 	//	prev_seed = seed;
 
+	start = gap_genome_start - SW_LEFT_FLANK - abs(gap_read_len);
+	end = gap_genome_end + SW_RIGHT_FLANK + abs(gap_read_len);
+	if (end <= start) {
+	  cal->invalid = 1;
+	  break;
+	}
+
 	seq = get_subsequence((cal->strand ? read->revcomp : read->sequence), 
 			      gap_read_start - SW_LEFT_FLANK - abs(gap_read_len), 
 			      gap_read_len + SW_LEFT_FLANK + SW_RIGHT_FLANK + (2*abs(gap_read_len)));
 
-	ref = sa_genome_get_sequence(cal->chromosome_id, gap_genome_start - SW_LEFT_FLANK - abs(gap_read_len), 
-				     gap_genome_end + SW_RIGHT_FLANK + abs(gap_read_len), sa_index->genome);
+	//	seed_cal_print(cal);
+	//printf("read gap (start, end, len) = (%i, %i, %i)\n", gap_read_start, gap_read_end, gap_read_len);
+	//printf("genome gap (start, end, len) = (%i, %i, %i)\n", gap_genome_start, gap_genome_end, gap_genome_len);
+	//printf("get genome sequence (%i, %i)\n", gap_genome_start - SW_LEFT_FLANK - abs(gap_read_len), gap_genome_end + SW_RIGHT_FLANK + abs(gap_read_len));
 
-	
+	ref = sa_genome_get_sequence(cal->chromosome_id, start, end, sa_index->genome);
+
+	//printf("\t---> (seq = %s, ref = %s)\n", seq, ref);
+
 	cigarset_info_set(CIGAR_FROM_GAP, abs(gap_read_len), NULL, NULL, &cigarset->info[seed_count * 2]);
 
 	//printf("case 1: %s\n", read->id);
@@ -2086,11 +2284,17 @@ int prepare_sw(fastq_read_t *read,   array_list_t *sw_prepare_list,
 	//	cal->num_open_gaps += 1;
 	//	cal->num_extend_gaps += (gap_genome_len - 1);
 
+	start = gap_genome_start - SW_LEFT_FLANK - abs(gap_genome_len);
+	end = gap_genome_end + SW_RIGHT_FLANK + abs(gap_genome_len);
+	if (end <= start) {
+	  cal->invalid = 1;
+	  break;
+	}
+
 	seq = get_subsequence((cal->strand ? read->revcomp : read->sequence), 
 			      gap_read_start - SW_LEFT_FLANK, gap_read_len + SW_LEFT_FLANK + SW_RIGHT_FLANK);
 
-	ref = sa_genome_get_sequence(cal->chromosome_id, gap_genome_start - SW_LEFT_FLANK - abs(gap_genome_len), 
-				     gap_genome_end + SW_RIGHT_FLANK + abs(gap_genome_len), sa_index->genome);
+	ref = sa_genome_get_sequence(cal->chromosome_id, start, end, sa_index->genome);
             
 	cigarset_info_set(CIGAR_FROM_GAP, 0, NULL, NULL, &cigarset->info[seed_count * 2]);
 
@@ -2132,6 +2336,13 @@ int prepare_sw(fastq_read_t *read,   array_list_t *sw_prepare_list,
       prev_seed = seed;
       cigarset_info_set(CIGAR_FROM_SEED, 0, &seed->cigar, seed, &cigarset->info[seed_count * 2 + 1]);
     }
+
+    if (cal->invalid) {
+      cigarset_free(cigarset);
+      cal->cigarset = NULL;
+      continue;
+    }
+
     // last seed
     seed = linked_list_get_last(cal->seed_list);
     if (seed->read_end < read->length - 1) {
@@ -2142,34 +2353,42 @@ int prepare_sw(fastq_read_t *read,   array_list_t *sw_prepare_list,
       #ifdef _VERBOSE
       print_seed("-------> after updating last right-side seed: ", seed);
       #endif
-
+	
       gap_genome_start = seed->genome_end - SW_LEFT_FLANK + 1;
       gap_genome_end = gap_genome_start + (read->length - seed->read_end) + SW_LEFT_FLANK_EX;
-      ref = sa_genome_get_sequence(cal->chromosome_id, gap_genome_start, gap_genome_end, sa_index->genome);
 
+      if (gap_genome_end <= gap_genome_start) {
+	printf("in last seed gap_genome_end <= gap_genome_start\n");
+	exit(-1);
+	//	cal->invalid = 1;
+	//	break;
+      }
+
+      ref = sa_genome_get_sequence(cal->chromosome_id, gap_genome_start, gap_genome_end, sa_index->genome);
+      
       seq = get_subsequence((cal->strand ? read->revcomp : read->sequence), 
 			    seed->read_end - SW_LEFT_FLANK + 1, 
 			    read->length + SW_LEFT_FLANK - seed->read_end);
-
+      
       sw_prepare = sw_prepare_new(seq, ref, 0, 0, LAST_SW);
       sw_prepare->seed_region = (seed_region_t *)(num_seeds * 2);
       sw_prepare->cal = (cal_t *)cal;
       sw_prepare->read = read;
       array_list_insert(sw_prepare, sw_prepare_list);
       num_sw++;
-
+      
       cigarset_info_set(CIGAR_FROM_GAP, 0, NULL, NULL, &cigarset->info[num_seeds * 2]);
-
+      
       //printf("case 5: %s\n", read->id);
       //exit(-1);
     } else {
       cigarset_info_set(0, 0, NULL, NULL, &cigarset->info[num_seeds * 2]);
     }
-
+    
     if (num_sw == 0) {
       seed_cal_set_cigar_by_seed(seed, cal);
     }
-
+    
     num_total_sw += num_sw;
   }
   
@@ -2248,9 +2467,19 @@ void execute_sw(array_list_t *sw_prepare_list, sa_mapping_batch_t *mapping_batch
   int left_flank, right_flank, query_start, ref_start;
   for (int i = 0; i < sw_count; i++) {
     sw_prepare = array_list_get(i, sw_prepare_list);
-    cal = (seed_cal_t *)sw_prepare->cal;
+
+    cal = (seed_cal_t *) sw_prepare->cal;
+
+    if (cal->invalid) continue;
     
     cigarset = cal->cigarset;
+    /*
+    if (cigarset == NULL) {
+      printf("cigarset is NULL for this cal\n");
+      seed_cal_print(cal);
+      exit(-1);
+    }
+    */
     cigar = cigar_new_empty();
 
     query_map = sw_output->query_map_p[i];
@@ -2418,8 +2647,10 @@ void post_process_sw(int sw_post_read_counter, int *sw_post_read,
     for (int i = 0; i < num_cals; i++) {
       cal = array_list_get(i, cal_list);
 
-      if (cal->seed_list->size <= 0) continue;
+      if (cal->seed_list->size <= 0 || cal->invalid) continue;
       
+      //      seed_cal_print(cal);
+
       //      cal->score = ((-4.0f) * cal->num_mismatches) 
       //	+ ((-10.0f) * cal->num_open_gaps) 
       //	+ ((-0.5f) * cal->num_extend_gaps);
@@ -2433,6 +2664,9 @@ void post_process_sw(int sw_post_read_counter, int *sw_post_read,
       cigarset = cal->cigarset;
       cigar = &cal->cigar;
       for (int j = 0; j < cigarset->size; j++) {
+
+	//printf("cigarset: item %i of %i\n", j, cigarset->size);
+
 	cigar_type = cigarset->info[j].active;
 	if (cigar_type > 0) {
 	  if (cigar_type == CIGAR_FROM_SEED) {
@@ -2540,6 +2774,12 @@ int sa_single_mapper(void *data) {
   int max_read_area, min_num_mismatches;
   float max_score;
 
+  // smith-waterman parameters
+  float match_score = wf_batch->options->match;
+  float mismatch_penalty = wf_batch->options->mismatch;
+  float gap_open_penalty = -1.0f * wf_batch->options->gap_open;
+  float gap_extend_penalty = -1.0f * wf_batch->options->gap_extend;
+  
   // CAL management
   size_t num_cals;
   seed_cal_t *cal;
@@ -2580,11 +2820,23 @@ int sa_single_mapper(void *data) {
 
       select_best_cals(read, &cal_list);
 
-      //printf("before cleaning cals...\n");
-      //for (int kk = 0; kk < array_list_size(cal_list); kk++) { seed_cal_print(array_list_get(kk, cal_list)); }
+      if (array_list_size(cal_list) <= 0) {
+	//	mapping_batch->status[i] = 3; // invalid
+	suffix_mng_search_read_cals(read, num_seeds, sa_index, cal_list, cal_mng->suffix_mng);
+	if (array_list_size(cal_list) > 0) {
+	  select_best_cals(read, &cal_list);
+	} else {
+	  mapping_batch->status[i] = 3; // invalid
+	}
+      }
+      //      printf("after select_best_cals and before cleaning cals...\n");
+      //      for (int kk = 0; kk < array_list_size(cal_list); kk++) { seed_cal_print(array_list_get(kk, cal_list)); }
 
       //fill_seed_gaps(cal_list, read, sa_index);
       clean_cals(&cal_list, read, sa_index);
+      if (array_list_size(cal_list) <= 0) {
+	mapping_batch->status[i] = 4; //clean cals
+      }
 
       //printf("after cleaning cals and before preparing sw...\n");
       //for (int kk = 0; kk < array_list_size(cal_list); kk++) { seed_cal_print(array_list_get(kk, cal_list)); }
@@ -2593,7 +2845,10 @@ int sa_single_mapper(void *data) {
       if (prepare_sw(read, sw_prepare_list, mapping_batch, sa_index, cal_list)) {
 	sw_post_read[sw_post_read_counter++] = i;
       }
+    } else {
+      mapping_batch->status[i] = 1; // no cals
     }
+
     cal_lists[i] = cal_list;
   }
 
@@ -2618,7 +2873,8 @@ int sa_single_mapper(void *data) {
       #ifdef _TIMING
       gettimeofday(&start, NULL);
       #endif
-      max_score = get_max_score(cal_list);
+      max_score = get_max_score(cal_list, match_score, mismatch_penalty,
+				gap_open_penalty, gap_extend_penalty);
       #ifdef _VERBOSE
       printf("\n******* after SW> max. score = %0.2f (read %s)\n", max_score, read->id);
       #endif
@@ -2700,6 +2956,12 @@ int sa_pair_mapper(void *data) {
   int max_read_area, min_num_mismatches;
   float max_score;
 
+  // smith-waterman parameters
+  float match_score = wf_batch->options->match;
+  float mismatch_penalty = wf_batch->options->mismatch;
+  float gap_open_penalty = -1.0f * wf_batch->options->gap_open;
+  float gap_extend_penalty = -1.0f * wf_batch->options->gap_extend;
+
   // CAL management
   size_t num_cals;
   seed_cal_t *cal;
@@ -2739,31 +3001,45 @@ int sa_pair_mapper(void *data) {
       //for (int kk = 0; kk < array_list_size(cal_list); kk++) { seed_cal_print(array_list_get(kk, cal_list)); }
 
       //      printf("***********   from sa_pair_mapper   *************\n");
+
+      //printf(">>>>> sa_pair_mapper: read %i, num. cals = %i\n", i, array_list_size(cal_list));
       select_best_cals(read, &cal_list);
+      if (array_list_size(cal_list) <= 0) {
+	//	mapping_batch->status[i] = 3; // invalid
+	suffix_mng_search_read_cals(read, num_seeds, sa_index, cal_list, cal_mng->suffix_mng);
+	if (array_list_size(cal_list) > 0) {
+	  //printf(">>>>> sa_pair_mapper: after calling suffix_mng_search_read_cals, read %i, num. cals = %i\n", i, array_list_size(cal_list));
+	  select_best_cals(read, &cal_list);
+	} else {
+	  mapping_batch->status[i] = 3; // invalid
+	}
+      }
 
       //      printf("after filtering min. num mismatches (%i) before cleaning cals...\n", min_num_mismatches);
       //      for (int kk = 0; kk < array_list_size(cal_list); kk++) { seed_cal_print(array_list_get(kk, cal_list)); }
 
       //fill_seed_gaps(cal_list, read, sa_index);
       clean_cals(&cal_list, read, sa_index);
-
-      //printf("after cleaning cals and before preparing sw...\n");
-      //for (int kk = 0; kk < array_list_size(cal_list); kk++) { seed_cal_print(array_list_get(kk, cal_list)); }
+      if (array_list_size(cal_list) <= 0) {
+	if (mapping_batch->status[i] == 0) {
+	  mapping_batch->status[i] = 4; //clean cals
+	}
+      } else {
+	if (((seed_cal_t *)array_list_get(0, cal_list))->mapq == 0) {
+	  mapping_batch->status[i] = 2; // mapq = 0
+	}
+      }
+    } else {
+      mapping_batch->status[i] = 1; // no cals
     }
     cal_lists[i] = cal_list;
   }
 
-  //  printf("before filtering by pair (read %s)...\n", read->id);
-  //  for (int kk = 0; kk < array_list_size(cal_list); kk++) { seed_cal_print(array_list_get(kk, cal_list)); }
-
   // 2) filter cals by pairs
   filter_cals_by_pair_mode(pair_mode, pair_min_distance, pair_max_distance, 
-			   num_reads, cal_lists);
+  			   num_reads, cal_lists);
   
   check_pairs(cal_lists, sa_index, mapping_batch, cal_mng);
-
-  //  printf("after filtering by pair (read %s)...\n", read->id);
-  //  for (int kk = 0; kk < array_list_size(cal_list); kk++) { seed_cal_print(array_list_get(kk, cal_list)); }
 
   // 3) prepare Smith-Waterman to fill in the gaps
   for (int i = 0; i < num_reads; i++) {
@@ -2771,9 +3047,13 @@ int sa_pair_mapper(void *data) {
     cal_list = cal_lists[i];
 
     if (array_list_size(cal_list) > 0) {
+      //printf("before prepare_sw\n");
+      //for (int kk = 0; kk < array_list_size(cal_list); kk++) { seed_cal_print(array_list_get(kk, cal_list)); }
       if (prepare_sw(read, sw_prepare_list, mapping_batch, sa_index, cal_list)) {
 	sw_post_read[sw_post_read_counter++] = i;
       }
+      //printf("after prepare_sw\n");
+      //for (int kk = 0; kk < array_list_size(cal_list); kk++) { seed_cal_print(array_list_get(kk, cal_list)); }
     }
   }
 
@@ -2798,7 +3078,8 @@ int sa_pair_mapper(void *data) {
       #ifdef _TIMING
       gettimeofday(&start, NULL);
       #endif
-      max_score = get_max_score(cal_list);
+      max_score = get_max_score(cal_list, match_score, mismatch_penalty,
+				gap_open_penalty, gap_extend_penalty);
       #ifdef _VERBOSE
       printf("\n******* after SW> max. score = %0.2f (read %s)\n", max_score, read->id);
       #endif

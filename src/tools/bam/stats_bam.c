@@ -101,11 +101,7 @@ void bam_stats_wf_batch_free(bam_stats_wf_batch_t *p) {
       array_list_free(p->bam1s, NULL);
     }
 
-    if (p->bam_stats) {
-      //TODO: segfault??
-      array_list_free(p->bam_stats, (void *)bam_stats_free);
-    }
-
+    if (p->bam_stats) array_list_free(p->bam_stats, (void *) bam_stats_free);
     if (p->passed_bam1s) array_list_free(p->passed_bam1s, NULL);
     if (p->failed_bam1s) array_list_free(p->failed_bam1s, NULL);    
 

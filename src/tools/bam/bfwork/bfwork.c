@@ -512,10 +512,6 @@ bfwork_run(bam_fwork_t *fwork)
 	double times;
 	bam1_t *read;
 
-	//Reference
-	char *ref_path;
-	char *ref_name;
-
 	assert(fwork);
 	assert(fwork->input_file_str);
 	assert(fwork->regions_list);
@@ -535,15 +531,23 @@ bfwork_run(bam_fwork_t *fwork)
 	if(fwork->reference_str)
 	{
 		//Obtain reference filename and dirpath from full path
+	  char *ref_path = NULL, *ref_name = NULL, *aux;
+
 		ref_path = strdup(fwork->reference_str);
-		ref_path = dirname(ref_path);
-		ref_name = strrchr(fwork->reference_str, '/');
+		aux = strrchr(ref_path, '/');
+		if (aux) {
+		  ref_name = strdup(aux);
+		  *aux = '\0';
+		}
 		printf("Reference path: %s\n", ref_path);
 		printf("Reference name: %s\n", ref_name);
 		printf("Opening reference genome from \"%s%s\" ...\n", ref_path, ref_name);
 		fwork->reference = genome_new(ref_name, ref_path, BWT_MODE);
 		assert(fwork->reference);
 		printf("Reference opened!...\n");
+
+		if (ref_path) free(ref_path);
+		if (ref_name) free(ref_name);
 	}
 
 	printf("--------------------------------------\n");

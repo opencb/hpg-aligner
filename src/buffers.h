@@ -542,6 +542,7 @@ typedef struct sa_alignment {
   cigar_code_t *c_right;
   cigar_code_t *c_final;
   int sp_middle[20];
+  int sp_middle_err[20];
   void *cigar_middle[20];
   int reported;
 } sa_alignment_t;

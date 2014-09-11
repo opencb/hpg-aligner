@@ -78,6 +78,8 @@ typedef struct sa_mapping_batch {
 
   array_list_t *fq_reads;
   array_list_t **mapping_lists;
+
+  char *status;
 } sa_mapping_batch_t;
 
 //--------------------------------------------------------------------
@@ -101,6 +103,8 @@ static inline sa_mapping_batch_t *sa_mapping_batch_new(array_list_t *fq_reads) {
     p->mapping_lists[i] = array_list_new(10, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
   }
 
+  p->status = (char *) calloc(num_reads, sizeof(char));
+
   #ifdef _TIMING
   for (int i = 0; i < NUM_TIMING; i++) {
     p->func_times[i] = 0;
@@ -116,6 +120,7 @@ static inline void sa_mapping_batch_free(sa_mapping_batch_t *p) {
   if (p) {
     if (p->fq_reads) { array_list_free(p->fq_reads, (void *) fastq_read_free); }
     if (p->mapping_lists) { free(p->mapping_lists); }
+    if (p->status) { free(p->status); }
     free(p);
   }
 }  
@@ -129,9 +134,14 @@ typedef struct sa_wf_batch {
   sa_index3_t *sa_index;
   batch_writer_input_t *writer_input;
   void *mapping_batch;  
+
   void *data_input;
   void *data_output;
   int data_output_size;
+
+  // to remove
+  //void *data;
+  //int data_size;
 } sa_wf_batch_t;
 
 //--------------------------------------------------------------------
@@ -871,6 +881,9 @@ typedef struct seed_cal {
   int num_extend_gaps;
 
   int mapq;
+
+  int num_hits;
+
   float score;
   cigar_t cigar;
 
@@ -931,9 +944,12 @@ static inline void seed_cal_update_info(seed_cal_t *cal) {
     num_mismatches += seed->num_mismatches;
     num_open_gaps += seed->num_open_gaps;
     num_extend_gaps += seed->num_extend_gaps;
-    read_area = (seed->read_end - seed->read_start > seed->genome_end - seed->genome_end ? 
-		 (seed->read_end - seed->read_start + 1) : 
-		 (seed->genome_end - seed->genome_start + 1));
+
+    read_area += (seed->read_end - seed->read_start > seed->genome_end - seed->genome_end ? 
+		  (seed->read_end - seed->read_start + 1) : 
+		  (seed->genome_end - seed->genome_start + 1));
+    
+    read_area -= (num_mismatches + (2 * num_open_gaps) + (num_extend_gaps));
     //    read_area += (seed->read_end - seed->read_start - num_mismatches - (2 * num_open_gaps) - (num_extend_gaps));
   }
   cal->num_mismatches = num_mismatches;
@@ -984,7 +1000,10 @@ static inline void seed_cal_print(seed_cal_t *cal) {
 // utils
 //--------------------------------------------------------------------
 
-float get_max_score(array_list_t *cal_list);
+float get_max_score(array_list_t *cal_list,
+		    float match_score, float mismatch_penalty,
+		    float gap_open_penalty, float gap_extend_penalty);
+
 int get_min_num_mismatches(array_list_t *cal_list);
 int get_max_read_area(array_list_t *cal_list);
 

@@ -853,6 +853,13 @@ void file_write_alignments(fastq_read_t *fq_read, array_list_t *items, FILE *fd)
   for (int i = 0; i < num_items; i++) {
     alignment_a = &alignment_aux[i];
     alignment_t *alignment = array_list_get(i, items);
+    
+    if (alignment->alig_data) {
+      alignment->cigar = new_cigar_code_string(alignment->alig_data);
+      array_list_clear(((cigar_code_t *)alignment->alig_data)->ops, (void *)cigar_op_free);
+      cigar_code_free(alignment->alig_data);
+    }
+
     alignment_aux_init(alignment, 
 		       alignment_a);     
 
@@ -1165,6 +1172,7 @@ void sa_file_write_partial_alignments(fastq_read_t *fq_read, array_list_t *items
   size_t tot_len = 0;
   
   simple_alignment_t simple_alignment[num_items];
+  
   simple_alignment_t *simple_a;
   
   //unsigned char type = MENTA_TYPE;
