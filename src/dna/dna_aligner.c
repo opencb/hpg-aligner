@@ -21,6 +21,8 @@ int counters[NUM_COUNTERS];
 
 #include "adapter.h"
 
+void bam_sort_core_ext(int is_by_qname, const char *fn, const char *prefix, size_t max_mem, int is_stdout);
+
 void dna_aligner(options_t *options) {
   /*
   {
