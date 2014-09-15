@@ -170,7 +170,7 @@ int sa_sam_writer(void *data) {
 
       mapping_list = mapping_batch->mapping_lists[i];
       num_mappings = array_list_size(mapping_list);
-      num_total_mappings += num_mappgins;
+      num_total_mappings += num_mappings;
 
       #ifdef _VERBOSE
       if (num_mappings > 1) {
@@ -222,12 +222,14 @@ int sa_sam_writer(void *data) {
 		  alig->quality,
 		  opt_fields
 		  );
-	
+
+	  // free memory
 	  free(opt_fields);
 	  alignment_free(alig);	 
-	}
+	} // end for num_mappings
       } else {
 	num_unmapped_reads++;
+
 	opt_fields = (char *) calloc(100, sizeof(char));
 	sprintf(opt_fields, "XM:i:%i XU:i:%i", num_mappings, mapping_batch->status[i]);
 
@@ -273,9 +275,8 @@ int sa_sam_writer(void *data) {
 	  free(sequence);
 	  free(quality);
 	}
+	array_list_free(mapping_list, (void *) alignment_free);
       }
-      
-      array_list_free(mapping_list, (void *) alignment_free);
     }
   } else {
     // SINGLE MODE
@@ -290,6 +291,8 @@ int sa_sam_writer(void *data) {
       read = (fastq_read_t *) array_list_get(i, read_list);
       mapping_list = mapping_batch->mapping_lists[i];
       num_mappings = array_list_size(mapping_list);
+      num_total_mappings += num_mappings;
+
       #ifdef _VERBOSE
       if (num_mappings > 1) {
 	num_dup_reads++;
@@ -297,23 +300,11 @@ int sa_sam_writer(void *data) {
       }
       #endif
       
-      if (num_mappings == 1) {
+      if (num_mappings > 0) {
 	num_mapped_reads++;
 	if (num_mappings > 1) {
 	  num_multihit_reads++;
 	}
-
-	/*
-	if (num_mappings == 1) {
-	  mapq = 3;
-	} else if (num_mappings == 2) {
-	  mapq = 2;
-	} else if (num_mappings > 2 && num_mappings < 9) {
-	  mapq = 1;
-	} else {
-	  mapq = 0;
-	}
-	*/
 
 	for (size_t j = 0; j < num_mappings; j++) {
 	  cal = (seed_cal_t *) array_list_get(j, mapping_list);
@@ -393,7 +384,7 @@ int sa_sam_writer(void *data) {
 		  flag,
 		  genome->chrom_names[cal->chromosome_id],
 		  cal->start + 1,
-		  cal->mapq,
+		  (num_mappings == 1 ? cal->mapq : 0),
 		  cigar_M_string,
 		  rnext,
 		  pnext,
@@ -417,15 +408,7 @@ int sa_sam_writer(void *data) {
 	  }
 	}
       } else {
-	/*
-	if (num_mappings > 0) {
-	  num_multihit_reads++;
-	  for (size_t j = 0; j < num_mappings; j++) {
-	    cal = (seed_cal_t *) array_list_get(j, mapping_list);
-	    seed_cal_free(cal);  
-	  }
-	}
-	*/
+	num_unmapped_reads++;
 
 	if (read->adapter) {
 	  // sequences and cigar
@@ -458,7 +441,6 @@ int sa_sam_writer(void *data) {
 	  quality = read->quality;
 	}
 	
-	num_unmapped_reads++;
 	fprintf(out_file, "%s\t4\t*\t0\t0\t*\t*\t0\t0\t%s\t%s\n", 
 		read->id,
 		sequence,
@@ -472,7 +454,7 @@ int sa_sam_writer(void *data) {
       }
       
       array_list_free(mapping_list, (void *) NULL);
-    }
+    } // end for num_reads
   }
 
   // free memory
@@ -539,7 +521,7 @@ int sa_bam_writer(void *data) {
 
   bam1_t *bam1;
   alignment_t *alig;
-  array_list_t *mapping_list, *mate_list;
+  array_list_t *mapping_list;
   bam_file_t *out_file = wf_batch->writer_input->bam_file;
 
   sa_genome3_t *genome = wf_batch->sa_index->genome;
@@ -548,17 +530,10 @@ int sa_bam_writer(void *data) {
   num_reads = mapping_batch->num_reads;
   for (size_t i = 0; i < num_reads; i++) {
     read = (fastq_read_t *) array_list_get(i, read_list);
-
-    if (i % 2 == 0)  {
-      mate_list = mapping_batch->mapping_lists[i+1];
-      num_mate_mappings = array_list_size(mate_list);
-    } else {
-      mate_list = mapping_list;
-      num_mate_mappings = num_mappings;
-    }
-
     mapping_list = mapping_batch->mapping_lists[i];
     num_mappings = array_list_size(mapping_list);
+    num_total_mappings += num_mappings;
+
     #ifdef _VERBOSE
     if (num_mappings > 1) {
       num_dup_reads++;
@@ -566,7 +541,7 @@ int sa_bam_writer(void *data) {
     }
     #endif
 
-    if (num_mappings == 1) {
+    if (num_mappings > 0) {
       num_mapped_reads++;
       if (num_mappings > 1) {
 	num_multihit_reads++;
@@ -575,13 +550,6 @@ int sa_bam_writer(void *data) {
 	alig = (alignment_t *) array_list_get(j, mapping_list);
 
 	// update alignment
-	alig->secondary_alignment = 0;
-	if (num_mate_mappings != 1) {
-	  alig->is_mate_mapped = 0;
-	  alig->is_paired_end_mapped = 0;
-	  alig->mate_strand = 0;
-	}
-
 	if (num_mappings > 1) {
 	  alig->map_quality = 0;
 	} else {
@@ -595,15 +563,6 @@ int sa_bam_writer(void *data) {
 	num_total_mappings++;
       }
     } else {
-      /*
-      if (num_mappings > 0) {
-	num_multihit_reads++;
-	for (size_t j = 0; j < num_mappings; j++) {
-	  alig = (alignment_t *) array_list_get(j, mapping_list);
-	  alignment_free(alig);        
-	}
-      }
-      */
       num_unmapped_reads++;
 
       if (read->adapter) {
