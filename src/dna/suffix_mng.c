@@ -99,6 +99,9 @@ void suffix_mng_update(int chrom, size_t read_start, size_t read_end,
     if (seed->chromosome_id == chrom && 
 	seed->read_start <= read_start && seed->read_end >= read_end &&
 	seed->genome_start <= genome_start && seed->genome_end >= genome_end) {
+      
+      // free memory
+      linked_list_iterator_free(itr);
       return;
     } 
     
@@ -109,6 +112,9 @@ void suffix_mng_update(int chrom, size_t read_start, size_t read_end,
       linked_list_iterator_insert(seed, itr);
       linked_list_iterator_prev(itr);
       p->num_seeds++;
+
+      // free memory
+      linked_list_iterator_free(itr);
       return;
     }
     
@@ -121,6 +127,9 @@ void suffix_mng_update(int chrom, size_t read_start, size_t read_end,
   seed->chromosome_id = chrom;
   linked_list_insert_last(seed, suffix_list);
   p->num_seeds++;
+
+  // free memory
+  linked_list_iterator_free(itr);
 }
 
 //--------------------------------------------------------------------

@@ -111,7 +111,7 @@ size_t num_unmapped_reads_by_cigar_length = 0;
 // SAM writer
 //--------------------------------------------------------------------
 
-#define HPG_ALIGNER_VERSION "2.1.0"
+#define HPG_ALIGNER_VERSION "2.0.0"
 
 void *write_sam_header(sa_genome3_t *genome, FILE *f) {
   fprintf(f, "@PG\tID:HPG-Aligner\tVN:%s\n", HPG_ALIGNER_VERSION);
