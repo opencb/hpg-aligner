@@ -163,22 +163,15 @@ int sa_sam_writer(void *data) {
 
     char *seq, *opt_fields;
     alignment_t *alig;
-    array_list_t *mate_list;
   
     for (size_t i = 0; i < num_reads; i++) {
       read = (fastq_read_t *) array_list_get(i, read_list);
       //      seq = read->sequence;
 
-      if (i % 2 == 0)  {
-	mate_list = mapping_batch->mapping_lists[i+1];
-	num_mate_mappings = array_list_size(mate_list);
-      } else {
-	mate_list = mapping_list;
-	num_mate_mappings = num_mappings;
-      }
-
       mapping_list = mapping_batch->mapping_lists[i];
       num_mappings = array_list_size(mapping_list);
+      num_total_mappings += num_mappgins;
+
       #ifdef _VERBOSE
       if (num_mappings > 1) {
 	num_dup_reads++;
@@ -186,7 +179,7 @@ int sa_sam_writer(void *data) {
       }
       #endif
       
-      if (num_mappings == 1) {
+      if (num_mappings > 0) {
 	num_mapped_reads++;
 	if (num_mappings > 1) {
 	  num_multihit_reads++;
@@ -194,28 +187,12 @@ int sa_sam_writer(void *data) {
 	for (size_t j = 0; j < num_mappings; j++) {
 	  alig = (alignment_t *) array_list_get(j, mapping_list);
 	  
-	  // update alignment
-	  alig->secondary_alignment = 0;
-	  if (num_mate_mappings != 1) {
-	    alig->is_mate_mapped = 0;
-	    alig->is_paired_end_mapped = 0;
-	    alig->mate_strand = 0;
-	  }
-
 	  if (alig->optional_fields) {
 	    opt_fields = (char *) calloc(strlen(alig->optional_fields) + 100, sizeof(char));
 	    sprintf(opt_fields, "%s XU:i:%i", alig->optional_fields, mapping_batch->status[i]);
 	  } else {
 	    opt_fields = (char *) calloc(100, sizeof(char));
 	    sprintf(opt_fields, "XU:i:%i", mapping_batch->status[i]);
-	  }
-
-	  // update alignment
-	  alig->secondary_alignment = 0;
-	  if (num_mate_mappings != 1) {
-	    alig->is_mate_mapped = 0;
-	    alig->is_paired_end_mapped = 0;
-	    alig->mate_strand = 0;
 	  }
 
 	  flag = 0;
@@ -229,23 +206,14 @@ int sa_sam_writer(void *data) {
 	  if (alig->secondary_alignment)                        flag += BAM_FSECONDARY;
 	  if (alig->fails_quality_check)                        flag += BAM_FQCFAIL;
 	  if (alig->pc_optical_duplicate)                       flag += BAM_FDUP;
-	  if (alig->seq_strand) {                               
-	    flag += BAM_FREVERSE;
-	    //seq = read->revcomp;
-	  }
+	  if (alig->seq_strand)                                 flag += BAM_FREVERSE;
 
-	  num_total_mappings++;
-	  if (num_mappings > 1) {
-	    alig->mapq = 0;
-	  }
-
-	  num_total_mappings++;
 	  fprintf(out_file, "%s\t%lu\t%s\t%i\t%i\t%s\t%s\t%i\t%i\t%s\t%s\t%s\n", 
 		  read->id,
 		  flag,
 		  genome->chrom_names[alig->chromosome],
 		  alig->position + 1,
-		  alig->mapq, //60, //(alig->map_quality > 3 ? 0 : alig->map_quality),
+		  (num_mappings > 1 ? 0 : alig->mapq), //60, //(alig->map_quality > 3 ? 0 : alig->map_quality),
 		  alig->cigar,
 		  genome->chrom_names[alig->mate_chromosome],
 		  alig->mate_position + 1,
@@ -259,15 +227,7 @@ int sa_sam_writer(void *data) {
 	  alignment_free(alig);	 
 	}
       } else {
-	/*
-	if (num_mappings > 0) {
-	  num_multihit_reads++;
-	  for (size_t j = 0; j < num_mappings; j++) {
-	    alig = (alignment_t *) array_list_get(j, mapping_list);
-	    alignment_free(alig);        
-	  }
-	}
-	*/
+	num_unmapped_reads++;
 	opt_fields = (char *) calloc(100, sizeof(char));
 	sprintf(opt_fields, "XM:i:%i XU:i:%i", num_mappings, mapping_batch->status[i]);
 
@@ -300,7 +260,6 @@ int sa_sam_writer(void *data) {
 	  quality = read->quality;
 	}
 
-	num_unmapped_reads++;
 	fprintf(out_file, "%s\t4\t*\t0\t0\t*\t*\t0\t0\t%s\t%s\t%s\n", 
 		read->id,
 		sequence,
@@ -316,7 +275,7 @@ int sa_sam_writer(void *data) {
 	}
       }
       
-      array_list_free(mapping_list, (void *) NULL);
+      array_list_free(mapping_list, (void *) alignment_free);
     }
   } else {
     // SINGLE MODE
