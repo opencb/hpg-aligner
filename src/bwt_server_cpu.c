@@ -403,7 +403,7 @@ int apply_bwt_rna(bwt_server_input_t* input, batch_t *batch) {
 	array_list_set_flag(0, list);
 	//printf("Read NO Mapped %i %s\n", num_anchors, read->id);
 	unmapped_indices[num_unmapped++] = i;
-      }else {
+      } else {
 	//Read Map, Metaexon Actualization
 	array_list_set_flag(ALIGNMENTS_FOUND, list);
 
@@ -413,10 +413,11 @@ int apply_bwt_rna(bwt_server_input_t* input, batch_t *batch) {
 
 	for (int i = 0; i < num_mappings; i++) {
 	  alignment_t *alignment = array_list_get(i, list);
-	  metaexon_insert(0/*alignment->seq_strand*/, alignment->chromosome,
+	  metaexon_insert(0, alignment->chromosome,
 			  alignment->position, alignment->position + read->length, 40,
 			  METAEXON_NORMAL, NULL,
 			  metaexons);
+	  //alignment->alig_data = cigar_code_new_by_string(alignment->cigar);
 	}
       }
     } else {

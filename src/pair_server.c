@@ -921,6 +921,13 @@ static inline size_t select_n_hits(array_list_t *mapping_list,
   for (i = num_mappings - 1; i >= report_n_hits; i--) {
     //printf("Remove... \n");
     aux_alignment = array_list_remove_at(i, mapping_list);
+    if (aux_alignment->alig_data) {
+      cigar_code_t *c = aux_alignment->alig_data;
+      array_list_clear(c->ops, (void *)cigar_op_free);
+      cigar_code_free(c);
+      aux_alignment->alig_data = NULL;
+    }
+
     alignment_free(aux_alignment);
     //printf("Remove ok!\n");
   }
@@ -951,7 +958,8 @@ static inline size_t select_best_hits(array_list_t *mapping_list,
     array_size = array_list_size(mapping_list);
     for (i = 1; i < array_size; i++) {
       aux_alignment = array_list_get(i, mapping_list);
-      if (alignmentcmp(best_alignment, aux_alignment) == 2) {
+      //if (alignmentcmp(best_alignment, aux_alignment) == 2) {
+      if (best_alignment->map_quality < aux_alignment->map_quality) {
 	best_alignment = aux_alignment;
 	best_pos = i;
       }
@@ -967,6 +975,14 @@ static inline size_t select_best_hits(array_list_t *mapping_list,
   for (j = array_size - 1; j >= 0; j--) {
     aux_alignment = array_list_remove_at(j, mapping_list);
     if (!is_secondary_alignment(aux_alignment)) { primary_delete = 1; } 
+
+    if (aux_alignment->alig_data) {
+      cigar_code_t *c = aux_alignment->alig_data;
+      array_list_clear(c->ops, (void *)cigar_op_free);
+      cigar_code_free(c);
+      aux_alignment->alig_data = NULL;
+    }
+
     alignment_free(aux_alignment);
   }
 
@@ -1018,9 +1034,14 @@ static inline void select_best (array_list_t *mapping_list) {
     alig = array_list_get(i, mapping_list);
     //printf("elem = %i\tquality = %i\n", i, alig->map_quality);
     if (alig->map_quality != max_quality) {
-      //printf("borrar item = %i\n", i);
       alig = array_list_remove_at(i, mapping_list);
       //printf("item %i borrado\n", i);
+      if (alig->alig_data) {
+	cigar_code_t *c = alig->alig_data;
+	array_list_clear(c->ops, (void *)cigar_op_free);
+	cigar_code_free(c);
+	alig->alig_data = NULL;
+      }
       alignment_free(alig);
       //printf("item %i liberado\n", i);
     } /*else {
@@ -1086,6 +1107,7 @@ void filter_alignments_lists(char report_all,
 			     int report_best,
 			     size_t num_lists,
 			     array_list_t **mapping_lists) {
+
   array_list_t *mapping_list;
   //printf("num_list = %lu\n", num_lists);
   //printf("report all = '%c'\nreport best = %lu\nreport hits = %lu\n", report_all, report_n_best, report_n_hits);
@@ -1257,13 +1279,24 @@ int apply_pair(pair_server_input_t* input, batch_t *batch) {
 
 //------------------------------------------------------------------------------------
 
+char *cigar_code_find_and_report_sj(size_t start_map, cigar_code_t *cigar_code, 
+				    int chromosome, int strand, avls_list_t *avls_list,
+				    metaexons_t *metaexons, genome_t *genome, fastq_read_t *read, int report_cig);
+
+//------------------------------------------------------------------------------------
+
 int prepare_alignments(pair_server_input_t *input, batch_t *batch) {
 
-  if (batch->mapping_mode == DNA_MODE) {
-    // convert Smith-Waterman output objects to alignments
-    //    prepare_single_alignments(input, batch->mapping_batch);
-  }
+  //if (batch->mapping_mode == DNA_MODE) {
+  // convert Smith-Waterman output objects to alignments
+  //    prepare_single_alignments(input, batch->mapping_batch);
+  //}
 
+  sw_server_input_t *sw_input = batch->sw_input;
+  genome_t *genome = sw_input->genome_p;
+  avls_list_t *avls_list = sw_input->avls_list;
+  metaexons_t *metaexons = sw_input->metaexons;
+  
   if (input->pair_mng->pair_mode == SINGLE_END_MODE) {
     // filter alignments by best-alignments, n-hits, all and unpaired reads
     filter_alignments_lists(input->report_optarg->all, 
@@ -1272,18 +1305,57 @@ int prepare_alignments(pair_server_input_t *input, batch_t *batch) {
 			    input->report_optarg->best,
 			    array_list_size(batch->mapping_batch->fq_batch),
 			    batch->mapping_batch->mapping_lists);
-  } else {
+  } else if (batch->mapping_mode == DNA_MODE) {
     // first, search for proper pairs and
     // then filter paired alignments by best-alignments, n-hits, all and unpaired reads
-    prepare_paired_alignments(input, batch->mapping_batch);
+    prepare_paired_alignments(input, batch->mapping_batch); 
   }
 
   //*********************************************************
 
+  if (batch->mapping_mode == RNA_MODE) {    
+    int num_reads = array_list_size(batch->mapping_batch->fq_batch);
+    array_list_t *mapping_list;
+    for (int r = 0; r < num_reads; r++) {
+      mapping_list = batch->mapping_batch->mapping_lists[r];
+      size_t n_alig = array_list_size(mapping_list);
+      for (int a = 0; a < n_alig; a++) {
+	alignment_t *alig = array_list_get(a, mapping_list);
+	if (alig->alig_data != NULL) {
+	  alig->cigar = new_cigar_code_string(alig->alig_data);
+	} else {
+	  alig->alig_data = cigar_code_new_by_string(alig->cigar);
+	}
+      }
+    }
+
+    if (input->pair_mng->pair_mode != SINGLE_END_MODE) {
+      prepare_paired_alignments(input, batch->mapping_batch); 
+    }
+
+    for (int i = 0; i < num_reads; i++) {
+      fastq_read_t *read = array_list_get(i, batch->mapping_batch->fq_batch);
+      array_list_t *mapping_list = batch->mapping_batch->mapping_lists[i];
+      size_t n_alignments = array_list_size(mapping_list);
+      for (int j = 0; j < n_alignments; j++) {
+	alignment_t *alig = array_list_get(j, mapping_list);
+	if (alig->alig_data) {
+	  alig->cigar = cigar_code_find_and_report_sj(alig->position, alig->alig_data, alig->chromosome + 1, 
+						      alig->seq_strand, avls_list, metaexons, genome, read, 1);
+	
+	  cigar_code_t *c = alig->alig_data;
+	  array_list_clear(c->ops, (void *)cigar_op_free);
+	  cigar_code_free(c);
+	  alig->alig_data = NULL;
+	}
+      }
+    }
+  }
+
   return CONSUMER_STAGE;
 
   //printf("pair_server.c: prepare_alignments done (pair mode = %i)\n", input->pair_mng->pair_mode);
-  //  printf("pair_server.c: 1: after prepare_single_alignments\n");
+  //printf("pair_server.c: 1: after prepare_single_alignments\n");
 }
 
 //------------------------------------------------------------------------------------

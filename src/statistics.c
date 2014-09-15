@@ -155,7 +155,7 @@ void basic_statistics_display(basic_statistics_t *statistics, int rna_mode, floa
   printf(" Total Reads Mapped                   : %lu (%.2f%%)\n", num_mapped_reads, num_mapped_reads * 100.0 / total_reads);
   printf(" Total Reads Unmapped                 : %lu (%.2f%%)\n", total_reads - num_mapped_reads, (total_reads - num_mapped_reads) * 100.0 / total_reads);
   printf(" Total Reads with one alignment       : %lu (%.2f%%)\n", reads_uniq_mappings, (reads_uniq_mappings * 100.0) / total_reads);
-  printf(" Total Reads with multiple alignment  : %lu (%.2f%%)\n", total_reads - reads_uniq_mappings, ((total_reads - reads_uniq_mappings) * 100.0) / total_reads);
+  printf(" Total Reads with multiple alignment  : %lu (%.2f%%)\n", total_reads - reads_uniq_mappings - (total_reads - num_mapped_reads), ((total_reads - reads_uniq_mappings - (total_reads - num_mapped_reads)) * 100.0) / total_reads);
   printf("+===============================================================+\n");
   
 }

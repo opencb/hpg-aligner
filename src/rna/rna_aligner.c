@@ -644,10 +644,11 @@ void sa_index3_parallel_genome_new(char *sa_index_dirname, int num_threads,
   }
 }
 
+//--------------------------------------------------------------------------------------
 
 void rna_aligner(options_t *options) {
-  //End fill 
 
+  //End fill 
   int path_length = strlen(options->output_name);
   int prefix_length = 0;
   
@@ -667,10 +668,40 @@ void rna_aligner(options_t *options) {
   char *extend_filename = (char *)calloc((path_length + prefix_length + 60), sizeof(char));
   char *exact_filename = (char *)calloc((path_length + prefix_length + 60), sizeof(char));
 
+  struct timeval time_genome_s, time_genome_e;
+  double time_genome;
+
+  metaexons_t *metaexons;
+  genome_t *genome;
+  
+  bwt_index_t *bwt_index;
+  sa_index3_t *sa_index;
+  int num_chromosomes;
+  // load index for dna/rna or for bisulfite case
+
+  char filename_tab[strlen(options->bwt_dirname) + 1024];  
+  sprintf(filename_tab, "%s/params.info", options->bwt_dirname);
+  FILE *fd = fopen(filename_tab, "r");
+
+  if (fd) { 
+    options->fast_mode = 1; 
+    fclose(fd);
+  } else { 
+    options->fast_mode = 0; 
+  }
+
+  if (!options->set_bam_format) {
+    if (options->fast_mode) {
+      options->bam_format = 0;
+    } else {
+      options->bam_format = 1;
+    }
+  }
+
   if (options->prefix_name) {
     strcat(reads_results, "/");
     strcat(reads_results, options->prefix_name);
-    if (!options->fast_mode) {
+    if (!options->bam_format) {
       strcat(reads_results, "_alignments.bam");  
     } else {
       strcat(reads_results, "_alignments.sam");  
@@ -692,10 +723,10 @@ void rna_aligner(options_t *options) {
     strcat(exact_junctions, "_exact_junctions.bed");
  
   } else {
-    if (!options->fast_mode) {
+    if (options->bam_format) {
       strcat(reads_results, "/alignments.bam");
     } else {
-      strcat(reads_results, "/alignments.sam");
+      strcat(reads_results, "/alignments.sam");    
     }
     strcat(log_input, "/hpg-aligner_input.log");
     strcat(log_output, "/hpg-aligner_output.log");
@@ -723,12 +754,27 @@ void rna_aligner(options_t *options) {
   strcat(exact_filename, exact_junctions);
   free(exact_junctions);
 
-
   FILE *fd_log_input, *fd_log_output;
   fd_log_input  = fopen(log_filename_input, "w");
   fd_log_output = fopen(log_filename_output, "w");
 
   LOG_DEBUG("Auto Thread Configuration Done !");
+
+  //Select mode
+  /*
+  DIR *d;
+  struct dirent *dir;
+  d = opendir(options->bwt_dirname);
+  if (d) {
+    while ((dir =readdir(d)) != NULL) {
+      if (strstr(dir->d_name, "SA")) {
+	options->fast_mode = 1;
+	break;
+      }
+    }
+    closedir(d);
+  }
+  */
 
   // timing
   //if (time_on) { 
@@ -742,11 +788,8 @@ void rna_aligner(options_t *options) {
 					  "BAM Writer                 ", 
 					  "TOTAL Time                 "};    
 
-  //timing = timing_new((char**) labels_time, NUM_SECTIONS_TIME);
-  //}
+  //======================================================================
 
-  //validate_options(options);
-  // display selected options
   LOG_DEBUG("Displaying options...\n");
   options_display(options);
 
@@ -787,19 +830,6 @@ void rna_aligner(options_t *options) {
     fprintf(stderr, "WARNING: The files input are gziped compressed, therefore the details of process are disable.\n");
   }
 
-  //time_on =  (unsigned int) options->timming;
-  //statistics_on =  (unsigned int) options->statistics;
-
-  struct timeval time_genome_s, time_genome_e;
-  double time_genome;
-
-  metaexons_t *metaexons;
-  genome_t *genome;
-  
-  bwt_index_t *bwt_index;
-  sa_index3_t *sa_index;
-  int num_chromosomes;
-  // load index for dna/rna or for bisulfite case
 
   start_timer(time_genome_s);
 
@@ -819,6 +849,7 @@ void rna_aligner(options_t *options) {
     ///////////////// LOAD SA INDEX ////////////////////// 
 
     LOG_DEBUG("Load SA State");
+
     //sa_index = sa_index3_new(options->bwt_dirname);
     start_timer(time_genome_s);
     sa_index3_parallel_genome_new(options->bwt_dirname, options->num_cpu_threads, &sa_index, &genome);
@@ -1057,7 +1088,6 @@ void rna_aligner(options_t *options) {
   double time_total_1, time_total_2;
   struct timeval time_s1, time_e1, time_s2, time_e2;
 
-
   for (int f = 0; f < num_files1; f++) {
     file1 = array_list_get(f, files_fq1);
 
@@ -1276,7 +1306,7 @@ void rna_aligner(options_t *options) {
       sa_rna.file1 = f_sa;
       sa_rna.file2 = f_hc;
       sa_rna.pair_input = &pair_input;
-      
+
       sa_wf_batch_t *wf_batch = sa_wf_batch_new(NULL, (void *)sa_index, &writer_input, NULL, &sa_rna);
       sa_wf_input_t *wf_input = sa_wf_input_new(options->bam_format, &reader_input, wf_batch);
       
@@ -1286,6 +1316,7 @@ void rna_aligner(options_t *options) {
       char *stage_labels[] = {"SA mapper"};
       workflow_set_stages_SA(1, stage_functions, stage_labels, wf);      
       // optional producer and consumer functions
+
       workflow_set_producer_SA((workflow_producer_function_SA_t *)sa_fq_reader_rna, "FastQ reader", wf);
 
       if (options->bam_format) {
@@ -1333,7 +1364,7 @@ void rna_aligner(options_t *options) {
 	  }
       }
 
-
+      
       printf("\nMapping Status (Second Phase)\n");
       #pragma omp parallel sections num_threads(2) 
       {
@@ -1353,6 +1384,7 @@ void rna_aligner(options_t *options) {
 	  }
       }
       printf("\n");
+      
 
       // free memory
       sa_wf_input_free(wf_input);
@@ -1405,7 +1437,7 @@ void rna_aligner(options_t *options) {
       fprintf(fd_log_output, " Reads mapped in First State             :  %lu (%.2f%%)\n", reads_ph1, reads_ph1 * 100.0 / total_reads);
       fprintf(fd_log_output, " Reads mapped in Second State            :  %lu (%.2f%%)\n", total_reads_ph2, total_reads_ph2 * 100.0 / total_reads);
       fprintf(fd_log_output, " Reads with a single mapping             :  %lu (%.2f%%)\n", reads_uniq_mappings, (reads_uniq_mappings * 100.0) / total_reads);
-      fprintf(fd_log_output, " Reads with multi mappings               :  %lu (%.2f%%)\n", total_reads - reads_uniq_mappings, ((total_reads - reads_uniq_mappings) * 100.0) / total_reads);
+      fprintf(fd_log_output, " Reads with multi mappings               :  %lu (%.2f%%)\n", total_reads - reads_uniq_mappings - (total_reads - num_mapped_reads), ((total_reads - reads_uniq_mappings - (total_reads - num_mapped_reads)) * 100.0) / total_reads);
 
   
       fprintf(fd_log_output, "\n= S P L I C E    J U N C T I O N S    S T A T I S T I C S\n");
@@ -1424,8 +1456,6 @@ void rna_aligner(options_t *options) {
       //printf("         W2 Time : %f(s)\n", time_total_2 / 1000000);
       //printf("         W TOTAL : %f(s)\n", (time_total_1 + time_total_2) / 1000000);
       //printf("         TOTAL   : %f(s)\n", (time_genome + time_total_1 + time_total_2) / 1000000);
-     
-
     }
 
     if (file1) { free(file1); }

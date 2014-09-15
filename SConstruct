@@ -7,6 +7,12 @@ commons_path = '#lib/hpg-libs/common-libs'
 system_include = '/usr/include'
 system_libs = '/usr/lib' 
 
+extrae_include = '/home/hmartinez/opt/extrae-2.5.1/include'
+extrae_libs    = '/home/hmartinez/opt/extrae-2.5.1/lib'
+
+other_libs = '/home/hmartinez/opt/lib/'
+other_include = '/home/hmartinez/opt/include/'
+
 vars = Variables('buildvars.py')
 
 compiler = ARGUMENTS.get('compiler', 'gcc')
@@ -22,7 +28,7 @@ env = Environment(tools = ['default', 'packaging'],
 
 if int(ARGUMENTS.get('debug', '0')) == 1:
     debug = 1
-    env['CFLAGS'] += ' -O0 -g'
+    env['CFLAGS'] += ' -O3 -g'
 else:
     debug = 0
     env['CFLAGS'] += ' -O3'
@@ -62,6 +68,7 @@ aligner = envprogram.Program('#bin/hpg-aligner',
 		       Glob('src/tools/bam/recalibrate/*.c'),
 	     	       Glob('src/tools/bam/aligner/*.c'),
 		       Glob('src/build-index/*.c'),
+		       Glob('src/dna/clasp_v1_1/*.c'),
 		       Glob('src/dna/*.c'),
 	               Glob('src/rna/*.c'),
 	               Glob('src/bs/*.c'),

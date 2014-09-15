@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <getopt.h>
 #include <unistd.h>
+#include <dirent.h>
 
 #include "containers/cprops/trie.h"
 

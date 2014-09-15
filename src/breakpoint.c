@@ -39,6 +39,18 @@ cigar_code_t *cigar_code_new() {
   return p;
 }
 
+cigar_code_t *cigar_code_dup(cigar_code_t *c) {
+  cigar_code_t *p = cigar_code_new();
+  size_t num_ops = array_list_size(c->ops);
+  
+  for (int i = 0; i < num_ops; i++) {
+    cigar_op_t *op = array_list_get(i, c->ops);
+    array_list_insert(cigar_op_new(op->number, op->name), p->ops);
+  }
+
+  return p;
+
+}
 
 cigar_code_t *cigar_code_new_by_string(char *cigar_str) {
   cigar_code_t *p = cigar_code_new();
@@ -1582,7 +1594,6 @@ int metaexon_insert(unsigned int strand, unsigned int chromosome,
 	  if (metaexon_ref->end >= metaexon->end) {
 	    metaexons->bypass_pointer[chromosome][ck_end].last = list_item_ref;
 	  }
-
 	}
       
 	for (int ck2 = loop_start; ck2 <= loop_end; ck2++) {

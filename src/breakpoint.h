@@ -47,6 +47,7 @@ typedef struct cigar_code {
 int cigar_code_score(cigar_code_t *cigar_code, int read_length);
 
 cigar_code_t *cigar_code_new();
+cigar_code_t *cigar_code_dup(cigar_code_t *c);
 cigar_code_t *cigar_code_new_by_string(char *cigar_str);
 void cigar_code_free(cigar_code_t* p);
 

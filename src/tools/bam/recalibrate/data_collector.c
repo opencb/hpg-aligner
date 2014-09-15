@@ -313,7 +313,7 @@ recal_get_data_from_bam_alignment(const bam1_t* read, const genome_t* ref, recal
 {
 	char *ref_seq;
 	char aux_comp[16];
-	int init_pos, end_pos;
+	int64_t init_pos, end_pos;
 	size_t init_pos_ref, end_pos_ref;
 	char *comp_res;
 	char *comp_mask;
@@ -405,7 +405,7 @@ recal_get_data_from_bam_alignment(const bam1_t* read, const genome_t* ref, recal
 		LOG_WARN_F("Alignment with sequence length zero: %s\n", bam1_qname(read));
 		return NO_ERROR;
 	}
-	init_pos = read->core.pos - 100;
+	init_pos = read->core.pos; //- 100;
 	if(init_pos < 0)
 		init_pos = 0;
 	end_pos = read->core.pos + (bam_seq_l  * 2) + 100;
@@ -442,7 +442,7 @@ recal_get_data_from_bam_alignment(const bam1_t* read, const genome_t* ref, recal
 
 	if((end_pos_ref - init_pos_ref) == 0)
 	{
-		//LOG_WARN_F("Cannot obtain reference for region %d:%d-%d, %s\n", read->core.tid + 1, init_pos_ref + 1, end_pos_ref + 1, bam1_qname(read));
+		LOG_WARN_F("Cannot obtain reference for region %d:%lu-%lu, %s\n", read->core.tid + 1, init_pos_ref + 1, end_pos_ref + 1, bam1_qname(read));
 		free(ref_seq);
 		return NO_ERROR;
 	}

@@ -1,6 +1,6 @@
 #include "options.h"
 
-const char DEFAULT_OUTPUT_NAME[30] = "hpg_aligner_output";
+const char DEFAULT_OUTPUT_NAME[29] = "hpg_aligner_output";
 
 //const char SPLICE_EXACT_FILENAME[30]   = "exact_junctions.bed";
 //const char SPLICE_EXTEND_FILENAME[30]  = "extend_junctions.bed";
@@ -68,9 +68,12 @@ options_t *options_new(void) {
   options->min_seed_size = 0;
   options->seed_size = 0;
   options->flank_length = 0;
-  options->fast_mode = 0;
+  options->fast_mode = 1;
 
   options->adapter_length = 0;
+
+  options->adapter_length = 0;
+  options->set_bam_format = 0;
 
   //new variables for bisulphite case in index generation
   options->bs_index = 0;
@@ -127,13 +130,13 @@ void validate_options(options_t *options) {
     }
     
     if (!options->in_filename) {
-      printf("Not filename input found. Please, insert it with option '-f FILENAME'.\n");
+      printf("Filename input is missing. Please, insert it with option '-f FILENAME'.\n");
       usage_cli(mode);
     }
 
     
     if (!options->bwt_dirname) {
-      printf("Not BWT index input found. Please, insert it with option '-i DIRNAME'.\n");
+      printf("Index directory is missing. Please, insert it with option '-i DIRNAME'.\n");
       usage_cli(mode);
     }
   }
@@ -370,6 +373,7 @@ void options_to_file(options_t *options, FILE *fd) {
   if (options->genome_filename != NULL) {
     genome_filename =  strdup(options->genome_filename);
   }
+
   unsigned int  report_all = (unsigned int)options->report_all;
   unsigned int  report_n_best = (unsigned int)options->report_n_best;
   unsigned int  report_n_hits = (unsigned int)options->report_n_hits;
@@ -481,6 +485,20 @@ void options_to_file(options_t *options, FILE *fd) {
     fprintf(fd, "= Min score        : %d\n", min_score);
   }
   fprintf(fd, "\n");
+
+  free(in_filename);
+  free(bwt_dirname);
+
+  if (options->in_filename2 != NULL) {
+    free(in_filename2);
+  }
+
+  if (options->genome_filename != NULL) {
+    free(genome_filename);
+  }
+
+  free(output_name);
+  
 }
 
 //--------------------------------------------------------------------
@@ -500,7 +518,7 @@ void** argtable_options_new(int mode) {
   argtable[count++] = arg_file0("f", "fq,fastq", NULL, "Reads file input. For more than one file: f1.fq,f2.fq,...");
   argtable[count++] = arg_file0("j", "fq2,fastq2", NULL, "Reads file input #2 (for paired mode)");
   argtable[count++] = arg_lit0("z", "gzip", "FastQ input files are gzip");
-  argtable[count++] = arg_file0("i", "bwt-index", NULL, "BWT directory name");
+  argtable[count++] = arg_file0("i", "index", NULL, "BWT directory name");
   argtable[count++] = arg_file0("o", "outdir", NULL, "Output directory");
   argtable[count++] = arg_int0(NULL, "filter-read-mappings", NULL, "Reads that map in more than <n> locations are discarded");
   argtable[count++] = arg_int0(NULL, "filter-seed-mappings", NULL, "Seeds that map in more than <n> locations are discarded");
@@ -512,7 +530,7 @@ void** argtable_options_new(int mode) {
   argtable[count++] = arg_dbl0(NULL, "sw-gap-open", NULL, "Gap open penalty for Smith-Waterman algorithm");
   argtable[count++] = arg_dbl0(NULL, "sw-gap-extend", NULL, "Gap extend penalty for Smith-Waterman algorithm");
   argtable[count++] = arg_int0(NULL, "min-score", NULL, "Minimum score for valid mappings");
-  argtable[count++] = arg_int0(NULL, "paired-mode", NULL, "Pair mode: 0 = single-end, 1 = paired-end, 2 = mate-pair [Default 0]");
+  //  argtable[count++] = arg_int0(NULL, "paired-mode", NULL, "Pair mode: 0 = single-end, 1 = paired-end, 2 = mate-pair [Default 0]");
   argtable[count++] = arg_int0(NULL, "paired-min-distance", NULL, "Minimum distance between pairs");
   argtable[count++] = arg_int0(NULL, "paired-max-distance", NULL, "Maximum distance between pairs");
   argtable[count++] = arg_lit0(NULL, "report-best", "Report all alignments with best score");
@@ -587,10 +605,12 @@ int read_config_file(const char *filename, options_t *options) {
  * Initializes the only default options from options_t.
  */
 options_t *read_CLI_options(void **argtable, options_t *options) {	
-  int set_bam_format = 0;
   int count = -1;
   if (((struct arg_file*)argtable[++count])->count) { options->in_filename = strdup(*(((struct arg_file*)argtable[count])->filename)); }
-  if (((struct arg_file*)argtable[++count])->count) { options->in_filename2 = strdup(*(((struct arg_file*)argtable[count])->filename)); }
+  if (((struct arg_file*)argtable[++count])->count) { 
+    options->pair_mode = 1;
+    options->in_filename2 = strdup(*(((struct arg_file*)argtable[count])->filename)); 
+  }
   if (((struct arg_int*)argtable[++count])->count) { options->gzip = ((struct arg_int*)argtable[count])->count; }
   if (((struct arg_file*)argtable[++count])->count) { options->bwt_dirname = strdup(*(((struct arg_file*)argtable[count])->filename)); }
   if (((struct arg_file*)argtable[++count])->count) { free(options->output_name); options->output_name = strdup(*(((struct arg_file*)argtable[count])->filename)); }  
@@ -604,7 +624,7 @@ options_t *read_CLI_options(void **argtable, options_t *options) {
   if (((struct arg_dbl*)argtable[++count])->count) { options->gap_open = *(((struct arg_dbl*)argtable[count])->dval); }
   if (((struct arg_dbl*)argtable[++count])->count) { options->gap_extend = *(((struct arg_dbl*)argtable[count])->dval); }
   if (((struct arg_int*)argtable[++count])->count) { options->min_score = *(((struct arg_int*)argtable[count])->ival); }
-  if (((struct arg_int*)argtable[++count])->count) { options->pair_mode = *(((struct arg_int*)argtable[count])->ival); }
+  //  if (((struct arg_int*)argtable[++count])->count) { options->pair_mode = *(((struct arg_int*)argtable[count])->ival); }
   if (((struct arg_int*)argtable[++count])->count) { options->pair_min_distance = *(((struct arg_int*)argtable[count])->ival); }
   if (((struct arg_int*)argtable[++count])->count) { options->pair_max_distance = *(((struct arg_int*)argtable[count])->ival); }
   if (((struct arg_int*)argtable[++count])->count) { options->report_best = (((struct arg_int*)argtable[count])->count); }
@@ -618,7 +638,7 @@ options_t *read_CLI_options(void **argtable, options_t *options) {
 
   if (((struct arg_int*)argtable[++count])->count) { 
     options->bam_format = ((struct arg_int*)argtable[count])->count; 
-    set_bam_format = 1;
+    options->set_bam_format = 1;
   }
 
   if (((struct arg_int*)argtable[++count])->count) { options->realignment = ((struct arg_int*)argtable[count])->count; }
@@ -635,8 +655,10 @@ options_t *read_CLI_options(void **argtable, options_t *options) {
     if (((struct arg_int*)argtable[++count])->count) { options->seed_size = *(((struct arg_int*)argtable[count])->ival); }
     if (((struct arg_int*)argtable[++count])->count) { options->max_intron_length = *(((struct arg_int*)argtable[count])->ival); }
     if (((struct arg_int*)argtable[++count])->count) { options->min_intron_length = *(((struct arg_int*)argtable[count])->ival); }
+
     if (((struct arg_file*)argtable[++count])->count) { options->fast_mode = (((struct arg_int *)argtable[count])->count); }
 
+    /*
     if (!set_bam_format) {
       if (options->fast_mode) {
 	options->bam_format = 0;
@@ -644,7 +666,7 @@ options_t *read_CLI_options(void **argtable, options_t *options) {
 	options->bam_format = 1;
       }
     }
-
+    */
   }
 
   return options;
@@ -676,7 +698,7 @@ options_t *parse_options(int argc, char **argv) {
     exit(-1);
   } else {
     int num_errors = arg_parse(argc, argv, argtable);   
-    if (((struct arg_int*)argtable[25])->count) {
+    if (((struct arg_int*)argtable[24])->count) {
       usage(argtable);
       argtable_options_free(argtable, num_options);
       options_free(options);

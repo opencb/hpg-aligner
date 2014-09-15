@@ -55,7 +55,7 @@
 //#define BS_MODE  2
 
 
-#define NUM_OPTIONS			30
+#define NUM_OPTIONS			29
 #define NUM_RNA_OPTIONS			 6
 #define NUM_DNA_OPTIONS			 1
 
@@ -109,6 +109,7 @@ typedef struct options {
   int filter_seed_mappings;
   int bs_index;
   int fast_mode;
+  int set_bam_format;
   int adapter_length;
   double min_score;
   double match;

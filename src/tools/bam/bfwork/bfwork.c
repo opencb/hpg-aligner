@@ -139,6 +139,12 @@ bfwork_configure(bam_fwork_t *fwork, const char *in_file, const char *out_file, 
 
 	//Logging
 	LOG_INFO("Framework configured\n");
+	if(fwork->input_file_str)
+		LOG_INFO_F("Input file: %s\n", fwork->input_file_str);
+	if(fwork->output_file_str)
+		LOG_INFO_F("Output file: %s\n", fwork->output_file_str);
+	if(fwork->reference_str)
+		LOG_INFO_F("Reference file: %s\n", fwork->reference_str);
 
 	return NO_ERROR;
 }
@@ -506,10 +512,6 @@ bfwork_run(bam_fwork_t *fwork)
 	double times;
 	bam1_t *read;
 
-	//Reference
-	char *ref_path;
-	char *ref_name;
-
 	assert(fwork);
 	assert(fwork->input_file_str);
 	assert(fwork->regions_list);
@@ -529,15 +531,23 @@ bfwork_run(bam_fwork_t *fwork)
 	if(fwork->reference_str)
 	{
 		//Obtain reference filename and dirpath from full path
+	  char *ref_path = NULL, *ref_name = NULL, *aux;
+
 		ref_path = strdup(fwork->reference_str);
-		ref_path = dirname(ref_path);
-		ref_name = strrchr(fwork->reference_str, '/');
+		aux = strrchr(ref_path, '/');
+		if (aux) {
+		  ref_name = strdup(aux);
+		  *aux = '\0';
+		}
 		printf("Reference path: %s\n", ref_path);
 		printf("Reference name: %s\n", ref_name);
 		printf("Opening reference genome from \"%s%s\" ...\n", ref_path, ref_name);
 		fwork->reference = genome_new(ref_name, ref_path, BWT_MODE);
 		assert(fwork->reference);
 		printf("Reference opened!...\n");
+
+		if (ref_path) free(ref_path);
+		if (ref_name) free(ref_name);
 	}
 
 	printf("--------------------------------------\n");
@@ -1061,10 +1071,10 @@ bfwork_region_insert(bam_fwork_t *fwork, bam_region_t *region)
 	linked_list_insert_last(region, list);
 
 	omp_set_lock(&region->lock);
-	LOG_INFO_F("Inserting region %d:%d-%d with %d reads\n",
+	LOG_INFO_F("Inserting region %d:%lu-%lu with %d reads\n",
 				region->chrom + 1, region->init_pos + 1,
 				region->end_pos + 1, region->size);
-	LOG_INFO_F("Regions to process %d\n", linked_list_size(list));
+	LOG_INFO_F("Regions to process %lu\n", linked_list_size(list));
 	omp_unset_lock(&region->lock);
 
 	omp_unset_lock(&fwork->regions_lock);

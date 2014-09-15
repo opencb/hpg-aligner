@@ -61,7 +61,9 @@ void init_func_names() {
 
 //--------------------------------------------------------------------
 
-float get_max_score(array_list_t *cal_list) {
+float get_max_score(array_list_t *cal_list,
+		    float match_score, float mismatch_penalty,
+		    float gap_open_penalty, float gap_extend_penalty) {
   seed_cal_t *cal;
   int num_matches, num_mismatches, num_open_gaps, num_extend_gaps;
   int num_cals = array_list_size(cal_list);
@@ -70,7 +72,9 @@ float get_max_score(array_list_t *cal_list) {
   for (int j = 0; j < num_cals; j++) {
     cal = array_list_get(j, cal_list);
 
-    cal->score = cigar_compute_score(5.0f, -4.0f, -10.0f, -0.05f, &cal->cigar);
+    cal->score = cigar_compute_score(match_score, mismatch_penalty, 
+				     gap_open_penalty, gap_extend_penalty, &cal->cigar);
+    //cal->score = cigar_compute_score(5.0f, -4.0f, -10.0f, -0.05f, &cal->cigar);
     cal->cigar_len = cigar_get_length(&cal->cigar);
 
     //    printf("(invalid, read length, cigar_len, score) = (%i, %i, %i, %0.2f)\n",
@@ -335,6 +339,7 @@ void select_best_cals(fastq_read_t *read, array_list_t **cal_list) {
   first_cal = sort_cals[0].cal;
 
   mapq = compute_mapq(first_cal, second_cal, num_hits);
+
   /*
   printf("--------------------------------------------------------------------\n");
   printf("after sorting and trimming (mapq = %i, first score = %0.2f, second score = %0.2f, num_hits = %i) %s ...\n", 
@@ -357,6 +362,7 @@ void select_best_cals(fastq_read_t *read, array_list_t **cal_list) {
     }
   }
   */
+
   if (first_cal->invalid) {
     array_list_clear(*cal_list, (void *) seed_cal_free);
   } else {
@@ -375,6 +381,8 @@ void select_best_cals(fastq_read_t *read, array_list_t **cal_list) {
       array_list_t *new_cal_list = array_list_new(num_hits, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
       for (int i = 0; i < num_hits; i++) {
 	sort_cals[i].cal->mapq = mapq;
+	sort_cals[i].cal->num_hits = num_hits;
+
 	array_list_insert(sort_cals[i].cal, new_cal_list);	
 	array_list_set(sort_cals[i].index, NULL, *cal_list);
       }
@@ -382,6 +390,7 @@ void select_best_cals(fastq_read_t *read, array_list_t **cal_list) {
       *cal_list = new_cal_list;      
     } else {
       sort_cals[0].cal->mapq = mapq;
+      sort_cals[0].cal->num_hits = num_hits;
     }
   }
   /*
@@ -588,13 +597,16 @@ void create_alignments(array_list_t *cal_list, fastq_read_t *read,
       p += 3;
       memcpy(p, &cal->num_mismatches, sizeof(int));
       p += sizeof(int);
+
       /*
       sprintf(p, "XCZ");
       p += 3;
       memcpy(p, cigar_string, len);
       p += len;
       */
+
       optional_fields_length = p - optional_fields;
+
     } else {
       sprintf(optional_fields, "NM:i:%i", num_mismatches);
       //sprintf(optional_fields, "NM:i:%i\tXC:Z:%s", num_mismatches, cigar_string);
@@ -783,7 +795,7 @@ void filter_cals_by_pair_mode(int pair_mode, int pair_min_distance, int pair_max
     }
     */
 
-    if (size1 > 1 && size2 > 1) {
+    if (size1 > 0 && size2 > 0) {
       int pair1[size1], pair2[size2];
       for (int j = 0; j < size1; j++) pair1[j] = 0;
       for (int j = 0; j < size2; j++) pair2[j] = 0;
@@ -805,10 +817,17 @@ void filter_cals_by_pair_mode(int pair_mode, int pair_min_distance, int pair_max
 	      pair1[i1] = 1;
 	      pair2[i2] = 1;
 	      pairs++;
+
+	      //printf(">>>>>>>>>> pair %i : distance = %i\n", pairs, diff);
+	      //seed_cal_print(cal1);
+	      //seed_cal_print(cal2);
 	    }
 	  }
 	}
       }
+
+      //printf("*********** pairs found: %i *****************\n", pairs);
+
       // update lists
       if (pairs) {
 	for (int i1 = 0; i1 < size1; i1++) {
@@ -832,15 +851,24 @@ void filter_cals_by_pair_mode(int pair_mode, int pair_min_distance, int pair_max
 	array_list_free(cal_list2, (void *) seed_cal_free);
 	cal_lists[i+1] = new_cal_list2;
 	new_cal_list2 = NULL;
+
+	if (pairs == 1) {
+	  //	  if (cal2->num_hits < 100 && cal1->num_hits < 100 && 
+	  if (cal2->mapq == 0 && cal1->mapq == 0) {
+	    cal1->mapq = 0; //0; //61;
+	    cal2->mapq = 0; //0; //61;
+	  }
+	}
       }
+
       /*
-      printf("*******-----> PAIR 1:\n");
+      printf("*******-----> MATES #1:\n");
       size1 = array_list_size(cal_lists[i]);
       for (int i1 = 0; i1 < size1; i1++) {
 	cal1 = array_list_get(i1, cal_lists[i]);
 	seed_cal_print(cal1);
       }
-      printf("*******-----> PAIR 2:\n");
+      printf("*******-----> MATES #2:\n");
       size2 = array_list_size(cal_lists[i+1]);
       for (int i2 = 0; i2 < size2; i2++) {
 	cal2 = array_list_get(i2, cal_lists[i+1]);
