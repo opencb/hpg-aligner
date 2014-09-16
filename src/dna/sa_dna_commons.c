@@ -587,12 +587,13 @@ void create_alignments(array_list_t *cal_list, fastq_read_t *read,
       p += 3;
       memcpy(p, &AS, sizeof(int));
       p += sizeof(int);
+      */
 
       sprintf(p, "NHi");
       p += 3;
       memcpy(p, &num_cals, sizeof(int));
       p += sizeof(int);
-      */
+
       sprintf(p, "NMi");
       p += 3;
       memcpy(p, &cal->num_mismatches, sizeof(int));
