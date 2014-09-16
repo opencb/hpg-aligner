@@ -301,8 +301,8 @@ int sa_sam_writer(void *data) {
 	  free(sequence);
 	  free(quality);
 	}
-	array_list_free(mapping_list, (void *) alignment_free);
       }
+      array_list_free(mapping_list, (void *) NULL);
     }
   } else {
     // SINGLE MODE
