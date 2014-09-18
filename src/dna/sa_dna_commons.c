@@ -5,6 +5,33 @@
 // commons
 //--------------------------------------------------------------------
 
+seed_t *seed_new(size_t read_start, size_t read_end,
+		 size_t genome_start, size_t genome_end) {
+  
+  seed_t *p = (seed_t *) malloc(sizeof(seed_t));
+
+  p->read_start = read_start;
+  p->read_end = read_end;
+  p->genome_start = genome_start;
+  p->genome_end = genome_end;
+
+  p->suf_read_start = read_start;
+  p->suf_read_end = read_end;
+  p->suf_genome_start = genome_start;
+  p->suf_genome_end = genome_end;
+
+  p->strand = 0;
+  p->chromosome_id = 0;
+  p->num_mismatches = 0;
+  p->num_open_gaps = 0;
+  p->num_extend_gaps = 0;
+
+
+  cigar_init(&p->cigar);
+
+  return p;
+}
+
 void seed_free(seed_t *p) {
   if (p) {
     cigar_clean(&p->cigar);
@@ -13,6 +40,40 @@ void seed_free(seed_t *p) {
 }
 
 //--------------------------------------------------------------------
+
+seed_cal_t *seed_cal_new(const size_t chromosome_id,
+			 const short int strand,
+			 const size_t start,
+			 const size_t end,
+			 linked_list_t *seed_list) {
+  
+  seed_cal_t *p = (seed_cal_t *) malloc(sizeof(seed_cal_t));
+
+  p->strand = strand;
+  p->chromosome_id = chromosome_id;
+  p->start = start;
+  p->end = end;
+
+  p->AS = 0;
+  p->read_area = 0;
+  p->invalid = 0;
+
+  p->cigar_len = 0;
+
+  p->num_mismatches = 0;
+  p->num_open_gaps = 0;
+  p->num_extend_gaps = 0;
+
+  p->mapq = 0;
+  p->score = 0.0f;
+  cigar_init(&p->cigar);
+
+  p->read = NULL;
+  p->seed_list = seed_list;
+  p->cigarset = NULL;
+
+  return p;
+}
 
 void seed_cal_free(seed_cal_t *p) {
   if (p) {

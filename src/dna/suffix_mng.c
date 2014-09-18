@@ -691,7 +691,7 @@ void suffix_mng_search_read_cals_by_region(fastq_read_t *read, int num_seeds,
     read_inc = sa_index->k_value / 2;
   }
 
-  // fill in the CAL manager structure
+  // Fill in the CAL manager structure
   int read_end_pos = read->length - sa_index->k_value;
   int extra_seed = (read->length - sa_index->k_value) % read_inc;
 

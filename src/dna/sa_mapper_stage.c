@@ -128,6 +128,8 @@ void append_seed_linked_list(seed_cal_t *cal,
 	    //seed_ltrim_read(overlap, item);
 	    linked_list_insert_at(i, new_item, seed_list);
 	    //if (i == 0) cal->start = genome_start;
+	  } else {
+	    seed_free(new_item);
 	  }
 	  process = 1;
 	  break;
@@ -266,6 +268,8 @@ void append_seed_linked_list(seed_cal_t *cal,
 	    //print_seed("11 last: ", seed_list->last->item);
 	    process_right_side(new_item, seed_list);
 	    //print_seed("22 last: ", seed_list->last->item);
+	  } else {
+	    seed_free(new_item);
 	  }
 	  process = 1;
 	  break;
@@ -654,12 +658,13 @@ array_list_t *search_mate_cal_by_prefixes(seed_cal_t *cal, fastq_read_t *read,
   if (array_list_size(cal_list) > 0) {
     //printf(">>>>> search_mate_cal_by_prefixes: (mapq = %i) num. cals = %i\n", mapq, array_list_size(cal_list));
     select_best_cals(read, &cal_list);
+
     if (array_list_size(cal_list) <= 0) {
       suffix_mng_search_read_cals_by_region(read, num_seeds, sa_index, 1 - cal->strand,
 					  chromosome, start, end, cal_list, cal_mng->suffix_mng);
       //printf(">>>>> search_mate_cal_by_prefixes: after calling suffix_mng_search_read_cals_by_region (%i:%lu-%lu), num. cals = %i\n", chromosome, start, end, array_list_size(cal_list));
       if (array_list_size(cal_list) > 0) {
-	select_best_cals(read, &cal_list);
+      	select_best_cals(read, &cal_list);
       }
     }
 
@@ -715,7 +720,7 @@ void check_pairs(array_list_t **cal_lists, sa_index3_t *sa_index,
   seed_cal_t *cal, *mate_cal, *cal1, *cal2;
   array_list_t *list, *mate_list, *mate1_list, *mate2_list, *list1, *list2;
   fastq_read_t *read, *read1, *read2;
-  size_t num_cals, num_reads = array_list_size(batch->fq_reads);
+  size_t mate_list_size, num_cals, num_reads = array_list_size(batch->fq_reads);
 
   int min_distance = batch->options->pair_min_distance;
   int max_distance = batch->options->pair_max_distance;
@@ -774,6 +779,7 @@ void check_pairs(array_list_t **cal_lists, sa_index3_t *sa_index,
 	    }
 	  }
 	}
+	array_list_free(list, (void *) seed_cal_free);
       }
       if (array_list_size(new_list) > 0) {
 	batch->status[i] = 5; // found mate #2 from mate #1
@@ -895,7 +901,6 @@ void check_pairs(array_list_t **cal_lists, sa_index3_t *sa_index,
     printf("======> list #2 size = %i\n", array_list_size(list2));
     for (int kk = 0; kk < array_list_size(list2); kk++) { seed_cal_print(array_list_get(kk, list2)); }
     */
-    int pairs = 0;
 
     for (int k = 0; k < 2; k++) {
       if  (k == 0) {
@@ -913,106 +918,144 @@ void check_pairs(array_list_t **cal_lists, sa_index3_t *sa_index,
 	//printf("--> searching mates for this cal:\n");
 	//seed_cal_print(cal);
 	mate_list = search_mate_cal_by_prefixes(cal, read, sa_index, batch, cal_mng);
-	if (array_list_size(mate_list) > 0) {
-
-	  for (int jj = 0; jj < array_list_size(mate_list); jj++) { 
-	    mate_cal = array_list_get(jj, mate_list);
-
-	    pairs++;
-	    //int distance = abs(cal->start - mate_cal->start) + 1 + read->length;
-	    //printf("**** >>>>>>>>>> pair %i : distance = %i\n", pairs, distance);
-	    //seed_cal_print(cal);
-	    //seed_cal_print(mate_cal);
-
-	    //printf("----->> found cals for the previous cal:\n");
-	    //seed_cal_print(mate_cal);
-
-	    // score management
-	    score = cal->score + mate_cal->score;
-	    if (score < first_score) {
-	      if (score > second_score) {
-		second_score = score;
-	      }
-	    } else if (score > first_score) {
-	      if (first_score > 0) {
-		second_score = first_score;
-	      }
-	      first_score = score;
-	    } else {
+	mate_list_size = array_list_size(mate_list);
+	int num_found_mates = 0;
+	int found_mates[mate_list_size];
+	for (int jj = 0; jj < mate_list_size; jj++) { 
+	  mate_cal = array_list_get(jj, mate_list);
+	  
+	  //int distance = abs(cal->start - mate_cal->start) + 1 + read->length;
+	  //printf("**** >>>>>>>>>> pair %i : distance = %i\n", pairs, distance);
+	  //seed_cal_print(cal);
+	  //seed_cal_print(mate_cal);
+	  
+	  //printf("----->> found cals for the previous cal:\n");
+	  //seed_cal_print(mate_cal);
+	  
+	  // score management
+	  score = cal->score + mate_cal->score;
+	  if (score < first_score) {
+	    if (score > second_score) {
 	      second_score = score;
 	    }
-	    
-	    // read area management
-	    read_area = cal->read_area + mate_cal->read_area;
-
-	    if (read_area < max_read_area) {
-	      // do nothing
-	      continue;
-	    } else if (read_area > max_read_area) {
-	      // remove the current mates from the mate lists, and insert this pair
-	      array_list_set(jj, NULL, mate_list);
-	      array_list_clear(mate1_list, (void *) NULL);
-	      array_list_clear(mate2_list, (void *) NULL);
-	      
-	      if (k == 0) {
-		if (!inserted) {
-		  array_list_insert(cal, mate1_list);
-		  inserted = 1;
-		}
-		array_list_insert(mate_cal, mate2_list);
-	      } else {
-		if (!inserted) {
-		  array_list_insert(cal, mate2_list);
-		  inserted = 1;
-		}
-		array_list_insert(mate_cal, mate1_list);
-	      }
-	      /*
-	      printf("\t------ best read area = %i (before = %i)\n", read_area, max_read_area);
-	      printf("list for mate #1\n");
-	      for (int kk = 0; kk < array_list_size(mate1_list); kk++) { seed_cal_print(array_list_get(kk, mate1_list)); }
-	      printf("list for mate #2\n");
-	      for (int kk = 0; kk < array_list_size(mate2_list); kk++) { seed_cal_print(array_list_get(kk, mate2_list)); }
-	      */
-	      // update max read area
-	      max_read_area = read_area;	      
-	    } else {
-	      // read_area == max_read_area
-	      // update the mate lists, insert to the corresponding list
-	      array_list_set(jj, NULL, mate_list);
-	      if (k == 0) {
-		if (!inserted) {
-		  array_list_insert(cal, mate1_list);
-		  inserted = 1;
-		}
-		array_list_insert(mate_cal, mate2_list);
-	      } else {
-		if (!inserted) {
-		  array_list_insert(cal, mate2_list);
-		  inserted = 1;
-		}
-		array_list_insert(mate_cal, mate1_list);
-	      }
-	      //array_list_set(i, NULL, list);
+	  } else if (score > first_score) {
+	    if (first_score > 0) {
+	      second_score = first_score;
 	    }
-	    //printf("======> total read area = %i\n", read_area);
+	    first_score = score;
+	  } else {
+	    second_score = score;
+	  }
+	  
+	  // read area management
+	  read_area = cal->read_area + mate_cal->read_area;
+	  
+	  if (read_area > max_read_area) {
+	    // remove the current mates from the mate lists, and insert this pair
+
+	    // in mate1_list, we insert the new mate found
+	    array_list_clear(mate1_list, (void *) seed_cal_free);
+	    array_list_set(jj, NULL, mate_list);
+	    array_list_insert(mate_cal, mate1_list);
+
+	    // now we update mate2_list
+	    array_list_clear(mate2_list, (void *) NULL);
+	    array_list_insert(cal, mate2_list);
+	    inserted = 1;
+
+	    //num_found_mates = 0;
+	    //found_mates[num_found_mates++] = jj;
+
+	    //	    array_list_clear(mate1_list, (void *) NULL);
+	    //  array_list_clear(mate2_list, (void *) NULL);
+
+	    //	    array_list_insert(mate_cal, mate2_list);
+ /*
+	    if (k == 0) {
+	      if (!inserted) {
+		array_list_insert(cal, mate1_list);
+		inserted = 1;
+	      }
+	      array_list_insert(mate_cal, mate2_list);
+	    } else {
+	      if (!inserted) {
+		array_list_insert(cal, mate2_list);
+		inserted = 1;
+	      }
+	      array_list_insert(mate_cal, mate1_list);
+	    }
+*/
+	    // update max read area
+	    max_read_area = read_area;	      
+	  } else if (read_area == max_read_area) {
+
+	    // in mate1_list, we insert the new mate found
+	    array_list_set(jj, NULL, mate_list);
+	    array_list_insert(mate_cal, mate1_list);
+
+	    // now, we update mate2_list
+	    if (!inserted) {
+	      array_list_insert(cal, mate2_list);
+	      inserted = 1;
+	    }
+
+	    // update the mate lists, insert to the corresponding list
+	    //	    array_list_set(jj, NULL, mate_list);
+	    //	    found_mates[num_found_mates++] = jj;
+
+	    //	    array_list_insert(mate_cal, mate2_list);
+
+	    /*
+	    if (k == 0) {
+	      if (!inserted) {
+		//array_list_insert(cal, mate1_list);
+		inserted = 1;
+	      }
+	      array_list_insert(mate_cal, mate2_list);
+	    } else {
+	      if (!inserted) {
+		//array_list_insert(cal, mate2_list);
+		inserted = 1;
+	      }
+	      array_list_insert(mate_cal, mate1_list);
+	    }
+	    */
+
 	  }
 	}
 	// free memory
+	//	for (int m = 0; m < num_found_mates; m++) {
+	//	  array_list_set(found_mates[m], NULL, mate_list);
+	//	}
 	array_list_free(mate_list, (void *) seed_cal_free);
       }
-      //array_list_free(list, (void *) seed_cal_free);
     }
    
-    if (max_read_area == 0) continue;
+    if (max_read_area == 0) {
+      // free memory
+      array_list_free(mate1_list, (void *) seed_cal_free);
+      array_list_free(mate2_list, (void *) NULL);
+      continue;
+    }
+    /*
+    array_list_free(mate1_list, (void *) seed_cal_free);
+    array_list_free(mate2_list, (void *) seed_cal_free);
+
+    array_list_clear(list1, (void *) seed_cal_free);
+    array_list_clear(list2, (void *) seed_cal_free);
+
+    continue;
+    */
+    //    printf("%s\n", read1->id);
+    //    exit(-1);
 
     // update cal lists with the found mate lists
-    list_size = array_list_size(mate1_list);
+    list_size = array_list_size(mate2_list);
     for (int ii = 0; ii < list1_size; ii++) { 
       cal1 = array_list_get(ii, list1); 
       found = 0;
       for (int jj = 0; jj < list_size; jj++) { 
-	cal2 = array_list_get(jj, mate1_list);
+	cal2 = array_list_get(jj, mate2_list);
 	if (cal1 == cal2) {
 	  found = 1;
 	  break;
@@ -2470,7 +2513,13 @@ void execute_sw(array_list_t *sw_prepare_list, sa_mapping_batch_t *mapping_batch
 
     cal = (seed_cal_t *) sw_prepare->cal;
 
-    if (cal->invalid) continue;
+    if (cal->invalid) {
+      // free memory
+      free(sw_prepare->query);
+      free(sw_prepare->ref);
+      sw_prepare_free(sw_prepare);
+      continue;
+    }
     
     cigarset = cal->cigarset;
     /*
@@ -2600,7 +2649,7 @@ void execute_sw(array_list_t *sw_prepare_list, sa_mapping_batch_t *mapping_batch
 	   i, gap_count, cigar_to_string(cigar));
     #endif
 
-    // free
+    // free memory
     free(sw_prepare->query);
     free(sw_prepare->ref);
     sw_prepare_free(sw_prepare);

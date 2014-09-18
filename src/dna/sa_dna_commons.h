@@ -580,7 +580,7 @@ typedef struct seed {
 } seed_t;
 
 //--------------------------------------------------------------------
-
+/*
 static inline seed_t *seed_new(size_t read_start, size_t read_end,
 			size_t genome_start, size_t genome_end) {
 
@@ -607,6 +607,9 @@ static inline seed_t *seed_new(size_t read_start, size_t read_end,
 
   return p;
 }
+*/
+seed_t *seed_new(size_t read_start, size_t read_end,
+		 size_t genome_start, size_t genome_end);
 
 //--------------------------------------------------------------------
 
@@ -893,7 +896,7 @@ typedef struct seed_cal {
 } seed_cal_t;
 
 //--------------------------------------------------------------------
-
+/*
 static inline seed_cal_t *seed_cal_new(const size_t chromosome_id,
 				const short int strand,
 				const size_t start,
@@ -927,6 +930,12 @@ static inline seed_cal_t *seed_cal_new(const size_t chromosome_id,
 
   return p;
 }
+*/
+seed_cal_t *seed_cal_new(const size_t chromosome_id,
+			 const short int strand,
+			 const size_t start,
+			 const size_t end,
+			 linked_list_t *seed_list);
 
 //--------------------------------------------------------------------
 
