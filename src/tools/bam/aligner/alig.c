@@ -292,7 +292,7 @@ alig_region_next(bam1_t **v_bams, size_t v_bams_l, int force_incomplete, alig_co
 	{
 		//Logging
 		LOG_INFO("************************************\n");
-		sprintf(log_msg, "INTERVAL %d - %d\n", context->region.start_pos + 1, context->region.end_pos + 1);
+		sprintf(log_msg, "INTERVAL %lu - %lu\n", context->region.start_pos + 1, context->region.end_pos + 1);
 		LOG_INFO(log_msg);
 
 		//Save interval reads in filtered list
@@ -1024,7 +1024,7 @@ alig_bam_file_old(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 							if(err != ALIG_INCOMPLETE_INTERVAL)
 							{
 								LOG_ERROR("Cannot obtain next region\n");
-								fprintf(stderr, "ERROR: Cannot obtain next region in buffer of size %d, error code = %d\n", err);
+								fprintf(stderr, "ERROR: Cannot obtain next region in buffer of size %lu, error code = %i\n", v_reads_l, err);
 								fflush(stdout);
 								omp_set_lock(&in_buffer.lock);
 								in_buffer.end_condition = 1;
@@ -1091,7 +1091,7 @@ alig_bam_file_old(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 								if(err != ALIG_INCOMPLETE_INTERVAL)
 								{
 									LOG_ERROR("Cannot obtain next region\n");
-									fprintf(stderr, "ERROR: Cannot obtain next region in buffer of size %d, error code = %d\n", err);
+									fprintf(stderr, "ERROR: Cannot obtain next region in buffer of size %lu, error code = %i\n", v_reads_l, err);
 									fflush(stdout);
 									omp_set_lock(&in_buffer.lock);
 									in_buffer.end_condition = 1;
@@ -1149,7 +1149,7 @@ alig_bam_file_old(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 						if(bam_processed / 10000 > aux_count)
 						{
 							aux_count = bam_processed / 10000;
-							printf("Total alignments readed: %d\r", bam_processed);
+							printf("Total alignments readed: %lu\r", bam_processed);
 							fflush(stdout);
 						}
 						it++;
@@ -1167,8 +1167,8 @@ alig_bam_file_old(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 	alig_aux_write_to_disk(write_buffer, out_bam_f, 1);
 
 	//Info
-	printf("\nReads processed from original BAM: %d\n", bam_processed);
-	printf("Iterations: %d\n", it);
+	printf("\nReads processed from original BAM: %lu\n", bam_processed);
+	printf("Iterations: %i\n", it);
 
 	//Free context
 	printf("\nDestroying context...\n");
@@ -1557,7 +1557,7 @@ alig_get_scores_from_read(bam1_t *read, alig_context_t *context, uint32_t *v_sco
 					{
 						#pragma omp critical
 						{
-							sprintf(log_msg, "Read-Ref: %d, Read: %d\n", read_seq_ref_l, read->core.l_qseq);
+							sprintf(log_msg, "Read-Ref: %lu, Read: %i\n", read_seq_ref_l, read->core.l_qseq);
 							LOG_ERROR(log_msg);
 						}
 					}
@@ -1787,7 +1787,7 @@ alig_indel_realign_from_haplo(alig_context_t *context, size_t alt_haplo_index)
 
 	//Logging
 	cigar32_to_string(&haplo->indel, 1, aux_msg);
-	sprintf(log_msg, "Realign, alternative haplotype = %s:%d, %d reads\n", aux_msg, haplo->ref_pos + 1, array_list_size(list));
+	sprintf(log_msg, "Realign, alternative haplotype = %s:%lu, %lu reads\n", aux_msg, haplo->ref_pos + 1, array_list_size(list));
 	LOG_INFO("************************************\n");
 	LOG_INFO(log_msg);
 	if(context->flags & ALIG_ORIGINAL_PRIORITY)

@@ -205,11 +205,11 @@ int sa_sam_writer(void *data) {
 	  */
 	  if (alig->optional_fields) {
 	    opt_fields = (char *) calloc(strlen(alig->optional_fields) + 100, sizeof(char));
-	    sprintf(opt_fields, "NH:i:%i\t%s", num_mappings, alig->optional_fields);
+	    sprintf(opt_fields, "NH:i:%lu\t%s", num_mappings, alig->optional_fields);
 	    //	    sprintf(opt_fields, "NH:i:%i\t%s\tXU:i:%i", num_mappings, alig->optional_fields, mapping_batch->status[i]);
 	  } else {
 	    opt_fields = (char *) calloc(100, sizeof(char));
-	    sprintf(opt_fields, "NH:i:%i", num_mappings);
+	    sprintf(opt_fields, "NH:i:%lu", num_mappings);
 	    //	    sprintf(opt_fields, "NH:i:%i\tXU:i:%i", num_mappings, mapping_batch->status[i]);
 	  }
 	  /*
@@ -257,7 +257,7 @@ int sa_sam_writer(void *data) {
 	num_unmapped_reads++;
 
 	opt_fields = (char *) calloc(100, sizeof(char));
-	sprintf(opt_fields, "XM:i:%i XU:i:%i", num_mappings, mapping_batch->status[i]);
+	sprintf(opt_fields, "XM:i:%lu XU:i:%i", num_mappings, mapping_batch->status[i]);
 
 	if (read->adapter) {
 	  len = read->length + abs(read->adapter_length);
@@ -404,7 +404,7 @@ int sa_sam_writer(void *data) {
 	  if (num_mappings > 1) {
 	    cal->mapq = 0;
 	  }
-	  fprintf(out_file, "%s\t%i\t%s\t%i\t%i\t%s\t%s\t%lu\t%i\t%s\t%s\tNH:i:%i\tNM:i:%i\n", 
+	  fprintf(out_file, "%s\t%lu\t%s\t%lu\t%i\t%s\t%s\t%lu\t%lu\t%s\t%s\tNH:i:%lu\tNM:i:%i\n", 
 		  read->id,
 		  flag,
 		  genome->chrom_names[cal->chromosome_id],

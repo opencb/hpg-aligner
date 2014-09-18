@@ -30,7 +30,9 @@ DOWNLOAD and BUILDING
     remote: Total 1441 (delta 0), reused 0 (delta 0)
     Receiving objects: 100% (1441/1441), 1.85 MiB | 122 KiB/s, done.
     Resolving deltas: 100% (882/882), done.
+
     $ cd hpg-aligner
+
     $ git submodule update --init
     Submodule 'lib/hpg-libs' (https://github.com/opencb/hpg-libs.git) registered for path 'lib/hpg-libs'
     Cloning into 'lib/hpg-libs'...
@@ -58,7 +60,7 @@ DOWNLOAD and BUILDING
     $ scons
 
 
-RUNNING
+RUNING
 -------
 
   For command line options invoke:
