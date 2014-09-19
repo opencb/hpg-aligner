@@ -886,6 +886,10 @@ void check_pairs(array_list_t **cal_lists, sa_index3_t *sa_index,
       continue;
     }
 
+    array_list_clear(list1, (void *) seed_cal_free);
+    array_list_clear(list2, (void *) seed_cal_free);
+    continue;
+
     // no valid pairs, then search mate by region
     max_read_area = 0;
     score = 0;
