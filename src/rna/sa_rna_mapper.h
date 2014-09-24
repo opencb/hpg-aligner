@@ -31,6 +31,7 @@ int sa_bam_writer_rna(void *data);
 //--------------------------------------------------------------------
 
 typedef struct sa_rna_input {
+  cal_optarg_t *cal_optarg;
   genome_t *genome;
   avls_list_t *avls_list;
   metaexons_t *metaexons;

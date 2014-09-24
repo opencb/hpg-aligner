@@ -111,11 +111,12 @@ typedef struct options {
   int fast_mode;
   int set_bam_format;
   int adapter_length;
+  int set_cal;
   double min_score;
   double match;
   double mismatch;
   double gap_open;
-  double gap_extend;
+  double gap_extend;  
   char str_mode[32];
   char* prefix_name;
   char* in_filename;

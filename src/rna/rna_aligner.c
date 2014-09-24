@@ -690,6 +690,19 @@ void rna_aligner(options_t *options) {
     options->fast_mode = 0; 
   }
 
+
+  if (options->fast_mode && !options->set_cal) {
+    options->min_cal_size = 30;
+  }
+
+  if (options->fast_mode && options->set_cal) {
+    if (options->min_cal_size < 30) {
+      options->min_cal_size = 30;
+    } else if(options->min_cal_size > 100)  {
+      options->min_cal_size = 100;
+    }
+  }
+
   if (!options->set_bam_format) {
     if (options->fast_mode) {
       options->bam_format = 0;
@@ -1297,8 +1310,9 @@ void rna_aligner(options_t *options) {
       sw_optarg_t sw_optarg;
       sw_optarg_init(options->gap_open, options->gap_extend, 
 		     options->match, options->mismatch, &sw_optarg);
-
+      
       sa_rna_input_t sa_rna;
+      sa_rna.cal_optarg   = cal_optarg;
       sa_rna.genome    = genome;
       sa_rna.avls_list = avls_list;
       sa_rna.metaexons = metaexons;
@@ -1306,7 +1320,7 @@ void rna_aligner(options_t *options) {
       sa_rna.file1 = f_sa;
       sa_rna.file2 = f_hc;
       sa_rna.pair_input = &pair_input;
-
+      
       sa_wf_batch_t *wf_batch = sa_wf_batch_new(NULL, (void *)sa_index, &writer_input, NULL, &sa_rna);
       sa_wf_input_t *wf_input = sa_wf_input_new(options->bam_format, &reader_input, wf_batch);
       

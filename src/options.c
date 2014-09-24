@@ -74,6 +74,7 @@ options_t *options_new(void) {
 
   options->adapter_length = 0;
   options->set_bam_format = 0;
+  options->set_cal = 0;
 
   //new variables for bisulphite case in index generation
   options->bs_index = 0;
@@ -145,7 +146,7 @@ void validate_options(options_t *options) {
     options->num_seeds = DEFAULT_NUM_SEEDS;
   }    
 
-  if (!options->min_cal_size) {
+  if (!options->min_cal_size || options->min_cal_size <= 20) {
     options->min_cal_size = DEFAULT_MIN_CAL_SIZE;
   }
  
@@ -309,7 +310,11 @@ void options_display(options_t *options) {
      if (options->mode == DNA_MODE) {
        printf("\tNum. seeds: %d\n",  num_seeds);
      }
-     printf("\tMin CAL size: %d\n",  min_cal_size);
+     if (options->mode == RNA_MODE && fast_mode) {
+       printf("\tMin CAL coverage form a read (0 to 100): %d \n",  min_cal_size);
+     } else {
+       printf("\tMin CAL size: %d\n",  min_cal_size);
+     }
      printf("\n");
 
      printf("Mapping filters\n");
@@ -447,7 +452,13 @@ void options_to_file(options_t *options, FILE *fd) {
   if (options->mode == DNA_MODE) {
     fprintf(fd, "= Num. seeds: %d\n",  num_seeds);
   }
-  fprintf(fd, "= Min CAL size: %d\n",  min_cal_size);
+
+  if (options->mode == RNA_MODE && fast_mode) {
+    fprintf(fd, "= Min CAL coverage form a read (0 to 100): %d \n",  min_cal_size);
+  } else {
+    fprintf(fd, "= Min CAL size: %d\n",  min_cal_size);
+  }
+
   fprintf(fd, "\n\n");
 
 
@@ -616,7 +627,10 @@ options_t *read_CLI_options(void **argtable, options_t *options) {
   if (((struct arg_file*)argtable[++count])->count) { free(options->output_name); options->output_name = strdup(*(((struct arg_file*)argtable[count])->filename)); }  
   if (((struct arg_int*)argtable[++count])->count) { options->filter_read_mappings = *(((struct arg_int*)argtable[count])->ival); }
   if (((struct arg_int*)argtable[++count])->count) { options->filter_seed_mappings = *(((struct arg_int*)argtable[count])->ival); }
-  if (((struct arg_int*)argtable[++count])->count) { options->min_cal_size = *(((struct arg_int*)argtable[count])->ival); }
+  if (((struct arg_int*)argtable[++count])->count) { 
+    options->min_cal_size = *(((struct arg_int*)argtable[count])->ival); 
+    options->set_cal = 1;
+  }
   if (((struct arg_int*)argtable[++count])->count) { options->num_cpu_threads = *(((struct arg_int*)argtable[count])->ival); }
   if (((struct arg_int*)argtable[++count])->count) { options->batch_size = *(((struct arg_int*)argtable[count])->ival); }
   if (((struct arg_dbl*)argtable[++count])->count) { options->match = *((struct arg_dbl*)argtable[count])->dval; }

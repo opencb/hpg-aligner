@@ -2674,8 +2674,9 @@ int sa_generate_cals(fastq_read_t *read,
 int filter_cals_by_score(array_list_t *cals_list, 
 			 const int limit_cals, 
 			 float *cals_score,
-			 fastq_read_t *read) {
-  
+			 fastq_read_t *read,
+			 int min_cal_score) {
+
   int num_targets = array_list_size(cals_list);
   array_list_t *merge_cals;
     
@@ -2714,7 +2715,7 @@ int filter_cals_by_score(array_list_t *cals_list,
     
   int report_tmp = 1;
   for (int i = 1; i < n_report; i++) {
-    if (cals_score[i] < 25.0) { 
+    if (cals_score[i] < min_cal_score) {
       break;
     }
     report_tmp++;
@@ -3237,9 +3238,11 @@ int sa_rna_mapper(void *data) {
   fastq_read_t *read;  
   //  int saved_pos[2][1024];
   // TODO !!! 20 = min. cal size
-  uint min_cal_size = 20;
+  int min_cal_size = sa_rna->cal_optarg->min_cal_size;
+
   int seed_size = 18;
   //Function old Seeding vars
+  int min_cal_score = sa_rna->cal_optarg->min_cal_size;
   int len_seq;
   
   const int MAX_SUFFIXES    = 50;
@@ -3351,7 +3354,8 @@ int sa_rna_mapper(void *data) {
     n_report = filter_cals_by_score(target_cals,
 				    limit_cals, 
 				    cals_score,
-				    read);
+				    read,
+				    min_cal_score);
        
     if (!n_report) { goto cal_mng; }
 
@@ -3951,6 +3955,7 @@ int sa_rna_mapper_last(void *data) {
   float match = sw_optarg->subst_matrix['A']['A'];
   float mismatch = sw_optarg->subst_matrix['A']['C'];
 
+  int min_cal_size = sa_rna->cal_optarg->min_cal_size;
   char *query;
   //size_t num_reads = sa_batch->num_reads;
   //array_list_t *sa_list;
@@ -4717,7 +4722,7 @@ int sa_rna_mapper_last(void *data) {
       //int report_tmp = 1;
       for (int i = 0; i < n_report; i++) {
 	//printf("CAL %i: %f\n", i, cals_score[i]);
-	if (cals_score[i] < 40.0) { 
+	if (cals_score[i] < min_cal_size) { 
 	  break;
 	}
 	report_tmp++;
