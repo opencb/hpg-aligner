@@ -3136,7 +3136,7 @@ int sa_pair_mapper(void *data) {
   for (int i = 0; i < num_reads; i++) {
     cal_list = cal_lists[i];
     read = array_list_get(i, mapping_batch->fq_reads);
-
+    /*
     if (array_list_size(cal_list) > 0) {
 
       //printf("read %i\tafter SW and before filtering by max. score (read %s)...\n", i, read->id);
@@ -3161,7 +3161,7 @@ int sa_pair_mapper(void *data) {
       //printf("read %i\tafter filtering by max. score (%0.2f) (read %s)...\n", i, max_score, read->id);
       //for (int kk = 0; kk < array_list_size(cal_list); kk++) { seed_cal_print(array_list_get(kk, cal_list)); }
     }
-
+    */
     //printf("******* read %s\n", read->id);
     //printf("after filtering by score (read %s, max. %0.2f)...\n", read->id, max_score);
     //for (int kk = 0; kk < array_list_size(cal_list); kk++) { seed_cal_print(array_list_get(kk, cal_list)); }
