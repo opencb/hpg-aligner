@@ -867,6 +867,7 @@ void check_pairs(array_list_t **cal_lists, sa_index3_t *sa_index,
       }
     }
     if (valid_pair) {
+      /*
       cal1 = array_list_get(0, list1);
       cal2 = array_list_get(0, list2);
       if (cal1->mapq == 0 && cal2->mapq == 0) {
@@ -883,12 +884,16 @@ void check_pairs(array_list_t **cal_lists, sa_index3_t *sa_index,
 	  }
 	}
       }
+      */
       continue;
     }
 
-    array_list_clear(list1, (void *) seed_cal_free);
-    array_list_clear(list2, (void *) seed_cal_free);
-    continue;
+
+    if (list1_size > 1 && list2_size > 1) {
+      array_list_clear(list1, (void *) seed_cal_free);
+      array_list_clear(list2, (void *) seed_cal_free);
+      continue;
+    }
 
     // no valid pairs, then search mate by region
     max_read_area = 0;
@@ -1093,20 +1098,22 @@ void check_pairs(array_list_t **cal_lists, sa_index3_t *sa_index,
 
     batch->status[i] = 7; 
     batch->status[i+1] = 7;
-
+    /*
     if (first_score > second_score) {
       num_cals = array_list_size(mate1_list);
       for (int kk = 0; kk < num_cals; kk++) { 
 	cal = array_list_get(kk, mate1_list);
-	cal->mapq = 0;//62;
+	//	cal->mapq = 62;
+	//	cal->mapq = 0;
       }
       num_cals = array_list_size(mate2_list);
       for (int kk = 0; kk < num_cals; kk++) { 
 	cal = array_list_get(kk, mate2_list);
-	cal->mapq = 0;//62;
+	//	cal->mapq = 62;
+	//	cal->mapq = 0;
       }
     }
-
+*/
     /*
     printf("======> result: max read area = %i\n", max_read_area);
     printf("=========> mate #1 list size = %i\n", array_list_size(mate1_list));
@@ -3050,8 +3057,8 @@ int sa_pair_mapper(void *data) {
 
     if (array_list_size(cal_list) > 0) {
 
-      //printf("after create_cals: list size = %i\n", array_list_size(cal_list));
-      //for (int kk = 0; kk < array_list_size(cal_list); kk++) { seed_cal_print(array_list_get(kk, cal_list)); }
+      //      printf("read %i\tafter create_cals and before select_best_cals: list size = %i\n", i, array_list_size(cal_list));
+      //      for (int kk = 0; kk < array_list_size(cal_list); kk++) { seed_cal_print(array_list_get(kk, cal_list)); }
 
       //      printf("***********   from sa_pair_mapper   *************\n");
 
@@ -3068,7 +3075,7 @@ int sa_pair_mapper(void *data) {
 	}
       }
 
-      //      printf("after filtering min. num mismatches (%i) before cleaning cals...\n", min_num_mismatches);
+      //      printf("read %i\tafter select_best_cals...\n", i);
       //      for (int kk = 0; kk < array_list_size(cal_list); kk++) { seed_cal_print(array_list_get(kk, cal_list)); }
 
       //fill_seed_gaps(cal_list, read, sa_index);
@@ -3086,7 +3093,11 @@ int sa_pair_mapper(void *data) {
       mapping_batch->status[i] = 1; // no cals
     }
     cal_lists[i] = cal_list;
+
+    //    printf("read %i\tbefore filter_cals_by_pair_mode...\n", i);
+    //    for (int kk = 0; kk < array_list_size(cal_list); kk++) { seed_cal_print(array_list_get(kk, cal_list)); }
   }
+
 
   // 2) filter cals by pairs
   filter_cals_by_pair_mode(pair_mode, pair_min_distance, pair_max_distance, 
@@ -3096,8 +3107,12 @@ int sa_pair_mapper(void *data) {
 
   // 3) prepare Smith-Waterman to fill in the gaps
   for (int i = 0; i < num_reads; i++) {
+
     read = array_list_get(i, mapping_batch->fq_reads);
     cal_list = cal_lists[i];
+
+    //    printf("read %i\tafter check_pairs...\n", i);
+    //    for (int kk = 0; kk < array_list_size(cal_list); kk++) { seed_cal_print(array_list_get(kk, cal_list)); }
 
     if (array_list_size(cal_list) > 0) {
       //printf("before prepare_sw\n");
@@ -3121,11 +3136,11 @@ int sa_pair_mapper(void *data) {
   for (int i = 0; i < num_reads; i++) {
     cal_list = cal_lists[i];
     read = array_list_get(i, mapping_batch->fq_reads);
-    
+
     if (array_list_size(cal_list) > 0) {
 
-      //      printf("before filtering by max. score (read %s)...\n", read->id);
-      //      for (int kk = 0; kk < array_list_size(cal_list); kk++) { seed_cal_print(array_list_get(kk, cal_list)); }
+      //printf("read %i\tafter SW and before filtering by max. score (read %s)...\n", i, read->id);
+      //for (int kk = 0; kk < array_list_size(cal_list); kk++) { seed_cal_print(array_list_get(kk, cal_list)); }
 
       // filter by score
       #ifdef _TIMING
@@ -3143,13 +3158,16 @@ int sa_pair_mapper(void *data) {
 	((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);  
       #endif
 
-      //      printf("after filtering by max. score (%0.2f) (read %s)...\n", max_score, read->id);
-      //      for (int kk = 0; kk < array_list_size(cal_list); kk++) { seed_cal_print(array_list_get(kk, cal_list)); }
+      //printf("read %i\tafter filtering by max. score (%0.2f) (read %s)...\n", i, max_score, read->id);
+      //for (int kk = 0; kk < array_list_size(cal_list); kk++) { seed_cal_print(array_list_get(kk, cal_list)); }
     }
-    
+
     //printf("******* read %s\n", read->id);
     //printf("after filtering by score (read %s, max. %0.2f)...\n", read->id, max_score);
     //for (int kk = 0; kk < array_list_size(cal_list); kk++) { seed_cal_print(array_list_get(kk, cal_list)); }
+
+    //    printf("read %i\tbefore creating alignments...\n", i);
+    //    for (int kk = 0; kk < array_list_size(cal_list); kk++) { seed_cal_print(array_list_get(kk, cal_list)); }
 
     // create alignments structures
     #ifdef _TIMING

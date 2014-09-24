@@ -353,10 +353,13 @@ int compute_mapq(seed_cal_t *best_cal, seed_cal_t *second_cal, int num_hits) {
 
   double identity, tmp;
   identity = 1. - (double) (best_cal->read_area - best_cal->score) / 5.0 / best_cal->read_area;
-  tmp = best_cal->read_area < 50 ? 1. : 3.9120 / log(best_cal->read_area);
-  tmp *= identity * identity;
-  mapq = (int) (6.02 * (best_cal->score - second_score) * tmp * tmp + .499);
-  //mapq = (int) (4.02 * (best_cal->score - second_score) * tmp * tmp + .499);
+  //  tmp = best_cal->read_area < 50 ? 1. : 3.9120 / log(best_cal->read_area);
+  //  tmp *= identity * identity;
+  //  mapq = (int) (6.02 * (best_cal->score - second_score) * tmp * tmp + .499);
+  
+  tmp = 3.9120 / log(best_cal->read_area);
+  tmp *= identity * identity * identity;
+  mapq = (int) (6.02 * (best_cal->score - second_score) * tmp + .499);
 
   if (num_hits > 1) mapq -= (int)(4.343 * log(num_hits) + .499);
   
@@ -913,7 +916,7 @@ void filter_cals_by_pair_mode(int pair_mode, int pair_min_distance, int pair_max
 	array_list_free(cal_list2, (void *) seed_cal_free);
 	cal_lists[i+1] = new_cal_list2;
 	new_cal_list2 = NULL;
-
+	/*
 	if (pairs == 1) {
 	  //	  if (cal2->num_hits < 100 && cal1->num_hits < 100 && 
 	  if (cal2->mapq == 0 && cal1->mapq == 0) {
@@ -921,6 +924,7 @@ void filter_cals_by_pair_mode(int pair_mode, int pair_min_distance, int pair_max
 	    cal2->mapq = 0; //0; //61;
 	  }
 	}
+	*/
       }
 
       /*
