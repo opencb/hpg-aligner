@@ -603,18 +603,19 @@ cigar_code_t *generate_cigar_code(char *query_map, char *ref_map, unsigned int m
   // hard clipping start
 
   if (query_start > 0) {
-    dist += query_start;
     if (ref_type == FIRST_SW) {
       //Normal Case
       if (query_start <= 5) {
 	cigar_code_append_op(cigar_op_new(query_start, 'M'), p);
       } else {
 	cigar_code_append_op(cigar_op_new(query_start, 'H'), p);
+	dist += query_start;
       }
     } else {
       //Middle or last ref
       if (ref_start == 0) {
 	cigar_code_append_op(cigar_op_new(query_start, 'I'), p);
+	dist += query_start;
       } else {
 	if (ref_start == query_start) {
 	  cigar_code_append_op(cigar_op_new(query_start, 'M'), p);
@@ -622,9 +623,11 @@ cigar_code_t *generate_cigar_code(char *query_map, char *ref_map, unsigned int m
 	  if (ref_start > query_start) {
 	    cigar_code_append_op(cigar_op_new(ref_start - query_start, 'D'), p);
 	    cigar_code_append_op(cigar_op_new(query_start, 'M'), p);
+	    dist += (ref_start - query_start);
 	  } else {
 	    cigar_code_append_op(cigar_op_new(query_start - ref_start, 'I'), p);
 	    cigar_code_append_op(cigar_op_new(ref_start, 'M'), p);
+	    dist += (query_start - ref_start);
 	  } 
 	}
       }
@@ -636,6 +639,8 @@ cigar_code_t *generate_cigar_code(char *query_map, char *ref_map, unsigned int m
     } 
   }
   
+
+
   // first Status
   if (query_map[0] != '-' && ref_map[0] != '-') {
     status = CIGAR_MATCH_MISMATCH;
@@ -698,7 +703,7 @@ cigar_code_t *generate_cigar_code(char *query_map, char *ref_map, unsigned int m
     }*/
   
   operation = select_op(status);
-  
+
   // hard and Soft clipped end
   if (status == CIGAR_MATCH_MISMATCH) {
     cigar_soft = map_len - 1;
@@ -735,9 +740,9 @@ cigar_code_t *generate_cigar_code(char *query_map, char *ref_map, unsigned int m
   //printf("query_start = %i, ref_start = %i, map_seq_len = %i, map_ref_len = %i, query_len = %i, ref_len = %i, map_len = %i\n", 
   //	 query_start, ref_start, map_seq_len, map_ref_len, query_len, ref_len, map_len);
 
+
   if (map_seq_len < query_len) {
     last_h = query_len - map_seq_len;
-    dist += last_h;
     //printf("last_h = %i\n", last_h);
     if (ref_type == LAST_SW) {
       //Normal Case
@@ -746,13 +751,14 @@ cigar_code_t *generate_cigar_code(char *query_map, char *ref_map, unsigned int m
 	cigar_code_append_op(cigar_op_new(last_h, 'M'), p);
       } else {
 	cigar_code_append_op(cigar_op_new(last_h, 'H'), p);
+	dist += last_h;
       }
-
 
     } else {
       //Middle or first ref
       if (map_ref_len == ref_len) {
 	cigar_code_append_op(cigar_op_new(last_h, 'I'), p);
+	dist += last_h;
       } else {
 	last_h_aux = ref_len - map_ref_len;
 	//printf("last_h_aux = %i\n", last_h_aux);
@@ -762,9 +768,11 @@ cigar_code_t *generate_cigar_code(char *query_map, char *ref_map, unsigned int m
 	  if (last_h_aux > last_h) {
 	    cigar_code_append_op(cigar_op_new(last_h_aux - last_h, 'D'), p);
 	    cigar_code_append_op(cigar_op_new(last_h, 'M'), p);
+	    dist += (last_h_aux - last_h);
 	  } else {
 	    cigar_code_append_op(cigar_op_new(last_h - last_h_aux, 'I'), p);
 	    cigar_code_append_op(cigar_op_new(last_h_aux, 'M'), p);
+	    dist += (last_h - last_h_aux);
 	  } 
 	}
       }

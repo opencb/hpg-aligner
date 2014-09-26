@@ -23,6 +23,10 @@ double avx1_matrix_t = 0.0f, avx1_tracking_t = 0.0f;
 // global variables for timing and capacity meausures
 //--------------------------------------------------------------------
 
+//====================================================================
+int min_intron, max_intron;
+//====================================================================
+
 basic_statistics_t *basic_st;
 
 pthread_mutex_t mutex_sp;

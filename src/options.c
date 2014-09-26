@@ -343,7 +343,7 @@ void options_display(options_t *options) {
        }
        printf("\tMax intron length: %d\n", max_intron_length);
        printf("\tMin intron length: %d\n", min_intron_length);
-       //printf("\tMin score        : %d\n", min_score);
+       printf("\tMin score        : %d\n", min_score);
      }
 
      if (options->realignment || options->recalibration) {
@@ -490,7 +490,7 @@ void options_to_file(options_t *options, FILE *fd) {
     fprintf(fd, "= R N A    P A R A M E T E R S \n");
     fprintf(fd, "=----------------------------=\n");
     fprintf(fd, "= Mode: %s\n", fast_mode ? "Fast":"Slow");
-    fprintf(fd, "= Seed size: %d\n",  seed_size);
+    if (!fast_mode) { fprintf(fd, "= Seed size: %d\n",  seed_size); }
     fprintf(fd, "= Max intron length: %d\n", max_intron_length);
     fprintf(fd, "= Min intron length: %d\n", min_intron_length);
     fprintf(fd, "= Min score        : %d\n", min_score);
@@ -540,7 +540,7 @@ void** argtable_options_new(int mode) {
   argtable[count++] = arg_dbl0(NULL, "sw-mismatch", NULL, "Mismatch value for Smith-Waterman algorithm");
   argtable[count++] = arg_dbl0(NULL, "sw-gap-open", NULL, "Gap open penalty for Smith-Waterman algorithm");
   argtable[count++] = arg_dbl0(NULL, "sw-gap-extend", NULL, "Gap extend penalty for Smith-Waterman algorithm");
-  argtable[count++] = arg_int0(NULL, "min-score", NULL, "Minimum score for valid mappings");
+  argtable[count++] = arg_int0(NULL, "min-score", NULL, "Minimum score for valid mappings (0 to 100 for RNA)"); //TODO: and DNA?
   //  argtable[count++] = arg_int0(NULL, "paired-mode", NULL, "Pair mode: 0 = single-end, 1 = paired-end, 2 = mate-pair [Default 0]");
   argtable[count++] = arg_int0(NULL, "paired-min-distance", NULL, "Minimum distance between pairs");
   argtable[count++] = arg_int0(NULL, "paired-max-distance", NULL, "Maximum distance between pairs");
@@ -552,7 +552,7 @@ void** argtable_options_new(int mode) {
   argtable[count++] = arg_str0(NULL, "prefix", NULL, "File prefix name");
   argtable[count++] = arg_int0("l", "log-level", NULL, "Log debug level");
   argtable[count++] = arg_lit0("h", "help", "Help option");
-  argtable[count++] = arg_lit0(NULL, "bam-format", "BAM output format (otherwise, SAM format), this option turn the process slow");
+  argtable[count++] = arg_lit0(NULL, "bam-format", "BAM output format (otherwise, SAM format. This option is only available for SA mode, BWT mode always report in BAM format), this option turn the process slow");
   argtable[count++] = arg_lit0(NULL, "indel-realignment", "Indel-based realignment");
   argtable[count++] = arg_lit0(NULL, "recalibration", "Base quality score recalibration");
   argtable[count++] = arg_str0("a", "adapter", NULL, "Adapter sequence in the read");

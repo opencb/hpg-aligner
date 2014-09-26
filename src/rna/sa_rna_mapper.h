@@ -39,6 +39,8 @@ typedef struct sa_rna_input {
   FILE *file1;
   FILE *file2;
   pair_server_input_t *pair_input;
+  int min_score;
+  int max_alig;
 } sa_rna_input_t;
 
 typedef struct sa_batch {

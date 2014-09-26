@@ -908,10 +908,11 @@ void rna_aligner(options_t *options) {
 
   //============================= INPUT INITIALIZATIONS =========================//  
   //BWT parameters
-  
+  extern int min_intron, max_intron;
+  min_intron = options->min_intron_length;
+  max_intron = options->max_intron_length;
   
   bwt_optarg_t *bwt_optarg = bwt_optarg_new(1, 0,
-					    //500,
 					    options->filter_read_mappings, 
 					    options->filter_seed_mappings);
   
@@ -930,7 +931,7 @@ void rna_aligner(options_t *options) {
   // paired mode parameters
   pair_mng_t *pair_mng = pair_mng_new(options->pair_mode, options->pair_min_distance, 
 				      options->pair_max_distance, options->report_only_paired);
-  
+
   // report parameters
   report_optarg_t *report_optarg = report_optarg_new(options->report_all,
 						     options->report_n_best,
@@ -1320,7 +1321,9 @@ void rna_aligner(options_t *options) {
       sa_rna.file1 = f_sa;
       sa_rna.file2 = f_hc;
       sa_rna.pair_input = &pair_input;
-      
+      sa_rna.min_score = options->min_score;
+      sa_rna.max_alig = options->filter_read_mappings;
+
       sa_wf_batch_t *wf_batch = sa_wf_batch_new(NULL, (void *)sa_index, &writer_input, NULL, &sa_rna);
       sa_wf_input_t *wf_input = sa_wf_input_new(options->bam_format, &reader_input, wf_batch);
       
