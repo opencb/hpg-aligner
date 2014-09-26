@@ -69,7 +69,7 @@ float get_max_score(array_list_t *cal_list,
     cal = array_list_get(j, cal_list);
 
     cal->score = cigar_compute_score(match_score, mismatch_penalty, 
-				     gap_open_penalty, gap_extend_penalty, &cal->cigar);
+				     gap_open_penalty, gap_extend_penalty, &cal->cigar) / match_score;
     cal->cigar_len = cigar_get_length(&cal->cigar);
 
     if (!cal->invalid && 
@@ -410,7 +410,7 @@ void create_bam_alignments(array_list_t *cal_list, fastq_read_t *read,
       alignment = alignment_new();	       
       alignment_init_single_end(strdup(read->id), strdup(read->sequence), strdup(read->quality), 
 				cal->strand, cal->chromosome_id, cal->start,
-				cigar_to_string(&cal->cigar), cal->cigar.num_ops, cal->AS, 1, (num_cals > 1),
+				cigar_to_string(&cal->cigar), cal->cigar.num_ops, cal->mapq, 1, (num_cals > 1),
 				0, 0, alignment);  
       
       array_list_insert(convert_to_bam(alignment, 33), mapping_list);
@@ -513,7 +513,6 @@ void create_alignments(array_list_t *cal_list, fastq_read_t *read,
     cal->AS = (cal->score * 253 / (read->length * 5));
     AS = (int) cal->score;
 
-
     optional_fields = (char *) calloc(optional_fields_length, sizeof(char));
     if (bam_format) {
       p = optional_fields;
@@ -545,7 +544,7 @@ void create_alignments(array_list_t *cal_list, fastq_read_t *read,
     alignment = alignment_new();	       
     alignment_init_single_end(strdup(read->id), strdup(seq), strdup(quality), 
 			      cal->strand, cal->chromosome_id, cal->start,
-			      cigar_M_string, num_cigar_ops, cal->AS, 1, (num_cals > 1),
+			      cigar_M_string, num_cigar_ops, cal->mapq, 1, (num_cals > 1),
 			      optional_fields_length, optional_fields, alignment);  
     alignment->mapq = cal->mapq;
     alignment->mate_chromosome = 0;

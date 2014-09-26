@@ -120,6 +120,7 @@ int sa_sam_writer(void *data) {
     char *seq, *opt_fields;
     alignment_t *alig;
   
+
     for (size_t i = 0; i < num_reads; i++) {
       read = (fastq_read_t *) array_list_get(i, read_list);
 
@@ -143,11 +144,9 @@ int sa_sam_writer(void *data) {
 	  alig = (alignment_t *) array_list_get(j, mapping_list);
 
 	  if (alig->optional_fields) {
-	    opt_fields = (char *) calloc(strlen(alig->optional_fields) + 100, sizeof(char));
-	    sprintf(opt_fields, "NH:i:%lu\t%s", num_mappings, alig->optional_fields);
+	    opt_fields = alig->optional_fields;
 	  } else {
-	    opt_fields = (char *) calloc(100, sizeof(char));
-	    sprintf(opt_fields, "NH:i:%lu", num_mappings);
+	    opt_fields = NULL;
 	  }
 
 	  flag = 0;
@@ -175,18 +174,14 @@ int sa_sam_writer(void *data) {
 		  alig->template_length,
 		  alig->sequence,
 		  alig->quality,
-		  opt_fields
+		  (opt_fields == NULL ? "" : opt_fields)
 		  );
 
 	  // free memory
-	  free(opt_fields);
 	  alignment_free(alig);	 
 	} // end for num_mappings
       } else {
 	num_unmapped_reads++;
-
-	opt_fields = (char *) calloc(100, sizeof(char));
-	sprintf(opt_fields, "XM:i:%lu XU:i:%i", num_mappings, mapping_batch->status[i]);
 
 	if (read->adapter) {
 	  len = read->length + abs(read->adapter_length);
@@ -217,14 +212,11 @@ int sa_sam_writer(void *data) {
 	  quality = read->quality;
 	}
 
-	fprintf(out_file, "%s\t4\t*\t0\t0\t*\t*\t0\t0\t%s\t%s\t%s\n", 
+	fprintf(out_file, "%s\t4\t*\t0\t0\t*\t*\t0\t0\t%s\t%s\n", 
 		read->id,
 		sequence,
-		quality,
-		opt_fields
+		quality
 		);
-
-	free(opt_fields);
 
 	if (read->adapter) {
 	  free(sequence);
@@ -327,7 +319,7 @@ int sa_sam_writer(void *data) {
 	  if (num_mappings > 1) {
 	    cal->mapq = 0;
 	  }
-	  fprintf(out_file, "%s\t%lu\t%s\t%lu\t%i\t%s\t%s\t%lu\t%lu\t%s\t%s\tNH:i:%lu\tNM:i:%i\n", 
+	  fprintf(out_file, "%s\t%lu\t%s\t%lu\t%i\t%s\t%s\t%lu\t%lu\t%s\t%s\tAS:i:%i\tNM:i:%i\n", 
 		  read->id,
 		  flag,
 		  genome->chrom_names[cal->chromosome_id],
@@ -339,7 +331,7 @@ int sa_sam_writer(void *data) {
 		  tlen,
 		  seq,
 		  quality,
-		  num_mappings,
+		  (int) cal->score,
 		  num_mismatches
 		  );
 
