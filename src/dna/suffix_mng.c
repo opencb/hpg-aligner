@@ -181,7 +181,6 @@ void extend_to_right(seed_t *seed, int max_length,
 
 void update_seed_left(alig_out_t *alig_out, seed_t *seed, seed_cal_t *cal) {
   if (alig_out->match > 0) {
-  //if (score > 0 || (alig_out.map_len1 + suffix_len) > 20) {
 
     // update seed
     seed->num_mismatches += alig_out->mismatch;
@@ -190,23 +189,7 @@ void update_seed_left(alig_out_t *alig_out, seed_t *seed, seed_cal_t *cal) {
     
     seed->read_start -= alig_out->map_len1;
     seed->genome_start -= alig_out->map_len2;
-    /*
-    // update cal
-    cal->num_mismatches += alig_out->mismatch;
-    cal->num_open_gaps += alig_out->gap_open;
-    cal->num_extend_gaps += alig_out->gap_extend;
-    cal->read_area += alig_out->map_len1;
-    */
-    /*
-    // if there's a mini-gap then try to fill the mini-gap
-    r_start = seed->read_start - alig_out->map_len1;
-    if (r_start > 0 && r_start < 5) {
-      alig_out.map_len1 += r_start;
-      alig_out.map_len2 += r_start;
 
-      cigar_append_op(r_start, 'S', &cigar);
-    }
-    */
     // update cigar with the sw output
     if (alig_out->cigar.num_ops > 0) {
       cigar_t cigar;
@@ -232,24 +215,6 @@ void update_seed_right(alig_out_t *alig_out, seed_t *seed, seed_cal_t *cal) {
     seed->read_end += alig_out->map_len1;
     seed->genome_end += alig_out->map_len2;
 
-    /*
-    // update cal
-    cal->num_mismatches += alig_out->mismatch;
-    cal->num_open_gaps += alig_out->gap_open;
-    cal->num_extend_gaps += alig_out->gap_extend;
-    cal->read_area += alig_out->map_len1;
-    */
-
-    /*
-    // if there's a mini-gap then try to fill the mini-gap
-    r_start = seed->read_start - alig_out->map_len1;
-    if (r_start > 0 && r_start < 5) {
-      alig_out.map_len1 += r_start;
-      alig_out.map_len2 += r_start;
-
-      cigar_append_op(r_start, 'S', &cigar);
-    }
-    */
     // update cigar with the sw output
     if (alig_out->cigar.num_ops > 0) {
       cigar_concat(&alig_out->cigar, &seed->cigar);
@@ -272,15 +237,7 @@ void extend_seeds(seed_cal_t *cal, sa_index3_t *sa_index) {
   fastq_read_t *read = cal->read;
 
   chrom = cal->chromosome_id;
-  /*
-    if (cal->chromosome_id != 0 || cal->start != 16141124) {
-    continue;
-    }
-  */
   seq = (cal->strand ? read->revcomp : read->sequence);
-  
-  //printf("---> fill_seed_gaps:\n");
-  //seed_cal_print(cal);
   
   num_seeds = cal->seed_list->size;
   if (num_seeds <= 0) return;
@@ -290,13 +247,9 @@ void extend_seeds(seed_cal_t *cal, sa_index3_t *sa_index) {
   cal->start = seed->genome_start;
   if (seed->read_start > 0) {
     // extend to left
-    //printf("\nextending initial seed to left\n");
-    //seed_cal_print(cal);
     extend_to_left(seed, seed->read_start, cal, sa_index, &alig_out);
     update_seed_left(&alig_out, seed, cal);
     cal->start = seed->genome_start;
-    //printf("------> cigar = %s\n", cigar_to_string(&alig_out.cigar));
-    //alig_out_print(&alig_out);
     cigar_clean(&alig_out.cigar);
   }
   
@@ -318,12 +271,9 @@ void extend_seeds(seed_cal_t *cal, sa_index3_t *sa_index) {
     gap_genome_end = seed->genome_start - 1;
     gap_genome_len = abs(gap_genome_end - gap_genome_start + 1);
 
-    //printf("gap lengths (read, genome) = (%i, %i)\n", gap_read_len, gap_genome_len);
-
     if (gap_read_len > 0) {
       // extend previous seed to right
       extend_to_right(prev_seed, gap_read_len, cal, sa_index, &alig_out);
-      //alig_out_print(&alig_out);
       if (alig_out.match) {
 	update_seed_right(&alig_out, prev_seed, cal);
 	read_area = alig_out.map_len1;
@@ -338,15 +288,12 @@ void extend_seeds(seed_cal_t *cal, sa_index3_t *sa_index) {
 	gap_genome_start = prev_seed->genome_end + 1;
 	gap_genome_end = seed->genome_start - 1;
 	gap_genome_len = abs(gap_genome_end - gap_genome_start + 1);
-
-	//printf("after extend to right, gap lengths (read, genome) = (%i, %i)\n", gap_read_len, gap_genome_len);
       }
     }
 
     if (gap_read_len > 0) {
       // extend current seed to left
       extend_to_left(seed, gap_read_len, cal, sa_index, &alig_out);
-      //alig_out_print(&alig_out);
       if (alig_out.match) {
 	update_seed_left(&alig_out, seed, cal);
 	read_area += alig_out.map_len1;
@@ -354,8 +301,6 @@ void extend_seeds(seed_cal_t *cal, sa_index3_t *sa_index) {
       }
     }
 
-    //seed_cal_print(cal);
-    
     prev_seed = seed;
   }
   
@@ -363,13 +308,9 @@ void extend_seeds(seed_cal_t *cal, sa_index3_t *sa_index) {
   cal->end = seed->genome_end;
   if (seed->read_end < read->length - 1) {
     // extend to right
-    //printf("\nextending final seed to left\n");
-    //seed_cal_print(cal);
     extend_to_right(seed, read->length - seed->read_end - 1, cal, sa_index, &alig_out);
     update_seed_right(&alig_out, seed, cal);
     cal->end = seed->genome_end;
-    //printf("------> cigar = %s\n", cigar_to_string(&alig_out.cigar));
-    //alig_out_print(&alig_out);
     cigar_clean(&alig_out.cigar);
   }
 }
@@ -432,7 +373,6 @@ void suffix_mng_create_cals(fastq_read_t *read, int min_area, int strand,
     if (i == bl_containerSize(info.fragments) ||
 	((slmatch_t *) bl_containerGet(info.fragments, begin))->subject !=
 	((slmatch_t *) bl_containerGet(info.fragments, i))->subject){
-      //fprintf(info.dev, "%d\t%d\n", begin, i-begin);
       if (info.chainmode == SOP){
 	// only use chaining without clustering if no ids are specified
 	bl_slClusterSop((slmatch_t *) info.fragments->contspace + begin, i - begin,
@@ -453,13 +393,6 @@ void suffix_mng_create_cals(fastq_read_t *read, int min_area, int strand,
 
 	  if (chain->scr >= info.minscore &&
 	      bl_containerSize(chain->matches) >= info.minfrag) {
-	    /*
-	    fprintf(info.dev, "C\t");
-	    fprintf(info.dev, "%s\t", *(char **) bl_containerGet(info.subject, chain->subject));
-	    fprintf(info.dev, "%d\t%d\t%d\t%d\t%.3f\n", chain->i,
-		    chain->i + chain->j - 1, chain->p,
-	    	    chain->p + chain->q - 1, chain->scr);
-	    */
 
 	    chrom = atoi(*(char **) bl_containerGet(info.subject, chain->subject));
 	    
@@ -468,14 +401,7 @@ void suffix_mng_create_cals(fastq_read_t *read, int min_area, int strand,
 	    
 	    for (int k = 0; k < bl_containerSize(chain->matches); k++){
 	      slmatch_t *frag = *(slmatch_t **) bl_containerGet(chain->matches, k);
-	      /*
-	      fprintf(info.dev, "------> F\t");
-	      fprintf(info.dev, "%s\t",
-		      *(char **) bl_containerGet(info.subject, frag->subject));
-	      fprintf(info.dev, "%d\t%d\t%d\t%d\t%.3f\n", frag->i,
-		      frag->i + frag->j - 1, frag->p, frag->p + frag->q - 1,
-		      frag->scr);
-	      */
+
 	      seed = seed_new(frag->i, frag->i + frag->j - 1, frag->p, frag->p + frag->q - 1);
 	      seed->chromosome_id = chrom;
 	      seed->strand = strand;
@@ -488,24 +414,13 @@ void suffix_mng_create_cals(fastq_read_t *read, int min_area, int strand,
 	    // extend seeds	    
 	    cal = seed_cal_new(chrom, strand, chain->p, chain->p + chain->q - 1, seed_list);
 	    cal->read = read;
-	    //cal->read_area = read_area;
-	    //cal->score = chain->scr;
-	    //cal->num_mismatches = 0;
-	    //printf("---------------------------------------------\n");
-	    //seed_cal_print(cal);
-	    //printf("after extending...\n");
 	    extend_seeds(cal, sa_index);
 	    seed_cal_update_info(cal);
-	    //seed_cal_print(cal);
-	    //printf("---------------------------------------------\n");
 
 	    if (cal->read_area >= min_area) {
-	      //printf("-----> yes, cal->read_area = %i >= %i = min_area\n", cal->read_area, min_area);
 	      array_list_insert(cal, cal_list);
 	    } else {
-	      //printf("-----> sorry but cal->read_area = %i < %i = min_area\n", cal->read_area, min_area);
 	      seed_cal_free(cal);
-	      //linked_list_free(seed_list, (void *)seed_free);
 	    }
 	  }
 
@@ -513,66 +428,6 @@ void suffix_mng_create_cals(fastq_read_t *read, int min_area, int strand,
 	  free(chain);
 	  match->chain = NULL;
 	}
-
-	/*
-	// output matches (if desired)
-	if (info.outputm){
-	  fprintf(info.dev, "M\t");
-	  if (!info.outputorig){
-	    if (info.idcol != NULL){
-	      fprintf(info.dev, "%s\t",
-		      *(char **) bl_containerGet(info.subject, match->subject));
-	    }
-	    fprintf(info.dev, "%d\t%d\t%d\t%d\t%.3f\n", match->i,
-		    match->i + match->j - 1, match->p,
-		    match->p + match->q - 1, match->scr);
-	  }
-	  // output in original format as input
-	  else {
-	    fprintf(info.dev, "%s\n", *(char **) bl_containerGet(info.lines, j));
-	  }
-	}
-	if (match->chain){
-	  slchain_t *chain = (slchain_t *) match->chain;
-	  if (info.outputc && chain->scr >= info.minscore &&
-	      bl_containerSize(chain->matches) >= info.minfrag){
-	    fprintf(info.dev, "C\t");
-	    if (1) { //info.idcol != NULL){
-	      fprintf(info.dev, "%s\t", *(char **) bl_containerGet(info.subject, chain->subject));
-	    }
-	    fprintf(info.dev, "%d\t%d\t%d\t%d\t%.3f\n", chain->i,
-		    chain->i + chain->j - 1, chain->p,
-		    chain->p + chain->q - 1, chain->scr);
-	  }
-	  // output chains and fragments (if requested)
-	  info.outputf = 1;
-	  if (info.outputf && chain->scr >= info.minscore &&
-	      bl_containerSize(chain->matches) >= info.minfrag){
-	    for (int k = 0; k < bl_containerSize(chain->matches); k++){
-	      slmatch_t *frag = *(slmatch_t **)
-		bl_containerGet(chain->matches, k);
-	      fprintf(info.dev, "F\t");
-	      if (!info.outputorig){
-		if (1) { //info.idcol != NULL){
-		  fprintf(info.dev, "%s\t",
-			  *(char **) bl_containerGet(info.subject, frag->subject));
-		}
-		fprintf(info.dev, "%d\t%d\t%d\t%d\t%.3f\n", frag->i,
-			frag->i + frag->j - 1, frag->p, frag->p + frag->q - 1,
-			frag->scr);
-	      }
-	      // output in original format as input
-	      else {
-		fprintf(info.dev, "%s\n",
-			*(char **) bl_containerGet(info.lines, frag->idx));
-	      }
-	    }
-	  }
-	  bl_slchainDestruct(chain);
-	  free(chain);
-	  match->chain = NULL;
-	} // END OF if (frag->chain)
-*/
       }  // END OF for (j = begin; j < i; j++)
       begin = i;
     } // END OF  if (i == bl_containerSize(info.fragments) ||
@@ -584,13 +439,6 @@ void suffix_mng_create_cals(fastq_read_t *read, int min_area, int strand,
 
   // finally, clear suffix manager
   suffix_mng_clear(p);
-
-  /*
-  printf("*********************************************\n");
-  printf("after creating cals:\n");
-  for (int kk = 0; kk < array_list_size(cal_list); kk++) { seed_cal_print(array_list_get(kk, cal_list)); }
-  printf("*********************************************\n");
-  */
 }
 
 //--------------------------------------------------------------------
@@ -611,8 +459,6 @@ void suffix_mng_search_read_cals(fastq_read_t *read, int num_seeds,
   // fill in the CAL manager structure
   int read_end_pos = read->length - sa_index->k_value;
   int extra_seed = (read->length - sa_index->k_value) % read_inc;
-
-  //    memset(saved_pos, 0, sizeof(saved_pos));
 
   // first step, searching mappings in both strands
   // distance between seeds >= prefix value (sa_index->k_value)
@@ -695,9 +541,6 @@ void suffix_mng_search_read_cals_by_region(fastq_read_t *read, int num_seeds,
   int read_end_pos = read->length - sa_index->k_value;
   int extra_seed = (read->length - sa_index->k_value) % read_inc;
 
-  //  read_inc = 1;
-  //  extra_seed = 0;
-
   // first step, searching mappings in both strands
   // distance between seeds >= prefix value (sa_index->k_value)
   char *r_seq = strand == 0 ? read->sequence : read->revcomp;
@@ -705,17 +548,6 @@ void suffix_mng_search_read_cals_by_region(fastq_read_t *read, int num_seeds,
     num_prefixes = search_prefix(&r_seq[read_pos], &low, &high, sa_index, 0);
     num_suffixes = num_prefixes;
     suffix_len = num_suffixes > 0 ? sa_index->k_value : 0;
-    /*
-    num_suffixes = search_suffix(&r_seq[read_pos], sa_index->k_value, 
-				 max_suffixes, sa_index, 
-				 &low, &high, &suffix_len
-                                 #ifdef _TIMING
-				 , &prefix_time, &suffix_time
-                                 #endif
-				 );
-    */
-    //printf("%c read_pos = %i, (num_suffixes = %i, suffix_len = %i)\n",
-    //	   (strand == 0 ? '+' : '-'), read_pos, num_suffixes, suffix_len);
     if (num_suffixes > 0) {
       for (size_t suff = low; suff <= high; suff++) {
 	chrom = sa_index->CHROM[suff];
@@ -727,11 +559,7 @@ void suffix_mng_search_read_cals_by_region(fastq_read_t *read, int num_seeds,
 	  g_start_suf = sa_index->SA[suff] - sa_index->genome->chrom_offsets[chrom];
 	  g_end_suf = g_start_suf + suffix_len - 1;
 	  
-	  //printf("region (chrom, start, end) = (%i, %lu, %lu), read_pos = %i, suffix = (%i, %lu, %lu)\n", 
-	  //	 chromosome, start, end, read_pos, chrom, g_start_suf, g_end_suf);
-	  
 	  if (start <= g_start_suf && end >= g_end_suf) {
-	    //printf("\t\tg_start_suf, g_end_suf) = (%lu, %lu)\n", g_start_suf, g_end_suf);
 	    suffix_mng_update(chrom, r_start_suf, r_end_suf, g_start_suf, g_end_suf, suffix_mng);
 	  }
 	}
@@ -744,17 +572,7 @@ void suffix_mng_search_read_cals_by_region(fastq_read_t *read, int num_seeds,
     num_prefixes = search_prefix(&r_seq[read_pos], &low, &high, sa_index, 0);
     num_suffixes = num_prefixes;
     suffix_len = num_suffixes > 0 ? sa_index->k_value : 0;
-    /*
-    num_suffixes = search_suffix(&r_seq[read_pos], sa_index->k_value, 
-				 max_suffixes, sa_index, 
-				 &low, &high, &suffix_len
-                                 #ifdef _TIMING
-				 , &prefix_time, &suffix_time
-                                 #endif
-				 );
-    */
-    //printf("%c read_pos = %i, (num_suffixes = %i, suffix_len = %i)\n",
-    //	   (strand == 0 ? '+' : '-'), read_pos, num_suffixes, suffix_len);
+
     if (num_suffixes > 0) {
       for (size_t suff = low; suff <= high; suff++) {
 	chrom = sa_index->CHROM[suff];
@@ -766,11 +584,7 @@ void suffix_mng_search_read_cals_by_region(fastq_read_t *read, int num_seeds,
 	  g_start_suf = sa_index->SA[suff] - sa_index->genome->chrom_offsets[chrom];
 	  g_end_suf = g_start_suf + suffix_len - 1;
 	  
-	  //printf("region (chrom, start, end) = (%i, %lu, %lu), read_pos = %i, suffix = (%i, %lu, %lu)\n", 
-	  //	 chromosome, start, end, read_pos, chrom, g_start_suf, g_end_suf);
-	  
 	  if (start <= g_start_suf && end >= g_end_suf) {
-	    //printf("g_start_suf, g_end_suf) = (%lu, %lu)\n", g_start_suf, g_end_suf);
 	    suffix_mng_update(chrom, r_start_suf, r_end_suf, g_start_suf, g_end_suf, suffix_mng);
 	  }
 	}

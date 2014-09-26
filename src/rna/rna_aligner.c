@@ -20,7 +20,7 @@ int max = 65;
 extern size_t total_reads_ph2;
 
 void *write_sam_header_BWT(genome_t *genome, FILE *f) {
-  fprintf(f, "@PG\tID:HPG-Aligner\tVN:2.0\n");
+  fprintf(f, "@PG\tID:HPG-Aligner\tVN:%s\n", HPG_ALIGNER_VERSION);
   for (int i = 0; i < genome->num_chromosomes; i++) {
     fprintf(f, "@SQ\tSN:%s\tLN:%lu\n", genome->chr_name[i], genome->chr_size[i] + 1);
     //printf("%iName %s\n", i, genome->chr_name[i]);
@@ -702,9 +702,13 @@ void rna_aligner(options_t *options) {
     strcat(reads_results, "/");
     strcat(reads_results, options->prefix_name);
     if (!options->bam_format) {
-      strcat(reads_results, "_alignments.bam");  
+      strcat(reads_results, "_");
+      strcat(reads_results, OUTPUT_FILENAME);
+      strcat(reads_results, ".bam");  
     } else {
-      strcat(reads_results, "_alignments.sam");  
+      strcat(reads_results, "_");
+      strcat(reads_results, OUTPUT_FILENAME);
+      strcat(reads_results, ".sam");  
     }
     strcat(log_input, "/");
     strcat(log_input, options->prefix_name);
@@ -724,9 +728,13 @@ void rna_aligner(options_t *options) {
  
   } else {
     if (options->bam_format) {
-      strcat(reads_results, "/alignments.bam");
+      strcat(reads_results, "/");
+      strcat(reads_results, OUTPUT_FILENAME);
+      strcat(reads_results, ".bam");  
     } else {
-      strcat(reads_results, "/alignments.sam");    
+      strcat(reads_results, "/");    
+      strcat(reads_results, OUTPUT_FILENAME);
+      strcat(reads_results, ".sam");  
     }
     strcat(log_input, "/hpg-aligner_input.log");
     strcat(log_output, "/hpg-aligner_output.log");
