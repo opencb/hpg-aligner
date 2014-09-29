@@ -292,7 +292,7 @@ void options_display(options_t *options) {
      printf("\n");
 
      printf("Architecture parameters\n");
-     printf("\tNumber of cpu threads %d\n",  num_cpu_threads);
+     printf("\tNumber of cpu threads: %d\n",  num_cpu_threads);
      //printf("CAL seeker errors: %d\n",  cal_seeker_errors);
      printf("\tBatch size: %d bytes\n",  batch_size);
      //     printf("\tWrite size: %d bytes\n",  write_size);
@@ -312,10 +312,10 @@ void options_display(options_t *options) {
      printf("\tMin CAL size: %d\n",  min_cal_size);
      printf("\n");
 
-     printf("Mapping filters\n");
-     printf("\tFor reads: %d mappings maximum, otherwise discarded\n", options->filter_read_mappings);
-     printf("\tFor seeds: %d mappings maximum, otherwise discarded\n", options->filter_seed_mappings);
-     printf("\n");
+     //printf("Mapping filters\n");
+     //printf("\tFor reads: %d mappings maximum, otherwise discarded\n", options->filter_read_mappings);
+     //printf("\tFor seeds: %d mappings maximum, otherwise discarded\n", options->filter_seed_mappings);
+     //printf("\n");
 
      printf("Pair-mode parameters\n");
      printf("\tPair mode: %d\n", pair_mode);
@@ -523,7 +523,7 @@ void** argtable_options_new(int mode) {
   argtable[count++] = arg_int0(NULL, "filter-read-mappings", NULL, "Reads that map in more than <n> locations are discarded");
   argtable[count++] = arg_int0(NULL, "filter-seed-mappings", NULL, "Seeds that map in more than <n> locations are discarded");
   argtable[count++] = arg_int0(NULL, "min-cal-size", NULL, "Minimum CAL size");
-  argtable[count++] = arg_int0(NULL, "cpu-threads", NULL, "Number of CPU Threads");
+  argtable[count++] = arg_int0("t", "cpu-threads", NULL, "Number of CPU Threads");
   argtable[count++] = arg_int0(NULL, "read-batch-size", NULL, "Batch Size");
   argtable[count++] = arg_dbl0(NULL, "sw-match", NULL, "Match value for Smith-Waterman algorithm");
   argtable[count++] = arg_dbl0(NULL, "sw-mismatch", NULL, "Mismatch value for Smith-Waterman algorithm");
