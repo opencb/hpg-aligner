@@ -14,7 +14,7 @@ options_t *options_new(void) {
   options->in_filename = NULL;
   options->in_filename2 = NULL;
   options->report_all =  0;
-  options->log_level = LOG_INFO_LEVEL;
+  options->log_level = LOG_ERROR_LEVEL;
   options->output_name = strdup(DEFAULT_OUTPUT_NAME);
   options->num_gpu_threads = DEFAULT_GPU_THREADS;
 

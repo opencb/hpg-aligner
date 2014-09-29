@@ -2430,7 +2430,6 @@ int sa_pair_mapper(void *data) {
 
       select_best_cals(read, &cal_list);
       if (array_list_size(cal_list) <= 0) {
-	//	mapping_batch->status[i] = 3; // invalid
 	suffix_mng_search_read_cals(read, num_seeds, sa_index, cal_list, cal_mng->suffix_mng);
 	if (array_list_size(cal_list) > 0) {
 	  select_best_cals(read, &cal_list);
@@ -2458,7 +2457,7 @@ int sa_pair_mapper(void *data) {
 
   // 2) filter cals by pairs
   filter_cals_by_pair_mode(pair_mode, pair_min_distance, pair_max_distance, 
-  			   num_reads, cal_lists);
+    			   num_reads, cal_lists);
   
   check_pairs(cal_lists, sa_index, mapping_batch, cal_mng);
 
