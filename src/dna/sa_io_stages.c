@@ -8,44 +8,6 @@
 // sa fq reader
 //--------------------------------------------------------------------
 
-size_t fastq_fread_se_ex(array_list_t *reads, size_t num_reads, fastq_file_t *fq_file) {
-  size_t count = 0;
-  char *p;
-  char header1[MAX_READ_ID_LENGTH];
-  char sequence[MAX_READ_SEQUENCE_LENGTH];
-  char header2[MAX_READ_ID_LENGTH];
-  char qualities[MAX_READ_SEQUENCE_LENGTH];
-  int header_length, sequence_length, quality_length;
-  fastq_read_t *read;
-  
-  while (count < num_reads && fgets(header1, MAX_READ_ID_LENGTH, fq_file->fd) != NULL) {
-    char *res = fgets(sequence, MAX_READ_SEQUENCE_LENGTH, fq_file->fd);
-    res = fgets(header2, MAX_READ_ID_LENGTH, fq_file->fd);
-    res = fgets(qualities, MAX_READ_SEQUENCE_LENGTH, fq_file->fd);
-    
-    header_length = strlen(header1);
-    sequence_length = strlen(sequence);
-    quality_length = strlen(qualities);
-    
-    // '\n' char is removed, but '\0' is left
-    chomp_at(header1, header_length - 1);
-    if ((p = strstr(header1, " ")) != NULL) {
-      *p = 0;
-    }
-    chomp_at(sequence, sequence_length - 1);
-    chomp_at(qualities, quality_length - 1);
-
-    read = fastq_read_new(&header1[1], sequence, qualities);
-    array_list_insert(read, reads);
-    
-    count++;
-  }
-  
-  return count;
-}
-
-//--------------------------------------------------------------------
-
 void *sa_fq_reader(void *input) {
   sa_wf_input_t *wf_input = (sa_wf_input_t *) input;
   
@@ -111,8 +73,6 @@ size_t num_unmapped_reads_by_cigar_length = 0;
 // SAM writer
 //--------------------------------------------------------------------
 
-#define HPG_ALIGNER_VERSION "2.0.0"
-
 void *write_sam_header(sa_genome3_t *genome, FILE *f) {
   fprintf(f, "@PG\tID:HPG-Aligner\tVN:%s\n", HPG_ALIGNER_VERSION);
   for (int i = 0; i < genome->num_chroms; i++) {
@@ -130,11 +90,7 @@ int sa_sam_writer(void *data) {
     printf("bam_writer1: error, NULL mapping batch\n");
     return 0;
   }
-  /*
-  for (int i = 0; i < NUM_COUNTERS; i++) {
-    counters[i] += mapping_batch->counters[i];
-  }
-  */
+
   #ifdef _TIMING
   for (int i = 0; i < NUM_TIMING; i++) {
     func_times[i] += mapping_batch->func_times[i];
@@ -164,18 +120,10 @@ int sa_sam_writer(void *data) {
     char *seq, *opt_fields;
     alignment_t *alig;
   
+
     for (size_t i = 0; i < num_reads; i++) {
       read = (fastq_read_t *) array_list_get(i, read_list);
-      //      seq = read->sequence;
-      /*
-      if (i % 2 == 0)  {
-	mate_list = mapping_batch->mapping_lists[i+1];
-	num_mate_mappings = array_list_size(mate_list);
-      } else {
-	mate_list = mapping_list;
-	num_mate_mappings = num_mappings;
-      }
-      */
+
       mapping_list = mapping_batch->mapping_lists[i];
       num_mappings = array_list_size(mapping_list);
       num_total_mappings += num_mappings;
@@ -194,33 +142,13 @@ int sa_sam_writer(void *data) {
 	}
 	for (size_t j = 0; j < num_mappings; j++) {
 	  alig = (alignment_t *) array_list_get(j, mapping_list);
-	  /*
-	  // update alignment
-	  alig->secondary_alignment = 0;
-	  if (num_mate_mappings != 1) {
-	    alig->is_mate_mapped = 0;
-	    alig->is_paired_end_mapped = 0;
-	    alig->mate_strand = 0;
-	  }
-	  */
+
 	  if (alig->optional_fields) {
-	    opt_fields = (char *) calloc(strlen(alig->optional_fields) + 100, sizeof(char));
-	    sprintf(opt_fields, "NH:i:%lu\t%s", num_mappings, alig->optional_fields);
-	    //	    sprintf(opt_fields, "NH:i:%i\t%s\tXU:i:%i", num_mappings, alig->optional_fields, mapping_batch->status[i]);
+	    opt_fields = alig->optional_fields;
 	  } else {
-	    opt_fields = (char *) calloc(100, sizeof(char));
-	    sprintf(opt_fields, "NH:i:%lu", num_mappings);
-	    //	    sprintf(opt_fields, "NH:i:%i\tXU:i:%i", num_mappings, mapping_batch->status[i]);
+	    opt_fields = NULL;
 	  }
-	  /*
-	  // update alignment
-	  alig->secondary_alignment = 0;
-	  if (num_mate_mappings != 1) {
-	    alig->is_mate_mapped = 0;
-	    alig->is_paired_end_mapped = 0;
-	    alig->mate_strand = 0;
-	  }
-	  */
+
 	  flag = 0;
 	  if (alig->is_paired_end)                              flag += BAM_FPAIRED;
 	  if (alig->is_paired_end_mapped)                       flag += BAM_FPROPER_PAIR;
@@ -239,25 +167,21 @@ int sa_sam_writer(void *data) {
 		  flag,
 		  genome->chrom_names[alig->chromosome],
 		  alig->position + 1,
-		  (num_mappings > 1 ? 0 : alig->mapq), //60, //(alig->map_quality > 3 ? 0 : alig->map_quality),
+		  (num_mappings > 1 ? 0 : alig->mapq),
 		  alig->cigar,
 		  (alig->chromosome == alig->mate_chromosome ? "=" : genome->chrom_names[alig->mate_chromosome]),
 		  alig->mate_position + 1,
 		  alig->template_length,
 		  alig->sequence,
 		  alig->quality,
-		  opt_fields
+		  (opt_fields == NULL ? "" : opt_fields)
 		  );
 
 	  // free memory
-	  free(opt_fields);
 	  alignment_free(alig);	 
 	} // end for num_mappings
       } else {
 	num_unmapped_reads++;
-
-	opt_fields = (char *) calloc(100, sizeof(char));
-	sprintf(opt_fields, "XM:i:%lu XU:i:%i", num_mappings, mapping_batch->status[i]);
 
 	if (read->adapter) {
 	  len = read->length + abs(read->adapter_length);
@@ -288,14 +212,11 @@ int sa_sam_writer(void *data) {
 	  quality = read->quality;
 	}
 
-	fprintf(out_file, "%s\t4\t*\t0\t0\t*\t*\t0\t0\t%s\t%s\t%s\n", 
+	fprintf(out_file, "%s\t4\t*\t0\t0\t*\t*\t0\t0\t%s\t%s\n", 
 		read->id,
 		sequence,
-		quality,
-		opt_fields
+		quality
 		);
-
-	free(opt_fields);
 
 	if (read->adapter) {
 	  free(sequence);
@@ -393,18 +314,12 @@ int sa_sam_writer(void *data) {
 	    seq = sequence;
 	  }
 
-	  /*
-	  if (i == 0) {
-	    flag += BAM_FSECONDARY;
-	  }
-	  */
-
 	  cigar_string = cigar_to_string(cigar);
 	  cigar_M_string = cigar_to_M_string(&num_mismatches, &num_cigar_ops, cigar);
 	  if (num_mappings > 1) {
 	    cal->mapq = 0;
 	  }
-	  fprintf(out_file, "%s\t%lu\t%s\t%lu\t%i\t%s\t%s\t%lu\t%lu\t%s\t%s\tNH:i:%lu\tNM:i:%i\n", 
+	  fprintf(out_file, "%s\t%lu\t%s\t%lu\t%i\t%s\t%s\t%lu\t%lu\t%s\t%s\tAS:i:%i\tNM:i:%i\n", 
 		  read->id,
 		  flag,
 		  genome->chrom_names[cal->chromosome_id],
@@ -416,7 +331,7 @@ int sa_sam_writer(void *data) {
 		  tlen,
 		  seq,
 		  quality,
-		  num_mappings,
+		  (int) cal->score,
 		  num_mismatches
 		  );
 
@@ -527,10 +442,6 @@ int sa_bam_writer(void *data) {
     return 0;
   }
 
-  //  for (int i = 0; i < NUM_COUNTERS; i++) {
-  //    counters[i] += mapping_batch->counters[i];
-  //  }
-
   #ifdef _TIMING
   for (int i = 0; i < NUM_TIMING; i++) {
     func_times[i] += mapping_batch->func_times[i];
@@ -620,7 +531,7 @@ int sa_bam_writer(void *data) {
       
       alig = alignment_new();       
       alignment_init_single_end(strdup(read->id), sequence, quality,
-				0, -1, -1, /*strdup(aux)*/"", 0, 0, 0, 0, 0, NULL, alig);
+				0, -1, -1, "", 0, 0, 0, 0, 0, NULL, alig);
       
       bam1 = convert_to_bam(alig, 33);
       bam_fwrite(bam1, out_file);

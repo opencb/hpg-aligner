@@ -18,6 +18,11 @@
 #include "commons/file_utils.h"
 #include "buffers.h"
 
+//========================================================================
+
+#define HPG_ALIGNER_VERSION  "2.0.0"
+#define OUTPUT_FILENAME      "alignments"
+
 //============================ DEFAULT VALUES ============================
 #define DEFAULT_GPU_THREADS		32
 #define DEFAULT_CPU_THREADS		1
@@ -44,23 +49,16 @@
 #define MINIMUM_BATCH_SIZE              10000
 #define DEFAULT_FILTER_READ_MAPPINGS    500
 #define DEFAULT_FILTER_SEED_MAPPINGS    500
+
 //new variable for default uses
 #define DEFAULT_NUCLEOTIDES             "ACGT"
 #define DEFAULT_FILTER_READ_MAPPINGS_BS 100
 #define DEFAULT_FILTER_SEED_MAPPINGS_BS 500
-//=====================================================================
-
-//#define DNA_MODE 0
-//#define RNA_MODE 1
-//#define BS_MODE  2
-
+//========================================================================
 
 #define NUM_OPTIONS			29
 #define NUM_RNA_OPTIONS			 6
 #define NUM_DNA_OPTIONS			 1
-
-//#define NUM_OPTIONS			26
-//#define NUM_RNA_OPTIONS			 6
 
 
 typedef struct options {

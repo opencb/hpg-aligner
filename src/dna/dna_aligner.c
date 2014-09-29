@@ -24,33 +24,6 @@ int counters[NUM_COUNTERS];
 void bam_sort_core_ext(int is_by_qname, const char *fn, const char *prefix, size_t max_mem, int is_stdout);
 
 void dna_aligner(options_t *options) {
-  /*
-  {
-    int num_reads, eof = 0;
-    fastq_read_t *read;
-    fastq_file_t *fq_file = fastq_fopen(options->in_filename);
-    array_list_t *reads;
-    while (1) {
-      reads = array_list_new(options->batch_size, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
-      num_reads = fastq_fread_se(reads, options->batch_size, fq_file);
-      if (num_reads == 0) {
-	break;
-      }
-      for (int i = 0; i < num_reads; i++) {
-	read = array_list_get(i, reads);
-
-	cut_adapter(options->adapter, options->adapter_length, read);
-	if (i > 100) {
-	  abort();
-	}
-      }
-      array_list_free(reads, (void *) fastq_read_free);
-    }
-    
-    fastq_fclose(fq_file);
-    exit(-1);
-  }
-  */
   for (int i = 0; i < NUM_COUNTERS; i++) {
     counters[i] = 0;
   }
@@ -85,21 +58,13 @@ void dna_aligner(options_t *options) {
     strcat(out_filename, options->prefix_name);
     strcat(out_filename, "_");
   }
+  strcat(out_filename, OUTPUT_FILENAME);
   if (options->bam_format || options->realignment || options->recalibration) {
     bam_format = 1;
-    strcat(out_filename, "out.bam");
+    strcat(out_filename, ".bam");
   } else {
-    strcat(out_filename, "out.sam");
+    strcat(out_filename, ".sam");
   }
-
-  /*
-  options->report_best = 1;
-  options->report_n_best = 0;
-  options->report_n_hits = 0;
-  options->report_all = 0;
-  */
-
-  //options_display(options);
 
   // load SA index
   struct timeval stop, start;
@@ -109,17 +74,11 @@ void dna_aligner(options_t *options) {
   gettimeofday(&start, NULL);
   sa_index3_t *sa_index = sa_index3_new(sa_dirname);
   gettimeofday(&stop, NULL);
-  //sa_index3_display(sa_index);
   printf("End of loading SA tables in %0.2f min. Done!!\n", 
 	 ((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f) / 60.0f);  
 
   // preparing input FastQ file
   fastq_batch_reader_input_t reader_input;
-  //  fastq_batch_reader_input_init(fastq_filename, NULL, 0, 
-  //				batch_size, NULL, options->gzip, &reader_input);
-  
-  //  reader_input.fq_file1 = fastq_fopen(fastq_filename);
-  //  reader_input.fq_file2 = NULL;
   
   // preparing output BAM file
   batch_writer_input_t writer_input;
@@ -146,18 +105,18 @@ void dna_aligner(options_t *options) {
   int num_files1 = 0, num_files2 = 0;
   
   if (fq_list1) {
-    ptr = strtok(fq_list1, token);    // Primera llamada => Primer token
+    ptr = strtok(fq_list1, token);
     array_list_insert(strdup(ptr), files_fq1);
-    while( (ptr = strtok( NULL, token)) != NULL ) {    // Posteriores llamadas
+    while( (ptr = strtok( NULL, token)) != NULL ) {
       array_list_insert(strdup(ptr), files_fq1);
     }
     num_files1 = array_list_size(files_fq1);
   }
   
   if (fq_list2) {
-   ptr = strtok(fq_list2, token);    // Primera llamada => Primer token
+   ptr = strtok(fq_list2, token);
    array_list_insert(strdup(ptr), files_fq2);
-   while( (ptr = strtok( NULL, token)) != NULL ) {    // Posteriores llamadas
+   while( (ptr = strtok( NULL, token)) != NULL ) {
      array_list_insert(strdup(ptr), files_fq2);
    }    
    num_files2 = array_list_size(files_fq2);
@@ -217,7 +176,6 @@ void dna_aligner(options_t *options) {
     } else {
       stage_functions[0] = sa_pair_mapper;
     }
-    //workflow_set_stages(1, &stage_functions, stage_labels, wf);
     workflow_set_stages(1, stage_functions, stage_labels, wf);
     
     // optional producer and consumer functions
@@ -236,11 +194,6 @@ void dna_aligner(options_t *options) {
     printf("End of mapping in %0.2f min. Done!!\n", 
 	   ((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f)/60.0f);  
     
-    //    printf("----------------------------------------------\n");
-    //    workflow_display_timing(wf);
-    //    printf("----------------------------------------------\n");
-    
-
     printf("----------------------------------------------\n");
     printf("Output file        : %s\n", out_filename);
     printf("\n");
@@ -313,19 +266,6 @@ void dna_aligner(options_t *options) {
     fclose((FILE *) writer_input.bam_file);
   }
 
-  /*
-  {
-    int total_pairs = 0;
-    for (int i = 0; i < NUM_COUNTERS; i++) {
-      total_pairs += counters[i];
-    }
-    printf("\tnum. total possible pairs: %i\n", total_pairs);
-    for (int i = 0; i < NUM_COUNTERS; i++) {
-      printf("\t\tcounters[%i] = %i (%0.2f %%)\n", i, counters[i], 100.0f * counters[i] / total_pairs);
-    }
-  }
-  */
-
   // post-processing: realignment and recalibration
   if (options->realignment || options->recalibration) {
     printf("-----------------------------------\n");
@@ -352,7 +292,8 @@ void dna_aligner(options_t *options) {
       strcat(sorted_filename, options->prefix_name);
       strcat(sorted_filename, "_");
     }
-    strcat(sorted_filename, "sorted_out");
+    strcat(sorted_filename, "sorted_");
+    strcat(sorted_filename, OUTPUT_FILENAME);
 
     // run sort
     bam_sort_core_ext(0, out_filename, sorted_filename, 500000000, 0);
@@ -368,7 +309,9 @@ void dna_aligner(options_t *options) {
       strcat(realig_filename, options->prefix_name);
       strcat(realig_filename, "_");
     }
-    strcat(realig_filename, "realigned_out.bam");
+    strcat(realig_filename, "realigned_");
+    strcat(realig_filename, OUTPUT_FILENAME);
+    strcat(realig_filename, ".bam");
 
     char ref_filename[strlen(sa_dirname) + 100];
     ref_filename[0] = 0;
@@ -394,9 +337,13 @@ void dna_aligner(options_t *options) {
       strcat(recal_filename, "_");
     }
     if (options->realignment) {
-      strcat(recal_filename, "recalibrated_realigned_out.bam");
+      strcat(recal_filename, "recalibrated_realigned_");
+      strcat(recal_filename, OUTPUT_FILENAME);
+      strcat(recal_filename, ".bam");
     } else {
-      strcat(recal_filename, "recalibrated_out.bam");
+      strcat(recal_filename, "recalibrated_");
+      strcat(recal_filename, OUTPUT_FILENAME);
+      strcat(recal_filename, ".bam");
     }
 
     char ref_filename[strlen(sa_dirname) + 100];
@@ -404,19 +351,9 @@ void dna_aligner(options_t *options) {
     strcpy(ref_filename, sa_dirname);
     strcat(ref_filename, "/dna_compression.bin");
 
-    /*recal_info_t *recal_info;
-    recal_info = (recal_info_t *)malloc(sizeof(recal_info_t));
-    recal_init_info(500, recal_info);
-    printf("-----------------------------------\nCollecting data for recalibration...\n");
-    recal_get_data_from_file(aux, "dna_compression.bin", sa_dirname, recal_info);
-    printf("-----------------------------------\n");
-    recal_calc_deltas(recal_info);
-    printf("-----------------------------------\nRecalibrating...\n");
-    recal_recalibrate_bam_file(aux, recal_info, recal_filename);*/
-    recal_bam_file(RECALIBRATE_COLLECT | RECALIBRATE_RECALIBRATE, aux, ref_filename, NULL, NULL, recal_filename, 500, NULL);
+    recal_bam_file(RECALIBRATE_COLLECT | RECALIBRATE_RECALIBRATE, aux, ref_filename, 
+		   NULL, NULL, recal_filename, 500, NULL);
     printf("Recalibrated file  : %s\n", recal_filename);
-    /*recal_destroy_info(recal_info);
-    free(recal_info);*/
   }
 
 
@@ -424,7 +361,6 @@ void dna_aligner(options_t *options) {
   printf("*********> num_dup_reads = %i, num_total_dup_reads = %i\n", 
 	 num_dup_reads, num_total_dup_reads);
   #endif
-
 }
 
 //--------------------------------------------------------------------

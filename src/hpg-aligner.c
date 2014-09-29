@@ -4,12 +4,6 @@
 #include "build-index/index_builder.h"
 
 
-double emboss_matrix_t = 0.0f, emboss_tracking_t = 0.0f;
-double sse_matrix_t = 0.0f, sse_tracking_t = 0.0f;
-double sse1_matrix_t = 0.0f, sse1_tracking_t = 0.0f;
-double avx_matrix_t = 0.0f, avx_tracking_t = 0.0f;
-double avx1_matrix_t = 0.0f, avx1_tracking_t = 0.0f;
-
 //--------------------------------------------------------------------
 // constants
 //--------------------------------------------------------------------
@@ -109,9 +103,6 @@ int main(int argc, char* argv[]) {
 
   pthread_mutex_init(&mutex_sp, NULL);
 
-  //memset(tot_cals, 0, sizeof(int)*50);
-  //const char HEADER_FILE[1024] = "Human_NCBI37.hbam\0";
-
   basic_st = basic_statistics_new();
 
   // init logs, after parsing the command-line
@@ -161,7 +152,6 @@ int main(int argc, char* argv[]) {
   LOG_DEBUG_F("Command Mode: %s\n", command);
 
   //convert ASCII fill 
-  
   convert_ASCII['a'] = 'T';
   convert_ASCII['A'] = 'T';
 
@@ -187,34 +177,8 @@ int main(int argc, char* argv[]) {
     validate_options(options);
     rna_aligner(options);
   }
-
-  //} else if (strcmp(command, "bs") == 0) {
-  // BS commnad
-  //printf("Run BS mode...");
-  //run_bs_aligner(genome1, genome2, genome, bwt_index1, bwt_index2,
-  //                   bwt_optarg, cal_optarg, pair_mng, report_optarg, options);
-  //}   
-
-  /*
-  if (options->fast_mode) {  
-    size_t mapped_reads = total_reads - unmapped_reads;
-    printf("TOTAL READS    : %lu\n", total_reads);
-    printf("    UNMAPPED READS : %lu (%f%%)\n", unmapped_reads, ((float)unmapped_reads * 100)/((float)total_reads));
-    printf("    MAPPED READS   : %lu (%f%%)\n", mapped_reads, ((float)mapped_reads * 100)/((float)total_reads));
-    printf("-------------------------------\n");
-    printf("    CORRECT READS    : %lu (%f%%)\n", correct_reads,  ((float)correct_reads * 100)/((float)total_reads));
-    printf("    INCORRECT READS  : %lu (%f%%)\n", mapped_reads - correct_reads,  ((float)(mapped_reads - correct_reads) * 100)/((float)total_reads));
-    
-
-    //printf("Seeds with one Error %i (%0.2f)\n", seeds_1err, seeds_1err*100/total_reads);
-  }
-  */
-
   options_free(options);
 
   return 0;
 
 }
-
-
-//--------------------------------------------------------------------
