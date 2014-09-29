@@ -59,6 +59,21 @@ DOWNLOAD and BUILDING
 
     $ scons
 
+  For build HPG Aligner yo need Git, GCC, Scons, zlib, curl, xml, curses, gsl and check. If some of they are not install in your system, you can try for Ubuntu and Debian:
+    
+
+    $ apt-get install git 
+    $ apt-get install gcc
+    $ apt-get install scons
+    $ apt-get install zlib1g-dev libcurl4-gnutls-dev libxml2-dev libncurses5-dev libgsl0-dev check
+
+  And you can try for Centos and Fedora:
+    
+    $ yum install git 
+    $ yum install gcc
+    $ yum install scons
+    $ yum install zlib-devel libcurl-devel libxml2-devel ncurses-devel gsl-devel check-devel
+     
 
 RUNING
 -------
