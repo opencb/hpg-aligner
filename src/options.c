@@ -518,7 +518,7 @@ void** argtable_options_new(int mode) {
   argtable[count++] = arg_file0("f", "fq,fastq", NULL, "Reads file input. For more than one file: f1.fq,f2.fq,...");
   argtable[count++] = arg_file0("j", "fq2,fastq2", NULL, "Reads file input #2 (for paired mode)");
   argtable[count++] = arg_lit0("z", "gzip", "FastQ input files are gzip");
-  argtable[count++] = arg_file0("i", "index", NULL, "BWT directory name");
+  argtable[count++] = arg_file0("i", "index", NULL, "Index directory name");
   argtable[count++] = arg_file0("o", "outdir", NULL, "Output directory");
   argtable[count++] = arg_int0(NULL, "filter-read-mappings", NULL, "Reads that map in more than <n> locations are discarded");
   argtable[count++] = arg_int0(NULL, "filter-seed-mappings", NULL, "Seeds that map in more than <n> locations are discarded");
