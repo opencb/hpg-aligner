@@ -8,16 +8,18 @@
 #include "aligners/bwt/bwt.h"
 #include "aligners/bwt/genome.h"
 #include "commons/file_utils.h"
+#include "options.h"
 #include "argtable2.h"
 #include "sa/sa_index3.h"
 
 #define SA_INDEX  0
 #define BWT_INDEX 1
 
-#define NUM_INDEX_OPTIONS 3
-#define NUM_INDEX_BWT_OPTIONS 2
+#define NUM_INDEX_OPTIONS 4
+#define NUM_INDEX_BWT_OPTIONS 1
 
 typedef struct index_options {
+  int version;
   int index_ratio;
   int bs_index;
   int help;

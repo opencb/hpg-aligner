@@ -205,6 +205,6 @@ DOCUMENTATION
 -------------
 
 
-  You can find more info about HPG project at:
+  You can find more info about HPG Aligner project at:
 
-  http://wiki.opencb.org/projects/hpg/doku.php
+  https://github.com/opencb/hpg-aligner/wiki

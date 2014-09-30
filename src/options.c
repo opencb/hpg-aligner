@@ -11,6 +11,7 @@ options_t *options_new(void) {
   size_t num_cores = 0;
   
   //======================= COMMON OPTIONS ====================
+  options->version = 0;
   options->in_filename = NULL;
   options->in_filename2 = NULL;
   options->report_all =  0;
@@ -293,7 +294,7 @@ void options_display(options_t *options) {
      printf("\n");
 
      printf("Architecture parameters\n");
-     printf("\tNumber of cpu threads %d\n",  num_cpu_threads);
+     printf("\tNumber of cpu threads: %d\n",  num_cpu_threads);
      //printf("CAL seeker errors: %d\n",  cal_seeker_errors);
      printf("\tBatch size: %d bytes\n",  batch_size);
      //     printf("\tWrite size: %d bytes\n",  write_size);
@@ -317,10 +318,10 @@ void options_display(options_t *options) {
      }
      printf("\n");
 
-     printf("Mapping filters\n");
-     printf("\tFor reads: %d mappings maximum, otherwise discarded\n", options->filter_read_mappings);
-     printf("\tFor seeds: %d mappings maximum, otherwise discarded\n", options->filter_seed_mappings);
-     printf("\n");
+     //printf("Mapping filters\n");
+     //printf("\tFor reads: %d mappings maximum, otherwise discarded\n", options->filter_read_mappings);
+     //printf("\tFor seeds: %d mappings maximum, otherwise discarded\n", options->filter_seed_mappings);
+     //printf("\n");
 
      printf("Pair-mode parameters\n");
      printf("\tPair mode: %d\n", pair_mode);
@@ -534,7 +535,7 @@ void** argtable_options_new(int mode) {
   argtable[count++] = arg_int0(NULL, "filter-read-mappings", NULL, "Reads that map in more than <n> locations are discarded");
   argtable[count++] = arg_int0(NULL, "filter-seed-mappings", NULL, "Seeds that map in more than <n> locations are discarded");
   argtable[count++] = arg_int0(NULL, "min-cal-size", NULL, "Minimum CAL size");
-  argtable[count++] = arg_int0(NULL, "cpu-threads", NULL, "Number of CPU Threads");
+  argtable[count++] = arg_int0("t", "cpu-threads", NULL, "Number of CPU Threads");
   argtable[count++] = arg_int0(NULL, "read-batch-size", NULL, "Batch Size");
   argtable[count++] = arg_dbl0(NULL, "sw-match", NULL, "Match value for Smith-Waterman algorithm");
   argtable[count++] = arg_dbl0(NULL, "sw-mismatch", NULL, "Mismatch value for Smith-Waterman algorithm");
@@ -556,6 +557,7 @@ void** argtable_options_new(int mode) {
   argtable[count++] = arg_lit0(NULL, "indel-realignment", "Indel-based realignment");
   argtable[count++] = arg_lit0(NULL, "recalibration", "Base quality score recalibration");
   argtable[count++] = arg_str0("a", "adapter", NULL, "Adapter sequence in the read");
+  argtable[count++] = arg_lit0("v", "version", "Display the HPG Aligner version");
 
   if (mode == DNA_MODE) {
     argtable[count++] = arg_int0(NULL, "num-seeds", NULL, "Number of seeds");
@@ -565,7 +567,6 @@ void** argtable_options_new(int mode) {
     argtable[count++] = arg_int0(NULL, "seed-size", NULL, "Number of nucleotides in a seed");
     argtable[count++] = arg_int0(NULL, "max-intron-size", NULL, "Maximum intron size");
     argtable[count++] = arg_int0(NULL, "min-intron-size", NULL, "Minimum intron size");
-    argtable[count++] = arg_lit0(NULL, "sa-mode", "SA mode enable, this mode is faster than BWT but the memory consumption is biggest");
   }
 
   argtable[num_options] = arg_end(count);
@@ -660,6 +661,7 @@ options_t *read_CLI_options(void **argtable, options_t *options) {
   if (((struct arg_str*)argtable[++count])->count) { options->adapter = strdup(*(((struct arg_str*)argtable[count])->sval)); }
 
   if (options->adapter) options->adapter_length = strlen(options->adapter);
+  if (((struct arg_int*)argtable[++count])->count) { options->version = ((struct arg_int*)argtable[count])->count; }
 
   if (options->mode == DNA_MODE) {
     if (((struct arg_int*)argtable[++count])->count) { options->num_seeds = *(((struct arg_int*)argtable[count])->ival); }
@@ -684,7 +686,6 @@ options_t *read_CLI_options(void **argtable, options_t *options) {
   }
 
   return options;
-
 }
 
 
@@ -700,7 +701,7 @@ options_t *parse_options(int argc, char **argv) {
     mode = RNA_MODE;
     num_options += NUM_RNA_OPTIONS;
   } else {
-    LOG_FATAL("Command unknown.\nValid commands are:\n\tdna: to map DNA sequences\n\trna: to map RNA sequences\n\tbs: to map BS sequences\n\tbuild-index: to create the genome index.\nUse -h or --help to display hpg-aligner options.");
+    LOG_FATAL("Command unknown.\nValid commands are:\n\tdna: to map DNA sequences\n\trna: to map RNA sequences\n\tbs: to map BS sequences\n\tbuild-index: to create the genome index.\nUse -h or --help to display hpg-aligner options.\n");
   }
 
   void **argtable = argtable_options_new(mode);
@@ -720,7 +721,9 @@ options_t *parse_options(int argc, char **argv) {
     }
         
     if (num_errors > 0) {
-      arg_print_errors(stdout, argtable[NUM_OPTIONS], "hpg-aligner");	// struct end is always allocated in the last position
+      fprintf(stdout, "Errors:\n");
+      // struct end is always allocated in the last position
+      arg_print_errors(stdout, argtable[num_options], "hpg-aligner");
       usage(argtable);
       exit(-1);
     }else {
@@ -750,7 +753,7 @@ options_t *parse_options(int argc, char **argv) {
 }
 
 void usage(void **argtable) {
-  printf("Usage:\nhpg-aligner {dna | rna | bs | build-bwt-index | build-sa-index}");
+  printf("Usage:\nhpg-aligner {dna | rna | build-bwt-index | build-sa-index}");
   arg_print_syntaxv(stdout, argtable, "\n");
   arg_print_glossary(stdout, argtable, "%-50s\t%s\n");
 }
@@ -759,4 +762,11 @@ void usage_cli(int mode) {
   void **argtable = argtable_options_new(mode);
   usage(argtable);
   exit(0);
+}
+
+void display_version() {
+  printf("HPG Aligner version %s\n", HPG_ALIGNER_VERSION);
+  printf("\n");
+  printf("Source code at https://github.com/opencb/hpg-aligner\n");
+  printf("Documentation at https://github.com/opencb/hpg-aligner/wiki/\n");
 }

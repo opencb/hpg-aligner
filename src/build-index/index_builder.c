@@ -2,47 +2,12 @@
 
 
 //------------------------------------------------------------------------------------
-
-
-//------------------------------------------------------------------------------------
-
-void help_index_builder(int mode) {
-     printf("./hpg-aligner {build-bwt-index | build-sa-index} -[i|--index=<directory>] [-g|--ref-genome=<file>] [--index-ratio=<int>] [-bs|--bisulphite-index]\n");
-
-     printf("-i, --index=<directory>\t\tIndex directory name\n");
-     printf("-g, --ref-genome=<file>\t\tReference genome\n");
-     if (mode == BWT_INDEX) {
-       printf("-r, --index-ratio=<int>\t\tBWT index ratio of compression\n");
-       printf("-bs, --bisulphite-index\t\tIndicates the generation of index for bisulphite case\n");
-     }
-
-     exit(0);
-
-}
-
-//------------------------------------------------------------------------------------
-/*
-void run_index_builder_bwt(char *genome_filename, char *bwt_dirname, 
-			   int bwt_ratio, bool duplicate_strand, char *bases) {
-
-     check_index_builder_bwt(genome_filename, bwt_dirname, bwt_ratio);
-
-}
-*/
-//------------------------------------------------------------------------------------
-
-void run_index_builder_sa(char *genome_filename, uint k_value, char *bwt_dirname) {
-  
-  //check_index_builder_sa(genome_filename, bwt_dirname);
-  //
-  
-}
-
 //------------------------------------------------------------------------------------
 
 index_options_t *index_options_new() {
   index_options_t *options = (index_options_t *)malloc(sizeof(index_options_t));
   
+  options->version = 0;
   options->help = 0;
   options->bs_index = 0;
   options->index_ratio = 0;
@@ -51,7 +16,6 @@ index_options_t *index_options_new() {
   options->index_filename = NULL;
 
   return options;
-
 }
 
 
@@ -77,16 +41,15 @@ void** argtable_index_options_new(int mode) {
   argtable[count++] = arg_file0("i", "index", NULL, "Index directory name");
   argtable[count++] = arg_file0("g", "ref-genome", NULL, "Reference genome");
   argtable[count++] = arg_lit0("h", "help", "Help option");
+  argtable[count++] = arg_lit0("v", "version", "Display HPG Aligner version");
 
   if (mode == BWT_INDEX) {
     argtable[count++] = arg_int0("r", "index-ratio", NULL, "BWT index compression ratio");
-    argtable[count++] = arg_lit0(NULL, "bs-index", "Indicate the use of bisulphite generation of the index");
   }
 
   argtable[num_options] = arg_end(count);
   
   return argtable;
-
 }
 
 void argtable_index_options_free(void **argtable, int num_options) {
@@ -102,19 +65,17 @@ index_options_t *read_CLI_index_options(void **argtable, index_options_t *option
   if (((struct arg_file*)argtable[++count])->count) { options->index_filename = strdup(*(((struct arg_file*)argtable[count])->filename)); }
   if (((struct arg_file*)argtable[++count])->count) { options->ref_genome = strdup(*(((struct arg_file*)argtable[count])->filename)); }
   if (((struct arg_int*)argtable[++count])->count) { options->help = ((struct arg_int*)argtable[count])->count; }
+  if (((struct arg_int*)argtable[++count])->count) { options->version = ((struct arg_int*)argtable[count])->count; }
   if (mode == BWT_INDEX) {
     if (((struct arg_int*)argtable[++count])->count) { options->index_ratio = *(((struct arg_int*)argtable[count])->ival); }
-    if (((struct arg_int*)argtable[++count])->count) { options->bs_index = (((struct arg_int*)argtable[count])->count); }
   }
 
   return options;
-
 }
 
 
 void usage_index(void **argtable, int mode) {
-  //void **argtable = argtable_index_options_new(mode);//argtable_options_new(mode);
-  printf("Usage:\nhpg-aligner {build-bwt-index | build-sa-index}");
+  printf("Usage:\nhpg-aligner {build-sa-index | build-bwt-index}");
 
   arg_print_syntaxv(stdout, argtable, "\n");
   arg_print_glossary(stdout, argtable, "%-50s\t%s\n");
@@ -128,28 +89,30 @@ index_options_t *parse_index_options(int argc, char **argv) {
 
   if (strcmp(argv[0], "build-bwt-index") == 0) {
     mode = BWT_INDEX;
+    num_options += NUM_INDEX_BWT_OPTIONS;
   } else if (strcmp(argv[0], "build-sa-index") == 0) {
     mode = SA_INDEX;
-    num_options += NUM_INDEX_BWT_OPTIONS;
   } 
 
-  void **argtable = argtable_index_options_new(mode);//argtable_options_new(mode);
+  void **argtable = argtable_index_options_new(mode);
   index_options_t *options = index_options_new();
-  if (argc < 3) {
+  if (argc < 2) {
     usage_index(argtable, mode);
     exit(-1);
   } else {
     int num_errors = arg_parse(argc, argv, argtable);
-
+    /*
     if (((struct arg_int*)argtable[2])->count) {
       usage_index(argtable, mode);
       argtable_index_options_free(argtable, num_options);
       index_options_free(options);
       exit(0);
     }
-
+    */
     if (num_errors > 0) {
-      arg_print_errors(stdout, argtable[num_options], "hpg-aligner");   // struct end is always allocated in the last position               
+      fprintf(stdout, "Errors:\n");
+      // struct end is always allocated in the last position               
+      arg_print_errors(stdout, argtable[num_options], "hpg-aligner");
       usage_index(argtable, mode);
       exit(-1);
     }else {
@@ -160,31 +123,31 @@ index_options_t *parse_index_options(int argc, char **argv) {
         index_options_free(options);
         exit(0);
       }
+      if (options->version) {
+	display_version();
+        argtable_index_options_free(argtable, num_options);
+        index_options_free(options);
+        exit(0);
+      }
     }
   }
   
-  
   argtable_index_options_free(argtable, num_options);
   
-  
   return options;
-  
 }
 
 void validate_index_options(index_options_t *options, int mode) {
   if (!exists(options->ref_genome)) {
-    printf("Reference genome does not exist.\n\n");
-    help_index_builder(BWT_INDEX);
+    LOG_FATAL("Reference genome does not exist.\n");
   }
   
   if (!exists(options->index_filename)) {
-    printf("Index directory does not exist.\n\n");
-    help_index_builder(BWT_INDEX);
+    LOG_FATAL("Index directory does not exist.\n");
   }
   
   if (mode == BWT_INDEX && options->index_ratio <= 0) {
-    printf("Invalid BWT index ratio. It must be greater than 0.\n\n");
-    help_index_builder(BWT_INDEX);
+    LOG_FATAL("Invalid BWT index ratio. It must be greater than 0.\n");
   }
 
 }
@@ -232,7 +195,6 @@ void run_index_builder(int argc, char **argv, char *mode_str) {
   }
 
   exit(0);
-
 }
 
 

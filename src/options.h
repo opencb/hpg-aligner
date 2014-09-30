@@ -56,12 +56,13 @@
 #define DEFAULT_FILTER_SEED_MAPPINGS_BS 500
 //========================================================================
 
-#define NUM_OPTIONS			29
-#define NUM_RNA_OPTIONS			 6
+#define NUM_OPTIONS			30
+#define NUM_RNA_OPTIONS			 5
 #define NUM_DNA_OPTIONS			 1
 
 
 typedef struct options {
+  int version;
   int mode;
   int gzip;
   int bam_format;
@@ -185,5 +186,6 @@ options_t *parse_options(int argc, char **argv);
 
 
 void usage(void **argtable);
+void display_version();
 
 #endif
