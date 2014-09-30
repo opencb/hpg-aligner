@@ -137,6 +137,13 @@ int main(int argc, char* argv[]) {
 
   // parsing options
   options_t *options = parse_options(argc, argv);
+  if (options->version) {
+    printf("HPG Aligner version %s\n", HPG_ALIGNER_VERSION);
+    printf("\n");
+    printf("Source code at https://github.com/opencb/hpg-aligner\n");
+    printf("Documentation at https://github.com/opencb/hpg-aligner/wiki/\n");
+    exit(0);
+  }
 
   if (options->adapter) {
     options->adapter_revcomp = strdup(options->adapter);
