@@ -18,7 +18,7 @@
 //--------------------------------------------------------------------------------------
 
 typedef struct sa_genome3 {
-  uint length;
+  size_t length;
   size_t num_chroms;
   size_t num_A;
   size_t num_C;
@@ -31,7 +31,7 @@ typedef struct sa_genome3 {
   char *S;
 } sa_genome3_t;
 
-static inline sa_genome3_t *sa_genome3_new(uint length, size_t num_chroms,
+static inline sa_genome3_t *sa_genome3_new(size_t length, size_t num_chroms,
 				    size_t *chrom_lengths,
 				    char **chrom_names, char *S) {
   sa_genome3_t *p = (sa_genome3_t *) calloc(1, sizeof(sa_genome3_t));
@@ -100,7 +100,7 @@ static inline void sa_genome3_set_nt_counters(size_t num_A, size_t num_C, size_t
 static inline void sa_genome3_display(sa_genome3_t *p) {
   if (!p) return;
 
-  printf("Genome length: %i\n", p->length);
+  printf("Genome length: %lu\n", p->length);
   printf("Number of chromosomes: %lu\n", p->num_chroms);
   for (size_t i = 0; i < p->num_chroms; i++) {
     printf("\tChrom %lu: (name, length, offset) = (%s, %lu, %lu)\n", 

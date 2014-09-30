@@ -32,7 +32,7 @@ sa_genome3_t *read_genome3(char *filename) {
   char **chrom_names = (char **) calloc(num_allocated_chroms, sizeof(char *));
   char *S = (char *) calloc(file_length + 1, sizeof(char));
 
-  uint skip = 0, l = 0, process = 0;
+  size_t skip = 0, l = 0, process = 0;
   char c;
   while ((c = getc(f)) != EOF) {
     process++;
@@ -446,7 +446,7 @@ void sa_index3_build_k18(char *genome_filename, uint k_value, char *sa_index_dir
   //-----------------------------------------
 
   char nt;
-  uint num_suffixes = genome->num_A + genome->num_C + genome->num_G + genome->num_T;
+  size_t num_suffixes = genome->num_A + genome->num_C + genome->num_G + genome->num_T;
 
   sprintf(filename_tab, "%s/%s.SA", sa_index_dirname, prefix);
   f_tab = fopen(filename_tab, "rb");
@@ -454,7 +454,7 @@ void sa_index3_build_k18(char *genome_filename, uint k_value, char *sa_index_dir
     printf("\ncomputing SA and CHROM table...\n");
     gettimeofday(&start, NULL);
     suffix_tmp_t *tmp[4];
-    uint tmp_A = 0, tmp_C = 0, tmp_G = 0, tmp_T = 0, nts[4];
+    size_t tmp_A = 0, tmp_C = 0, tmp_G = 0, tmp_T = 0, nts[4];
     
     nts[0] = genome->num_A;
     nts[1] = genome->num_C;
@@ -465,9 +465,9 @@ void sa_index3_build_k18(char *genome_filename, uint k_value, char *sa_index_dir
       tmp[i] = (suffix_tmp_t *) malloc(nts[i] * sizeof(suffix_tmp_t));
     }
     
-    uint c = 0;
-    for (uint i = 0; i < genome->num_chroms; i++) {
-      for (uint j = 0; j < genome->chrom_lengths[i]; j++) {
+    size_t c = 0;
+    for (size_t i = 0; i < genome->num_chroms; i++) {
+      for (size_t j = 0; j < genome->chrom_lengths[i]; j++) {
 	nt = genome->S[c];
 	if (nt == 'A' || nt == 'a') {
 	  tmp[0][tmp_A].value = c;
@@ -489,12 +489,12 @@ void sa_index3_build_k18(char *genome_filename, uint k_value, char *sa_index_dir
 	c++;
       }
     }
-    
+
     assert(tmp_A == genome->num_A);
     assert(tmp_C == genome->num_C);
     assert(tmp_G == genome->num_G);
     assert(tmp_T == genome->num_T);
-    
+
     for (size_t i = 0; i < genome->length; i++) {
       if (genome->S[i] == 'N' || genome->S[i] == 'n') {
 	genome->S[i] = 'A';
@@ -565,19 +565,19 @@ p      display_prefix(&genome->S[tmp[0][i].value], k_value);
     printf("Error: could not open %s to write\n", filename_tab);
     exit(-1);
   }
-  printf("SA: filename %s, num_suffixes = %i\n", filename_tab, num_suffixes);
+  printf("SA: filename %s, num_suffixes = %lu\n", filename_tab, num_suffixes);
   uint *SA = (uint *) malloc(num_suffixes * sizeof(uint));
   
   printf("\nreading SA table from file %s...\n", filename_tab);
   gettimeofday(&start, NULL);
   uint num_items = fread(SA, sizeof(uint), num_suffixes, f_tab);
   if (num_items != num_suffixes) {
-    printf("Error: (%s) mismatch num_items = %i vs num_suffixes = %i\n", 
+    printf("Error: (%s) mismatch num_items = %lu vs num_suffixes = %lu\n", 
 	   filename_tab, num_items, num_suffixes);
     exit(-1);
   }
   gettimeofday(&stop, NULL);
-  printf("end of reading SA table (%i num_suffixes) from file %s in %0.2f s\n", 
+  printf("end of reading SA table (%lu num_suffixes) from file %s in %0.2f s\n", 
   	 num_suffixes, filename_tab,
 	 (stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);      
   fclose(f_tab);
@@ -780,11 +780,11 @@ p      display_prefix(&genome->S[tmp[0][i].value], k_value);
   f_tab = fopen(filename_tab, "w");
   fprintf(f_tab, "%s\n", prefix);
   fprintf(f_tab, "%i\n", k_value);
-  fprintf(f_tab, "%i\n", pre_length);
-  fprintf(f_tab, "%i\n", A_counter);
-  fprintf(f_tab, "%i\n", IA_counter);
-  fprintf(f_tab, "%i\n", num_suffixes);
-  fprintf(f_tab, "%i\n", genome->length);
+  fprintf(f_tab, "%lu\n", pre_length);
+  fprintf(f_tab, "%lu\n", A_counter);
+  fprintf(f_tab, "%lu\n", IA_counter);
+  fprintf(f_tab, "%lu\n", num_suffixes);
+  fprintf(f_tab, "%lu\n", genome->length);
   fprintf(f_tab, "%lu\n", genome->num_chroms);
   for (size_t i = 0; i < genome->num_chroms; i++) {
     fprintf(f_tab, "%s\t%lu\n", 
