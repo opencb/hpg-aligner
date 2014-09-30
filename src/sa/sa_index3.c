@@ -82,7 +82,7 @@ sa_genome3_t *read_genome3(char *filename) {
 	else if (c == 'T' || c == 't') { S[l++] = 'T'; num_T++; chrom_length++; }
 	else if (c == 'N' || c == 'n') { S[l++] = 'N'; num_N++; chrom_length++; }
 	else {
-	  printf("Unknown character %c at %i position\n", c, process);
+	  printf("Unknown character %c at %lu position\n", c, process);
 	}
       } else {
 	if (reading_name) {
@@ -371,7 +371,7 @@ void sa_index3_build(char *genome_filename, uint k_value, char *sa_index_dirname
   fprintf(f_tab, "%i\n", k_value);
   fprintf(f_tab, "%i\n", pre_length);
   fprintf(f_tab, "%i\n", num_suffixes);
-  fprintf(f_tab, "%i\n", genome->length);
+  fprintf(f_tab, "%lu\n", genome->length);
   fprintf(f_tab, "%lu\n", genome->num_chroms);
   for (size_t i = 0; i < genome->num_chroms; i++) {
     fprintf(f_tab, "%s\t%lu\n", 
@@ -572,7 +572,7 @@ p      display_prefix(&genome->S[tmp[0][i].value], k_value);
   gettimeofday(&start, NULL);
   uint num_items = fread(SA, sizeof(uint), num_suffixes, f_tab);
   if (num_items != num_suffixes) {
-    printf("Error: (%s) mismatch num_items = %lu vs num_suffixes = %lu\n", 
+    printf("Error: (%s) mismatch num_items = %i vs num_suffixes = %lu\n", 
 	   filename_tab, num_items, num_suffixes);
     exit(-1);
   }
@@ -780,9 +780,9 @@ p      display_prefix(&genome->S[tmp[0][i].value], k_value);
   f_tab = fopen(filename_tab, "w");
   fprintf(f_tab, "%s\n", prefix);
   fprintf(f_tab, "%i\n", k_value);
-  fprintf(f_tab, "%lu\n", pre_length);
-  fprintf(f_tab, "%lu\n", A_counter);
-  fprintf(f_tab, "%lu\n", IA_counter);
+  fprintf(f_tab, "%i\n", pre_length);
+  fprintf(f_tab, "%i\n", A_counter);
+  fprintf(f_tab, "%i\n", IA_counter);
   fprintf(f_tab, "%lu\n", num_suffixes);
   fprintf(f_tab, "%lu\n", genome->length);
   fprintf(f_tab, "%lu\n", genome->num_chroms);
