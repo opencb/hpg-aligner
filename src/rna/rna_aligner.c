@@ -950,7 +950,7 @@ void rna_aligner(options_t *options) {
   avls_list_t* avls_list = avls_list_new(num_chromosomes);
 
   if (options->transcriptome_filename != NULL) {
-    printf("Loading transcriptome...\n");
+    printf("\nLoading transcriptome...\n");
     load_transcriptome(options->transcriptome_filename, genome, avls_list, metaexons);
     printf("Load done!\n");
   }
@@ -1813,8 +1813,27 @@ void load_transcriptome(char *filename, genome_t *genome,
 	if (exon2->start - 1 < exon1->end + 1) {
 	  LOG_FATAL_F("start_splice = %lu - end_splice = %lu (%s, %s, %s)\n", exon1->end, exon2->start, exon1->transcript_id, exon2->transcript_id, transcript_id);
 	}
+
+	char sj_ref[10];
+	size_t genome_start = exon1->end + 1;
+	size_t genome_end   = genome_start + 2;      
+	genome_read_sequence_by_chr_index(sj_ref, 0, exon1->chr,
+					  &genome_start, &genome_end, genome);     
+
+	sj_ref[2] = '-';
+
+	genome_start = exon2->start - 2;
+	genome_end   = genome_start + 1;
+	genome_read_sequence_by_chr_index(&sj_ref[3], 0, exon1->chr,
+					  &genome_start, &genome_end, genome);
+
+      
+	sj_ref[5] = '\0';
+
+	//printf("%i:%lu-%lu : %s\n", exon1->chr + 1, exon1->end + 1, exon2->start - 1, sj_ref);
 	
-	allocate_start_node(exon1->chr, // startint at 0
+	//exit(-1);
+	allocate_start_node(exon1->chr,       // startint at 0
 			    splice_strand,
 			    exon1->end + 1,   // splice start
 			    exon2->start - 1, // splice_end,
@@ -1822,7 +1841,7 @@ void load_transcriptome(char *filename, genome_t *genome,
 			    exon2->start - 1, // splice_end,
 			    FROM_FILE,
 			    type,
-			    NULL, 
+			    sj_ref, 
 			    &avl_node_start,
 			    &avl_node_end, 
 			    avls_list);
