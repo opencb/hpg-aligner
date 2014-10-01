@@ -714,7 +714,7 @@ void rna_aligner(options_t *options) {
   if (options->prefix_name) {
     strcat(reads_results, "/");
     strcat(reads_results, options->prefix_name);
-    if (!options->bam_format) {
+    if (options->bam_format) {
       strcat(reads_results, "_");
       strcat(reads_results, OUTPUT_FILENAME);
       strcat(reads_results, ".bam");  
