@@ -537,7 +537,7 @@ typedef struct seed {
   size_t suf_genome_end;
 
   int strand;
-  int chromosome_id;
+  unsigned int chromosome_id;
   int num_mismatches;
   int num_open_gaps;
   int num_extend_gaps;
@@ -831,7 +831,7 @@ static inline void cigarset_free(cigarset_t *p) {
 //--------------------------------------------------------------------
 
 typedef struct seed_cal {
-  size_t chromosome_id;
+  unsigned int chromosome_id;
   short int strand;
   size_t start;
   size_t end;
@@ -860,7 +860,7 @@ typedef struct seed_cal {
 
 //--------------------------------------------------------------------
 
-static inline seed_cal_t *seed_cal_new(const size_t chromosome_id,
+static inline seed_cal_t *seed_cal_new(const unsigned int chromosome_id,
 				const short int strand,
 				const size_t start,
 				const size_t end,
@@ -894,7 +894,7 @@ static inline seed_cal_t *seed_cal_new(const size_t chromosome_id,
   return p;
 }
 
-seed_cal_t *seed_cal_new(const size_t chromosome_id,
+seed_cal_t *seed_cal_new(const unsigned int chromosome_id,
 			 const short int strand,
 			 const size_t start,
 			 const size_t end,

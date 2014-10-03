@@ -35,7 +35,7 @@ void cal_mng_simple_clear(cal_mng_t *p);
 void cal_mng_clear(cal_mng_t *p);
 
 void cal_mng_update(seed_t *seed, fastq_read_t *read, cal_mng_t *p);
-int cal_mng_find(int strand, int chrom, size_t start, size_t end, cal_mng_t *p);
+int cal_mng_find(int strand, unsigned int chrom, size_t start, size_t end, cal_mng_t *p);
 
 void cal_mng_to_array_list(int read_area, array_list_t *out_list, cal_mng_t *p);
 void cal_mng_select_best(int read_area, array_list_t *valid_list, 

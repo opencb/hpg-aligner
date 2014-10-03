@@ -568,7 +568,7 @@ void create_alignments(array_list_t *cal_list, fastq_read_t *read,
 
 void display_suffix_mappings(int strand, size_t r_start, size_t suffix_len, 
 			     size_t low, size_t high, sa_index3_t *sa_index) {
-  int chrom;
+  unsigned int chrom;
   size_t r_end, g_start, g_end;
   for (size_t suff = low; suff <= high; suff++) {
     r_end = r_start + suffix_len - 1;
@@ -594,7 +594,7 @@ void print_seed(char *msg, seed_t *s) {
 
 void display_sequence(uint j, sa_index3_t *index, uint len) {
   char *p = &index->genome->S[index->SA[j]];
-  char chrom = index->CHROM[j];
+  unsigned int chrom = (unsigned int) index->CHROM[j];
   for (int i = 0; i < len; i++) {
     printf("%c", *p);
     p++;
@@ -614,7 +614,8 @@ char *get_subsequence(char *seq, size_t start, size_t len) {
 //--------------------------------------------------------------------
 
 void display_cmp_sequences(fastq_read_t *read, sa_index3_t *sa_index) {
-  size_t pos, chrom, strand;
+  unsigned int chrom;
+  size_t pos, strand;
   char *ref, *seq, *chrom_str, *aux, *p1, *p2;
   
   aux = strdup(read->id);

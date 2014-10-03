@@ -119,7 +119,7 @@ char *global_S;
 
 typedef struct suffix_tmp {
   uint value;
-  char chrom;
+  unsigned char chrom;
 } suffix_tmp_t;
 
 
@@ -272,19 +272,19 @@ void sa_index3_build(char *genome_filename, uint k_value, char *sa_index_dirname
       nt = genome->S[c];
       if (nt == 'A' || nt == 'a') {
 	tmp[0][tmp_A].value = c;
-	tmp[0][tmp_A].chrom = i;
+	tmp[0][tmp_A].chrom = (unsigned char) i;
 	tmp_A++;
       } else if (nt == 'C' || nt == 'c') {
 	tmp[1][tmp_C].value = c;
-	tmp[1][tmp_C].chrom = i;
+	tmp[1][tmp_C].chrom = (unsigned char) i;
 	tmp_C++;
       } else if (nt == 'G' || nt == 'g') {
 	tmp[2][tmp_G].value = c;
-	tmp[2][tmp_G].chrom = i;
+	tmp[2][tmp_G].chrom = (unsigned char) i;
 	tmp_G++;
       } else if (nt == 'T' || nt == 't') {
 	tmp[3][tmp_T].value = c;
-	tmp[3][tmp_T].chrom = i;
+	tmp[3][tmp_T].chrom = (unsigned char) i;
 	tmp_T++;
       }
       c++;
@@ -320,7 +320,7 @@ void sa_index3_build(char *genome_filename, uint k_value, char *sa_index_dirname
   f_tab = fopen(filename_tab, "wb");
   for (int i = 0; i < 4; i++) {
     for (int j = 0; j < nts[i]; j++) {
-      fwrite(&(tmp[i][j].chrom), sizeof(char), 1, f_tab);
+      fwrite(&(tmp[i][j].chrom), sizeof(unsigned char), 1, f_tab);
     }
   }
   fclose(f_tab);
@@ -484,19 +484,19 @@ void sa_index3_build_k18(char *genome_filename, uint k_value, char *sa_index_dir
 	nt = genome->S[c];
 	if (nt == 'A' || nt == 'a') {
 	  tmp[0][tmp_A].value = c;
-	  tmp[0][tmp_A].chrom = i;
+	  tmp[0][tmp_A].chrom = (unsigned char) i;
 	  tmp_A++;
 	} else if (nt == 'C' || nt == 'c') {
 	  tmp[1][tmp_C].value = c;
-	  tmp[1][tmp_C].chrom = i;
+	  tmp[1][tmp_C].chrom = (unsigned char) i;
 	  tmp_C++;
 	} else if (nt == 'G' || nt == 'g') {
 	  tmp[2][tmp_G].value = c;
-	  tmp[2][tmp_G].chrom = i;
+	  tmp[2][tmp_G].chrom = (unsigned char) i;
 	  tmp_G++;
 	} else if (nt == 'T' || nt == 't') {
 	  tmp[3][tmp_T].value = c;
-	  tmp[3][tmp_T].chrom = i;
+	  tmp[3][tmp_T].chrom = (unsigned char) i;
 	  tmp_T++;
 	}
 	c++;
@@ -553,7 +553,7 @@ p      display_prefix(&genome->S[tmp[0][i].value], k_value);
     f_tab = fopen(filename_tab, "wb");
     for (size_t i = 0; i < 4; i++) {
       for (size_t j = 0; j < nts[i]; j++) {
-	fwrite(&(tmp[i][j].chrom), sizeof(char), 1, f_tab);
+	fwrite(&(tmp[i][j].chrom), sizeof(unsigned char), 1, f_tab);
       }
     }
     fclose(f_tab);

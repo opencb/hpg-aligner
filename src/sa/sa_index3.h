@@ -72,7 +72,7 @@ static inline void sa_genome3_free(sa_genome3_t *p) {
 
 //--------------------------------------------------------------------------------------
 
-static inline char *sa_genome_get_sequence(int chrom, size_t start, size_t end, sa_genome3_t *p) {
+static inline char *sa_genome_get_sequence(unsigned int chrom, size_t start, size_t end, sa_genome3_t *p) {
   size_t pos, len = end - start + 1;
   char *seq = (char *) malloc((len + 1) * sizeof(char));
   for (size_t i = 0, pos = start + p->chrom_offsets[chrom]; i < len; i++, pos++) {
@@ -195,7 +195,7 @@ typedef struct sa_index3 {
   uint prefix_length;
   uint A_items; // JA_items = A_items
   uint IA_items;
-  char *CHROM;
+  unsigned char *CHROM;
   uint *PRE;
   uint *SA;
   uint *A;

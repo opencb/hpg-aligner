@@ -423,9 +423,9 @@ void cal_mng_update(seed_t *seed, fastq_read_t *read, cal_mng_t *p) {
 
 //--------------------------------------------------------------------
 
-int cal_mng_find(int strand, int chrom, size_t start, size_t end, cal_mng_t *p) {
+int cal_mng_find(int strand, unsigned int chrom, size_t start, size_t end, cal_mng_t *p) {
   #ifdef _VERBOSE1
-  printf("\t\t***** searching CAL: chrom %i: %lu-%lu\n", chrom, start, end);
+  printf("\t\t***** searching CAL: chrom %u: %lu-%lu\n", chrom, start, end);
   #endif
   int found_cal = 0;
   if (p->cals_lists) {
@@ -526,7 +526,8 @@ array_list_t *search_mate_cal_by_prefixes(seed_cal_t *cal, fastq_read_t *read,
   array_list_t *cal_list = array_list_new(10, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
   char *seq;
 
-  int chromosome, start, end;
+  unsigned int chromosome;
+  int start, end;
   int read_pos, read_inc, read_end_pos;
 
   int mapq = cal->mapq;
@@ -549,7 +550,7 @@ array_list_t *search_mate_cal_by_prefixes(seed_cal_t *cal, fastq_read_t *read,
   
   size_t num_prefixes, low, high;
   size_t g_start_suf, g_end_suf;
-  int chrom;
+  unsigned int chrom;
 
   for (read_pos = 0; read_pos < read_end_pos; read_pos += read_inc)  {	
 
@@ -557,7 +558,7 @@ array_list_t *search_mate_cal_by_prefixes(seed_cal_t *cal, fastq_read_t *read,
     if (num_prefixes <= 0) continue;
 
     for (size_t i = low; i <= high; i++) {
-      chrom = sa_index->CHROM[i];
+      chrom = (unsigned int) sa_index->CHROM[i];
       if (chrom == chromosome) {
 	g_start_suf = sa_index->SA[i] - sa_index->genome->chrom_offsets[chrom];
 	g_end_suf = g_start_suf + sa_index->k_value - 1;
@@ -884,14 +885,14 @@ void generate_cals_from_exact_read(int strand, fastq_read_t *read,
 				   size_t low, size_t high, sa_index3_t *sa_index, 
 				   cal_mng_t *cal_mng) {
   size_t g_start, g_end;
-  int chrom;
+  unsigned int chrom;
 
   seed_cal_t *cal;
   cigar_t *cigar;
   seed_t *seed;
   
   for (size_t suff = low; suff <= high; suff++) {
-    chrom = sa_index->CHROM[suff];
+    chrom = (unsigned int) sa_index->CHROM[suff];
     g_start = sa_index->SA[suff] - sa_index->genome->chrom_offsets[chrom];
     g_end = g_start + read->length - 1;
 
@@ -928,7 +929,8 @@ int generate_cals_from_suffixes(int strand, fastq_read_t *read,
 
   size_t r_start_suf, r_end_suf, g_start_suf, g_end_suf;
   size_t r_start, r_end, r_len, g_start, g_end, g_len;
-  int found_cal, chrom, diff, max_map_len = 0;
+  int found_cal, diff, max_map_len = 0;
+  unsigned int chrom;
 
   float score;
   alig_out_t alig_out;
@@ -950,7 +952,11 @@ int generate_cals_from_suffixes(int strand, fastq_read_t *read,
     #ifdef _TIMING
     gettimeofday(&start, NULL);
     #endif
-    chrom = sa_index->CHROM[suff];
+    chrom = (unsigned int) sa_index->CHROM[suff];
+    if (chrom < 0) {
+      printf("chrom %c %i %u is < 0\n", chrom, chrom, chrom);
+      exit(-1);
+    }
 
     // extend suffix to right side
     r_start_suf = read_pos;
