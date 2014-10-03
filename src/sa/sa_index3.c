@@ -1,4 +1,6 @@
 #include "sa_index3.h"
+
+#include "options.h"
  
 #define PROGRESS 1000000
 
@@ -51,7 +53,7 @@ sa_genome3_t *read_genome3(char *filename) {
 	  if (num_chroms >= num_allocated_chroms) {
 	    num_allocated_chroms += 50;
 	    chrom_lengths = (size_t *) realloc(chrom_lengths, num_allocated_chroms * sizeof(size_t));
-	    chrom_names = (char **) realloc(chrom_lengths, num_allocated_chroms * sizeof(char *));
+	    chrom_names = (char **) realloc(chrom_names, num_allocated_chroms * sizeof(char *));
 	  }
 	}
       }
@@ -385,8 +387,8 @@ void sa_index3_build(char *genome_filename, uint k_value, char *sa_index_dirname
 
 void sa_index3_build_k18(char *genome_filename, uint k_value, char *sa_index_dirname) {
 
-  k_value = 18;
   //printf("\n***************** K value = 18 ***************************\n");
+  k_value = 18;
 
   const size_t value4M = 4194304; // 4 M
   const size_t value16M = 16777216; // 16 M
@@ -429,6 +431,17 @@ void sa_index3_build_k18(char *genome_filename, uint k_value, char *sa_index_dir
   gettimeofday(&start, NULL);
   sa_genome3_t *genome = read_genome3(genome_filename);
   gettimeofday(&stop, NULL);
+  
+  if (genome->length > max_uint || genome->num_chroms > 256) {
+    printf("Genome not supported: (%s)\n", genome_filename);
+    printf("\tGenome length: %lu\n", genome->length);
+    printf("\tNumber segments (chromosomes, scaffolds,...): %i\n", genome->num_chroms);
+    printf("\n");
+    printf("Genomes supported by HPG Aligner %s\n", HPG_ALIGNER_VERSION);
+    printf("\tMax. genome length: %lu\n", max_uint);
+    printf("\tMax. number segments (chromosomes, scaffolds,...): %i\n", 256);
+    exit(-1);
+  }
   
   sa_genome3_display(genome);
 
