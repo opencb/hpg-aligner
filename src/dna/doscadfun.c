@@ -17,9 +17,8 @@ static inline void set_map_trace(int *map_counter, char *st1_map, char st1_value
 float doscadfun(char* st1, int ll1, char* st2, int ll2, 
 		float mismatch_perc, alig_out_t *out) {
   int  i, j;
-  char ch;
-  float  faux;
-  int aborto=0;
+
+
   int num_errors=0;
   float score;
 
@@ -666,13 +665,13 @@ float doscadfun(char* st1, int ll1, char* st2, int ll2,
 float doscadfun_inv(char* st1, int ll1, char* st2, int ll2, 
 		    float mismatch_perc, alig_out_t *out) {
   int  i, j;
-  char ch;
-  float  faux;
-  int aborto=0;
+
+
+
   int num_errors=0;
   float score;
   
-  int map_len1, map_len2, match, mism, gap1, gapmas, st_m_len;
+  int map_len1, map_len2, match, mism, gap1, gapmas, st_m_len = 0;
 	
   int first_i, first_j, first_match, first_mism, first_gap1, first_gapmas, first_st_map_len;
   cigar_t first_cigar;

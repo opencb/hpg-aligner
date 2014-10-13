@@ -61,7 +61,7 @@ float get_max_score(array_list_t *cal_list,
 		    float match_score, float mismatch_penalty,
 		    float gap_open_penalty, float gap_extend_penalty) {
   seed_cal_t *cal;
-  int num_matches, num_mismatches, num_open_gaps, num_extend_gaps;
+
   int num_cals = array_list_size(cal_list);
   float max_score = -1000000.0f;
 
@@ -285,7 +285,7 @@ void select_best_cals(fastq_read_t *read, array_list_t **cal_list) {
   if (num_cals == 0) return;
 
   seed_cal_t *cal, *first_cal, *second_cal = NULL;
-  sort_cal_t *sort_cal;
+
 
   sort_cal_t sort_cals[num_cals];
   for (int i = 0; i < num_cals; i++) {
@@ -392,7 +392,7 @@ void create_bam_alignments(array_list_t *cal_list, fastq_read_t *read,
   }
 
   int i, cigar_len;
-  linked_list_item_t *list_item; 
+
 
 
   for (i = 0; i < num_cals; i++) {
@@ -444,7 +444,7 @@ void create_alignments(array_list_t *cal_list, fastq_read_t *read,
 
   char *seq, *p, *optional_fields, *cigar_string, *cigar_M_string;
   int AS, optional_fields_length, num_mismatches, num_cigar_ops, len;
-  linked_list_item_t *list_item; 
+
 
   for (int i = 0; i < num_cals; i++) {
     cal = array_list_get(i, cal_list);
@@ -545,7 +545,7 @@ void create_alignments(array_list_t *cal_list, fastq_read_t *read,
     alignment_init_single_end(strdup(read->id), strdup(seq), strdup(quality), 
 			      cal->strand, cal->chromosome_id, cal->start,
 			      cigar_M_string, num_cigar_ops, cal->mapq, 1, (num_cals > 1),
-			      optional_fields_length, optional_fields, alignment);  
+			      optional_fields_length, (uint8_t *)optional_fields, alignment);  
     alignment->mapq = cal->mapq;
     alignment->mate_chromosome = 0;
     alignment->mate_position = 0;
@@ -759,8 +759,8 @@ void filter_cals_by_pair_mode(int pair_mode, int pair_min_distance, int pair_max
 //--------------------------------------------------------------------
 
 array_list_t *create_list(size_t *valid_items, size_t num_valids, array_list_t *list) {
-  void *item;
-  int num = 0;
+
+
 
   size_t num_items = array_list_size(list);
 
@@ -788,7 +788,7 @@ void complete_pairs(sa_mapping_batch_t *batch) {
   int distance;
   int min_distance = batch->options->pair_min_distance;
   int max_distance = batch->options->pair_max_distance;
-  int pair_mode = batch->options->pair_mode;
+
   int report_only_paired = batch->options->report_only_paired;
 
   array_list_t *list1, *list2;
@@ -802,10 +802,10 @@ void complete_pairs(sa_mapping_batch_t *batch) {
   short int chr1, chr2, strand1, strand2;
   size_t end1, start2;
 
-  int pair_found;
 
-  int num_best1, num_best2;
-  float best_score, best_score1, best_score2, score;
+
+
+  float best_score, score;
 
   pair_t *pair, *new_pair;
   linked_list_t *pair_list = linked_list_new(COLLECTION_MODE_ASYNCHRONIZED);

@@ -225,7 +225,7 @@ unsigned int pack_junction(unsigned int chromosome, unsigned int strand,
 			   size_t num_reads, char *type, char* buffer_p){
   int len;
   char str[1024];
-  char *chr_p, *p = buffer_p;
+  char *p = buffer_p;
   char strand_char[2] = {'+', '-'};
 
   if (chromosome == 23) { sprintf(str, "%c%c", 'X', '\0'); }
@@ -520,9 +520,6 @@ void alignment_aux_init(alignment_t* alignment,
 
 fastq_read_t *file_read_fastq_reads(size_t *num_items, FILE *fd) {
 
-  extern double time_read_fq, time_read_fq_process;
-  struct timeval time_start, time_end;    
-
   size_t sizes_to_read[3], head_len, seq_len;
   int bytes;
 
@@ -789,7 +786,7 @@ int file_read_alignments(size_t num_items, array_list_t *list,
     
     char *query = (char *) calloc (len_read + 1, sizeof(char));
     strncpy(query, fq_read->sequence + hc_start, len_read);
-
+ 
     //Revisar rna_Server get_to_first_blank header copy
     alignment_t *alignment = alignment_new();
     alignment_init_single_end(strdup(header_id),
@@ -1161,7 +1158,6 @@ void sa_file_write_alignments(fastq_read_t *fq_read, array_list_t *items, FILE *
 
 void sa_file_write_partial_alignments(fastq_read_t *fq_read, array_list_t *items, FILE *fd) {
   //size_t head_size = strlen(fq_read->id);
-  size_t seq_size  = fq_read->length;
   size_t num_items = array_list_size(items);
   if (!num_items) { 
     return;
@@ -1218,14 +1214,7 @@ alignment_data_t *sa_file_read_alignments(size_t num_items, array_list_t *list,
 					  fastq_read_t *fq_read, FILE *fd) {
   
   if (!num_items) { return 0; }
-  
-  extern double time_read_alig;
-  extern double time_read_proc;
-  struct timeval time_start, time_end;
-
-  simple_alignment_t simple_alignment[num_items];
-  
-  simple_alignment_t *simple_a;
+    
   int bytes;
 
   alignment_data_t *p = alignment_data_new();
@@ -1281,271 +1270,6 @@ void sa_file_write_items(int type, fastq_read_t *fq_read, array_list_t *items, F
 
 //=================================================================
 
-
-/*
-void insert_file_item (fastq_read_t *fq_read, array_list_t *items, FILE *f_sa) {
-  size_t head_size = strlen(fq_read->id);
-  size_t seq_size  = fq_read->length;
-  size_t num_items = array_list_size(items);
-
-  //Write binary file 
-  //[type][size head][size seq][num items][HEAD][SEQUENCE][QUALITY][CAL 0][CAL n]
-  size_t items_sizes[3] = {head_size, seq_size, num_items};
-  //printf("NUM items %i\n", num_items);
-  //printf("Insert-id  (%i): %s\n", head_size, fq_read->id);
-  //printf("Insert-seq (%i): %s\n", seq_size, fq_read->sequence);
-  //printf("Insert-qua (%i): %s\n", seq_size, fq_read->quality);
-
-  //[size head][size seq][num items]
-  fwrite(items_sizes, sizeof(size_t), 3, f_sa);
-  //fwrite(&head_size, sizeof(size_t), 1, f_sa);
-  //fwrite(&seq_size,  sizeof(size_t), 1, f_sa);
-  //fwrite(&num_items, sizeof(size_t), 1, f_sa);
-  
-  //[HEAD][SEQUENCE][QUALITY]
-  size_t total_size = head_size + 2*seq_size;
-  char *buffer = (char *)malloc(sizeof(char)*total_size);
-  
-
-  memcpy(buffer, fq_read->id, head_size);
-  memcpy(&buffer[head_size], fq_read->sequence, seq_size);
-  memcpy(&buffer[head_size + seq_size], fq_read->quality, seq_size);
-  fwrite(buffer, sizeof(char), total_size, f_sa);
-  
-  bwt_anchor_t bwt_anchor[num_items];
-  memset(bwt_anchor, 0, sizeof(bwt_anchor_t)*num_items);
-
-  for (int i = 0; i < num_items; i++) {
-    cal_t *cal = array_list_get(i, items);
-    bwt_anchor[i].strand     = cal->strand;
-    bwt_anchor[i].chromosome = cal->chromosome_id - 1;
-    bwt_anchor[i].start      = cal->start;
-    bwt_anchor[i].end        = cal->start + (cal->end - cal->start + 1);
-    seed_region_t *seed = linked_list_get_first(cal->sr_list);
-    if (seed->read_start == 0) {
-      bwt_anchor[i].type = FORWARD_ANCHOR;
-    } else {
-      bwt_anchor[i].type = BACKWARD_ANCHOR;
-    }
-  }
-
-  fwrite(bwt_anchor, sizeof(bwt_anchor_t), num_items, f_sa);
-  
-  free(buffer);
-
-}
-
-void insert_file_item_2 (fastq_read_t *fq_read, array_list_t *items, FILE *f_hc) {
-  size_t head_size = strlen(fq_read->id);
-  size_t seq_size  = fq_read->length;
-  size_t num_items = array_list_size(items);
-  size_t max_len = num_items * 1024;
-  char *cigar_buffer = (char *)calloc(max_len, sizeof(char));
-  size_t tot_len = 0;
-
-  simple_alignment_t simple_alignment[num_items];
-  simple_alignment_t *simple_a;
-  memset(simple_alignment, 0, sizeof(simple_alignment_t)*num_items);
-  for (int i = 0; i < num_items; i++) {
-    meta_alignment_t *meta_alignment = array_list_get(i, items);
-    cal_t *first_cal = array_list_get(0, meta_alignment->cals_list);
-    cal_t *last_cal = array_list_get(meta_alignment->cals_list->size - 1, meta_alignment->cals_list);
-    seed_region_t *first_seed = linked_list_get_first(first_cal->sr_list);
-    seed_region_t *last_seed  = linked_list_get_last(last_cal->sr_list);
-    cigar_code_t *cigar_code = meta_alignment->cigar_code;    
-    char *cigar_str = new_cigar_code_string(cigar_code);
-    int cigar_len = strlen(cigar_str);
-
-    simple_a = &simple_alignment[i];
-
-    if (meta_alignment->cigar_left !=  NULL) {
-      //printf("LEFT CIGAR: %s\n", new_cigar_code_string(meta_alignment->cigar_left));
-      simple_a->gap_start = 0;
-    } else {
-      simple_a->gap_start = first_seed->read_start;
-    }
-
-    if (meta_alignment->cigar_right !=  NULL) {
-      //printf("RIGHT CIGAR: %s\n", new_cigar_code_string(meta_alignment->cigar_right));
-      simple_a->gap_end = 0;
-    } else {
-      simple_a->gap_end = seq_size - last_seed->read_end - 1;
-    }
-
-    simple_a->map_strand = first_cal->strand;
-    simple_a->map_chromosome = first_cal->chromosome_id;
-    simple_a->map_start = first_cal->start;
-    simple_a->map_distance = cigar_code->distance;
-    simple_a->cigar_len = cigar_len;
-    
-    //printf(" [%i:%lu] INSERT CIGAR(%i): %s\n", simple_a->map_chromosome, 
-    //	   simple_a->map_start, cigar_len, cigar_str);
-
-    memcpy(&cigar_buffer[tot_len], cigar_str, cigar_len);
-    tot_len += cigar_len;
-
-    if (tot_len >= max_len) { 
-      max_len = max_len * 2;
-      cigar_buffer = realloc(cigar_buffer, max_len); 
-    }
-
-  }
-
-  //Write binary file 
-  //[size head][size seq][num items][HEAD][SEQUENCE][QUALITY][CAL 0][CAL n]
-  size_t items_sizes[3] = {head_size, seq_size, num_items};
-
-  //[size head][size seq][num items]
-  fwrite(items_sizes, sizeof(size_t), 3, f_hc);
-  
-  //[HEAD][SEQUENCE][QUALITY]
-  size_t total_size = head_size + 2*seq_size;
-  char *buffer = (char *)malloc(sizeof(char)*total_size);
-  
-  memcpy(buffer, fq_read->id, head_size);
-  memcpy(&buffer[head_size], fq_read->sequence, seq_size);
-  memcpy(&buffer[head_size + seq_size], fq_read->quality, seq_size);
-
-  fwrite(buffer, sizeof(char), total_size, f_hc);  
-  fwrite(simple_alignment, sizeof(simple_alignment_t), num_items, f_hc);
-  fwrite(cigar_buffer, sizeof(char), tot_len, f_hc);  
-
-  free(buffer);
-  free(cigar_buffer);
-}
-
-/*
-void buffer_item_insert_new_item(fastq_read_t *fq_read, 
-				 linked_list_t *items_list, 
-				 void *data,
-				 int type_items,
-				 linked_list_t *buffer, 
-				 linked_list_t *buffer_hc,
-				 int phase) {
-  //printf("INSERT TO BUFFER\n");
-
-  buffer_item_t *buffer_item = buffer_item_complete_new(fq_read, items_list, data);
-  array_list_set_flag(type_items, buffer_item->items_list);
-  
-  //Select list to insert
-  cal_t *cal_prev;
-  cal_t *cal_next;
-  int insert_hc = 1;
-  int end;
-
-  if (phase == 1) {
-    if (type_items == BITEM_SINGLE_ANCHORS) {
-      linked_list_insert(buffer_item, buffer_hc);
-    }
-    return;
-  } else {
-    linked_list_insert(buffer_item, buffer);
-    return;
-  }
-
-  if (type_items == BITEM_CALS) {    
-    end = 0;
-    for (int i = 0; i < array_list_size(items_list); i++) {
-      array_list_t *fusion_list = array_list_get(i, items_list);
-      for (int j = 0; j < array_list_size(fusion_list); j++) {
-	cal_prev = array_list_get(j, fusion_list);
-	if (cal_prev == NULL) {
-	  //printf("CAL NULL\n");
-	  insert_hc = 0;
-	  end = 1;
-	  break;
-	} else {
-	  seed_region_t *s_first = linked_list_get_first(cal_prev->sr_list);
-	  seed_region_t *s_last = linked_list_get_last(cal_prev->sr_list);
-	  
-	  assert(s_first);
-	  assert(s_last);
-	  
-	  //printf("s_first->read_start = %i, fq_read->length - s_last->read_end = %i\n",
-	  //     s_first->read_start, fq_read->length - s_last->read_end);
-	  if (s_first->read_start > 16 ||
-	      fq_read->length - s_last->read_end > 16) {
-	    //printf("INSERT IN HC = 0\n");
-	    insert_hc = 0;
-	    end = 1;
-	    break;
-	  }
-	}
-      }
-      if (end) { break; }
-    }
-  } if (type_items == BITEM_SINGLE_ANCHORS) {    
-    for (int j = 0; j < array_list_size(items_list); j++) {
-      cal_prev = array_list_get(j, items_list);
-      if (cal_prev == NULL) {
-	//printf("CAL NULL\n");
-	insert_hc = 0;
-	break;
-      } else {
-	seed_region_t *s_first = linked_list_get_first(cal_prev->sr_list);
-	seed_region_t *s_last = linked_list_get_last(cal_prev->sr_list);
-	
-	assert(s_first);
-	assert(s_last);
-	
-	//printf("s_first->read_start = %i, fq_read->length - s_last->read_end = %i\n",
-	//     s_first->read_start, fq_read->length - s_last->read_end);
-	if (s_first->read_start > 16 ||
-	    fq_read->length - s_last->read_end > 16) {
-	  //printf("INSERT IN HC = 0\n");
-	  insert_hc = 0;
-	  break;
-	}
-      }
-    }  
-  } else {
-    //printf("Insert buffer meta alignments\n");
-    for (int i = 0; i < array_list_size(items_list); i++) {
-      meta_alignment_t *meta_alignment = array_list_get(i, items_list);
-      cal_prev = array_list_get(0, meta_alignment->cals_list);
-      cal_next = array_list_get(array_list_size(meta_alignment->cals_list) - 1, 
-				meta_alignment->cals_list);
-
-      if (cal_prev == NULL || cal_next == NULL) {
-	insert_hc = 0;
-	//printf("NULL\n");
-	break;
-      }
-
-      seed_region_t *s_first = linked_list_get_first(cal_prev->sr_list);
-      seed_region_t *s_last = linked_list_get_last(cal_next->sr_list);
-
-      assert(s_first);
-      assert(s_last);
-
-      //cal_print(cal_prev);
-      //cal_print(cal_next);
-
-      if (s_first->read_start > 16 ||
-	  fq_read->length - s_last->read_end > 16) {
-	insert_hc = 0;
-	break;
-      }
-    }
-  }
-
-  if (!insert_hc) {
-    //printf("INSERT IN HC = 0\n");
-    linked_list_insert(buffer_item, buffer);
-  } else {
-    //printf("INSERT IN HC = 1\n");
-    linked_list_insert(buffer_item, buffer_hc);
-  }
-  
-}
-
-
-void buffer_item_free(buffer_item_t *buffer_item) {
-  array_list_free(buffer_item->items_list, NULL);
-  free(buffer_item);
-  
-}
-*/
 
 bs_context_t *bs_context_new(size_t num_reads) {
   bs_context_t *p = (bs_context_t*) calloc(1, sizeof(bs_context_t));

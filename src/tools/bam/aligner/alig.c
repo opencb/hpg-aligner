@@ -38,9 +38,13 @@ char aux_msg[512];
  * PRIVATE INLINE FUNCTIONS
  */
 static inline ERROR_CODE alig_region_filter_read(bam1_t *read, array_list_t *list, alig_context_t *context) __ATTR_HOT __ATTR_INLINE;
-
 static inline ERROR_CODE alig_aux_write_to_disk(array_list_t *write_buffer, bam_file_t *output_bam_f, uint8_t force) /* DEPRECATED */;
 static inline ERROR_CODE alig_aux_read_from_disk(circular_buffer_t *read_buffer, bam_file_t *input_bam_f) /* DEPRECATED */;
+static ERROR_CODE alig_get_scores(alig_context_t *context);
+static ERROR_CODE alig_get_scores_from_read(bam1_t *read, alig_context_t *context, uint32_t *v_scores, size_t *v_positions);
+static inline ERROR_CODE alig_get_alternative_haplotype(alig_context_t *context, int *out_haplo_index, uint32_t *out_haplo_score, uint32_t *out_ref_score);
+static ERROR_CODE alig_indel_realign_from_haplo(alig_context_t *context, size_t alt_haplo_index);
+
 
 /**
  * CONTEXT
@@ -52,7 +56,6 @@ static inline ERROR_CODE alig_aux_read_from_disk(circular_buffer_t *read_buffer,
 ERROR_CODE
 alig_init(alig_context_t *context, genome_t *genome, uint8_t flags)
 {
-	ERROR_CODE err;
 
 	assert(context);
 	assert(genome);
@@ -103,9 +106,9 @@ ERROR_CODE
 alig_destroy(alig_context_t *context)
 {
 	int i;
-	bam1_t *read;
+
 	aux_indel_t *haplo;
-	size_t list_l;
+
 
 	assert(context);
 
@@ -213,10 +216,10 @@ alig_region_next(bam1_t **v_bams, size_t v_bams_l, int force_incomplete, alig_co
 	//Read
 	size_t reads;
 	bam1_t* read = NULL;
-	int32_t read_pos;
-	size_t indels;
-	size_t interval_read_begin;
-	size_t interval_read_end;
+
+
+
+
 
 	//Aux list
 	array_list_t *aux_list = NULL;
@@ -536,7 +539,7 @@ alig_region_haplotype_process(alig_context_t *context)
 	size_t read_seq_l;
 	uint32_t *read_cigar;
 	size_t read_indels;
-	size_t read_bases;
+
 	int64_t read_disp_ref;
 
 	//CIGARS
@@ -545,7 +548,7 @@ alig_region_haplotype_process(alig_context_t *context)
 
 	//Reference
 	char *ref_seq;
-	uint32_t ref_miss;
+
 
 	//Haplotype
 	aux_indel_t *haplo;
@@ -729,12 +732,12 @@ ERROR_CODE
 alig_region_indel_realignment(alig_context_t *context)
 {
 	ERROR_CODE err;
-	int i;
+
 
 	//Haplotype
-	int alt_haplo_index;
-	uint32_t alt_haplo_score;
-	uint32_t ref_haplo_score;
+	int alt_haplo_index = 0;
+	uint32_t alt_haplo_score = 0;
+	uint32_t ref_haplo_score = 0;
 
 	//Improvement
 	double improvement;
@@ -807,11 +810,11 @@ alig_region_indel_realignment(alig_context_t *context)
 ERROR_CODE
 alig_region_clear(alig_context_t *context)
 {
-	ERROR_CODE err;
-	int i;
+
+
 
 	//Lists
-	size_t list_l;
+
 
 	assert(context);
 
@@ -870,7 +873,6 @@ alig_bam_file_old(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 	bam_file_t *bam_f;
 	bam_file_t *out_bam_f;
 	genome_t* ref;
-	int bytes;
 
 	//Read
 	bam1_t *read;
@@ -974,7 +976,7 @@ alig_bam_file_old(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 		//printf("Minimum threads required is 3, setting number of threads to 3\n");
 		omp_set_num_threads(3);
 	}
-	#pragma omp parallel private(i, bytes, read, v_reads, v_reads_l, list_l, filled, err)
+	#pragma omp parallel private(i, read, v_reads, v_reads_l, list_l, filled, err)
 	{
 			#pragma omp  sections
 			{
@@ -994,7 +996,7 @@ alig_bam_file_old(char *bam_path, char *ref_name, char *ref_path, char *outbam)
 						filled = in_buffer.readed - in_buffer.processed;
 						int32_t chrom;
 						int chrom_changed = 0;
-						int force_region = 0;
+
 						chrom = in_buffer.buffer[(in_buffer.head_idx + in_buffer.processed) % in_buffer.size]->core.tid;
 						for(i = 0; i < filled; i++)
 						{
@@ -1217,7 +1219,7 @@ static ERROR_CODE
 alig_get_scores(alig_context_t *context)
 {
 	ERROR_CODE err;
-	int i, j;
+	int i;
 
 	//Reads
 	bam1_t *read;
@@ -1383,8 +1385,8 @@ alig_get_scores_from_read(bam1_t *read, alig_context_t *context, uint32_t *v_sco
 	char *comp_seq;
 	char *quals_seq;
 	size_t read_l;
-	size_t indels;
-	size_t bases;
+
+
 	size_t read_disp_ref;
 	size_t read_disp_clip;
 
@@ -1393,7 +1395,7 @@ alig_get_scores_from_read(bam1_t *read, alig_context_t *context, uint32_t *v_sco
 	size_t read_seq_ref_l;
 	uint32_t misses;
 	uint32_t misses_sum;
-	size_t best_pos;
+
 	size_t curr_pos;
 	int64_t init_pos;
 	int64_t end_pos;
@@ -1939,7 +1941,7 @@ alig_aux_write_to_disk(array_list_t *write_buffer, bam_file_t *output_bam_f, uin
 	static size_t last_index = 0;
 
 	//Timing
-	double time_w;
+
 
 	//Get list length
 	write_buffer_l = array_list_size(write_buffer);
@@ -1986,7 +1988,7 @@ alig_aux_read_from_disk(circular_buffer_t *read_buffer, bam_file_t *input_bam_f)
 	bam1_t *bam;
 
 	//Timing
-	double time_r;
+
 
 	//More reads?
 	omp_set_lock(&read_buffer->lock);

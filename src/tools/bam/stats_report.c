@@ -188,6 +188,10 @@ void generate_gnuplot_image(report_graph_t *graph, char *data_filename, char *pr
     // execute command line: gnuplot filename.gnuplot
     sprintf(line, "gnuplot %s;", gnuplot_filename);
     int res = system(line);
+    if (res == -1)  {
+      printf("Error in system call\n");
+    }
+
 }
 
 //--------------------------------------------------------------------

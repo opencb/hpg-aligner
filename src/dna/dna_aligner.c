@@ -37,7 +37,7 @@ void dna_aligner(options_t *options) {
 
   // set input parameters
   char *sa_dirname = options->bwt_dirname;
-  char *fastq_filename = options->in_filename;
+
   int batch_size = options->batch_size;
   int num_threads = options->num_cpu_threads;
 

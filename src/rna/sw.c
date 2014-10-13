@@ -192,7 +192,7 @@ sw_simd_context_t* sw_simd_context_new(float match, float mismatch, float gap_op
 
 void sw_simd_context_update(int x_size, int y_size, sw_simd_context_t* context_p) {
   //printf("sw_simd_context_update...\n");
-     int max_size = x_size * y_size;
+
      if (context_p->x_size < x_size || context_p->y_size < y_size) {
 	  if (context_p->x_size < x_size) {
 	       context_p->x_size = x_size;
@@ -257,7 +257,7 @@ void sw_simd_context_free(sw_simd_context_t* context_p) {
 void smith_waterman_simd(sw_simd_input_t* input, sw_simd_output_t* output, 
 			 sw_simd_context_t* context) {
 
-  int len, simd_depth = 4, num_queries = input->depth;
+  int simd_depth = 4, num_queries = input->depth;
   int max_q_len = 0, max_r_len = 0;
 
   //float gap_open = context->gap_open;
@@ -298,19 +298,19 @@ void smith_waterman_simd(sw_simd_input_t* input, sw_simd_output_t* output,
 		    &context->aux_size, &context->q_aux, &context->r_aux);
 
   sse_matrix(num_queries, 
-	      input->seq_p, input->seq_len_p, max_q_len, 
-	      input->ref_p, input->ref_len_p, max_r_len, 
+	     input->seq_p, (int *)input->seq_len_p, max_q_len, 
+	     input->ref_p, (int *)input->ref_len_p, max_r_len, 
 	      context->matrix, context->gap_open, context->gap_extend, 
 	      context->H, context->F, context->C, output->score_p);
   
   simd_traceback(simd_depth, num_queries, 
-		  input->seq_p, input->seq_len_p, max_q_len, 
-		  input->ref_p, input->ref_len_p, max_r_len, 
+		  input->seq_p, (int *)input->seq_len_p, max_q_len, 
+		  input->ref_p, (int *)input->ref_len_p, max_r_len, 
 		  context->gap_open, context->gap_extend, 
 		  context->H, context->C, output->score_p,
-		  output->mapped_seq_p, output->start_seq_p,
-		  output->mapped_ref_p, output->start_p, 
-		  output->mapped_len_p, 
+		  output->mapped_seq_p, (int *)output->start_seq_p,
+		  output->mapped_ref_p, (int *)output->start_p, 
+		  (int *)output->mapped_len_p, 
 		  context->q_aux, context->r_aux);
   
   // free memory

@@ -52,8 +52,8 @@ static int bfwork_obtain_region(bam_fwork_t *fwork, bam_region_t *current_region
 void
 bfwork_init(bam_fwork_t *fwork)
 {
-	int i, threads;
-	bam_region_t *region;
+
+
 
 	assert(fwork);
 
@@ -241,7 +241,7 @@ bfwork_run_sequential(bam_fwork_t *fwork)
 
 				reads_to_write = region->size;
 				reads += reads_to_write;
-				printf("Reads processed: %d\r", reads);
+				printf("Reads processed: %lu\r", reads);
 
 				//Write region
 				breg_write_n(region, reads_to_write, fwork->output_file);
@@ -378,7 +378,7 @@ bfwork_run_threaded(bam_fwork_t *fwork)
 
 								omp_set_lock(&reads_lock);
 								reads += region->size;
-								printf("Reads processed: %d\r", reads);
+								printf("Reads processed: %lu\r", reads);
 								omp_unset_lock(&reads_lock);
 
 #ifdef D_TIME_DEBUG
@@ -508,9 +508,9 @@ bfwork_run_threaded(bam_fwork_t *fwork)
 int
 bfwork_run(bam_fwork_t *fwork)
 {
-	int err, c;
+	int err = 0, c;
 	double times;
-	bam1_t *read;
+
 
 	assert(fwork);
 	assert(fwork->input_file_str);
@@ -874,7 +874,7 @@ bfwork_context_init_timing(bfwork_context_t *context, const char *tag, const cha
 	char *sched;
 	char filename[100];
 	char intaux[20];
-	char cwd[1024];
+
 
 	assert(context);
 
@@ -1088,7 +1088,7 @@ bfwork_region_insert(bam_fwork_t *fwork, bam_region_t *region)
 static inline int
 bfwork_obtain_region(bam_fwork_t *fwork, bam_region_t *region)
 {
-	int i, err, bytes;
+	int err, bytes;
 	bam1_t *read;
 	double times;
 

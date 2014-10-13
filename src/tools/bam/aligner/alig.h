@@ -217,7 +217,7 @@ EXTERNC ERROR_CODE alig_bam_file_old(char *bam_path, char *ref_name, char *ref_p
  *
  * \param[in] context Context to process.
  */
-static ERROR_CODE alig_get_scores(alig_context_t *context) __ATTR_HOT;
+//static ERROR_CODE alig_get_scores(alig_context_t *context) __ATTR_HOT;
 
 /**
  * \brief PRIVATE FUNCTION.Obtain score tables from read.
@@ -227,7 +227,7 @@ static ERROR_CODE alig_get_scores(alig_context_t *context) __ATTR_HOT;
  * \param[out] v_scores Best score vector for every haplotype (index).
  * \param[out] v_positions Best score position vector for every haplotype (index).
  */
-static ERROR_CODE alig_get_scores_from_read(bam1_t *read, alig_context_t *context, uint32_t *v_scores, size_t *v_positions) __ATTR_HOT;
+//static ERROR_CODE alig_get_scores_from_read(bam1_t *read, alig_context_t *context, uint32_t *v_scores, size_t *v_positions) __ATTR_HOT;
 
 /**
  * \brief PRIVATE FUNCTION. Obtain alternative haplotype from generated score tables.
@@ -237,7 +237,7 @@ static ERROR_CODE alig_get_scores_from_read(bam1_t *read, alig_context_t *contex
  * \param[out] out_haplo_score Alternative haplotype score.
  * \param[out] out_ref_score Reference haplotype (H0) score.
  */
-static ERROR_CODE alig_get_alternative_haplotype(alig_context_t *context, int *out_haplo_index, uint32_t *out_haplo_score, uint32_t *out_ref_score);
+//static ERROR_CODE alig_get_alternative_haplotype(alig_context_t *context, int *out_haplo_index, uint32_t *out_haplo_score, uint32_t *out_ref_score);
 
 /**
  * \brief PRIVATE FUNCTION. Realign around indels using an alternative haplotype.
@@ -245,7 +245,7 @@ static ERROR_CODE alig_get_alternative_haplotype(alig_context_t *context, int *o
  * \param[in] context Context to process.
  * \param[in] alt_haplo_index Index of alternative haplotype in haplotypes list.
  */
-static ERROR_CODE alig_indel_realign_from_haplo(alig_context_t *context, size_t alt_haplo_index);
+//static ERROR_CODE alig_indel_realign_from_haplo(alig_context_t *context, size_t alt_haplo_index);
 
 
 #endif /* ALIG_H_ */

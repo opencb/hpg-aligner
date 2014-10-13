@@ -80,9 +80,8 @@ void append_seed_linked_list(seed_cal_t *cal,
   size_t genome_start = new_item->genome_start;
   size_t genome_end = new_item->genome_end;
 
-  int i, j, overlap;
-  int seeds_to_delete, inserted = 0;
-  seed_t *item, *aux_item;
+  int i, overlap;
+  seed_t *item;
   linked_list_iterator_t* itr = linked_list_iterator_new(seed_list);
   
   if (linked_list_size(seed_list) <= 0) {
@@ -304,7 +303,6 @@ void cal_mng_simple_free(cal_mng_t *p) {
 //--------------------------------------------------------------------
 
 void cal_mng_simple_clear(cal_mng_t *p) {
-  int list_size;
   linked_list_item_t *item;
   linked_list_t *list;
   cal_t *cal;
@@ -461,17 +459,17 @@ int cal_mng_find(int strand, unsigned int chrom, size_t start, size_t end, cal_m
 void cal_mng_to_array_list(int min_read_area, array_list_t *out_list, cal_mng_t *p) {
   seed_t *first, *last;
   seed_cal_t *cal;
-  linked_list_iterator_t itr;
+
 
   #ifdef _VERBOSE
   printf("-----> cal_mng_to_array_list\n");
   #endif
-
+ 
   if (p->cals_lists) {
     linked_list_t *cal_list;
     for (unsigned int i = 0; i < p->num_chroms; i++) {
       cal_list = p->cals_lists[i];
-      while (cal = (seed_cal_t *) linked_list_remove_last(cal_list)) {
+      while ((cal = (seed_cal_t *) linked_list_remove_last(cal_list))) {
 	#ifdef _VERBOSE
 	seed_cal_print(cal);
 	#endif
@@ -498,13 +496,13 @@ void cal_mng_to_array_list(int min_read_area, array_list_t *out_list, cal_mng_t 
 void cal_mng_select_best(int read_area, array_list_t *valid_list, array_list_t *invalid_list, 
 			 cal_mng_t *p) {
   seed_cal_t *cal;
-  linked_list_iterator_t itr;
+
 
   if (p->cals_lists) {
     linked_list_t *cal_list;
     for (unsigned int i = 0; i < p->num_chroms; i++) {
       cal_list = p->cals_lists[i];
-      while (cal = (seed_cal_t *) linked_list_remove_last(cal_list)) {
+      while ((cal = (seed_cal_t *) linked_list_remove_last(cal_list))) {
 	if (p->min_read_area <= read_area && cal->read_area <= read_area) {
 	  array_list_insert(cal, valid_list);
 	} else {
@@ -534,7 +532,7 @@ array_list_t *search_mate_cal_by_prefixes(seed_cal_t *cal, fastq_read_t *read,
 
   int num_seeds = batch->options->num_seeds;
 
-  int min_distance = batch->options->pair_min_distance;
+
   int max_distance = batch->options->pair_max_distance;
   
   read_end_pos = read->length - sa_index->k_value;
@@ -627,10 +625,10 @@ void check_pairs(array_list_t **cal_lists, sa_index3_t *sa_index,
 
   int score, first_score, second_score;
   int distance, valid_pair, list_size, list1_size, list2_size;
-  seed_cal_t *cal, *mate_cal, *cal1, *cal2;
+  seed_cal_t *cal, *mate_cal, *cal1 = NULL, *cal2;
   array_list_t *list, *mate_list, *mate1_list, *mate2_list, *list1, *list2;
   fastq_read_t *read, *read1, *read2;
-  size_t mate_list_size, num_cals, num_reads = array_list_size(batch->fq_reads);
+  size_t mate_list_size, num_reads = array_list_size(batch->fq_reads);
 
   int min_distance = batch->options->pair_min_distance;
   int max_distance = batch->options->pair_max_distance;
@@ -770,8 +768,8 @@ void check_pairs(array_list_t **cal_lists, sa_index3_t *sa_index,
 	cal = array_list_get(ii, list);
 	mate_list = search_mate_cal_by_prefixes(cal, read, sa_index, batch, cal_mng);
 	mate_list_size = array_list_size(mate_list);
-	int num_found_mates = 0;
-	int found_mates[mate_list_size];
+
+
 	for (int jj = 0; jj < mate_list_size; jj++) { 
 	  mate_cal = array_list_get(jj, mate_list);
 	  
@@ -887,8 +885,8 @@ void generate_cals_from_exact_read(int strand, fastq_read_t *read,
   size_t g_start, g_end;
   unsigned int chrom;
 
-  seed_cal_t *cal;
-  cigar_t *cigar;
+
+
   seed_t *seed;
   
   for (size_t suff = low; suff <= high; suff++) {
@@ -929,14 +927,14 @@ int generate_cals_from_suffixes(int strand, fastq_read_t *read,
 
   size_t r_start_suf, r_end_suf, g_start_suf, g_end_suf;
   size_t r_start, r_end, r_len, g_start, g_end, g_len;
-  int found_cal, diff, max_map_len = 0;
+  int found_cal, diff;
   unsigned int chrom;
 
   float score;
   alig_out_t alig_out;
   cigar_init(&alig_out.cigar);
 
-  cigar_t cigar;
+
   seed_t *seed;
 
   char *g_seq, *r_seq;
@@ -1178,7 +1176,7 @@ array_list_t *create_cals(int num_seeds, fastq_read_t *read,
   struct timeval stop, start;
   #endif
 
-  double prefix_time, suffix_time;
+
   size_t suffix_len, num_suffixes;
   char *r_seq = read->sequence;
 
@@ -1192,7 +1190,7 @@ array_list_t *create_cals(int num_seeds, fastq_read_t *read,
   cal_mng->min_read_area = read->length;
   cal_mng->read_length = read->length;
 
-  int max_read_area;
+
   int read_pos, read_inc;
   
   read_inc = read->length / num_seeds;
@@ -1370,15 +1368,15 @@ array_list_t *create_cals(int num_seeds, fastq_read_t *read,
 void fill_seed_gaps(array_list_t *cal_list, fastq_read_t *read, sa_index3_t *sa_index) {
 
   seed_t *prev_seed, *seed;
-  linked_list_item_t *prev_item, *item;
+
 
   seed_cal_t *cal;
   size_t num_seeds, num_cals = array_list_size(cal_list);
 
-  float score;
-  char *g_seq, *r_seq;
+
+
   alig_out_t alig_out;
-  size_t r_start, r_end, r_len, g_start, g_end, g_len;
+
   cigar_init(&alig_out.cigar);
 
 
@@ -1426,7 +1424,7 @@ int check_gap_lengths(int max_gap_length, array_list_t *cal_list) {
   int gap_read_len, gap_genome_len;
   size_t gap_read_start, gap_read_end;
   size_t gap_genome_start, gap_genome_end;
-  size_t seed_count, num_seeds, num_cals = array_list_size(cal_list);
+  size_t num_seeds, num_cals = array_list_size(cal_list);
 
   seed_cal_t *cal;
   seed_t *prev_seed, *seed;
@@ -1496,7 +1494,7 @@ void clean_cals(array_list_t **list, fastq_read_t *read, sa_index3_t *sa_index) 
 
   seed_t *prev_seed, *seed;
   linked_list_item_t *prev_item, *item;
-  linked_list_iterator_t* itr;
+
 
   int trim, invalid, overlap;
   seed_cal_t *cal;
@@ -1681,7 +1679,7 @@ int prepare_sw(fastq_read_t *read,   array_list_t *sw_prepare_list,
 
   char *seq, *ref;
   seed_t *prev_seed, *seed;
-  int gap_len;
+
   int gap_read_len, gap_genome_len;
   size_t start, end;
   size_t gap_read_start, gap_read_end;
@@ -1691,10 +1689,10 @@ int prepare_sw(fastq_read_t *read,   array_list_t *sw_prepare_list,
   sw_prepare_t *sw_prepare;
 
   seed_cal_t *cal;
-  cigar_t *cigar;
+
   cigarset_t *cigarset;
 
-  int query_flank, ref_flank;
+
   int num_sw, num_total_sw = 0;
 
   for (int i = 0; i < num_cals; i++) {
@@ -1968,7 +1966,7 @@ void execute_sw(array_list_t *sw_prepare_list, sa_mapping_batch_t *mapping_batch
 
   // process Smith-Waterman output
   seed_t *seed;
-  char *seq, *ref, *query_map, *ref_map;
+  char *query_map, *ref_map;
   int op_name, op_value, diff, len, r_nt_mapped;
   int left_flank, right_flank, query_start, ref_start;
   for (int i = 0; i < sw_count; i++) {
@@ -2117,7 +2115,7 @@ void post_process_sw(int sw_post_read_counter, int *sw_post_read,
   int num_cals, cigar_type;
   array_list_t *cal_list;
 
-  seed_t *seed;
+  seed_t *seed = NULL;
   seed_cal_t *cal;
   cigar_t *cigar, *aux_cigar;
   cigarset_t *cigarset;
@@ -2212,7 +2210,7 @@ int sa_single_mapper(void *data) {
   sa_wf_batch_t *wf_batch = (sa_wf_batch_t *) data;
 
   int num_seeds = wf_batch->options->num_seeds;
-  int min_cal_size = wf_batch->options->min_cal_size;
+
   
   sa_mapping_batch_t *mapping_batch = wf_batch->mapping_batch;
   mapping_batch->options = wf_batch->options;
@@ -2222,7 +2220,7 @@ int sa_single_mapper(void *data) {
   int bam_format = mapping_batch->bam_format;
 
   size_t num_reads = mapping_batch->num_reads;
-  int max_read_area, min_num_mismatches;
+
   float max_score;
 
   // smith-waterman parameters
@@ -2232,8 +2230,8 @@ int sa_single_mapper(void *data) {
   float gap_extend_penalty = -1.0f * wf_batch->options->gap_extend;
   
   // CAL management
-  size_t num_cals;
-  seed_cal_t *cal;
+
+
   cal_mng_t *cal_mng;
   array_list_t *cal_list;
 
@@ -2380,7 +2378,6 @@ int sa_pair_mapper(void *data) {
   int pair_max_distance = wf_batch->options->pair_max_distance;
 
   int num_seeds = wf_batch->options->num_seeds;
-  int min_cal_size = wf_batch->options->min_cal_size;
   
   sa_mapping_batch_t *mapping_batch = wf_batch->mapping_batch;
   mapping_batch->options = wf_batch->options;
@@ -2388,20 +2385,10 @@ int sa_pair_mapper(void *data) {
   sa_index3_t *sa_index = (sa_index3_t *) wf_batch->sa_index;
   
   int bam_format = mapping_batch->bam_format;
-
   size_t num_reads = mapping_batch->num_reads;
-  int max_read_area, min_num_mismatches;
-  float max_score;
 
-  // smith-waterman parameters
-  float match_score = wf_batch->options->match;
-  float mismatch_penalty = wf_batch->options->mismatch;
-  float gap_open_penalty = -1.0f * wf_batch->options->gap_open;
-  float gap_extend_penalty = -1.0f * wf_batch->options->gap_extend;
 
   // CAL management
-  size_t num_cals;
-  seed_cal_t *cal;
   cal_mng_t *cal_mng;
   array_list_t *cal_list;
 

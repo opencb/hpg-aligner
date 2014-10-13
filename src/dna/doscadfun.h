@@ -43,7 +43,7 @@ static inline void alig_out_init(alig_out_t *out) {
 //--------------------------------------------------------------------
 
 static inline void alig_out_set(int map_l1, int map_l2, int mm, int mism,
-                         int gap1, int gapmas, int st_mm_len, alig_out_t *out) {
+				int gap1, int gapmas, int st_mm_len, alig_out_t *out) {
   out->map_len1 = map_l1;
   out->map_len2 = map_l2;
   out->match = mm;

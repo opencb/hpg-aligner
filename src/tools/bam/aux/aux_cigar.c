@@ -42,10 +42,6 @@ cigar32_leftmost(char *ref, size_t ref_l, char *read, size_t read_l, uint32_t *c
 	//Counters
 	int retry;
 
-	//ERASE
-	char str_cigar[MAX_CIGAR_LENGTH*3];
-	char str_new_cigar[MAX_CIGAR_LENGTH*3];
-	int printed = 0;
 
 	assert(ref);
 	assert(ref_l > 0);
@@ -233,7 +229,7 @@ ERROR_CODE
 cigar32_reclip(uint32_t *clip_cigar, size_t clip_cigar_l, uint32_t *unclip_cigar, size_t unclip_cigar_l, uint32_t *out_cigar, size_t *out_cigar_l)
 {
 	int i;
-	int c_count;
+
 	int c_type;
 	size_t new_l = 0;
 	uint32_t aux_cigar[MAX_CIGAR_LENGTH];
@@ -328,10 +324,10 @@ cigar32_reclip(uint32_t *clip_cigar, size_t clip_cigar_l, uint32_t *unclip_cigar
 ERROR_CODE
 cigar32_shift_left_indel(uint32_t *cigar, size_t cigar_l, size_t indel_index, uint32_t *out_cigar, size_t *out_cigar_l)
 {
-	int i, elem, type;
+	int elem, type;
 
 	//Index
-	size_t actual_index;
+	size_t actual_index = 0;
 
 	assert(cigar);
 	assert(cigar_l > 0);
@@ -394,7 +390,7 @@ cigar32_count_m_blocks(uint32_t *cigar, size_t cigar_l, size_t *blocks)
 	int c_count;
 	int c_type;
 	size_t block_c;
-	char *str_cigar;
+
 
 	assert(cigar);
 	assert(cigar_l > 0);
@@ -431,7 +427,7 @@ cigar32_count_indels(uint32_t *cigar, size_t cigar_l, size_t *indels)
 	int c_count;
 	int c_type;
 	size_t indel_c;
-	char *str_cigar;
+
 
 	assert(cigar);
 	//assert(cigar_l > 0);
@@ -563,7 +559,7 @@ cigar32_count_all(uint32_t *cigar, size_t cigar_l, size_t *m_blocks, size_t *ind
 	size_t indel_c;
 	size_t m_block_c;
 	size_t indel_index;
-	char *str_cigar;
+
 
 	assert(cigar);
 	assert(cigar_l > 0);
@@ -637,7 +633,7 @@ cigar32_to_string(uint32_t *cigar, size_t cigar_l, char* str_cigar)
 {
 	int i, elem, type;
 
-	sprintf(str_cigar, "");
+	str_cigar[0] = '\0';
 	for(i = 0; i < cigar_l; i++)
 	{
 		elem = cigar[i] >> BAM_CIGAR_SHIFT;	//Get number of bases from cigar
@@ -688,7 +684,7 @@ cigar32_create_ref(uint32_t *cigar, size_t cigar_l, char *ref, size_t ref_l, cha
 	size_t index_ref = 0;
 	size_t index_read = 0;
 	size_t index_aux = 0;
-	size_t remain = 0;
+
 	extra = 0;
 
 	assert(cigar);
@@ -845,9 +841,9 @@ cigar32_get_indels(size_t ref_pos, uint32_t *cigar, size_t cigar_l, aux_indel_t 
 ERROR_CODE
 cigar32_from_haplo(uint32_t *cigar, size_t cigar_l, aux_indel_t *haplo, size_t read_pos, uint32_t *new_cigar, size_t *new_cigar_l)
 {
-	int i, elem, type;
-	size_t current_pos;
-	size_t current_cigar_elem;
+
+
+
 	size_t bases;
 
 	//Read

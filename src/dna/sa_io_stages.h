@@ -12,7 +12,7 @@
 void *sa_fq_reader(void *input);
 
 int sa_sam_writer(void *data);
-void *write_sam_header(sa_genome3_t *genome, FILE *f);
+void write_sam_header(sa_genome3_t *genome, FILE *f);
 
 bam_header_t *create_bam_header(sa_genome3_t *genome);
 int sa_bam_writer(void *data);

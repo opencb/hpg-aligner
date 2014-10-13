@@ -231,8 +231,6 @@ void sw_output_free(sw_output_t *p);
 //--------------------------------------------------------------------------------------
 
 int apply_sw(sw_server_input_t* input, batch_t *batch);
-int apply_sw_bs(sw_server_input_t* input, batch_t *batch);
-int apply_sw_bs_4nt(sw_server_input_t* input, batch_t *batch);
 
 void fill_matrix(subst_matrix_t subst_matrix, float match, float mismatch, int type, float factor_match, float factor_mismatch);
 

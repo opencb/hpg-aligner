@@ -123,7 +123,7 @@ void load_intron_file(genome_t *genome, char* intron_filename, avls_list_t *avls
   size_t chr, start, end;
   unsigned char strand;
   int found;
-  node_element_splice_t *node;
+
 
   if (fd_intron == NULL) {
     return;
@@ -131,6 +131,9 @@ void load_intron_file(genome_t *genome, char* intron_filename, avls_list_t *avls
   
   while (!feof(fd_intron)) {
     char *res = fgets(line, max_size, fd_intron);
+    if (!res) {
+      break;
+    }
     line_size = strlen(line);
     pos = 0;
     value_pos = 0;
@@ -466,14 +469,13 @@ avls_list_t* avls_list_new(size_t num_chromosomes) {
 allocate_buffers_t* process_avlnode_ends(avl_node_t *node_val, unsigned char st,
 					 unsigned int chromosome, allocate_buffers_t *allocate_batches) {
   int i;
-  char strand[2] = {'+', '-'};
-  list_item_t* item_p = NULL;
-  unsigned int bytes_exact, bytes_extend;
+
+
+  unsigned int bytes_exact;
   start_data_t *start_data = node_val->data;
   size_t num_ends = array_list_size(start_data->list_ends);
   const int write_size = 5000000;
 
-  allocate_batches->write_exact_sp;
 
   for (i = 0; i < num_ends; i++) {
     if ((allocate_batches->write_exact_sp->size + 100) > write_size) {
@@ -546,7 +548,7 @@ void write_chromosome_avls( char *extend_sp, char *exact_sp,
     exit(-1);
   }
 
-  FILE *fd_extend = NULL;//fopen(extend_sp, "w");
+
   //if (!fd_extend) { 
   //printf("Imposible to create FILE: %s\n", exact_sp);
   //exit(-1);

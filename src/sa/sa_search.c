@@ -6,11 +6,11 @@ size_t search_prefix(char *sequence, size_t *low, size_t *high,
 		     sa_index3_t *sa_index, int display) {
   size_t num_mappings = 0;
 
-  char *seq;
+
   size_t value, row, col;
-  uint ia, ia1, ia2, found_ia;
-  uint ja, found_ja;
-  uint a, a1, a2;
+  uint ia, ia1, ia2;
+  uint  found_ja;
+  uint a1, a2;
 
   //  printf("prefix: %s\n", sequence);
   //  display_prefix(sequence, sa_index->k_value);
@@ -46,7 +46,7 @@ size_t search_prefix(char *sequence, size_t *low, size_t *high,
   
   found_ja = 0;
 
-  int idx, size = ia2 - ia1;
+
   for (ia = ia1; ia < ia2; ia++) {
     a1 = sa_index->A[ia];
     //ja = sa_index->JA[ia];
