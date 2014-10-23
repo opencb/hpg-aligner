@@ -2028,7 +2028,7 @@ void execute_sw(array_list_t *sw_prepare_list, sa_mapping_batch_t *mapping_batch
 	  cigar_append_op(query_start, 'I', cigar);      
 	}
       } else if (ref_start > 0) {
-	cigar_append_op(ref_start, 'D', cigar);      
+	cigar_append_op(ref_start, '=', cigar);      
       }
     }
 
