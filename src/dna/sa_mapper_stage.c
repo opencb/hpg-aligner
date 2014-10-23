@@ -1710,6 +1710,11 @@ int prepare_sw(fastq_read_t *read,   array_list_t *sw_prepare_list,
     num_seeds = cal->seed_list->size;
     if (num_seeds <= 0) continue;
 
+    seed_cal_merge_seeds(cal);
+    if (cigar_get_length(&cal->cigar) == read->length) {
+      continue;
+    }
+    
     // first seed
     seed = linked_list_get_first(cal->seed_list);
 
@@ -1897,11 +1902,7 @@ int prepare_sw(fastq_read_t *read,   array_list_t *sw_prepare_list,
     } else {
       cigarset_info_set(0, 0, NULL, NULL, &cigarset->info[num_seeds * 2]);
     }
-    
-    if (num_sw == 0) {
-      seed_cal_set_cigar_by_seed(seed, cal);
-    }
-    
+
     num_total_sw += num_sw;
   }
   
@@ -2028,7 +2029,7 @@ void execute_sw(array_list_t *sw_prepare_list, sa_mapping_batch_t *mapping_batch
 	  cigar_append_op(query_start, 'I', cigar);      
 	}
       } else if (ref_start > 0) {
-	cigar_append_op(ref_start, '=', cigar);      
+	//cigar_append_op(ref_start, '=', cigar);      
       }
     }
 
