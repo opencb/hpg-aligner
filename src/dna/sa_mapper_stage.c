@@ -2474,6 +2474,9 @@ int sa_pair_mapper(void *data) {
     read = array_list_get(i, mapping_batch->fq_reads);
     cal_list = cal_lists[i];
 
+    //printf("%s:%s:%i: before prepare_sw:\n", __FILE__, __func__, __LINE__);
+    //for(int i = 0; i < array_list_size(cal_list); i++) { seed_cal_print(array_list_get(i, cal_list)); }
+
     if (array_list_size(cal_list) > 0) {
       if (prepare_sw(read, sw_prepare_list, mapping_batch, sa_index, cal_list)) {
 	sw_post_read[sw_post_read_counter++] = i;

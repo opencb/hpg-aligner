@@ -30,7 +30,7 @@ void seed_cal_merge_seeds(seed_cal_t *cal) {
   int read_length = cal->read->length;
 
   size_t num_seeds = linked_list_size(cal->seed_list);
-  if (num_seeds > 0) {
+  if (num_seeds > 1) {
     // multiple seeds
     linked_list_iterator_t* itr = linked_list_iterator_new(cal->seed_list);
     linked_list_iterator_next(itr);
@@ -47,7 +47,7 @@ void seed_cal_merge_seeds(seed_cal_t *cal) {
     linked_list_iterator_free(itr);
   } else if (num_seeds == 1) {
     // one seed
-    seed_t *seed = linked_list_get_first(cal->seed_list);
+    seed = linked_list_get_first(cal->seed_list);
     if (cigar_get_length(&seed->cigar) == cal->read->length) {
       seed_cal_set_cigar_by_seed(seed, cal);
       linked_list_clear(cal->seed_list, (void *)seed_free);
