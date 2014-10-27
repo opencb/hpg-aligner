@@ -985,11 +985,11 @@ int generate_cals_from_suffixes(int strand, fastq_read_t *read,
     if (found_cal) continue;
 
 
-    //#ifdef _VERBOSE
-    //printf("%s:%i:\t\tsuffix at [%lu|%lu-%lu|%lu] %c chrom %s\n", __FILE__, __LINE__,
-    //	   g_start_suf, r_start_suf, r_end_suf, g_end_suf, (strand == 0 ? '+' : '-'), 
-    //	   sa_index->genome->chrom_names[chrom]);
-    //#endif
+    #ifdef _VERBOSE
+    printf("%s:%i:\t\tsuffix at [%lu|%lu-%lu|%lu] %c chrom %s\n", __FILE__, __LINE__,
+    	   g_start_suf, r_start_suf, r_end_suf, g_end_suf, (strand == 0 ? '+' : '-'), 
+    	   sa_index->genome->chrom_names[chrom]);
+    #endif
 
     seed = seed_new(r_start_suf, r_end_suf, g_start_suf, g_end_suf);
 
@@ -1018,8 +1018,8 @@ int generate_cals_from_suffixes(int strand, fastq_read_t *read,
       #endif
       score = doscadfun_inv(r_seq, r_len, g_seq, g_len, MISMATCH_PERC,
 			    &alig_out);
-      //printf("%s:%i********** doscadfun_inv (score = %0.2f) cigar: %s\n", 
-      //	     __FILE__, __LINE__, score, cigar_to_string(&alig_out.cigar));
+      //      printf("%s:%i********** doscadfun_inv (score = %0.2f) cigar: %s\n", 
+      //      	     __FILE__, __LINE__, score, cigar_to_string(&alig_out.cigar));
 			    
       #ifdef _TIMING
       gettimeofday(&stop, NULL);
@@ -1095,8 +1095,8 @@ int generate_cals_from_suffixes(int strand, fastq_read_t *read,
       #endif
       score = doscadfun(&r_seq[r_start], r_len, g_seq, g_len, MISMATCH_PERC,
 			&alig_out);
-      //printf("%s:%i********** doscadfun (score = %0.2f) cigar: %s\n", 
-      //	     __FILE__, __LINE__, score, cigar_to_string(&alig_out.cigar));
+      //      printf("%s:%i********** doscadfun (score = %0.2f) cigar: %s\n", 
+      //      	     __FILE__, __LINE__, score, cigar_to_string(&alig_out.cigar));
       #ifdef _TIMING
       gettimeofday(&stop, NULL);
       mapping_batch->func_times[FUNC_MINI_SW_RIGHT_SIDE] += 
@@ -1143,7 +1143,7 @@ int generate_cals_from_suffixes(int strand, fastq_read_t *read,
       }
     }
 
-    //printf("%s:%c:\t seed final cigar: %s\n", __FILE__, __LINE__, cigar_to_string(&seed->cigar));
+    //    printf("%s:%c:\t seed final cigar: %s\n", __FILE__, __LINE__, cigar_to_string(&seed->cigar));
 
     // update CAL manager with this seed
     if (seed->read_end - seed->read_start + 1 > 20) {
@@ -2447,12 +2447,16 @@ int sa_pair_mapper(void *data) {
     // 1) extend using mini-sw from suffix
     cal_list = create_cals(num_seeds, read, mapping_batch, sa_index, cal_mng);
 
-    //printf("\t\t%s:%i: after create_cals:\n", __FILE__, __LINE__);
-    //for(int i = 0; i < array_list_size(cal_list); i++) { seed_cal_print(array_list_get(i, cal_list)); }
-
     if (array_list_size(cal_list) > 0) {
 
+      //      printf("\t\t%s:%i: before select_best_cals:\n", __FILE__, __LINE__);
+      //      for (int i = 0; i < array_list_size(cal_list); i++) { seed_cal_print(array_list_get(i, cal_list)); }
+
       select_best_cals(read, &cal_list);
+
+      //      printf("\t\t%s:%i: after select_best_cals:\n", __FILE__, __LINE__);
+      //      for (int i = 0; i < array_list_size(cal_list); i++) { seed_cal_print(array_list_get(i, cal_list)); }
+
       if (array_list_size(cal_list) <= 0) {
 	suffix_mng_search_read_cals(read, num_seeds, sa_index, cal_list, cal_mng->suffix_mng);
 	if (array_list_size(cal_list) > 0) {
