@@ -24,6 +24,91 @@ void seed_cal_free(seed_cal_t *p) {
 }
 
 //--------------------------------------------------------------------
+
+void seed_cal_merge_seeds(seed_cal_t *cal) {
+  #ifdef _VERBOSE
+  int display = 0;
+  #endif
+  seed_t *seed;
+  int read_length = cal->read->length;
+
+  size_t num_seeds = linked_list_size(cal->seed_list);
+  if (num_seeds > 1) {
+    // multiple seeds
+    seed_t *prev_seed;
+    linked_list_item_t *prev_item, *item;
+    prev_item = cal->seed_list->first; 
+    prev_seed = prev_item->item;
+    for (item = prev_item->next; 
+	 item != NULL; item = item->next) {
+      seed = item->item;
+
+      if (prev_seed->read_end == seed->read_start) {
+	seed_rtrim_read(1, prev_seed);
+      } 
+
+      if (prev_seed->genome_end == seed->genome_start) {
+	seed_rtrim_genome(1, prev_seed);
+      } 
+
+      //      if (prev_seed->read_end + 1 == seed->read_start && 
+      //	  prev_seed->genome_end + 1 == seed->genome_start) {
+      //	display = 1;
+      //      }
+
+      if (prev_seed->read_end + 1 == seed->read_start && 
+	  prev_seed->genome_end + 1 == seed->genome_start) {
+	#ifdef _VERBOSE
+	display = 1;
+	print_seed("prev_seed: ", prev_seed);
+	print_seed("seed     : ", seed);
+	#endif
+	
+	prev_seed->read_end = seed->read_end;
+	prev_seed->genome_end = seed->genome_end;
+
+	prev_seed->suf_read_end = seed->suf_read_end;
+	prev_seed->suf_genome_end = seed->suf_genome_end;
+
+	prev_seed->num_mismatches += seed->num_mismatches;
+	prev_seed->num_open_gaps += seed->num_open_gaps;
+	prev_seed->num_extend_gaps += seed->num_extend_gaps;
+
+	cigar_concat(&seed->cigar, &prev_seed->cigar);
+
+	linked_list_remove_item(item, cal->seed_list);
+	seed_free(seed);
+
+	#ifdef _VERBOSE
+	print_seed("result   : ", prev_seed);
+	printf("\n");
+	#endif
+	item = prev_item;
+      } else {
+	prev_item = item;
+	prev_seed = seed;
+      }
+    }
+    num_seeds = linked_list_size(cal->seed_list);
+  }
+
+  if (num_seeds == 1) {
+    // one seed
+    seed = linked_list_get_first(cal->seed_list);
+    if (cigar_get_length(&seed->cigar) == cal->read->length) {
+      seed_cal_set_cigar_by_seed(seed, cal);
+      linked_list_clear(cal->seed_list, (void *)seed_free);
+    }
+  }
+
+  #ifdef _VERBOSE
+  if (display) {
+    seed_cal_print(cal);
+  }
+  #endif
+}
+
+//--------------------------------------------------------------------
 // utils
 //--------------------------------------------------------------------
 
@@ -507,6 +592,16 @@ void create_alignments(array_list_t *cal_list, fastq_read_t *read,
     cigar_string = cigar_to_string(cigar);
     cigar_M_string = cigar_to_M_string(&num_mismatches, &num_cigar_ops, cigar);
     len = strlen(cigar_string);
+
+    #ifdef _VERBOSE
+    if (cigar_get_length(cigar) != read->length) {
+      printf("--> %s:%i read length %i != cigar %s length %i\n", 
+	     __FILE__, __LINE__, read->length, cigar_string, cigar_get_length(cigar));
+      seed_cal_print(cal);
+      //      printf("********************** A B O R T ************************\n");
+      //      exit(-1);
+    }
+    #endif
 
     optional_fields_length = 100 + len;
 

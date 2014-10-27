@@ -945,7 +945,10 @@ static inline void seed_cal_set_cigar_by_seed(seed_t *seed, seed_cal_t *cal) {
   cigar_concat(&seed->cigar, &cal->cigar);
 }
 
+void seed_cal_merge_seeds(seed_cal_t *cal);
+
 //--------------------------------------------------------------------
+
 void print_seed(char *msg, seed_t *s);
 
 static inline void seed_cal_print(seed_cal_t *cal) {
