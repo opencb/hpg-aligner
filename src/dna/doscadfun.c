@@ -739,6 +739,7 @@ float doscadfun_inv(char* st1, int ll1, char* st2, int ll2,
 	     score, map_len1, ll1, match, mism, gap1, gapmas, cigar_to_string(&out->cigar));
 #endif
       
+      cigar_rev(&out->cigar);
       cigar_clean(&first_cigar);
 
       return score;
