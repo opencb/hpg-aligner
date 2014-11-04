@@ -750,14 +750,6 @@ int cal_stage(void *data) {
   return apply_caling_rna(batch->cal_input, batch);
 }
 
-//--------------------------------------------------------------------
-
-
-int rna_preprocess_stage(void *data) {
-  batch_t *batch = (batch_t *) data;
-
-  return apply_preprocess_rna(batch->preprocess_rna, batch);  
-}
 
 //---------------------------------------------------------------------
 

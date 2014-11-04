@@ -79,8 +79,9 @@ void append_seed_linked_list(seed_cal_t *cal,
   size_t read_end = new_item->read_end; 
   size_t genome_start = new_item->genome_start;
   size_t genome_end = new_item->genome_end;
-
+  
   int i, overlap;
+
   seed_t *item;
   linked_list_iterator_t* itr = linked_list_iterator_new(seed_list);
   
@@ -303,6 +304,7 @@ void cal_mng_simple_free(cal_mng_t *p) {
 //--------------------------------------------------------------------
 
 void cal_mng_simple_clear(cal_mng_t *p) {
+
   linked_list_item_t *item;
   linked_list_t *list;
   cal_t *cal;
@@ -464,7 +466,7 @@ void cal_mng_to_array_list(int min_read_area, array_list_t *out_list, cal_mng_t 
   #ifdef _VERBOSE
   printf("-----> cal_mng_to_array_list\n");
   #endif
- 
+
   if (p->cals_lists) {
     linked_list_t *cal_list;
     for (unsigned int i = 0; i < p->num_chroms; i++) {
@@ -496,8 +498,7 @@ void cal_mng_to_array_list(int min_read_area, array_list_t *out_list, cal_mng_t 
 void cal_mng_select_best(int read_area, array_list_t *valid_list, array_list_t *invalid_list, 
 			 cal_mng_t *p) {
   seed_cal_t *cal;
-
-
+  
   if (p->cals_lists) {
     linked_list_t *cal_list;
     for (unsigned int i = 0; i < p->num_chroms; i++) {
@@ -625,7 +626,7 @@ void check_pairs(array_list_t **cal_lists, sa_index3_t *sa_index,
 
   int score, first_score, second_score;
   int distance, valid_pair, list_size, list1_size, list2_size;
-  seed_cal_t *cal, *mate_cal, *cal1 = NULL, *cal2;
+  seed_cal_t *cal, *mate_cal, *cal1, *cal2;
   array_list_t *list, *mate_list, *mate1_list, *mate2_list, *list1, *list2;
   fastq_read_t *read, *read1, *read2;
   size_t mate_list_size, num_reads = array_list_size(batch->fq_reads);
@@ -657,7 +658,7 @@ void check_pairs(array_list_t **cal_lists, sa_index3_t *sa_index,
 	if (array_list_size(list) > 0) {
 	  for (int kk = 0; kk < array_list_size(list); kk++) { 
 	    cal = array_list_get(kk, list); 
-	    if (is_valid_cal_pair(cal1, cal, min_distance, max_distance, &distance)) {
+	    if (is_valid_cal_pair(cal2, cal, min_distance, max_distance, &distance)) {
 	      array_list_insert(cal, new_list);
 	      array_list_set(kk, NULL, list);
 	    }
@@ -768,7 +769,6 @@ void check_pairs(array_list_t **cal_lists, sa_index3_t *sa_index,
 	cal = array_list_get(ii, list);
 	mate_list = search_mate_cal_by_prefixes(cal, read, sa_index, batch, cal_mng);
 	mate_list_size = array_list_size(mate_list);
-
 
 	for (int jj = 0; jj < mate_list_size; jj++) { 
 	  mate_cal = array_list_get(jj, mate_list);
@@ -885,8 +885,6 @@ void generate_cals_from_exact_read(int strand, fastq_read_t *read,
   size_t g_start, g_end;
   unsigned int chrom;
 
-
-
   seed_t *seed;
   
   for (size_t suff = low; suff <= high; suff++) {
@@ -983,11 +981,11 @@ int generate_cals_from_suffixes(int strand, fastq_read_t *read,
     if (found_cal) continue;
 
 
-    //#ifdef _VERBOSE
-    //printf("%s:%i:\t\tsuffix at [%lu|%lu-%lu|%lu] %c chrom %s\n", __FILE__, __LINE__,
-    //	   g_start_suf, r_start_suf, r_end_suf, g_end_suf, (strand == 0 ? '+' : '-'), 
-    //	   sa_index->genome->chrom_names[chrom]);
-    //#endif
+    #ifdef _VERBOSE
+    printf("\t\tsuffix at [%lu|%lu-%lu|%lu] %c chrom %s\n",
+	   g_start_suf, r_start_suf, r_end_suf, g_end_suf, (strand == 0 ? '+' : '-'), 
+	   sa_index->genome->chrom_names[chrom]);
+    #endif
 
     seed = seed_new(r_start_suf, r_end_suf, g_start_suf, g_end_suf);
 
@@ -1016,15 +1014,13 @@ int generate_cals_from_suffixes(int strand, fastq_read_t *read,
       #endif
       score = doscadfun_inv(r_seq, r_len, g_seq, g_len, MISMATCH_PERC,
 			    &alig_out);
-      //printf("%s:%i********** doscadfun_inv (score = %0.2f) cigar: %s\n", 
-      //	     __FILE__, __LINE__, score, cigar_to_string(&alig_out.cigar));
 			    
       #ifdef _TIMING
       gettimeofday(&stop, NULL);
       mapping_batch->func_times[FUNC_MINI_SW_LEFT_SIDE] += 
 	((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);  
       #endif
-      if (score > 0.0f) {
+      if (1) {
 
 	// update seed
 	seed->num_mismatches += alig_out.mismatch;
@@ -1093,14 +1089,12 @@ int generate_cals_from_suffixes(int strand, fastq_read_t *read,
       #endif
       score = doscadfun(&r_seq[r_start], r_len, g_seq, g_len, MISMATCH_PERC,
 			&alig_out);
-      //printf("%s:%i********** doscadfun (score = %0.2f) cigar: %s\n", 
-      //	     __FILE__, __LINE__, score, cigar_to_string(&alig_out.cigar));
       #ifdef _TIMING
       gettimeofday(&stop, NULL);
       mapping_batch->func_times[FUNC_MINI_SW_RIGHT_SIDE] += 
 	((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);  
       #endif
-      if (score > 0.0f) {
+      if (1) {
 
 	// update seed
 	seed->num_mismatches += alig_out.mismatch;
@@ -1140,8 +1134,6 @@ int generate_cals_from_suffixes(int strand, fastq_read_t *read,
 	}
       }
     }
-
-    //printf("%s:%c:\t seed final cigar: %s\n", __FILE__, __LINE__, cigar_to_string(&seed->cigar));
 
     // update CAL manager with this seed
     if (seed->read_end - seed->read_start + 1 > 20) {
@@ -1506,7 +1498,7 @@ void clean_cals(array_list_t **list, fastq_read_t *read, sa_index3_t *sa_index) 
   seed_cal_t *cal;
   array_list_t *cal_list = *list;
   size_t num_cals = array_list_size(cal_list);
-
+  
   invalid = 0;
   for (int i = 0; i < num_cals; i++) {
     cal = array_list_get(i, cal_list);
@@ -1527,7 +1519,7 @@ void clean_cals(array_list_t **list, fastq_read_t *read, sa_index3_t *sa_index) 
 	  break;
 	}
       } else {
-	break;
+ 	break;
       }
     }
     if (!item) continue;
@@ -1714,16 +1706,10 @@ int prepare_sw(fastq_read_t *read,   array_list_t *sw_prepare_list,
     num_seeds = cal->seed_list->size;
     if (num_seeds <= 0) continue;
 
-    seed_cal_merge_seeds(cal);
-    if (cigar_get_length(&cal->cigar) == read->length) {
-      continue;
-    }
-    
     // first seed
     seed = linked_list_get_first(cal->seed_list);
 
     // cal cigar
-    num_seeds = cal->seed_list->size;
     cigarset = cigarset_new(num_seeds * 2 + 1);
     cal->cigarset = cigarset;
 
@@ -1907,7 +1893,11 @@ int prepare_sw(fastq_read_t *read,   array_list_t *sw_prepare_list,
     } else {
       cigarset_info_set(0, 0, NULL, NULL, &cigarset->info[num_seeds * 2]);
     }
-
+    
+    if (num_sw == 0) {
+      seed_cal_set_cigar_by_seed(seed, cal);
+    }
+    
     num_total_sw += num_sw;
   }
   
@@ -1940,7 +1930,6 @@ void execute_sw(array_list_t *sw_prepare_list, sa_mapping_batch_t *mapping_batch
     r[i] = sw_prepare->ref;
 
     #ifdef _VERBOSE
-    printf("\t\t%s:%i:to SW:\n", __FILE__, __LINE__);
     printf("\t\t%i: query: %s\n", i, q[i]);
     printf("\t\t%i: ref. : %s\n", i, r[i]);
     printf("\n");
@@ -1960,7 +1949,6 @@ void execute_sw(array_list_t *sw_prepare_list, sa_mapping_batch_t *mapping_batch
   sw_multi_output_t *sw_output = sw_multi_output_new(sw_count);
   smith_waterman_mqmr(q, r, sw_count, &sw_optarg, 1, sw_output);
   #ifdef _VERBOSE
-  printf("\t\t%s:%i:SW output:\n", __FILE__, __LINE__);
   sw_multi_output_save(sw_count, sw_output, stdout);
   #endif
 
@@ -2036,7 +2024,7 @@ void execute_sw(array_list_t *sw_prepare_list, sa_mapping_batch_t *mapping_batch
 	  cigar_append_op(query_start, 'I', cigar);      
 	}
       } else if (ref_start > 0) {
-	//cigar_append_op(ref_start, '=', cigar);      
+	cigar_append_op(ref_start, '=', cigar);      
       }
     }
 
@@ -2124,8 +2112,8 @@ void post_process_sw(int sw_post_read_counter, int *sw_post_read,
 
   int num_cals, cigar_type;
   array_list_t *cal_list;
-
-  seed_t *seed = NULL;
+  
+  seed_t *seed = NULL; 
   seed_cal_t *cal;
   cigar_t *cigar, *aux_cigar;
   cigarset_t *cigarset;
@@ -2148,14 +2136,10 @@ void post_process_sw(int sw_post_read_counter, int *sw_post_read,
       #endif
       cigarset = cal->cigarset;
       cigar = &cal->cigar;
-      //printf("cigarset size = %i\n", cigarset->size);
       for (int j = 0; j < cigarset->size; j++) {
 
 	cigar_type = cigarset->info[j].active;
 	if (cigar_type > 0) {
-	  //printf("************** cigar type %i : %s\n",
-	  //	 cigar_type, cigar_to_string(cigarset->info[j].cigar));
-
 	  if (cigar_type == CIGAR_FROM_SEED) {
 	    seed = cigarset->info[j].seed;
 	    aux_cigar = cigarset->info[j].cigar;
@@ -2197,7 +2181,6 @@ void post_process_sw(int sw_post_read_counter, int *sw_post_read,
 	  cigar_append_op(cal->read->length - cigar_len, 'S', cigar);
 	}
       }
-      //printf("************** CAL cigar: %s\n", cigar_to_string(cigar));
     }
   }
 
@@ -2393,6 +2376,7 @@ int sa_pair_mapper(void *data) {
   int pair_max_distance = wf_batch->options->pair_max_distance;
 
   int num_seeds = wf_batch->options->num_seeds;
+
   
   sa_mapping_batch_t *mapping_batch = wf_batch->mapping_batch;
   mapping_batch->options = wf_batch->options;
@@ -2400,10 +2384,20 @@ int sa_pair_mapper(void *data) {
   sa_index3_t *sa_index = (sa_index3_t *) wf_batch->sa_index;
   
   int bam_format = mapping_batch->bam_format;
+
   size_t num_reads = mapping_batch->num_reads;
 
 
+
+  // smith-waterman parameters
+
+
+
+
+
   // CAL management
+
+
   cal_mng_t *cal_mng;
   array_list_t *cal_list;
 
@@ -2433,9 +2427,6 @@ int sa_pair_mapper(void *data) {
 
     // 1) extend using mini-sw from suffix
     cal_list = create_cals(num_seeds, read, mapping_batch, sa_index, cal_mng);
-
-    //printf("\t\t%s:%i: after create_cals:\n", __FILE__, __LINE__);
-    //for(int i = 0; i < array_list_size(cal_list); i++) { seed_cal_print(array_list_get(i, cal_list)); }
 
     if (array_list_size(cal_list) > 0) {
 
@@ -2477,9 +2468,6 @@ int sa_pair_mapper(void *data) {
 
     read = array_list_get(i, mapping_batch->fq_reads);
     cal_list = cal_lists[i];
-
-    //printf("---> %s:%s:%i: before prepare_sw:\n", __FILE__, __func__, __LINE__);
-    //for(int i = 0; i < array_list_size(cal_list); i++) { seed_cal_print(array_list_get(i, cal_list)); }
 
     if (array_list_size(cal_list) > 0) {
       if (prepare_sw(read, sw_prepare_list, mapping_batch, sa_index, cal_list)) {

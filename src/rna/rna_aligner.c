@@ -998,10 +998,10 @@ void rna_aligner(options_t *options) {
   cal_seeker_input_init(NULL, cal_optarg, NULL, 0, NULL, NULL, genome, 
 			bwt_optarg, bwt_index, metaexons, &cal_input);
   
-  preprocess_rna_input_t preprocess_rna;  
-  preprocess_rna_input_init(options->max_intron_length, options->flank_length, 
-			    options->seeds_max_distance, options->seed_size, genome, 
-			    &preprocess_rna);
+  //preprocess_rna_input_t preprocess_rna;  
+  //preprocess_rna_input_init(options->max_intron_length, options->flank_length, 
+  //			    options->seeds_max_distance, options->seed_size, genome, 
+  //			    &preprocess_rna);
 
   int pair_mode = pair_mng->pair_mode;
   sw_server_input_t sw_input;
@@ -1049,7 +1049,7 @@ void rna_aligner(options_t *options) {
 
 
   batch_t *batch = batch_new(&bwt_input, &region_input, &cal_input, 
-			     &pair_input, &preprocess_rna, &sw_input, &writer_input, RNA_MODE, NULL);
+			     &pair_input, NULL, &sw_input, &writer_input, RNA_MODE, NULL);
 
   //  fastq_batch_reader_input_t reader_input;
 

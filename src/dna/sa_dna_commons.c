@@ -30,7 +30,6 @@ void seed_cal_merge_seeds(seed_cal_t *cal) {
   int display = 0;
   #endif
   seed_t *seed;
-  int read_length = cal->read->length;
 
   size_t num_seeds = linked_list_size(cal->seed_list);
   if (num_seeds > 1) {

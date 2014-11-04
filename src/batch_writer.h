@@ -22,8 +22,6 @@
 #include "buffers.h"
 #include "timing.h"
 
-#include "bs/methylation.h"
-
 //====================================================================================
 //  structures and prototypes
 //====================================================================================
@@ -43,9 +41,6 @@ struct batch_writer_input {
   char* splice_extend_filename;
   genome_t* genome;
   linked_list_t* list_p;
-
-  // for methylation only
-  metil_file_t *metil_file;
 };
 
 //------------------------------------------------------------------------------------
