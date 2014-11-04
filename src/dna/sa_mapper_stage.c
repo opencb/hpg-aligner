@@ -640,7 +640,18 @@ void check_pairs(array_list_t **cal_lists, sa_index3_t *sa_index,
 
     list1 = cal_lists[i];
     list2 = cal_lists[i+1];
-
+    /*
+    ////////////////////////
+    printf(">>>> mate #1 (%i):\n", array_list_size(list1));
+    for (int i = 0; i < array_list_size(list1); i++) {
+      seed_cal_print(array_list_get(i, list1));
+    }
+    printf(">>>> mate #2 (%i):\n", array_list_size(list2));
+    for (int i = 0; i < array_list_size(list2); i++) {
+      seed_cal_print(array_list_get(i, list2));
+    }
+    ////////////////////////
+    */
     list1_size = array_list_size(list1);
     list2_size = array_list_size(list2);
 
@@ -652,9 +663,12 @@ void check_pairs(array_list_t **cal_lists, sa_index3_t *sa_index,
       array_list_t *new_list = array_list_new(10, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
       for (int i2 = 0; i2 < list2_size; i2++) {
 	cal2 = array_list_get(i2, list2);
-	if (i2 == 0 && cal2->mapq < 10) break;
+	//if (i2 == 0 && cal2->mapq < 10) break;
 
 	list = search_mate_cal_by_prefixes(cal2, read1, sa_index, batch, cal_mng);
+	//printf("--> search mates for mate #1:\n");
+	//seed_cal_print(cal2);
+	//printf("----> mates found %i\n", array_list_size(list));
 	if (array_list_size(list) > 0) {
 	  for (int kk = 0; kk < array_list_size(list); kk++) { 
 	    cal = array_list_get(kk, list); 
@@ -682,11 +696,16 @@ void check_pairs(array_list_t **cal_lists, sa_index3_t *sa_index,
       array_list_t *new_list = array_list_new(10, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
       for (int i1 = 0; i1 < list1_size; i1++) {
 	cal1 = array_list_get(i1, list1);
-	if (i1 == 0 && cal1->mapq < 10) break;
+	//if (i1 == 0 && cal1->mapq < 10) break;
 	list = search_mate_cal_by_prefixes(cal1, read2, sa_index, batch, cal_mng);
+	//printf("--> search mates for mate #2:\n");
+	//seed_cal_print(cal2);
+	//printf("----> mates found %i\n", array_list_size(list));
 	if (array_list_size(list) > 0) {
 	  for (int kk = 0; kk < array_list_size(list); kk++) { 
 	    cal = array_list_get(kk, list);
+	    //printf("----------> %i of %i\n", kk, array_list_size(list));
+	    //seed_cal_print(cal);
 	    if (is_valid_cal_pair(cal1, cal, min_distance, max_distance, &distance)) {
 	      array_list_insert(cal, new_list);
 	      array_list_set(kk, NULL, list);
@@ -737,7 +756,6 @@ void check_pairs(array_list_t **cal_lists, sa_index3_t *sa_index,
     if (valid_pair) {
       continue;
     }
-
 
     if (list1_size > 1 && list2_size > 1) {
       array_list_clear(list1, (void *) seed_cal_free);
@@ -949,10 +967,6 @@ int generate_cals_from_suffixes(int strand, fastq_read_t *read,
     gettimeofday(&start, NULL);
     #endif
     chrom = (unsigned int) sa_index->CHROM[suff];
-    if (chrom < 0) {
-      printf("chrom %c %i %u is < 0\n", chrom, chrom, chrom);
-      exit(-1);
-    }
 
     // extend suffix to right side
     r_start_suf = read_pos;
@@ -982,9 +996,9 @@ int generate_cals_from_suffixes(int strand, fastq_read_t *read,
 
 
     #ifdef _VERBOSE
-    printf("\t\tsuffix at [%lu|%lu-%lu|%lu] %c chrom %s\n",
-	   g_start_suf, r_start_suf, r_end_suf, g_end_suf, (strand == 0 ? '+' : '-'), 
-	   sa_index->genome->chrom_names[chrom]);
+    printf("%s:%i:\t\tsuffix at [%lu|%lu-%lu|%lu] %c chrom %s\n", __FILE__, __LINE__,
+    	   g_start_suf, r_start_suf, r_end_suf, g_end_suf, (strand == 0 ? '+' : '-'), 
+    	   sa_index->genome->chrom_names[chrom]);
     #endif
 
     seed = seed_new(r_start_suf, r_end_suf, g_start_suf, g_end_suf);
@@ -1020,8 +1034,7 @@ int generate_cals_from_suffixes(int strand, fastq_read_t *read,
       mapping_batch->func_times[FUNC_MINI_SW_LEFT_SIDE] += 
 	((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);  
       #endif
-      if (1) {
-
+      if (score > 0.0f) {
 	// update seed
 	seed->num_mismatches += alig_out.mismatch;
 	seed->num_open_gaps += alig_out.gap_open;
@@ -1029,36 +1042,36 @@ int generate_cals_from_suffixes(int strand, fastq_read_t *read,
 
 	seed->read_start -= alig_out.map_len1;
 	seed->genome_start -= alig_out.map_len2;
+      }
 
-	// if there's a mini-gap then try to fill the mini-gap
-	if (seed->read_start > 0 && seed->read_start < 5) {
-          #ifdef _TIMING
-	  gettimeofday(&start, NULL);
-          #endif
-	  g_seq = &sa_index->genome->S[seed->genome_start + sa_index->genome->chrom_offsets[chrom] - seed->read_start];
-	  for (size_t k1 = 0, k2 = 0; k1 < seed->read_start; k1++, k2++) {
-	    if (r_seq[k1] != g_seq[k2]) {
-	      seed->num_mismatches++;
-	      cigar_append_op(1, 'X', &seed->cigar);
-	    } else {
-	      cigar_append_op(1, '=', &seed->cigar);
-	    }
+      // if there's a mini-gap then try to fill the mini-gap
+      if (seed->read_start > 0 && seed->read_start < 5) {
+        #ifdef _TIMING
+	gettimeofday(&start, NULL);
+        #endif
+	g_seq = &sa_index->genome->S[seed->genome_start + sa_index->genome->chrom_offsets[chrom] - seed->read_start];
+	for (size_t k1 = 0, k2 = 0; k1 < seed->read_start; k1++, k2++) {
+	  if (r_seq[k1] != g_seq[k2]) {
+	    seed->num_mismatches++;
+	    cigar_append_op(1, 'X', &seed->cigar);
+	  } else {
+	    cigar_append_op(1, '=', &seed->cigar);
 	  }
+	}
 	  
-	  seed->genome_start -= seed->read_start;
-	  seed->read_start = 0;
-          #ifdef _TIMING
-	  gettimeofday(&stop, NULL);
-	  mapping_batch->func_times[FUNC_SEED_NEW] += 
-	    ((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);  
-          #endif
-	}
+	seed->genome_start -= seed->read_start;
+	seed->read_start = 0;
+        #ifdef _TIMING
+	gettimeofday(&stop, NULL);
+	mapping_batch->func_times[FUNC_SEED_NEW] += 
+	  ((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);  
+        #endif
+      }
 
-
-	// update cigar with the sw output
-	if (alig_out.cigar.num_ops > 0) {
-	  cigar_concat(&alig_out.cigar, &seed->cigar);
-	}
+      // update cigar with the sw output
+      if (score > 0.0f && alig_out.cigar.num_ops > 0) {
+	//      if (alig_out.cigar.num_ops > 0) {
+	cigar_concat(&alig_out.cigar, &seed->cigar);
       }
     }
     // update cigar with the suffix length
@@ -1094,8 +1107,7 @@ int generate_cals_from_suffixes(int strand, fastq_read_t *read,
       mapping_batch->func_times[FUNC_MINI_SW_RIGHT_SIDE] += 
 	((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);  
       #endif
-      if (1) {
-
+      if (score > 0.0f) {
 	// update seed
 	seed->num_mismatches += alig_out.mismatch;
 	seed->num_open_gaps += alig_out.gap_open;
@@ -1108,30 +1120,31 @@ int generate_cals_from_suffixes(int strand, fastq_read_t *read,
 	if (alig_out.cigar.num_ops > 0) {
 	  cigar_concat(&alig_out.cigar, &seed->cigar);
 	}
-	// if there's a mini-gap then try to fill the mini-gap
-	diff = read->length - seed->read_end - 1;
-	if (diff > 0 && diff < 5) {
-          #ifdef _TIMING
-	  gettimeofday(&start, NULL);
-          #endif
-	  g_seq = &sa_index->genome->S[seed->genome_end + sa_index->genome->chrom_offsets[chrom] + 1];
-	  for (size_t k1 = seed->read_end + 1, k2 = 0; k1 < read->length; k1++, k2++) {
-	    if (r_seq[k1] != g_seq[k2]) {
-	      seed->num_mismatches++;
-	      cigar_append_op(1, 'X', &seed->cigar);
-	    } else {
-	      cigar_append_op(1, '=', &seed->cigar);
-	    }
-	  }
+      }
 
-	  seed->read_end += diff;
-	  seed->genome_end += diff;
-          #ifdef _TIMING
-	  gettimeofday(&stop, NULL);
-	  mapping_batch->func_times[FUNC_SEED_NEW] += 
-	    ((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);  
-          #endif
+      // if there's a mini-gap then try to fill the mini-gap
+      diff = read->length - seed->read_end - 1;
+      if (diff > 0 && diff < 5) {
+        #ifdef _TIMING
+	gettimeofday(&start, NULL);
+        #endif
+	g_seq = &sa_index->genome->S[seed->genome_end + sa_index->genome->chrom_offsets[chrom] + 1];
+	for (size_t k1 = seed->read_end + 1, k2 = 0; k1 < read->length; k1++, k2++) {
+	  if (r_seq[k1] != g_seq[k2]) {
+	    seed->num_mismatches++;
+	    cigar_append_op(1, 'X', &seed->cigar);
+	  } else {
+	    cigar_append_op(1, '=', &seed->cigar);
+	  }
 	}
+	
+	seed->read_end += diff;
+	seed->genome_end += diff;
+        #ifdef _TIMING
+	gettimeofday(&stop, NULL);
+	mapping_batch->func_times[FUNC_SEED_NEW] += 
+	  ((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);  
+          #endif
       }
     }
 
@@ -2430,7 +2443,14 @@ int sa_pair_mapper(void *data) {
 
     if (array_list_size(cal_list) > 0) {
 
+      //      printf("------------------> %s:%i: before select_best_cals (%i):\n", __FILE__, __LINE__, array_list_size(cal_list));
+      //      for (int i = 0; i < array_list_size(cal_list); i++) { seed_cal_print(array_list_get(i, cal_list)); }
+
       select_best_cals(read, &cal_list);
+
+      //      printf("-----------------> %s:%i: after select_best_cals (%i):\n", __FILE__, __LINE__, array_list_size(cal_list));
+      //      for (int i = 0; i < array_list_size(cal_list); i++) { seed_cal_print(array_list_get(i, cal_list)); }
+
       if (array_list_size(cal_list) <= 0) {
 	suffix_mng_search_read_cals(read, num_seeds, sa_index, cal_list, cal_mng->suffix_mng);
 	if (array_list_size(cal_list) > 0) {

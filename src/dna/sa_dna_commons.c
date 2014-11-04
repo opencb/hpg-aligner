@@ -5,6 +5,42 @@
 // commons
 //--------------------------------------------------------------------
 
+extern sa_genome3_t *global_genome;
+
+int is_cal_in(seed_cal_t *cal) {
+  // Y_9911717_9912231_0:1:0_1:0:0_1677c
+  unsigned int chrom;
+  size_t start, end;
+  char *chrom_str, *aux, *p1, *p2;
+  
+  aux = strdup(cal->read->id);
+  p1 = strstr(aux, "_");
+  *p1 = 0;
+  chrom_str = strdup(aux);
+  for (chrom = 0; chrom < global_genome->num_chroms; chrom++) {
+    if (strcmp(chrom_str, global_genome->chrom_names[chrom]) == 0) {
+      break;
+    }
+  }
+  p2 = strstr(p1 + 1, "_");
+  *p2 = 0;
+  start = atol(p1 + 1);
+  
+  p1 = strstr(p2 + 1, "_");
+  *p1 = 0;
+  end = atol(p2 + 1);
+
+  free(aux);
+  free(chrom_str);
+
+  if (cal->start >= start && cal->end <= end) {
+    return 1;
+  }
+  return 0;
+}
+
+//--------------------------------------------------------------------
+
 void seed_free(seed_t *p) {
   if (p) {
     cigar_clean(&p->cigar);
@@ -388,6 +424,17 @@ void select_best_cals(fastq_read_t *read, array_list_t **cal_list) {
 
   mapq = compute_mapq(first_cal, second_cal, num_hits);
 
+  //printf("%s:%i: num_hits = %i, mapq = %i\n", __FILE__, __LINE__, num_hits, mapq);
+
+  /////////////////
+  //  printf(">>>> best cals (%i):\n", num_cals);
+  //  for (int i = 0; i < 5; i++) {
+  //  if (i >= num_cals) break;
+  //  seed_cal_print(sort_cals[i].cal);
+  //}
+  ///////////////
+
+
   if (first_cal->invalid) {
     array_list_clear(*cal_list, (void *) seed_cal_free);
   } else {
@@ -396,6 +443,7 @@ void select_best_cals(fastq_read_t *read, array_list_t **cal_list) {
       if ( cal->invalid &&
 	   ((abs(cal->start - first_cal->end) <= (2 * cal->read->length)) ||
 	     (abs(cal->end - first_cal->start) <= (2 * cal->read->length))) ) {
+
 	array_list_clear(*cal_list, (void *) seed_cal_free);
 	return;
       }
@@ -592,15 +640,15 @@ void create_alignments(array_list_t *cal_list, fastq_read_t *read,
     cigar_M_string = cigar_to_M_string(&num_mismatches, &num_cigar_ops, cigar);
     len = strlen(cigar_string);
 
-    #ifdef _VERBOSE
-    if (cigar_get_length(cigar) != read->length) {
-      printf("--> %s:%i read length %i != cigar %s length %i\n", 
-	     __FILE__, __LINE__, read->length, cigar_string, cigar_get_length(cigar));
-      seed_cal_print(cal);
+    //#ifdef _VERBOSE
+    //if (cigar_get_length(cigar) != read->length) {
+    //printf("--> %s:%i read length %i != cigar %s length %i\n", 
+    //	     __FILE__, __LINE__, read->length, cigar_string, cigar_get_length(cigar));
+    //seed_cal_print(cal);
       //      printf("********************** A B O R T ************************\n");
       //      exit(-1);
-    }
-    #endif
+    //}
+    //#endif
 
     optional_fields_length = 100 + len;
 
