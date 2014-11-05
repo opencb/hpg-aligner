@@ -60,7 +60,7 @@ static inline ERROR_CODE
 nucleotide_compare(const char *ref_seq, const char *bam_seq, size_t bam_seq_l, char *comp_res, uint32_t *miss_count)
 {
 	int i;
-	uint32_t count;
+
 	uint32_t misses;
 
 	assert(ref_seq);
@@ -78,7 +78,7 @@ nucleotide_compare(const char *ref_seq, const char *bam_seq, size_t bam_seq_l, c
 	//Constants
 	const __m128i v_zero = _mm_set1_epi8(0);
 	const __m128i v_one = _mm_set1_epi8(1);
-	const __m128i v_one16 = _mm_set1_epi16(1);
+
 
 	char *ref_aux;
 	char *bam_aux;
@@ -175,7 +175,7 @@ nucleotide_compare(const char *ref_seq, const char *bam_seq, size_t bam_seq_l, c
 static inline ERROR_CODE
 nucleotide_miss_qual_sum(const char *ref_seq, const char *bam_seq, const char *bam_qual, size_t bam_seq_l, char *comp_res, uint32_t *out_miss_count, uint32_t *out_sum_quals)
 {
-	int i, z;
+	int i;
 	uint32_t misses;
 	uint32_t sum;
 
@@ -190,7 +190,7 @@ nucleotide_miss_qual_sum(const char *ref_seq, const char *bam_seq, const char *b
 	//Constants
 	const __m128i v_zero = _mm_set1_epi8(0);
 	const __m128i v_one = _mm_set1_epi8(1);
-	const __m128i v_one16 = _mm_set1_epi16(1);
+
 
 	//Nucleotides
 	__m128i v_ref, v_seq, v_qual;

@@ -18,6 +18,7 @@ extern size_t num_unmapped_reads_by_cigar_length;
 //--------------------------------------------------------------------
 
 int counters[NUM_COUNTERS];
+sa_genome3_t *global_genome = NULL;
 
 #include "adapter.h"
 
@@ -37,7 +38,7 @@ void dna_aligner(options_t *options) {
 
   // set input parameters
   char *sa_dirname = options->bwt_dirname;
-  char *fastq_filename = options->in_filename;
+
   int batch_size = options->batch_size;
   int num_threads = options->num_cpu_threads;
 
@@ -76,6 +77,7 @@ void dna_aligner(options_t *options) {
   printf("Loading SA tables...\n");
   gettimeofday(&start, NULL);
   sa_index3_t *sa_index = sa_index3_new(sa_dirname);
+  global_genome = sa_index->genome;
   gettimeofday(&stop, NULL);
   printf("End of loading SA tables in %0.2f min. Done!!\n", 
 	 ((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f) / 60.0f);  

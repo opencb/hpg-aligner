@@ -361,13 +361,13 @@ recal_add_base_v(recal_info_t *data, const char *seq, const char *quals, const U
 ERROR_CODE
 recal_calc_deltas(recal_info_t* data)
 {
-	double phred, err0;
+
 	//double r_empirical;
 	int matrix_index;
 	int i, j;
 
 	double estimated_Q;
-	double est2;
+
 	double emp_Q;
 	double delta;
 
@@ -576,7 +576,7 @@ recal_fprint_info(const recal_info_t *data, const char *path)
 	fprintf(fp, "==============================\nQUAL VECTOR:\n");
 	for(i = 0; i < n_quals; i++)
 	{
-		fprintf(fp, "%3d %8.2f %10u %6.2f \n", i + MIN_QUALITY, data->qual_miss[i] /*- SMOOTH_CONSTANT_MISS*/, data->qual_bases[i] /*- SMOOTH_CONSTANT_BASES*/, data->qual_delta[i] /*- SMOOTH_CONSTANT_MISS*/);
+		fprintf(fp, "%3d %8.2f %lu %6.2f \n", i + MIN_QUALITY, data->qual_miss[i] /*- SMOOTH_CONSTANT_MISS*/, data->qual_bases[i] /*- SMOOTH_CONSTANT_BASES*/, data->qual_delta[i] /*- SMOOTH_CONSTANT_MISS*/);
 	}
 
 	//Print cycle infos
@@ -597,7 +597,7 @@ recal_fprint_info(const recal_info_t *data, const char *path)
 		fprintf(fp, "%d \t", i + MIN_QUALITY);
 		for(j = 0; j < n_cycles; j++)
 		{
-			fprintf(fp, "%u \t", data->qual_cycle_bases[i * n_cycles + j] /*- SMOOTH_CONSTANT_BASES*/);
+			fprintf(fp, "%lu \t", data->qual_cycle_bases[i * n_cycles + j] /*- SMOOTH_CONSTANT_BASES*/);
 		}
 		fprintf(fp, "\n");
 	}
@@ -631,7 +631,7 @@ recal_fprint_info(const recal_info_t *data, const char *path)
 		fprintf(fp, "%d \t", i + MIN_QUALITY);
 		for(j = 0; j < n_dinuc; j++)
 		{
-			fprintf(fp, "%u \t", data->qual_dinuc_bases[i * n_dinuc + j] /*- SMOOTH_CONSTANT_BASES*/);
+			fprintf(fp, "%lu \t", data->qual_dinuc_bases[i * n_dinuc + j] /*- SMOOTH_CONSTANT_BASES*/);
 		}
 		fprintf(fp, "\n");
 	}

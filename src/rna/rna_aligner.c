@@ -19,14 +19,11 @@ extern size_t reads_w2, reads_w3;
 int max = 65;
 extern size_t total_reads_ph2;
 
-void *write_sam_header_BWT(genome_t *genome, FILE *f) {
+void write_sam_header_BWT(genome_t *genome, FILE *f) {
   fprintf(f, "@PG\tID:HPG-Aligner\tVN:%s\n", HPG_ALIGNER_VERSION);
   for (int i = 0; i < genome->num_chromosomes; i++) {
     fprintf(f, "@SQ\tSN:%s\tLN:%lu\n", genome->chr_name[i], genome->chr_size[i] + 1);
-    //printf("%iName %s\n", i, genome->chr_name[i]);
   }
-  //fclose(f);
-  //exit(-1);
 }
 
 
@@ -66,7 +63,7 @@ void display_progress() {
   float progress;
 
   struct timeval wt_s, wt_e;
-  double w_time;
+  double w_time = 0.0;
 
   start_timer(wt_s);
   while (!w1_end) {
@@ -130,7 +127,7 @@ void display_progress_2_3(int w_id) {
   float progress;
 
   struct timeval wt_s, wt_e;
-  double w_time;
+  double w_time = 0.0;
 
   int total_reads;
   size_t *actual_reads;
@@ -304,7 +301,6 @@ void sa_index3_parallel_genome_new(char *sa_index_dirname, int num_threads,
   char *prefix;
   uint k_value, pre_length, A_items, IA_items, num_suffixes, genome_len, num_chroms, num_items;
 
-  struct timeval stop, start, end;
 
   PREFIX_TABLE_NT_VALUE['A'] = 0;
   PREFIX_TABLE_NT_VALUE['N'] = 0;
@@ -629,7 +625,7 @@ void sa_index3_parallel_genome_new(char *sa_index_dirname, int num_threads,
     p->IA_items = IA_items;
     p->k_value = k_value;
     p->SA = SA;
-    p->CHROM = CHROM;
+    p->CHROM = (unsigned char *)CHROM;
     p->PRE = PRE;
     p->A = A;
     p->IA = IA;
@@ -669,12 +665,12 @@ void rna_aligner(options_t *options) {
   char *exact_filename = (char *)calloc((path_length + prefix_length + 60), sizeof(char));
 
   struct timeval time_genome_s, time_genome_e;
-  double time_genome;
+  double time_genome = 0.0;
 
   metaexons_t *metaexons;
   genome_t *genome;
   
-  bwt_index_t *bwt_index;
+  bwt_index_t *bwt_index = NULL;
   sa_index3_t *sa_index;
   int num_chromosomes;
   // load index for dna/rna or for bisulfite case
@@ -800,14 +796,6 @@ void rna_aligner(options_t *options) {
   // timing
   //if (time_on) { 
 
-  char* labels_time[NUM_SECTIONS_TIME] = {"FASTQ Reader               ", 
-					  "BWT Server                 ", 
-					  "REGION Seeker              ", 
-					  "CAL Seeker                 ", 
-					  "RNA Preprocess             ", 
-					  "RNA Server                 ",
-					  "BAM Writer                 ", 
-					  "TOTAL Time                 "};    
 
   //======================================================================
 
@@ -1010,10 +998,10 @@ void rna_aligner(options_t *options) {
   cal_seeker_input_init(NULL, cal_optarg, NULL, 0, NULL, NULL, genome, 
 			bwt_optarg, bwt_index, metaexons, &cal_input);
   
-  preprocess_rna_input_t preprocess_rna;  
-  preprocess_rna_input_init(options->max_intron_length, options->flank_length, 
-			    options->seeds_max_distance, options->seed_size, genome, 
-			    &preprocess_rna);
+  //preprocess_rna_input_t preprocess_rna;  
+  //preprocess_rna_input_init(options->max_intron_length, options->flank_length, 
+  //			    options->seeds_max_distance, options->seed_size, genome, 
+  //			    &preprocess_rna);
 
   int pair_mode = pair_mng->pair_mode;
   sw_server_input_t sw_input;
@@ -1056,12 +1044,12 @@ void rna_aligner(options_t *options) {
     }
   }
 
-  extra_stage_t extra_stage_input;
+
   
-  int workflow_enable = 1;
+
 
   batch_t *batch = batch_new(&bwt_input, &region_input, &cal_input, 
-			     &pair_input, &preprocess_rna, &sw_input, &writer_input, RNA_MODE, NULL);
+			     &pair_input, NULL, &sw_input, &writer_input, RNA_MODE, NULL);
 
   //  fastq_batch_reader_input_t reader_input;
 
@@ -1102,8 +1090,8 @@ void rna_aligner(options_t *options) {
     LOG_FATAL("Diferent number of files in paired-end/mate-pair mode");
   }
   
-  extern double main_time;
-  double time_alig;
+
+  double time_alig = 0.0;
   struct timeval time_start_alig, time_end_alig;  
   char *file1, *file2;
 
@@ -1226,10 +1214,10 @@ void rna_aligner(options_t *options) {
      
       // Create new thread POSIX for search extra Splice Junctions
       //============================================================
-      pthread_attr_t attr;
-      pthread_t thread;
-      void *status;
-      int ret;
+      
+      
+
+
 
       //Run workflow
       size_t tot_reads_in;
@@ -1421,10 +1409,10 @@ void rna_aligner(options_t *options) {
       //for (int x = 0; x <= 10; x++) {
       //printf("%i CALs: %i reads (%f)\n", x, tot_cals[x], ((float)tot_cals[x]*100)/(float)total_reads );
       //}
-      extern size_t search_calls;
-      extern size_t insert_calls;
-      extern double time_search;
-      extern double time_insert;
+
+
+
+
 
       basic_statistics_display(basic_st, 1, 
 			       (time_total_1 + time_total_2) / 1000000, 
@@ -1442,10 +1430,10 @@ void rna_aligner(options_t *options) {
       //Write to file 
       size_t total_reads         = basic_st->total_reads;
       size_t num_mapped_reads    = basic_st->num_mapped_reads;
-      size_t total_mappings      = basic_st->total_mappings;
+
       size_t reads_uniq_mappings = basic_st->reads_uniq_mappings;
-      size_t total_sp            = basic_st->total_sp;
-      size_t uniq_sp             = basic_st->uniq_sp;
+
+
       size_t reads_ph1           = total_reads - total_reads_ph2;
 
       fprintf(fd_log_output, "\n= T I M E    S T A T I S T I C S\n");
@@ -1652,11 +1640,11 @@ static inline char *parse_attribute(char *name, char *attrs) {
 static inline exon_t *parse_exon_line(FILE *f, genome_t *genome) {
   const int MAX_LENGTH = 8192;
 
-  int field, found;
-  char line[MAX_LENGTH], *token, *str, *p1, *p2;
+  int field, found = 0;
+  char line[MAX_LENGTH], *token, *str;
   
-  int chr, strand, start, end, exon_number;
-  char *chr_name, *gene_id, *transcript_id, *exon_id, *exon_number_str;
+  int chr = 0, strand = 0, start = 0, end = 0, exon_number = 0;
+  char *chr_name = NULL, *gene_id = NULL, *transcript_id = NULL, *exon_id = NULL, *exon_number_str;
 
   while (fgets(line, MAX_LENGTH, f) != NULL) {
     //    LOG_DEBUG_F("%s", line);
@@ -1723,7 +1711,7 @@ void load_transcriptome(char *filename, genome_t *genome,
   exon_t *exon = NULL, *exon1 = NULL, *exon2 = NULL;
 
   size_t g_start, g_end;
-  int type, splice_strand, strand;
+  int type, strand;
   char nt_start[2], nt_end[2];
   char *transcript_id;
 

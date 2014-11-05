@@ -196,9 +196,9 @@ int alig_bam(int argc, char **argv)
 int
 align_launch(const char *reference, const char *bam, const char *output, const char *stats_path, int recalibration)
 {
-	int err, threads;
+	int threads;
 	char *sched;
-	double init_time, end_time;
+
 
 	assert(reference);
 	assert(bam);

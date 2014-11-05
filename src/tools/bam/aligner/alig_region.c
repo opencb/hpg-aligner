@@ -30,6 +30,8 @@ region_create(alig_region_t *region)
 	region->chrom = -1;
 	region->end_pos = 0;
 	region->start_pos = 0;
+
+	return 0;
 }
 
 int
@@ -38,6 +40,8 @@ region_destroy(alig_region_t *region)
 	assert(region);
 
 	free(region);
+
+	return 0;
 }
 
 /**
@@ -47,7 +51,7 @@ region_destroy(alig_region_t *region)
 int
 region_table_create(alig_region_table_t *table)
 {
-	int i, ret;
+
 	khash_t(32) *h;
 	//linked_list_t *aux_list;
 	//khiter_t iter;
@@ -69,6 +73,8 @@ region_table_create(alig_region_table_t *table)
 		assert(ret);
 		kh_value(table->chroms, iter) = aux_list;
 	}*/
+
+	return 0;
 }
 
 int
@@ -99,6 +105,9 @@ region_table_destroy(alig_region_table_t *table)
 
 	//Free hash table
 	kh_destroy(32, h);
+
+	return 0;
+
 }
 
 int
@@ -196,6 +205,9 @@ region_table_insert(alig_region_table_t *table, alig_region_t *region)
 			linked_list_insert(region, chrom_list);
 		//printf("Table insertion: %d:%u-%u\n", region->chrom, region->start_pos, region->start_pos + region->length);
 	}
+
+	return 0;
+
 }
 
 /**
@@ -211,7 +223,7 @@ region_get_from_cigar(char *cigar, size_t cigar_len, size_t pos, size_t *r_pos, 
 	int err;
 
 	//CIGAR
-	uint32_t *cigar32;
+	uint32_t *cigar32 = NULL;
 	uint32_t cigar_l;
 
 	//CHECK ARGUMENTS
@@ -242,8 +254,8 @@ region_get_from_batch(const bam_batch_t* batch, alig_region_table_t *region_tabl
 {
 	int i;
 	bam1_t *alig;
-	size_t r_pos;
-	size_t r_end_pos;
+	size_t r_pos = 0;
+	size_t r_end_pos = 0;
 
 	assert(region_table);
 

@@ -125,7 +125,7 @@ recal_get_data_from_bam(const bam_file_t *bam, const genome_t* ref, recal_info_t
 
 					//Read batch
 					//bam_fread_max_size(batch, MAX_BATCH_SIZE, 1, bam);
-					bam_fread_max_size_no_duplicates(read_batch, MAX_BATCH_SIZE, 0, (bam_file_t *)bam, last_seq, &l_last_seq, &pos_last_seq);
+					bam_fread_max_size_no_duplicates(read_batch, MAX_BATCH_SIZE, 0, (bam_file_t *)bam, (uint8_t *)last_seq, (int *)&l_last_seq, (int *)&pos_last_seq);
 				}
 
 				//Collect batch
@@ -184,15 +184,15 @@ recal_get_data_from_bam(const bam_file_t *bam, const genome_t* ref, recal_info_t
 	}	/* END PARALLEL */
 
 	printf("\n----------------\n%d alignments readed.", count);
-	printf("\n%d alignments processed.", count - unmapped - mapzero - duplicated - notprimary);
-	printf("\n%d alignments duplicated.", duplicated);
+	printf("\n%lu alignments processed.", count - unmapped - mapzero - duplicated - notprimary);
+	printf("\n%lu alignments duplicated.", duplicated);
 	#ifdef NOT_PRIMARY_ALIGNMENT
-		printf("\n%d not primary alignments.", notprimary);
+		printf("\n%lu not primary alignments.", notprimary);
 	#endif
 	#ifdef NOT_MAPPING_QUAL_ZERO
-	printf("\n%d alignments with map quality zero.", mapzero);
+	printf("\n%lu alignments with map quality zero.", mapzero);
 	#endif
-	printf("\n%d alignments unmapped.", unmapped);
+	printf("\n%lu alignments unmapped.", unmapped);
 
 	//Last free
 	free(last_seq);
@@ -209,17 +209,17 @@ recal_get_data_from_bam(const bam_file_t *bam, const genome_t* ref, recal_info_t
 ERROR_CODE
 recal_get_data_from_bam_batch(const bam_batch_t* batch, const genome_t* ref, recal_info_t* output_data)
 {
-	int i, j;
+	int i;
 	ERROR_CODE err;
 
 	//Batch splitting
 	bam_batch_t *current_batch;
-	bam_batch_t *v_batchs;
-	size_t batchs_l;
-	size_t num_chroms;
+
+
+
 
 	//Time measures
-	double init_time, end_time;
+
 
 	//Get data environment
 	recal_data_collect_env_t *collect_env;
@@ -235,7 +235,7 @@ recal_get_data_from_bam_batch(const bam_batch_t* batch, const genome_t* ref, rec
 	}
 
 	//Parallel zone
-	#pragma omp parallel private(collect_env, data, init_time, end_time, err)
+	#pragma omp parallel private(collect_env, data, err)
 	{
 
 		//Initialize get data environment
@@ -312,7 +312,7 @@ ERROR_CODE
 recal_get_data_from_bam_alignment(const bam1_t* read, const genome_t* ref, recal_info_t* output_data, recal_data_collect_env_t *collect_env)
 {
 	char *ref_seq;
-	char aux_comp[16];
+
 	int64_t init_pos, end_pos;
 	size_t init_pos_ref, end_pos_ref;
 	char *comp_res;
@@ -329,20 +329,18 @@ recal_get_data_from_bam_alignment(const bam1_t* read, const genome_t* ref, recal
 	char *aux_res_qual;
 	//U_CYCLES aux_res_seq_l;
 	//U_CYCLES bam_seq_max_l;
-	uint32_t *read_left_cigar;
-	uint32_t *read_cigar;
-	size_t read_disp_clip;
+
+
+
 	char *read_seq_ref;
 	size_t read_seq_ref_l;
 	uint32_t misses;
 	size_t read_l;
 
 	//SSE
-	#ifdef __SSE2__
-	__m128i v_ref, v_seq, v_comp;
-	#endif
 
-	unsigned int i, j;
+
+	unsigned int i;
 
 	//CHECK ARGUMENTS (Assuming this function is called always from recal_get_data_from_bam_batch)
 	{
@@ -479,7 +477,7 @@ recal_get_data_from_bam_alignment(const bam1_t* read, const genome_t* ref, recal
 	{
 		if(i > 0)
 		{
-			recal_get_dinuc(bam_seq[i-1], bam_seq[i], &dinucs[i]);
+		  recal_get_dinuc(bam_seq[i-1], bam_seq[i], (U_DINUC *)&dinucs[i]);
 		}
 		else
 		{

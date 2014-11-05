@@ -1,6 +1,6 @@
 #include "dna/dna_aligner.h"
 #include "rna/rna_aligner.h"
-#include "bs/bs_aligner.h"
+
 #include "build-index/index_builder.h"
 
 

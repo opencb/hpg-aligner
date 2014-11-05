@@ -18,7 +18,6 @@ extern int counters[NUM_COUNTERS];
 
 //--------------------------------------------------------------------
 
-
 #ifdef _TIMING
 
 #define FUNC_SEARCH_SUFFIX             0
@@ -85,8 +84,8 @@ typedef struct sa_mapping_batch {
 //--------------------------------------------------------------------
 
 static inline sa_mapping_batch_t *sa_mapping_batch_new(array_list_t *fq_reads) {
-  fastq_read_t *read;
-  size_t read_length, num_reads = array_list_size(fq_reads);
+
+  size_t num_reads = array_list_size(fq_reads);
 
   sa_mapping_batch_t *p = (sa_mapping_batch_t *) malloc(sizeof(sa_mapping_batch_t));
 
@@ -793,12 +792,15 @@ typedef struct cigarset_info {
 } cigarset_info_t;
 
 static inline cigarset_info_t *cigarset_info_set(int active, int overlap,
-					  cigar_t *cigar, seed_t *seed,
-					  cigarset_info_t *p) {
+						 cigar_t *cigar, seed_t *seed,
+						 cigarset_info_t *p) {
   p->active = active;
   p->overlap = overlap;
   p->cigar = cigar;
   p->seed = seed;
+
+  return NULL;
+
 }
 
 //--------------------------------------------------------------------
@@ -942,11 +944,14 @@ static inline void seed_cal_set_cigar_by_seed(seed_t *seed, seed_cal_t *cal) {
   cigar_concat(&seed->cigar, &cal->cigar);
 }
 
+void seed_cal_merge_seeds(seed_cal_t *cal);
+
 //--------------------------------------------------------------------
+
 void print_seed(char *msg, seed_t *s);
 
 static inline void seed_cal_print(seed_cal_t *cal) {
-  printf(" CAL (%c)[%lu:%lu-%lu] (%s, x:%i, og:%i, eg:%i) area = %i score = %0.2f mapq = %i (invalid = %i): (read id %s)\n", 
+  printf(" CAL (%c)[%i:%lu-%lu] (%s, x:%i, og:%i, eg:%i) area = %i score = %0.2f mapq = %i (invalid = %i): (read id %s)\n", 
 	 (cal->strand == 0 ? '+' : '-'), 
 	 cal->chromosome_id, cal->start, cal->end, cigar_to_string(&cal->cigar), cal->num_mismatches,
 	 cal->num_open_gaps, cal->num_extend_gaps, cal->read_area, cal->score, cal->mapq,
@@ -1005,6 +1010,10 @@ void display_cmp_sequences(fastq_read_t *read, sa_index3_t *sa_index);
 //--------------------------------------------------------------------
 
 void complete_pairs(sa_mapping_batch_t *batch);
+
+//--------------------------------------------------------------------
+
+int is_cal_in(seed_cal_t *cal);
 
 //--------------------------------------------------------------------
 //--------------------------------------------------------------------

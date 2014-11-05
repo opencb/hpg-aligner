@@ -28,6 +28,7 @@
 #include "aux/timestats.h"
 #include "bam_region.h"
 
+
 //VERSION
 #define FWORK_VER_CURRENT		"1"
 #define FWORK_VER_REVISION		"0"
@@ -238,7 +239,7 @@ static int bfwork_unlock_user_data(bam_fwork_t *fwork);
  * \param[in] fwork Target framework which contains current context.
  * \param[out] user_data Local user data returned.
  */
-static int bfwork_local_user_data(bam_fwork_t *fwork, void **user_data);
+//static int bfwork_local_user_data(bam_fwork_t *fwork, void **user_data);
 
 /**
  * \brief Set local user data to be used in current context of the framework.

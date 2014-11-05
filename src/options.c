@@ -8,7 +8,6 @@ const char DEFAULT_OUTPUT_NAME[29] = "hpg_aligner_output";
 
 options_t *options_new(void) {
   options_t *options = (options_t*) calloc (1, sizeof(options_t));
-  size_t num_cores = 0;
   
   //======================= COMMON OPTIONS ====================
   options->version = 0;
@@ -24,11 +23,14 @@ options_t *options_new(void) {
   options->adapter = NULL;
   //GET Number System Cores
   //----------------------------------------------
-  if (num_cores = get_optimal_cpu_num_threads()) {
+  options->num_cpu_threads = get_optimal_cpu_num_threads();
+  /*
+  if (num_cores == get_optimal_cpu_num_threads()) {
     options->num_cpu_threads = num_cores;
-  }else {
+  } else {
     options->num_cpu_threads = DEFAULT_CPU_THREADS;
   }
+  */
   //----------------------------------------------
   options->max_intron_length = DEFAULT_MAX_INTRON_LENGTH;
   options->num_seeds = 0;
@@ -84,13 +86,13 @@ options_t *options_new(void) {
 
 void validate_options(options_t *options) {
   int value_dir = exists(options->output_name);
-  int DEFAULT_READ_BATCH_SIZE;
-  int DEFAULT_SEED_SIZE;
-  int DEFAULT_FLANK_LENGTH;
-  int DEFAULT_NUM_SEEDS;
-  int DEFAULT_MIN_SEED_SIZE;
-  int DEFAULT_MIN_CAL_SIZE;
-  int DEFAULT_SEEDS_MAX_DISTANCE;
+  int DEFAULT_READ_BATCH_SIZE = 200000;
+  int DEFAULT_SEED_SIZE = 18;
+  int DEFAULT_FLANK_LENGTH = 5;
+  int DEFAULT_NUM_SEEDS = 20;
+  int DEFAULT_MIN_SEED_SIZE = 16;
+  int DEFAULT_MIN_CAL_SIZE = 20;
+  int DEFAULT_SEEDS_MAX_DISTANCE = 100;
 
   int mode = options->mode;
 
@@ -238,19 +240,19 @@ void options_display(options_t *options) {
      unsigned int  report_best = (unsigned int)options->report_best;
           
      char* output_name =  strdup(options->output_name);
-     unsigned int num_gpu_threads =  (unsigned int)options->num_gpu_threads;
+
      unsigned int num_cpu_threads =  (unsigned int)options->num_cpu_threads;
-     unsigned int cal_seeker_errors =  (unsigned int)options->cal_seeker_errors; 
+
      unsigned int min_cal_size =  (unsigned int)options->min_cal_size; 
-     unsigned int seeds_max_distance =  (unsigned int)options->seeds_max_distance; 
+
      unsigned int batch_size =  (unsigned int)options->batch_size; 
-     unsigned int write_size =  (unsigned int)options->write_size;  
-     unsigned int min_seed_size =  (unsigned int)options->min_seed_size;
+
+
      unsigned int seed_size =  (unsigned int)options->seed_size;
      unsigned int num_seeds =  (unsigned int)options->num_seeds;
-     int min_num_seeds_in_cal =  (int)options->min_num_seeds_in_cal;
+
      unsigned int max_intron_length =  (unsigned int)options->max_intron_length;
-     unsigned int flank_length =  (unsigned int)options->flank_length;
+
      unsigned int pair_mode =  (unsigned int)options->pair_mode;
      unsigned int pair_min_distance =  (unsigned int)options->pair_min_distance;
      unsigned int pair_max_distance =  (unsigned int)options->pair_max_distance;
@@ -387,19 +389,19 @@ void options_to_file(options_t *options, FILE *fd) {
   unsigned int  report_best = (unsigned int)options->report_best;
           
   char* output_name =  strdup(options->output_name);
-  unsigned int num_gpu_threads =  (unsigned int)options->num_gpu_threads;
+
   unsigned int num_cpu_threads =  (unsigned int)options->num_cpu_threads;
-  unsigned int cal_seeker_errors =  (unsigned int)options->cal_seeker_errors; 
+
   unsigned int min_cal_size =  (unsigned int)options->min_cal_size; 
-  unsigned int seeds_max_distance =  (unsigned int)options->seeds_max_distance; 
+
   unsigned int batch_size =  (unsigned int)options->batch_size; 
-  unsigned int write_size =  (unsigned int)options->write_size;  
-  unsigned int min_seed_size =  (unsigned int)options->min_seed_size;
+
+
   unsigned int seed_size =  (unsigned int)options->seed_size;
   unsigned int num_seeds =  (unsigned int)options->num_seeds;
-  int min_num_seeds_in_cal =  (int)options->min_num_seeds_in_cal;
+
   unsigned int max_intron_length =  (unsigned int)options->max_intron_length;
-  unsigned int flank_length =  (unsigned int)options->flank_length;
+
   unsigned int pair_mode =  (unsigned int)options->pair_mode;
   unsigned int pair_min_distance =  (unsigned int)options->pair_min_distance;
   unsigned int pair_max_distance =  (unsigned int)options->pair_max_distance;
@@ -595,8 +597,8 @@ int read_config_file(const char *filename, options_t *options) {
 		return -1;
 	}
 
-	const char *tmp_string;
-	long tmp_int;
+
+
 
 	/*if(config_lookup_string(config, "app.outdir", &tmp_string)) { options->output_directory = strdup(tmp_string); }
 	if(config_lookup_int(config, "app.cpu-num-threads", &tmp_int)) { options->cpu_num_threads = (int)tmp_int; }

@@ -85,7 +85,7 @@ void usage_index(void **argtable, int mode) {
 
 
 index_options_t *parse_index_options(int argc, char **argv) {
-  int mode, num_options = NUM_INDEX_OPTIONS;
+  int mode = SA_INDEX, num_options = NUM_INDEX_OPTIONS;
 
   if (strcmp(argv[0], "build-bwt-index") == 0) {
     mode = BWT_INDEX;
@@ -156,7 +156,7 @@ void validate_index_options(index_options_t *options, int mode) {
 //------------------------------------------------------------------------------------
 
 void run_index_builder(int argc, char **argv, char *mode_str) {
-  int mode;
+  int mode = BWT_INDEX;
   if (!strcmp(mode_str, "build-bwt-index")) {
     mode = BWT_INDEX;
   } else if (!strcmp(mode_str, "build-sa-index")) {

@@ -12,8 +12,6 @@
 
 #include "breakpoint.h"
 
-#include "bs/array_list_bs.h"
-
 //#include "bwt_server.h"
 //#include "rna/rna_server.h"
 
@@ -296,37 +294,6 @@ pair_mng_t *pair_mng_new(int pair_mode, size_t min_distance,
 
 void pair_mng_free(pair_mng_t *p);
 
-//=====================================================================================
-
-// Added by PP
-//====================================================================================
-
-typedef struct bs_context {
-  size_t CpG_methyl;                 /**< Partial Counter for methylated Cytosines in CpG context   */
-  size_t CpG_unmethyl;               /**< Partial Counter for unmethylated Cytosines in CpG context */
-  size_t CHG_methyl;                 /**< Partial Counter for methylated Cytosines in CHG context   */
-  size_t CHG_unmethyl;               /**< Partial Counter for unmethylated Cytosines in CpG context */
-  size_t CHH_methyl;                 /**< Partial Counter for methylated Cytosines in CHH context   */
-  size_t CHH_unmethyl;               /**< Partial Counter for unmethylated Cytosines in CpG context */
-  size_t MUT_methyl;                 /**< Partial Counter for mutated Cytosines                     */
-  size_t num_bases;                  /**< Partial Counter for number of bases in the batch          */
-  array_list_t *context_CpG;             /**< Array with the sequences from CpG context to write */
-  array_list_t *context_CHG;             /**< Array with the sequences from CHG context to write */
-  array_list_t *context_CHH;             /**< Array with the sequences from CHH context to write */
-  array_list_t *context_MUT;             /**< Array with the sequences from mutations to write   */
-
-  array_list_bs_t *context_bs_CpG;             /**< Array with the sequences from CpG context to write */
-  array_list_bs_t *context_bs_CHG;             /**< Array with the sequences from CHG context to write */
-  array_list_bs_t *context_bs_CHH;             /**< Array with the sequences from CHH context to write */
-  array_list_bs_t *context_bs_MUT;             /**< Array with the sequences from mutations to write   */
-} bs_context_t;
-
-bs_context_t *bs_context_new(size_t num_reads);
-void bs_context_free(bs_context_t *bs_context);
-
-void bs_context_init(bs_context_t * bs_context, size_t num_reads);
-
-//====================================================================================
 
 typedef struct mapping_batch {
   int action;
@@ -365,8 +332,6 @@ typedef struct mapping_batch {
   array_list_t *CT_rev_fq_batch;
   array_list_t *GA_rev_fq_batch;
 
-  array_list_t *bs_status;
-  bs_context_t *bs_context;
   //  bs_context_t bs_context;
 } mapping_batch_t;
 

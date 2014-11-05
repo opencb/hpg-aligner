@@ -241,13 +241,13 @@ int bam_stats_consumer(void *data) {
 
   // variables for storint stats in db
   int db_on = batch->options->db_on;
-  sqlite3 *db;
+  sqlite3 *db = NULL;
   sqlite3_stmt* stmt;
   bam_query_fields_t *fields;
   char* errorMessage;
-  khash_t(stats_chunks) *hash;
-  size_t *sequence_lengths;
-  char **sequence_labels;
+  khash_t(stats_chunks) *hash = NULL;
+  size_t *sequence_lengths = NULL;
+  char **sequence_labels = NULL;
 
   if (db_on) {
     db = batch->options->db;
@@ -357,6 +357,9 @@ int bam_stats_consumer(void *data) {
 
   // free memory
   bam_stats_wf_batch_free(batch);
+
+  return 0;
+
 }
 
 //--------------------------------------------------------------------
@@ -378,7 +381,7 @@ void stats_bam(stats_options_t *opts) {
   counters->sequence_lengths = (size_t *) calloc(num_targets, sizeof(size_t));
   counters->depth_per_sequence = (double *) calloc(num_targets, sizeof(size_t));
 
-  size_t size = 0;
+
   for (int i = 0; i < num_targets; i++) {
     ref_length += bam_file->bam_header_p->target_len[i];
 

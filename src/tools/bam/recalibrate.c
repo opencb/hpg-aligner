@@ -50,7 +50,7 @@ int mymain(	int full,
 {	
 	char *refc, *inputc, *outputc, *infofilec, *datafilec, *statsc;
 	char *sched;
-	char cwd[1024];
+
 	
 	//Incorrect case: No input files
     if (incount == 0)

@@ -450,7 +450,7 @@ void workflow_schedule_SA(workflow_SA_t *wf) {
 	  workflow_stage_function_SA_t stage_function = wf->stage_functions[item->stage_id];
 
 	  struct timeval start_time, end_time;
-	  double total_time;
+	  double total_time = 0.0;
 
 	  start_timer(start_time);
 
@@ -512,6 +512,8 @@ int workflow_unlock_producer_SA(workflow_SA_t *wf) {
   pthread_mutex_lock(&wf->producer_mutex);
   wf->running_producer = 0;
   pthread_mutex_unlock(&wf->producer_mutex);
+  
+  return 0;
 }
 
 int workflow_lock_consumer_SA(workflow_SA_t *wf) {
@@ -527,7 +529,7 @@ int workflow_lock_consumer_SA(workflow_SA_t *wf) {
      return ret;
 }
 
-int workflow_unlock_consumer_SA(workflow_SA_t *wf) {
+void workflow_unlock_consumer_SA(workflow_SA_t *wf) {
   pthread_mutex_lock(&wf->consumer_mutex);
   wf->running_consumer = 0;
   pthread_mutex_unlock(&wf->consumer_mutex);
@@ -568,12 +570,12 @@ void *thread_function_SA(void *wf_context) {
   void *data = NULL;
 
   int num_threads = wf->num_threads;
-  workflow_stage_function_SA_t stage_function = NULL;
+
   workflow_producer_function_SA_t producer_function = (workflow_producer_function_SA_t)wf->producer_function;
   workflow_consumer_function_SA_t consumer_function = (workflow_consumer_function_SA_t)wf->consumer_function;
 
   int min_batches = (int)(num_threads * 3);
-  int max_batches = (int)(num_threads * 3);
+
 
   //int max_write_batches = 1000;
 
@@ -609,7 +611,7 @@ void *thread_function_SA(void *wf_context) {
 	       workflow_get_num_completed_items_SA_(wf) > 0 && 
 	       workflow_lock_consumer_SA(wf)) {	 
       
-      while (data = workflow_remove_item_SA(wf)) {
+      while ((data = workflow_remove_item_SA(wf))) {
 	//printf("Remove item %lu\n", pthread_self());
 	total_time = 0;
 	start_timer(start_time);
@@ -629,6 +631,7 @@ void *thread_function_SA(void *wf_context) {
     }
   }
 
+  return NULL;
   //printf("-------------> End\n");
 
 }
@@ -667,7 +670,7 @@ void workflow_run_with_SA(int num_threads, void *input, workflow_SA_t *wf) {
 	  CPU_SET( cpuArray[i % num_cpus], &cpu_set);
 	  sched_setaffinity(syscall(SYS_gettid), sizeof(cpu_set), &cpu_set);
 
-	  if (ret = pthread_create(&threads[i], &attr, thread_function_SA, (void *) wf_context)) {
+	  if ((ret = pthread_create(&threads[i], &attr, thread_function_SA, (void *) wf_context))) {
 	       printf("ERROR; return code from pthread_create() is %d\n", ret);
 	       exit(-1);
 	  }
@@ -678,7 +681,7 @@ void workflow_run_with_SA(int num_threads, void *input, workflow_SA_t *wf) {
      void *status;
      pthread_attr_destroy(&attr);
      for (int i = 0; i < num_threads; i++) {
-	  if (ret = pthread_join(threads[i], &status)) {
+       if ((ret = pthread_join(threads[i], &status))) {
 	       printf("ERROR; return code from pthread_join() is %d\n", ret);
 	       exit(-1);
 	  }
