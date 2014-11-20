@@ -278,6 +278,7 @@ void options_display(options_t *options) {
      //     printf("Num gpu threads %d\n", num_gpu_threads);
      //     printf("GPU Process: %s\n",  gpu_process == 0 ? "Disable":"Enable");
      printf("General parameters\n");
+     printf("\tHPG Aligner version: %s\n", HPG_ALIGNER_VERSION);
      printf("\tMode: %s\n", options->str_mode);
      if (in_filename2) {
        printf("\tInput FastQ filename, pair #1: %s\n", in_filename);

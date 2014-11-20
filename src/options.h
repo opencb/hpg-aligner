@@ -20,7 +20,7 @@
 
 //========================================================================
 
-#define HPG_ALIGNER_VERSION  "2.0.0"
+#define HPG_ALIGNER_VERSION  "2.0.1"
 #define OUTPUT_FILENAME      "alignments"
 
 //============================ DEFAULT VALUES ============================
