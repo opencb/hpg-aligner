@@ -641,13 +641,13 @@ void create_alignments(array_list_t *cal_list, fastq_read_t *read,
     len = strlen(cigar_string);
 
     //#ifdef _VERBOSE
-    //if (cigar_get_length(cigar) != read->length) {
-    //printf("--> %s:%i read length %i != cigar %s length %i\n", 
-    //	     __FILE__, __LINE__, read->length, cigar_string, cigar_get_length(cigar));
-    //seed_cal_print(cal);
-      //      printf("********************** A B O R T ************************\n");
-      //      exit(-1);
-    //}
+    if (cigar_get_length(cigar) != read->length) {
+      printf("--> %s:%i read length %i != cigar %s length %i\n", 
+	     __FILE__, __LINE__, read->length, cigar_string, cigar_get_length(cigar));
+      seed_cal_print(cal);
+      printf("********************** A B O R T ************************\n");
+      exit(-1);
+    }
     //#endif
 
     optional_fields_length = 100 + len;

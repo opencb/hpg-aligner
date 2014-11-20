@@ -1908,7 +1908,7 @@ int prepare_sw(fastq_read_t *read,   array_list_t *sw_prepare_list,
     }
     
     if (num_sw == 0) {
-      seed_cal_set_cigar_by_seed(seed, cal);
+      seed_cal_merge_seeds(cal);
     }
     
     num_total_sw += num_sw;
@@ -2400,16 +2400,7 @@ int sa_pair_mapper(void *data) {
 
   size_t num_reads = mapping_batch->num_reads;
 
-
-
-  // smith-waterman parameters
-
-
-
-
-
   // CAL management
-
 
   cal_mng_t *cal_mng;
   array_list_t *cal_list;
