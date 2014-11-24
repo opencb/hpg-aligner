@@ -305,6 +305,9 @@ static inline char *cigar_to_M_string(int *num_mismatches, int *num_cigar_ops, c
       }
       num_ops++;
       sprintf(str, "%s%i%c", str, value, name);
+      if (name == 'I' || name == 'D') {
+	mis += value;
+      }
     }
   }
   if (num_m > 0) {

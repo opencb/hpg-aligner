@@ -28,7 +28,7 @@ env = Environment(tools = ['default', 'packaging'],
 
 if int(ARGUMENTS.get('debug', '0')) == 1:
     debug = 1
-    env['CFLAGS'] += ' -O3 -g'
+    env['CFLAGS'] += ' -g'
 else:
     debug = 0
     env['CFLAGS'] += ' -O3'

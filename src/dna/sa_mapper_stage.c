@@ -1722,8 +1722,15 @@ int prepare_sw(fastq_read_t *read,   array_list_t *sw_prepare_list,
     // first seed
     seed = linked_list_get_first(cal->seed_list);
 
+    seed_cal_merge_seeds(cal);
+    if (cigar_get_length(&cal->cigar) == read->length) {
+      continue;
+    }
+
     // cal cigar
+    num_seeds = cal->seed_list->size;
     cigarset = cigarset_new(num_seeds * 2 + 1);
+    // printf("cigarset = %x, size = %i\n", cigarset, cigarset->size);
     cal->cigarset = cigarset;
 
     if (seed->read_start > 0) {
@@ -1866,7 +1873,8 @@ int prepare_sw(fastq_read_t *read,   array_list_t *sw_prepare_list,
 
     if (cal->invalid) {
       cigarset_free(cigarset);
-      cal->cigarset = NULL;
+      cigarset = NULL;
+      cal->cigarset = cigarset;
       continue;
     }
 
@@ -1908,7 +1916,12 @@ int prepare_sw(fastq_read_t *read,   array_list_t *sw_prepare_list,
     }
     
     if (num_sw == 0) {
-      seed_cal_merge_seeds(cal);
+      seed_cal_set_cigar_by_seed(seed, cal);     
+      //printf("num_sw = 0: before\n");
+      //seed_cal_print(cal);
+      //      seed_cal_merge_seeds(cal);
+      //printf("num_sw = 0: after\n");
+      //seed_cal_print(cal);
     }
     
     num_total_sw += num_sw;
@@ -1942,7 +1955,7 @@ void execute_sw(array_list_t *sw_prepare_list, sa_mapping_batch_t *mapping_batch
     q[i] = sw_prepare->query;
     r[i] = sw_prepare->ref;
 
-    #ifdef _VERBOSE
+    #ifdef _VERBOSE    
     printf("\t\t%i: query: %s\n", i, q[i]);
     printf("\t\t%i: ref. : %s\n", i, r[i]);
     printf("\n");
@@ -2009,6 +2022,9 @@ void execute_sw(array_list_t *sw_prepare_list, sa_mapping_batch_t *mapping_batch
     ref_start = sw_output->ref_start_p[i];
     diff = query_start - ref_start;
 
+    //    printf("flanks (left, right) = (%i, %i), starts (query, ref) = (%i, %i)\n",
+    //	   left_flank, right_flank, query_start, ref_start);
+
     // check initial positions
     if (sw_prepare->ref_type == FIRST_SW) {
       seed = (seed_t *)sw_prepare->seed_region;
@@ -2036,8 +2052,9 @@ void execute_sw(array_list_t *sw_prepare_list, sa_mapping_batch_t *mapping_batch
 	} else {
 	  cigar_append_op(query_start, 'I', cigar);      
 	}
-      } else if (ref_start > 0) {
-	cigar_append_op(ref_start, '=', cigar);      
+	//} else if (ref_start > 0) {
+	//	cigar_append_op(ref_start, '=', cigar);      
+	//cigar_append_op(ref_start, 'D', cigar);      
       }
     }
 
@@ -2143,12 +2160,13 @@ void post_process_sw(int sw_post_read_counter, int *sw_post_read,
 
       if (cal->seed_list->size <= 0 || cal->invalid) continue;
       
-      #ifdef _VERBOSE
-      printf("\t\t\t\tcal score = %0.2f\n", cal->score);
-      seed_cal_print(cal);
-      #endif
       cigarset = cal->cigarset;
       cigar = &cal->cigar;
+
+      #ifdef _VERBOSE
+      printf("\tcal score = %0.2f (cigarset %x size = %i)\n", cal->score, cigarset, cigarset->size);
+      seed_cal_print(cal);
+      #endif
       for (int j = 0; j < cigarset->size; j++) {
 
 	cigar_type = cigarset->info[j].active;
@@ -2166,15 +2184,15 @@ void post_process_sw(int sw_post_read_counter, int *sw_post_read,
 	      cigar_set_op(aux_cigar->num_ops - 1, op_value - SW_RIGHT_FLANK, op_name, aux_cigar);
 	    }
             #ifdef _VERBOSE
-	    printf("************** gap %i -> concat SEED cigar %s into %s\n",
-		   j, cigar_to_string(aux_cigar), cigar_to_string(cigar));
+	    printf("************** gap %i of %i -> concat SEED cigar %s into %s\n",
+		   j, cigarset->size, cigar_to_string(aux_cigar), cigar_to_string(cigar));
             #endif
 	    cigar_concat(aux_cigar, cigar);
 	  } else {
 	    // CIGAR_FROM_GAP
             #ifdef _VERBOSE
-	    printf("************** gap %i -> concat GAP cigar %s into %s\n",
-		   j, cigar_to_string(cigarset->info[j].cigar), cigar_to_string(cigar));
+	    printf("************** gap %i of %i -> concat GAP cigar %s into %s\n",
+		   j, cigarset->size, cigar_to_string(cigarset->info[j].cigar), cigar_to_string(cigar));
             #endif
 	    aux_cigar = cigarset->info[j].cigar;
 	    if (cigarset->info[j].overlap) {
@@ -2187,6 +2205,7 @@ void post_process_sw(int sw_post_read_counter, int *sw_post_read,
 	}
       }
       cigar_len = cigar_get_length(cigar);
+
       if (cigar_len < cal->read->length) {
 	if (seed && seed->read_end == cal->read->length - 1) {
 	  cigar_append_op(cal->read->length - cigar_len, '=', cigar);

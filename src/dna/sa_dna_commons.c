@@ -580,6 +580,11 @@ void create_alignments(array_list_t *cal_list, fastq_read_t *read,
 
   for (int i = 0; i < num_cals; i++) {
     cal = array_list_get(i, cal_list);
+    if (cal->invalid) {
+      // free memory
+      seed_cal_free(cal);
+      continue;
+    }
     
     #ifdef _VERBOSE	  
     printf("--> CAL #%i (cigar %s):\n", i, cigar_to_string(&cal->cigar));
@@ -639,16 +644,6 @@ void create_alignments(array_list_t *cal_list, fastq_read_t *read,
     cigar_string = cigar_to_string(cigar);
     cigar_M_string = cigar_to_M_string(&num_mismatches, &num_cigar_ops, cigar);
     len = strlen(cigar_string);
-
-    //#ifdef _VERBOSE
-    if (cigar_get_length(cigar) != read->length) {
-      printf("--> %s:%i read length %i != cigar %s length %i\n", 
-	     __FILE__, __LINE__, read->length, cigar_string, cigar_get_length(cigar));
-      seed_cal_print(cal);
-      printf("********************** A B O R T ************************\n");
-      exit(-1);
-    }
-    //#endif
 
     optional_fields_length = 100 + len;
 
