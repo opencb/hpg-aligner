@@ -1,3 +1,5 @@
+import os
+import sys
 
 # Initialize the environment with path variables, CFLAGS, and so on
 bioinfo_path = '#lib/hpg-libs/bioinfo-libs'
@@ -26,12 +28,20 @@ env = Environment(tools = ['default', 'packaging'],
                   LIBS = ['xml2', 'm', 'z', 'curl', 'dl', 'bioinfo', 'common'],
                   LINKFLAGS = ['-fopenmp'])
 
+if os.environ.has_key('C_INCLUDE_PATH'):
+   for dir in os.getenv('C_INCLUDE_PATH').split(':'):
+       env.Append(CPPPATH=[dir])
+
+if os.environ.has_key('LIBRARY_PATH'):
+   for dir in os.getenv('LIBRARY_PATH').split(':'):
+       env.Append(LIBPATH=[dir])
+
 if int(ARGUMENTS.get('debug', '0')) == 1:
     debug = 1
-    env['CFLAGS'] += ' -g'
+    env['CFLAGS'] += ' -O0 -g'
 else:
     debug = 0
-    env['CFLAGS'] += ' -O3'
+    env['CFLAGS'] += ' -O3 -g'
 
 if int(ARGUMENTS.get('verbose', '0')) == 1:
     env['CFLAGS'] += ' -D_VERBOSE'
