@@ -31,9 +31,15 @@ env = Environment(tools = ['default', 'packaging'],
 if os.environ.has_key('C_INCLUDE_PATH'):
    for dir in os.getenv('C_INCLUDE_PATH').split(':'):
        env.Append(CPPPATH=[dir])
+elif os.environ.has_key('C_PATH'):
+   for dir in os.getenv('C_PATH').split(':'):
+       env.Append(CPPPATH=[dir])
 
 if os.environ.has_key('LIBRARY_PATH'):
    for dir in os.getenv('LIBRARY_PATH').split(':'):
+       env.Append(LIBPATH=[dir])
+elif os.environ.has_key('LD_LIBRARY_PATH'):
+   for dir in os.getenv('LD_LIBRARY_PATH').split(':'):
        env.Append(LIBPATH=[dir])
 
 if int(ARGUMENTS.get('debug', '0')) == 1:
