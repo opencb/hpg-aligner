@@ -306,14 +306,15 @@ void *sa_bam_reader_unmapped(void *input) {
   while ((bam_read1(fnomap->bam_fd, bam1) > 0) && (size < batch_size)) {
 
     char *id1 = bam1_qname(bam1);
-    if (!strcmp(id1,id2)) {
-      //If is same were sending
+    if (!strcmp(id1, id2)) {
+      // if is same were sending
     } else if (bam1->core.flag & BAM_FUNMAP) {
       found = 0;
-      while (bam_read1(fnomap->bam_fd, bam2)>0) {
+      while (bam_read1(fnomap->bam_fd, bam2) > 0) {
 	id2 = bam1_qname(bam2);
-	if(!strcmp(id1,id2)) { //need are same
-	  found =1;
+	if (!strcmp(id1, id2)) { 
+	  // need are same
+	  found = 1;
 	  break;
 	} else {
 	  printf("\n Corrupt Bam, missing a mate, there is a single read \n");
@@ -325,10 +326,10 @@ void *sa_bam_reader_unmapped(void *input) {
       }
     } else {
       found = 0;
-      while (bam_read1(fnomap->bam_fd, bam2)>0) {
+      while (bam_read1(fnomap->bam_fd, bam2) > 0) {
 	id2 = bam1_qname(bam2);
-	if (!strcmp(id1,id2) && (bam2->core.flag & BAM_FUNMAP)) {
-	  found =1;
+	if (!strcmp(id1, id2) && (bam2->core.flag & BAM_FUNMAP)) {
+	  found = 1;
 	  break;
 	}
       }

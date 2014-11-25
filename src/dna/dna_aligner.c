@@ -222,7 +222,7 @@ void dna_aligner(options_t *options) {
     //
     sa_wf_batch_t *wf_batch = sa_wf_batch_new(options, (void *)sa_index, &writer_input, NULL, NULL);
     sa_wf_input_t *wf_input = sa_wf_input_new(bam_format, &reader_input, wf_batch);
-
+    
     
     // create and initialize workflow
     workflow_t *wf = workflow_new();
@@ -238,6 +238,9 @@ void dna_aligner(options_t *options) {
     
     // optional producer and consumer functions
     if (options->input_format == BAM_FORMAT) {
+      wf_input->idx = idx;
+      wf_input->stats = stats;
+      wf_input->data = fnomapped;
       if (options->pair_mode == PAIRED_END_MODE) {
 	workflow_set_producer(sa_bam_reader_pairend, "BAM reader", wf);
       } else {
@@ -298,24 +301,27 @@ void dna_aligner(options_t *options) {
     
     //closing files
     if ((options->input_format == BAM_FORMAT) || (options->input_format == SAM_FORMAT)){
-      bam_fclose(fnomapped);////close the unmapped file
+      // close the unmapped file
+      bam_fclose(fnomapped);
       bam_fclose((bam_file_t *)reader_input.fq_file1);
 
-      if(options->pair_mode == PAIRED_END_MODE){
+      if (options->pair_mode == PAIRED_END_MODE) {
 	// sort the bam
 	char *un = "Unmapped.bam";
 	char *sortname = "SortedUnmap";
 	bam_sort_core_ext(0, un, sortname, 500000000, 0);
 	printf("Unmapped \n");
-	bam_file_t *fnomap = bam_fopen("SortedUnmap.bam");
-	// freeing the previous wf_input and workflow
+	fnomapped = bam_fopen("SortedUnmap.bam");
+
+	// free the previous wf_input
 	sa_wf_input_free(wf_input);
-	workflow_free(wf);
 	wf_input = sa_wf_input_new(bam_format, &reader_input, wf_batch);
 	wf_input->idx = idx;
-	wf_input->data = fnomap;
+	wf_input->data = fnomapped;
 	wf_input->stats = stats;
-	// freeing the previous workflow and create the new one
+
+	// free the previous workflow and create the new one
+	workflow_free(wf);
 	wf = workflow_new();
 	workflow_set_stages(1, stage_functions, stage_labels, wf);
 	workflow_set_producer(sa_bam_reader_unmapped, "BAM reader", wf);
@@ -326,14 +332,14 @@ void dna_aligner(options_t *options) {
 	  workflow_set_consumer((workflow_consumer_function_t *)sa_sam_writer, "SAM writer", wf);
 	}
 
-	printf("----------------------------------------------\n");
+	printf("-----------------------------------------------------------------\n");
 	printf("Starting mapping unmapped reads...\n");
 	gettimeofday(&start, NULL);
 	workflow_run_with(num_threads, wf_input, wf);
 	gettimeofday(&stop, NULL);
 	printf("End of mapping in %0.2f min. Done!!\n",
 	       ((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f)/60.0f);
-	printf("----------------------------------------------\n");
+	printf("-----------------------------------------------------------------\n");
 	printf("Output file : %s\n", out_filename);
 	printf("\n");
 	printf("Num. reads : %lu\nNum. mapped reads : %lu (%0.2f %%)\nNum. unmapped reads: %lu (%0.2f %%)\n",
@@ -343,13 +349,13 @@ void dna_aligner(options_t *options) {
 	printf("\n");
 	printf("Num. mappings : %lu\n", num_total_mappings);
 	printf("Num. multihit reads: %lu\n", num_multihit_reads);
-	printf("----------------------------------------------\n");
+	printf("-----------------------------------------------------------------\n");
 	printf("Input file : %s\n", file1);
 	printf("Total reads : %d \n", stats->total_reads);
-	printf("secondary Reads : %d \n", stats->secondary_reads);
+	printf("Secondary Reads : %d \n", stats->secondary_reads);
 	printf("Alone Reads : %d \n", stats->alone_reads);
-	printf("----------------------------------------------\n");
-	bam_fclose(fnomap); //close the unmapped file
+	printf("-----------------------------------------------------------------\n");
+	bam_fclose(fnomapped); // close the unmapped file
 	remove("Unmapped.bam");
 	remove("SortedUnmap.bam");
       }
