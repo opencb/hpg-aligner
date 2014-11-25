@@ -77,14 +77,14 @@ void *sa_bam_reader_single(void *input) {
   int total_reads = 0;
   
   fastq_read_t *read;
-  char *header1, *sequence, *quality;
+  char *header, *sequence, *quality;
 
   bam1 = bam_init1();
   while ((bam_read1(bam_file->bam_fd, bam1) > 0) && (size < batch_size) ) {
     // convert bam1_t to fastq_read_t
     total_reads++;
     if (!(bam1->core.flag & BAM_FSECONDARY)) {
-      header1 = strdup(bam1_qname(bam1));
+      header = strdup(bam1_qname(bam1));
       sequence = calloc(sizeof(char), (int32_t)bam1->core.l_qseq + 1);
       quality = calloc(sizeof(char), (int32_t)bam1->core.l_qseq + 1);
       
@@ -96,9 +96,9 @@ void *sa_bam_reader_single(void *input) {
       bam1_get_quality(bam1, quality);
       
       size += bam1->core.l_qname + 2 * bam1->core.l_qseq;
-      read = fastq_read_new(header1, sequence, quality);
+      read = fastq_read_new(header, sequence, quality);
       array_list_insert(read, reads);
-      free(header1);
+      free(header);
       free(sequence);
       free(quality);
     } else {
@@ -153,7 +153,6 @@ void *sa_bam_reader_pairend(void *input) {
   bam1_t *bam2; // mate 2
   bam2 = bam_init1();
 
-  int ret;
   bam_iter_t iter;
   
   int ret, found, size = 0, total_reads = 0;
@@ -167,8 +166,8 @@ void *sa_bam_reader_pairend(void *input) {
 	&& !(bam1->core.flag & BAM_FSECONDARY)) {
 
       // bam_fetch modified function
-      iter = bam_iter_query(wf_input->idx, (int)b am1->core.mtid,
-			    (int) bam1->core.mpos, (int)bam1->core.mpos + 1);
+      iter = bam_iter_query(wf_input->idx, (int) bam1->core.mtid,
+			    (int) bam1->core.mpos, (int) bam1->core.mpos + 1);
       if (iter == NULL){
 	printf("Wrong fail in the index or in bam file, pair not found");	
       }
@@ -176,7 +175,7 @@ void *sa_bam_reader_pairend(void *input) {
       found = 0;
       bam_seek(bam_file_aux, 0, SEEK_SET);
       while ((ret = bam_iter_read(bam_file_aux, iter, bam2)) >= 0) {
-	if ((!strcmp(bam1_qname(bam1),bam1_qname(bam2))) && (bam1->core.mtid == bam2->core.tid)) {
+	if ((!strcmp(bam1_qname(bam1), bam1_qname(bam2))) && (bam1->core.mtid == bam2->core.tid)) {
 	  found = 1;
 	  break;
 	}
@@ -204,7 +203,7 @@ void *sa_bam_reader_pairend(void *input) {
 	bam1_get_quality(bam1, quality);
 
 	size += bam1->core.l_qname + 2 * bam1->core.l_qseq;
-	read = fastq_read_new(header1, sequence, quality);
+	read = fastq_read_new(header, sequence, quality);
 	array_list_insert(read, reads);
 
 	free(header);
@@ -232,7 +231,8 @@ void *sa_bam_reader_pairend(void *input) {
 
 	total_reads += 2;
       }
-    } else if ((bam1->core.flag & BAM_FUNMAP) || (bam1->core.flag & BAM_FMUNMAP) && 
+    } else if (((bam1->core.flag & BAM_FUNMAP) || 
+		(bam1->core.flag & BAM_FMUNMAP)) && 
 	       !(bam1->core.flag & BAM_FSECONDARY)) { 
       // Unmapped or mate, save it into a tmp file
       total_reads++;
@@ -387,7 +387,7 @@ void *sa_bam_reader_unmapped(void *input) {
       bam1_get_quality(bam2, quality);
 
       size += bam2->core.l_qname + 2 * bam2->core.l_qseq;
-      read = fastq_read_new(header2, sequence2, quality2);
+      read = fastq_read_new(header, sequence, quality);
       array_list_insert(read, reads);
 
       free(header);

@@ -1,6 +1,8 @@
 #ifndef _SA_IO_STAGES_H
 #define _SA_IO_STAGES_H
 
+#include "utils.h"
+
 #include "sa/sa_index3.h"
 
 #include "batch_writer.h"

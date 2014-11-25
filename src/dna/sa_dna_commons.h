@@ -165,6 +165,32 @@ static inline void sa_wf_batch_free(sa_wf_batch_t *p) {
 }
 
 //--------------------------------------------------------------------
+// stats_t
+//--------------------------------------------------------------------
+
+typedef struct stats {
+  int alone_reads; // reads pair alone
+  int secondary_reads;
+  int total_reads;
+} stats_t;
+
+//---------------------------------------------------------------------
+
+static inline stats_t *sa_stats_new(int alone_reads, int secondary_reads, int total_reads){
+  stats_t *p = (stats_t *) malloc(sizeof(stats_t));
+  p->alone_reads = alone_reads;
+  p->secondary_reads = secondary_reads;
+  p->total_reads = total_reads;
+  return p;
+}
+
+//---------------------------------------------------------------------
+
+static inline void sa_stats_free(stats_t *p) {
+  if (p) free(p);
+}
+
+//--------------------------------------------------------------------
 // sa_wf_input_t
 //--------------------------------------------------------------------
 
@@ -172,6 +198,9 @@ typedef struct sa_wf_input {
   int bam_format;
   fastq_batch_reader_input_t *fq_reader_input;
   sa_wf_batch_t *wf_batch;
+  bam_index_t *idx;
+  stats_t *stats;
+  void *data;
 } sa_wf_input_t;
 
 //--------------------------------------------------------------------
@@ -183,6 +212,9 @@ static inline sa_wf_input_t *sa_wf_input_new(int bam_format,
   p->bam_format = bam_format;
   p->fq_reader_input = fq_reader_input;
   p->wf_batch = wf_batch;
+  p->idx = NULL;
+  p->stats = NULL;
+  p->data = NULL;
   return p;
 }
 
