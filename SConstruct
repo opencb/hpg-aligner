@@ -1,5 +1,4 @@
 import os
-import sys
 
 # Initialize the environment with path variables, CFLAGS, and so on
 bioinfo_path = '#lib/hpg-libs/bioinfo-libs'

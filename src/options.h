@@ -56,10 +56,15 @@
 #define DEFAULT_FILTER_SEED_MAPPINGS_BS 500
 //========================================================================
 
-#define NUM_OPTIONS			30
+#define NUM_OPTIONS			31
 #define NUM_RNA_OPTIONS			 5
 #define NUM_DNA_OPTIONS			 1
 
+#define FASTQ_FORMAT 1
+#define BAM_FORMAT   2
+#define SAM_FORMAT   3
+
+#define FORMAT_STR(f) (f == BAM_FORMAT ? "BAM" : (f == SAM_FORMAT ? "SAM" : "FastQ"))
 
 typedef struct options {
   int version;
@@ -90,6 +95,7 @@ typedef struct options {
   int flank_length;
   int timming;
   int statistics;
+  int input_format;
   int rna_seq; 
   int help;
   int cal_seeker_errors;

@@ -2420,7 +2420,6 @@ int sa_pair_mapper(void *data) {
   size_t num_reads = mapping_batch->num_reads;
 
   // CAL management
-
   cal_mng_t *cal_mng;
   array_list_t *cal_list;
 

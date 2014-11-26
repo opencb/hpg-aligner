@@ -21,6 +21,8 @@ options_t *options_new(void) {
   options->realignment = 0;
   options->recalibration = 0;
   options->adapter = NULL;
+  options->input_format = FASTQ_FORMAT;
+
   //GET Number System Cores
   //----------------------------------------------
   options->num_cpu_threads = get_optimal_cpu_num_threads();
@@ -263,6 +265,8 @@ void options_display(options_t *options) {
        adapter = strdup(options->adapter);
      }
 
+     int input_format = options->input_format;
+
      //unsigned int gpu_process = (unsigned int)options->gpu_process;
 
      int min_score    =  (int)options->min_score;
@@ -284,9 +288,11 @@ void options_display(options_t *options) {
        printf("\tInput FastQ filename, pair #1: %s\n", in_filename);
        printf("\tInput FastQ filename, pair #2: %s\n", in_filename2);
      } else {
-       printf("\tInput FastQ filename: %s\n", in_filename);
+       printf("\tInput %s filename: %s\n", FORMAT_STR(input_format), in_filename);
      }
-     printf("\tFastQ gzip mode: %s\n", options->gzip == 1 ? "Enable" : "Disable");
+     if (input_format == FASTQ_FORMAT) {
+       printf("\tFastQ gzip mode: %s\n", options->gzip == 1 ? "Enable" : "Disable");
+     }
      printf("\tIndex directory name: %s\n", bwt_dirname);
      printf("\tOutput directory name: %s\n", output_name);
           
@@ -560,6 +566,7 @@ void** argtable_options_new(int mode) {
   argtable[count++] = arg_lit0(NULL, "indel-realignment", "Indel-based realignment");
   argtable[count++] = arg_lit0(NULL, "recalibration", "Base quality score recalibration");
   argtable[count++] = arg_str0("a", "adapter", NULL, "Adapter sequence in the read");
+  argtable[count++] = arg_str0(NULL, "input-format", NULL, "Input file format: fastq or bam. Default: fastq");
   argtable[count++] = arg_lit0("v", "version", "Display the HPG Aligner version");
 
   if (mode == DNA_MODE) {
@@ -664,6 +671,18 @@ options_t *read_CLI_options(void **argtable, options_t *options) {
   if (((struct arg_str*)argtable[++count])->count) { options->adapter = strdup(*(((struct arg_str*)argtable[count])->sval)); }
 
   if (options->adapter) options->adapter_length = strlen(options->adapter);
+
+  if (((struct arg_int*)argtable[++count])->count) {
+    char *input_format = strdup(*(((struct arg_str*)argtable[count])->sval));
+    if (!strcmp(input_format, "sam") || !strcmp(input_format, "SAM")) {
+      options->input_format = SAM_FORMAT;
+    } else if (!strcmp(input_format, "bam") || !strcmp(input_format, "BAM")) {
+      options->input_format = BAM_FORMAT;
+    } else {
+      options->input_format = FASTQ_FORMAT;
+    }
+  }
+
   if (((struct arg_int*)argtable[++count])->count) { options->version = ((struct arg_int*)argtable[count])->count; }
 
   if (options->mode == DNA_MODE) {
@@ -716,22 +735,23 @@ options_t *parse_options(int argc, char **argv) {
     exit(-1);
   } else {
     int num_errors = arg_parse(argc, argv, argtable);   
+    /*
     if (((struct arg_int*)argtable[24])->count) {
       usage(argtable);
       argtable_options_free(argtable, num_options);
       options_free(options);
       exit(0);
     }
-        
+    */  
     if (num_errors > 0) {
-      fprintf(stdout, "Errors:\n");
+      fprintf(stdout, "\nError:\n");
       // struct end is always allocated in the last position
-      arg_print_errors(stdout, argtable[num_options], "hpg-aligner");
+      arg_print_errors(stdout, argtable[num_options], "\t");
       usage(argtable);
       exit(-1);
-    }else {
+    } else {
       options = read_CLI_options(argtable, options);
-      if(options->help) {
+      if (options->help) {
 	usage(argtable);
 	argtable_options_free(argtable, num_options);
 	options_free(options);
@@ -756,9 +776,10 @@ options_t *parse_options(int argc, char **argv) {
 }
 
 void usage(void **argtable) {
-  printf("Usage:\nhpg-aligner {dna | rna | build-bwt-index | build-sa-index}");
-  arg_print_syntaxv(stdout, argtable, "\n");
-  arg_print_glossary(stdout, argtable, "%-50s\t%s\n");
+  printf("\nUsage:\n\thpg-aligner {dna | rna | build-bwt-index | build-sa-index} <options>\n");
+  //  arg_print_syntaxv(stdout, argtable, "\n");
+  printf("\nOptions:\n");
+  arg_print_glossary(stdout, argtable, "\t%-50s\t%s\n");
 }
 
 void usage_cli(int mode) {

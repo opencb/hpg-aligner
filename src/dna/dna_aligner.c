@@ -148,28 +148,81 @@ void dna_aligner(options_t *options) {
 				  NULL, options->gzip, 
 				  &reader_input);
     
-    if (options->pair_mode == SINGLE_END_MODE) {
-      if (options->gzip) {
-	reader_input.fq_gzip_file1 = fastq_gzopen(file1);
-      } else {
-	reader_input.fq_file1 = fastq_fopen(file1);
+    if (options->input_format == BAM_FORMAT) {
+      // BAM input files
+      reader_input.fq_file1 = (fastq_file_t*) bam_fopen(file1);
+      if (options->input_format == BAM_FORMAT) {
+	if (is_pair(file1)) {
+	  options->pair_mode = PAIRED_END_MODE;
+	} else {
+	  options->pair_mode = SINGLE_END_MODE;
+	}
       }
     } else {
-      if (options->gzip) {
-	reader_input.fq_gzip_file1 = fastq_gzopen(file1);
-	reader_input.fq_gzip_file2 = fastq_gzopen(file2);	
+      if (options->pair_mode == SINGLE_END_MODE) {
+	if (options->gzip) {
+	  reader_input.fq_gzip_file1 = fastq_gzopen(file1);
+	} else {
+	  reader_input.fq_file1 = fastq_fopen(file1);
+	}
       } else {
-	reader_input.fq_file1 = fastq_fopen(file1);
-	reader_input.fq_file2 = fastq_fopen(file2);
+	if (options->gzip) {
+	  reader_input.fq_gzip_file1 = fastq_gzopen(file1);
+	  reader_input.fq_gzip_file2 = fastq_gzopen(file2);	
+	} else {
+	  reader_input.fq_file1 = fastq_fopen(file1);
+	  reader_input.fq_file2 = fastq_fopen(file2);
+	}
+      }
+    }    
+   
+    bam_index_t *idx = 0;
+    bam_file_t *fnomapped = NULL;
+    stats_t *stats = sa_stats_new(0,0,0);
+
+    if (options->input_format == BAM_FORMAT) {
+      if (options->pair_mode == PAIRED_END_MODE){
+	bam_header_t *bam_header = create_bam_header(sa_index->genome);
+	fnomapped = bam_fopen_mode("Unmapped.bam", bam_header, "w");
+	bam_fwrite_header(bam_header, fnomapped);//write the header in fnomapped
+	idx = bam_index_load(file1); //idx_filename);//load the index
+	if (idx == 0){
+	  char *idx_filename = malloc(strlen(file1) + 5);
+	  strcpy(idx_filename, file1);
+	  strcat(idx_filename, ".bai");
+	  printf("Creating BAM index...\n");
+	  //samtools index fastq_filename;
+	  bamFile bf = bam_open(file1, "r");
+	  idx = bam_index_core(bf);
+	  if (!idx) {
+	    printf("Could not create the BAM index. Please, check your BAM file: %s\n", file1);
+	    exit(-1);
+	  }
+	  bam_close(bf);
+	  printf("Done. BAM index: %s\n", idx_filename);
+	  FILE *idxf = fopen(idx_filename, "wb");
+	  if (idxf == NULL) {
+	    LOG_FATAL_F("Could not open the BAM index: %s", idx_filename);
+	  }
+	  bam_index_save(idx, idxf);
+	  //bam_index_destroy(idx);
+	  fclose(idxf);
+	  idx = bam_index_load(file1);
+	  if (idx == 0){
+	    printf("Could not load the BAM index: %s", idx_filename);
+	    exit(-1);
+	  }
+	  free(idx_filename);
+	}
       }
     }
-    
+ 
     //--------------------------------------------------------------------------------------
     // workflow management
     //
     sa_wf_batch_t *wf_batch = sa_wf_batch_new(options, (void *)sa_index, &writer_input, NULL, NULL);
     sa_wf_input_t *wf_input = sa_wf_input_new(bam_format, &reader_input, wf_batch);
-
+    
     
     // create and initialize workflow
     workflow_t *wf = workflow_new();
@@ -184,7 +237,21 @@ void dna_aligner(options_t *options) {
     workflow_set_stages(1, stage_functions, stage_labels, wf);
     
     // optional producer and consumer functions
-    workflow_set_producer((workflow_producer_function_t *)sa_fq_reader, "FastQ reader", wf);
+    if (options->input_format == BAM_FORMAT) {
+      wf_input->idx = idx;
+      wf_input->stats = stats;
+      wf_input->data = fnomapped;
+      if (options->pair_mode == PAIRED_END_MODE) {
+	workflow_set_producer(sa_bam_reader_pairend, "BAM reader", wf);
+      } else {
+	workflow_set_producer(sa_bam_reader_single, "BAM reader", wf);
+      }
+    } else if (options->input_format == SAM_FORMAT) {
+      // workflow_set_producer(sa_sam_reader, "SAM reader", wf);
+    } else {
+      workflow_set_producer(sa_fq_reader, "FastQ reader", wf);
+    }
+
     if (bam_format) {
       workflow_set_consumer((workflow_consumer_function_t *)sa_bam_writer, "BAM writer", wf);
     } else {
@@ -195,24 +262,8 @@ void dna_aligner(options_t *options) {
     printf("Starting mapping...\n");
     gettimeofday(&start, NULL);
     workflow_run_with(num_threads, wf_input, wf);
-    gettimeofday(&stop, NULL);
-    printf("End of mapping in %0.2f min. Done!!\n", 
-	   ((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f)/60.0f);  
-    
-    printf("-----------------------------------------------------------------\n");
-    printf("Output file        : %s\n", out_filename);
-    printf("\n");
-    printf("Num. reads         : %lu\nNum. mapped reads  : %lu (%0.2f %%)\nNum. unmapped reads: %lu (%0.2f %%)\n",
-	   num_mapped_reads + num_unmapped_reads,
-	   num_mapped_reads, 100.0f * num_mapped_reads / (num_mapped_reads + num_unmapped_reads),
-	   num_unmapped_reads, 100.0f * num_unmapped_reads / (num_mapped_reads + num_unmapped_reads));
-    printf("\n");
-    printf("Num. mappings      : %lu\n", num_total_mappings);
-    printf("Num. multihit reads: %lu\n", num_multihit_reads);
-    printf("-----------------------------------------------------------------\n");
 
-
-  #ifdef _TIMING
+    #ifdef _TIMING
     char func_name[1024];
     double total_func_times = 0;
     for (int i = 0; i < NUM_TIMING; i++) {
@@ -230,15 +281,49 @@ void dna_aligner(options_t *options) {
       printf("\t%0.2f %%\t%0.4f\tof %0.4f\t%s\n", 
 	     100.0 * func_times[i] / total_func_times, func_times[i], total_func_times, func_names[i]);
     }
-  #endif
+    #endif
     
-    // free memory
-    sa_wf_input_free(wf_input);
-    sa_wf_batch_free(wf_batch);
-    workflow_free(wf);
+    if ((options->input_format == BAM_FORMAT) || 
+	(options->input_format == SAM_FORMAT)) {
+      // close the unmapped file
+      bam_fclose(fnomapped);
+      bam_fclose((bam_file_t *)reader_input.fq_file1);
 
-    //closing files
-    if (options->gzip) {
+      if (options->pair_mode == PAIRED_END_MODE) {
+	// sort the bam
+	char *un = "Unmapped.bam";
+	char *sortname = "SortedUnmap";
+	bam_sort_core_ext(0, un, sortname, 500000000, 0);
+	fnomapped = bam_fopen("SortedUnmap.bam");
+
+	// free the previous wf_input
+	sa_wf_input_free(wf_input);
+	wf_input = sa_wf_input_new(bam_format, &reader_input, wf_batch);
+	wf_input->idx = idx;
+	wf_input->data = fnomapped;
+	wf_input->stats = stats;
+
+	// free the previous workflow and create the new one
+	workflow_free(wf);
+	wf = workflow_new();
+	workflow_set_stages(1, stage_functions, stage_labels, wf);
+	workflow_set_producer(sa_bam_reader_unmapped, "BAM reader", wf);
+
+	if (bam_format) {
+	  workflow_set_consumer((workflow_consumer_function_t *)sa_bam_writer, "BAM writer", wf);
+	} else {
+	  workflow_set_consumer((workflow_consumer_function_t *)sa_sam_writer, "SAM writer", wf);
+	}
+
+	workflow_run_with(num_threads, wf_input, wf);
+	gettimeofday(&stop, NULL);
+
+	// close files and remove tmp files
+	bam_fclose(fnomapped); 
+	remove("Unmapped.bam");
+	remove("SortedUnmap.bam");
+      }
+    } else if (options->gzip) {
       if (options->pair_mode == SINGLE_END_MODE) {
 	fastq_gzclose(reader_input.fq_gzip_file1);
       } else {
@@ -254,6 +339,36 @@ void dna_aligner(options_t *options) {
       }
     }
     
+    // display stats
+    printf("End of mapping in %0.2f min. Done!!\n",
+	   ((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f)/60.0f);
+    printf("-----------------------------------------------------------------\n");
+    printf("Output file : %s\n", out_filename);
+    printf("\n");
+    printf("Num. reads : %lu\nNum. mapped reads : %lu (%0.2f %%)\nNum. unmapped reads: %lu (%0.2f %%)\n",
+	   num_mapped_reads + num_unmapped_reads,
+	   num_mapped_reads, 100.0f * num_mapped_reads / (num_mapped_reads + num_unmapped_reads),
+	   num_unmapped_reads, 100.0f * num_unmapped_reads / (num_mapped_reads + num_unmapped_reads));
+    printf("\n");
+    printf("Num. mappings : %lu\n", num_total_mappings);
+    printf("Num. multihit reads: %lu\n", num_multihit_reads);
+    printf("-----------------------------------------------------------------\n");
+
+    if ((options->input_format == BAM_FORMAT) || 
+	(options->input_format == SAM_FORMAT)) {
+      printf("Num. mappings not processed:\n");
+      printf("\tBy secondary mappings: %d \n", stats->secondary_reads);
+      printf("\tBy unpaired mappings : %d \n", stats->alone_reads);
+      printf("-----------------------------------------------------------------\n");
+    }
+
+    // free memory
+    sa_wf_input_free(wf_input);
+    sa_wf_batch_free(wf_batch);
+    workflow_free(wf);
+    if (idx) bam_index_destroy(idx);
+    if (stats) sa_stats_free(stats);
+
     //
     // end of workflow management
     //--------------------------------------------------------------------------------------
@@ -334,7 +449,6 @@ void dna_aligner(options_t *options) {
     printf("Realigned file     : %s\n", realig_filename);
   }
 
-
   if (options->recalibration) {
     recal_filename[0] = 0;
     strcat(recal_filename, (options->output_name ? options->output_name : "."));
@@ -368,7 +482,7 @@ void dna_aligner(options_t *options) {
   printf("*********> num_dup_reads = %i, num_total_dup_reads = %i\n", 
 	 num_dup_reads, num_total_dup_reads);
   #endif
-}
+  }
 
 //--------------------------------------------------------------------
 //--------------------------------------------------------------------
