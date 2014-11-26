@@ -735,22 +735,23 @@ options_t *parse_options(int argc, char **argv) {
     exit(-1);
   } else {
     int num_errors = arg_parse(argc, argv, argtable);   
+    /*
     if (((struct arg_int*)argtable[24])->count) {
       usage(argtable);
       argtable_options_free(argtable, num_options);
       options_free(options);
       exit(0);
     }
-        
+    */  
     if (num_errors > 0) {
-      fprintf(stdout, "Errors:\n");
+      fprintf(stdout, "\nError:\n");
       // struct end is always allocated in the last position
-      arg_print_errors(stdout, argtable[num_options], "hpg-aligner");
+      arg_print_errors(stdout, argtable[num_options], "\t");
       usage(argtable);
       exit(-1);
-    }else {
+    } else {
       options = read_CLI_options(argtable, options);
-      if(options->help) {
+      if (options->help) {
 	usage(argtable);
 	argtable_options_free(argtable, num_options);
 	options_free(options);
@@ -775,9 +776,10 @@ options_t *parse_options(int argc, char **argv) {
 }
 
 void usage(void **argtable) {
-  printf("Usage:\nhpg-aligner {dna | rna | build-bwt-index | build-sa-index}");
-  arg_print_syntaxv(stdout, argtable, "\n");
-  arg_print_glossary(stdout, argtable, "%-50s\t%s\n");
+  printf("\nUsage:\n\thpg-aligner {dna | rna | build-bwt-index | build-sa-index} <options>\n");
+  //  arg_print_syntaxv(stdout, argtable, "\n");
+  printf("\nOptions:\n");
+  arg_print_glossary(stdout, argtable, "\t%-50s\t%s\n");
 }
 
 void usage_cli(int mode) {

@@ -344,12 +344,9 @@ void *sa_bam_reader_unmapped(void *input) {
       if ((bam1->core.flag & BAM_FREAD2) || (bam2->core.flag & BAM_FREAD1)) {
 
 	bam1_t *bamaux; // mate 1
-	bam1 = bam_init1();
-
 	bamaux = bam1;
 	bam1 = bam2;
 	bam2 = bamaux;
-	bam_destroy1(bamaux);
       }
 
       // convert bam1_t to fastq_read_t
