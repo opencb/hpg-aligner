@@ -194,7 +194,7 @@ void options_to_file(options_t *options, FILE *fd);
 options_t *parse_options(int argc, char **argv);
 
 
-void usage(void **argtable);
+void usage(void **argtable, int mode);
 void display_version();
 
 void options_set_cmdline(int argc, char **argv, 

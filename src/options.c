@@ -756,7 +756,7 @@ options_t *parse_options(int argc, char **argv) {
   options->mode = mode;
 
   if (argc < 2) {
-    usage(argtable);
+    usage(argtable, mode);
     exit(-1);
   } else {
     int num_errors = arg_parse(argc, argv, argtable);   
@@ -772,12 +772,12 @@ options_t *parse_options(int argc, char **argv) {
       fprintf(stdout, "\nError:\n");
       // struct end is always allocated in the last position
       arg_print_errors(stdout, argtable[num_options], "\t");
-      usage(argtable);
+      usage(argtable, mode);
       exit(-1);
     } else {
       options = read_CLI_options(argtable, options);
       if (options->help) {
-	usage(argtable);
+	usage(argtable, mode);
 	argtable_options_free(argtable, num_options);
 	options_free(options);
 	exit(0);
@@ -802,8 +802,8 @@ options_t *parse_options(int argc, char **argv) {
 
 //--------------------------------------------------------------------
 
-void usage(void **argtable) {
-  printf("\nUsage:\n\t%s {dna | rna} options\n", HPG_ALIGNER_NAME);
+void usage(void **argtable, int mode) {
+  printf("\nUsage:\n\t%s %s <options>\n", HPG_ALIGNER_BIN, (mode == RNA_MODE ? "rna" : "dna"));
   //  arg_print_syntaxv(stdout, argtable, "\n");
   printf("\nOptions:\n");
   arg_print_glossary(stdout, argtable, "\t%-50s\t%s\n");
@@ -813,7 +813,7 @@ void usage(void **argtable) {
 
 void usage_cli(int mode) {
   void **argtable = argtable_options_new(mode);
-  usage(argtable);
+  usage(argtable, mode);
   exit(0);
 }
 
