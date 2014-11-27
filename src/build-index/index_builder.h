@@ -15,16 +15,20 @@
 #define SA_INDEX  0
 #define BWT_INDEX 1
 
-#define NUM_INDEX_OPTIONS 4
-#define NUM_INDEX_BWT_OPTIONS 1
+#define NUM_INDEX_OPTIONS     5
+#define NUM_INDEX_BWT_OPTIONS 0
+
+#define BWT_RATIO_DEFAULT  8
 
 typedef struct index_options {
+  int mode;
   int version;
   int index_ratio;
-  int bs_index;
   int help;
+  char *decoy_genome;
   char *ref_genome;
   char *index_filename;  
+  char *cmdline;
 } index_options_t;
 
 index_options_t *index_options_new();
@@ -34,14 +38,9 @@ void run_index_builder_bwt(char *genome_filename, char *bwt_dirname,
 			   int bwt_ratio, bool duplicate_strand, 
 			   char *nucleotides);
 
-void run_index_builder_sa(char *genome_filename, uint k_value, 
-			  char *bwt_dirname);
-
 void help_index_builder();
+void index_options_display(index_options_t *options);
 
 void run_index_builder(int argc, char **argv, char *mode_str);
-
-//void run_index_builder_bs(char *genome_filename, char *bwt_dirname, int bwt_ratio, char *bases);
-
 
 #endif // INDEX_BUILDER_H

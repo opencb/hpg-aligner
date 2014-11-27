@@ -197,7 +197,6 @@ options_t *parse_options(int argc, char **argv);
 void usage(void **argtable, int mode);
 void display_version();
 
-void options_set_cmdline(int argc, char **argv, 
-			 options_t *options);
+char *create_cmdline(int argc, char **argv);
 
 #endif
