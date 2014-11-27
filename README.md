@@ -104,7 +104,7 @@ RUNING
       Starting mapping...
       End of mapping in 1.40 min. Done!!
       ----------------------------------------------
-      Output file        : hpg_aligner_output/out.sam
+      Output file        : hpg_aligner_output/alignments.sam
       Num. reads         : 4000000
       Num. mapped reads  : 3994693 (99.87 %)
       Num. unmapped reads: 5307 (0.13 %)
