@@ -297,7 +297,7 @@ void *sa_bam_reader_unmapped(void *input) {
   bam1_t *bam2; // mate 2
   bam2 = bam_init1();
 
-  int size = 0, cont = 0, found = 0;
+  int size = 0, found = 0;
   char *header, *sequence, *quality;
   fastq_read_t *read;
 
@@ -435,8 +435,9 @@ size_t num_unmapped_reads_by_cigar_length = 0;
 // SAM writer
 //--------------------------------------------------------------------
 
-void write_sam_header(sa_genome3_t *genome, FILE *f) {
-  fprintf(f, "@PG\tID:HPG-Aligner\tVN:%s\n", HPG_ALIGNER_VERSION);
+void write_sam_header(options_t *options, sa_genome3_t *genome, FILE *f) {
+  fprintf(f, "@HD\tVN:1.4\tSO:unsorted\n");
+  fprintf(f, "@PG\tID:HPG-Aligner\tVN:%s\tCL:%s\n", HPG_ALIGNER_VERSION, options->cmdline);
   for (int i = 0; i < genome->num_chroms; i++) {
     fprintf(f, "@SQ\tSN:%s\tLN:%lu\n", genome->chrom_names[i], genome->chrom_lengths[i]);
   }
@@ -771,7 +772,7 @@ int sa_sam_writer(void *data) {
 // BAM writer
 //--------------------------------------------------------------------
 
-bam_header_t *create_bam_header(sa_genome3_t *genome) {
+bam_header_t *create_bam_header(options_t *options, sa_genome3_t *genome) {
 
   bam_header_t *bam_header = (bam_header_t *) calloc(1, sizeof(bam_header_t));
 
@@ -786,7 +787,8 @@ bam_header_t *create_bam_header(sa_genome3_t *genome) {
   }
 
   char pg[1024];
-  sprintf(pg, "@PG\tID:HPG-Aligner\tVN:%s\n", HPG_ALIGNER_VERSION);
+  sprintf(pg, "@HD\tVN:1.4\tSO:unsorted\n");
+  sprintf(pg, "@PG\tID:HPG-Aligner\tVN:%s\tCL:%s\n", HPG_ALIGNER_VERSION, options->cmdline);
   bam_header->text = strdup(pg);
   bam_header->l_text = strlen(bam_header->text);
 

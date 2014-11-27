@@ -19,8 +19,9 @@ extern size_t reads_w2, reads_w3;
 int max = 65;
 extern size_t total_reads_ph2;
 
-void write_sam_header_BWT(genome_t *genome, FILE *f) {
-  fprintf(f, "@PG\tID:HPG-Aligner\tVN:%s\n", HPG_ALIGNER_VERSION);
+void write_sam_header_BWT(options_t *options, genome_t *genome, FILE *f) {
+  fprintf(f, "@HD\tVN:1.4\tSO:unsorted\n");
+  fprintf(f, "@PG\tID:HPG-Aligner\tVN:%s\tCL:%s\n", HPG_ALIGNER_VERSION, options->cmdline);
   for (int i = 0; i < genome->num_chromosomes; i++) {
     fprintf(f, "@SQ\tSN:%s\tLN:%lu\n", genome->chr_name[i], genome->chr_size[i] + 1);
   }
@@ -1029,7 +1030,7 @@ void rna_aligner(options_t *options) {
   if (options->bam_format) {
     bam_header_t *bam_header;
     if (options->fast_mode) {
-      bam_header = create_bam_header(sa_index->genome);
+      bam_header = create_bam_header(options, sa_index->genome);
     } else {
       bam_header = create_bam_header_by_genome(genome);
     }
@@ -1038,9 +1039,9 @@ void rna_aligner(options_t *options) {
   } else {
     writer_input.bam_file = (bam_file_t *) fopen(output_filename, "w"); 
     if (options->fast_mode) {
-      write_sam_header(sa_index->genome, (FILE *) writer_input.bam_file);
+      write_sam_header(options, sa_index->genome, (FILE *) writer_input.bam_file);
     } else {
-      write_sam_header_BWT(genome, (FILE *) writer_input.bam_file);
+      write_sam_header_BWT(options, genome, (FILE *) writer_input.bam_file);
     }
   }
 

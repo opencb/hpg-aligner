@@ -20,7 +20,9 @@
 
 //========================================================================
 
-#define HPG_ALIGNER_VERSION  "2.0.1"
+#define HPG_ALIGNER_BIN      "hpg-aligner"
+#define HPG_ALIGNER_NAME     "HPG-Aligner"
+#define HPG_ALIGNER_VERSION  "2.1.0-beta"
 #define OUTPUT_FILENAME      "alignments"
 
 //============================ DEFAULT VALUES ============================
@@ -123,17 +125,18 @@ typedef struct options {
   double gap_open;
   double gap_extend;  
   char str_mode[32];
-  char* prefix_name;
-  char* in_filename;
-  char* in_filename2;
-  char* bwt_dirname;
-  char* genome_filename;
-  char* output_name;
-  char* header_filename;
-  char* transcriptome_filename;
-  char* intron_filename;
-  char* adapter;
-  char* adapter_revcomp;
+  char *prefix_name;
+  char *in_filename;
+  char *in_filename2;
+  char *bwt_dirname;
+  char *genome_filename;
+  char *output_name;
+  char *header_filename;
+  char *transcriptome_filename;
+  char *intron_filename;
+  char *adapter;
+  char *adapter_revcomp;
+  char *cmdline;
   // new variables for bisulphite case
 } options_t;
 
@@ -193,5 +196,8 @@ options_t *parse_options(int argc, char **argv);
 
 void usage(void **argtable);
 void display_version();
+
+void options_set_cmdline(int argc, char **argv, 
+			 options_t *options);
 
 #endif

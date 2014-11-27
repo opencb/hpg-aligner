@@ -534,7 +534,7 @@ array_list_t *search_mate_cal_by_prefixes(seed_cal_t *cal, fastq_read_t *read,
   int num_seeds = batch->options->num_seeds;
 
 
-  int max_distance = batch->options->pair_max_distance;
+  int max_distance = batch->pair_max_distance;
   
   read_end_pos = read->length - sa_index->k_value;
   read_inc = read->length / num_seeds;
@@ -631,8 +631,8 @@ void check_pairs(array_list_t **cal_lists, sa_index3_t *sa_index,
   fastq_read_t *read, *read1, *read2;
   size_t mate_list_size, num_reads = array_list_size(batch->fq_reads);
 
-  int min_distance = batch->options->pair_min_distance;
-  int max_distance = batch->options->pair_max_distance;
+  int min_distance = batch->pair_min_distance;
+  int max_distance = batch->pair_max_distance;
 
   for (int i = 0; i < num_reads; i += 2) {
     read1 = array_list_get(i, batch->fq_reads);
@@ -2403,15 +2403,21 @@ int sa_pair_mapper(void *data) {
   
   sa_wf_batch_t *wf_batch = (sa_wf_batch_t *) data;
 
-  int pair_mode = wf_batch->options->pair_mode;
+  int infer_insert;
   int pair_min_distance = wf_batch->options->pair_min_distance;
   int pair_max_distance = wf_batch->options->pair_max_distance;
 
   int num_seeds = wf_batch->options->num_seeds;
-
   
   sa_mapping_batch_t *mapping_batch = wf_batch->mapping_batch;
   mapping_batch->options = wf_batch->options;
+  if (pair_min_distance > 0 && pair_max_distance > 0) {
+    infer_insert = 0;
+    mapping_batch->pair_min_distance = pair_min_distance; 
+    mapping_batch->pair_max_distance = pair_max_distance; 
+  } else {
+    infer_insert = 1;
+  }
 
   sa_index3_t *sa_index = (sa_index3_t *) wf_batch->sa_index;
   
@@ -2487,7 +2493,13 @@ int sa_pair_mapper(void *data) {
 
 
   // 2) filter cals by pairs
-  filter_cals_by_pair_mode(pair_mode, pair_min_distance, pair_max_distance, 
+  if (infer_insert) {
+    infer_insert_size(&pair_min_distance, &pair_max_distance, 
+		      num_reads, cal_lists);
+    mapping_batch->pair_min_distance = pair_min_distance; 
+    mapping_batch->pair_max_distance = pair_max_distance; 
+  }
+  filter_cals_by_pair_mode(pair_min_distance, pair_max_distance, 
     			   num_reads, cal_lists);
   
   check_pairs(cal_lists, sa_index, mapping_batch, cal_mng);

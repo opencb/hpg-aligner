@@ -79,6 +79,7 @@ size_t reads_w2, reads_w3;
 //--------------------------------------------------------------------
 // main parameters support
 //--------------------------------------------------------------------
+
 int main(int argc, char* argv[]) {
   redirect_stdout = 0;
   gziped_fileds = 0;
@@ -152,6 +153,8 @@ int main(int argc, char* argv[]) {
     options_free(options);
     exit(0);
   }
+
+  options_set_cmdline(argc, argv, options);
 
   if (options->adapter) {
     options->adapter_revcomp = strdup(options->adapter);

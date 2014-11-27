@@ -69,6 +69,9 @@ typedef struct sa_mapping_batch {
   int bam_format;
   size_t num_reads;
 
+  int pair_min_distance;
+  int pair_max_distance;
+
   #ifdef _TIMING
   double func_times[NUM_TIMING];
   #endif
@@ -95,6 +98,9 @@ static inline sa_mapping_batch_t *sa_mapping_batch_new(array_list_t *fq_reads) {
 
   p->bam_format = 0;
   p->num_reads = num_reads;
+
+  p->pair_min_distance = 0;
+  p->pair_max_distance = 0;
 
   p->fq_reads = fq_reads;
   p->mapping_lists = (array_list_t **) malloc(num_reads * sizeof(array_list_t *));
@@ -1015,13 +1021,16 @@ float get_max_score(array_list_t *cal_list,
 int get_min_num_mismatches(array_list_t *cal_list);
 int get_max_read_area(array_list_t *cal_list);
 
+void infer_insert_size(int *pair_min_distance, int *pair_max_distance, 
+		       int num_lists, array_list_t **cal_lists);
+
 //--------------------------------------------------------------------
 
 void filter_cals_by_min_read_area(int read_area, array_list_t **list);
 void filter_cals_by_max_read_area(int read_area, array_list_t **list);
 void filter_cals_by_max_score(float score, array_list_t **list);
 void filter_cals_by_max_num_mismatches(int num_mismatches, array_list_t **list);
-void filter_cals_by_pair_mode(int pair_mode, int pair_min_distance, int pair_max_distance, 
+void filter_cals_by_pair_mode(int pair_min_distance, int pair_max_distance, 
 			      int num_lists, array_list_t **cal_lists);
 
 void select_best_cals(fastq_read_t *read, array_list_t **list);

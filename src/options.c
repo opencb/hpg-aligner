@@ -6,6 +6,8 @@ const char DEFAULT_OUTPUT_NAME[29] = "hpg_aligner_output";
 //const char SPLICE_EXTEND_FILENAME[30]  = "extend_junctions.bed";
 //const char INDEX_NAME[30]  = "index";
 
+//--------------------------------------------------------------------
+
 options_t *options_new(void) {
   options_t *options = (options_t*) calloc (1, sizeof(options_t));
   
@@ -83,8 +85,13 @@ options_t *options_new(void) {
 
   //new variables for bisulphite case in index generation
   options->bs_index = 0;
+
+  options->cmdline = NULL;
+
   return options;
 }
+
+//--------------------------------------------------------------------
 
 void validate_options(options_t *options) {
   int value_dir = exists(options->output_name);
@@ -201,28 +208,31 @@ void validate_options(options_t *options) {
   //if (!options->fast_mode) {
   //options->bam_format = 1;
   //}
-
 }
 
+//--------------------------------------------------------------------
 
 void options_free(options_t *options) {
-     if(options == NULL) { return; }
+     if(!options) { return; }
 
-     if (options->in_filename  != NULL)	{ free(options->in_filename); }
-     if (options->in_filename2  != NULL) { free(options->in_filename2); }
-     if (options->bwt_dirname  != NULL)	{ free(options->bwt_dirname); }     
-     if (options->genome_filename  != NULL) { free(options->genome_filename); }
-     if (options->output_name  != NULL)	{ free(options->output_name); }
-     if (options->prefix_name != NULL) { free(options->prefix_name); }
-     if (options->adapter != NULL) { free(options->adapter); }
+     if (options->in_filename)	{ free(options->in_filename); }
+     if (options->in_filename2) { free(options->in_filename2); }
+     if (options->bwt_dirname)	{ free(options->bwt_dirname); }     
+     if (options->genome_filename) { free(options->genome_filename); }
+     if (options->output_name)	{ free(options->output_name); }
+     if (options->prefix_name) { free(options->prefix_name); }
+     if (options->adapter) { free(options->adapter); }
 
      if (options->mode == RNA_MODE) {
-       if (options->transcriptome_filename != NULL) { free(options->transcriptome_filename); }
+       if (options->transcriptome_filename) { free(options->transcriptome_filename); }
      }
+
+     if (options->cmdline)  { free(options->cmdline); }
 
      free(options);
 }
 
+//--------------------------------------------------------------------
 
 void options_display(options_t *options) {
      char* in_filename = strdup(options->in_filename);
@@ -281,8 +291,10 @@ void options_display(options_t *options) {
      printf("+===============================================================+\n");
      //     printf("Num gpu threads %d\n", num_gpu_threads);
      //     printf("GPU Process: %s\n",  gpu_process == 0 ? "Disable":"Enable");
+     printf("HPG Aligner version: %s\n", HPG_ALIGNER_VERSION);
+     printf("Command line: %s\n", options->cmdline);
+     printf("\n");
      printf("General parameters\n");
-     printf("\tHPG Aligner version: %s\n", HPG_ALIGNER_VERSION);
      printf("\tMode: %s\n", options->str_mode);
      if (in_filename2) {
        printf("\tInput FastQ filename, pair #1: %s\n", in_filename);
@@ -298,7 +310,6 @@ void options_display(options_t *options) {
           
      printf("\tOutput file format: %s\n", 
 	    (options->bam_format || options->realignment || options->recalibration) ? "BAM" : "SAM");
-     printf("\tFastQ gzip mode: %s\n", options->gzip == 1 ? "Enable" : "Disable");
      printf("\tAdapter: %s\n", (adapter ? adapter : "Not present"));
      printf("\n");
 
@@ -414,6 +425,12 @@ void options_to_file(options_t *options, FILE *fd) {
   unsigned int pair_max_distance =  (unsigned int)options->pair_max_distance;
   unsigned int min_intron_length =  (unsigned int)options->min_intron_length;
   unsigned int fast_mode =   (unsigned int)options->fast_mode;
+  char* adapter =  NULL;
+  if (options->adapter) {
+    adapter = strdup(options->adapter);
+  }
+
+  int input_format = options->input_format;
 
   //unsigned int gpu_process = (unsigned int)options->gpu_process;
 
@@ -423,6 +440,9 @@ void options_to_file(options_t *options, FILE *fd) {
   float gap_open   =  (float)options->gap_open;
   float gap_extend =  (float)options->gap_extend;
    
+  fprintf(fd, "= HPG Aligner version: %s\n", HPG_ALIGNER_VERSION);
+  fprintf(fd, "= Command line: %s\n", options->cmdline);
+  fprintf(fd, "=------------------------------------=\n");
   fprintf(fd, "= G E N E R A L    P A R A M E T E R S \n");
   fprintf(fd, "=------------------------------------=\n");
   fprintf(fd, "= Mode: %s\n", options->str_mode);
@@ -430,13 +450,17 @@ void options_to_file(options_t *options, FILE *fd) {
     fprintf(fd, "= Input FastQ filename, pair #1: %s\n", in_filename);
     fprintf(fd, "= Input FastQ filename, pair #2: %s\n", in_filename2);
   } else {
-    fprintf(fd, "= Input FastQ filename: %s\n", in_filename);
+    fprintf(fd, "= Input %s filename: %s\n", FORMAT_STR(input_format), in_filename);
   }
-  fprintf(fd, "= FastQ gzip mode: %s\n", options->gzip == 1 ? "Enable" : "Disable");
+  if (input_format == FASTQ_FORMAT) {
+    fprintf(fd, "= FastQ gzip mode: %s\n", options->gzip == 1 ? "Enable" : "Disable");
+  }
   fprintf(fd, "= Index directory name: %s\n", bwt_dirname);
   fprintf(fd, "= Output directory name: %s\n", output_name);
+
   fprintf(fd, "= Output file format: %s\n", 
 	 (options->bam_format || options->realignment || options->recalibration) ? "SAM" : "BAM");
+  fprintf(fd, "= Adapter: %s\n", (adapter ? adapter : "Not present"));
   fprintf(fd, "\n\n");
 
 
@@ -519,7 +543,7 @@ void options_to_file(options_t *options, FILE *fd) {
   }
 
   free(output_name);
-  
+  if (adapter) free(adapter);
 }
 
 //--------------------------------------------------------------------
@@ -710,6 +734,7 @@ options_t *read_CLI_options(void **argtable, options_t *options) {
   return options;
 }
 
+//--------------------------------------------------------------------
 
 options_t *parse_options(int argc, char **argv) {
   //	struct arg_end *end = arg_end(10);
@@ -723,7 +748,7 @@ options_t *parse_options(int argc, char **argv) {
     mode = RNA_MODE;
     num_options += NUM_RNA_OPTIONS;
   } else {
-    LOG_FATAL("Command unknown.\nValid commands are:\n\tdna: to map DNA sequences\n\trna: to map RNA sequences\n\tbs: to map BS sequences\n\tbuild-index: to create the genome index.\nUse -h or --help to display hpg-aligner options.\n");
+    LOG_FATAL("Command unknown.\nValid commands are:\n\tdna: to map DNA sequences\n\trna: to map RNA sequences\n\tbs: to map BS sequences\n\tbuild-index: to create the genome index.\nUse -h or --help to display options.\n");
   }
 
   void **argtable = argtable_options_new(mode);
@@ -775,12 +800,16 @@ options_t *parse_options(int argc, char **argv) {
   return options;
 }
 
+//--------------------------------------------------------------------
+
 void usage(void **argtable) {
-  printf("\nUsage:\n\thpg-aligner {dna | rna | build-bwt-index | build-sa-index} <options>\n");
+  printf("\nUsage:\n\t%s {dna | rna} options\n", HPG_ALIGNER_NAME);
   //  arg_print_syntaxv(stdout, argtable, "\n");
   printf("\nOptions:\n");
   arg_print_glossary(stdout, argtable, "\t%-50s\t%s\n");
 }
+
+//--------------------------------------------------------------------
 
 void usage_cli(int mode) {
   void **argtable = argtable_options_new(mode);
@@ -788,9 +817,37 @@ void usage_cli(int mode) {
   exit(0);
 }
 
+//--------------------------------------------------------------------
+
 void display_version() {
-  printf("HPG Aligner version %s\n", HPG_ALIGNER_VERSION);
+  printf("%s version %s\n", HPG_ALIGNER_NAME, HPG_ALIGNER_VERSION);
   printf("\n");
   printf("Source code at https://github.com/opencb/hpg-aligner\n");
   printf("Documentation at https://github.com/opencb/hpg-aligner/wiki/\n");
 }
+
+//--------------------------------------------------------------------
+
+void options_set_cmdline(int argc, char **argv, 
+			 options_t *options) {
+  if (!options) { return; }
+
+  char *cmdline;
+
+  int size = 0;
+  for (int i = 0; i < argc; i++) {
+    size += strlen(argv[i]);
+  }
+  size += 100;
+  
+  cmdline = (char *) calloc(size, sizeof(char));
+  sprintf(cmdline, "%s ", HPG_ALIGNER_BIN);
+  for (int i = 0; i < argc; i++) {
+    sprintf(cmdline, "%s %s", cmdline, argv[i]);
+  }
+  
+  options->cmdline = cmdline;
+}
+
+//--------------------------------------------------------------------
+//--------------------------------------------------------------------

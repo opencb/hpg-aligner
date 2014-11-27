@@ -814,13 +814,66 @@ void display_cmp_sequences(fastq_read_t *read, sa_index3_t *sa_index) {
 // Support for paired mode
 //--------------------------------------------------------------------
 
-void filter_cals_by_pair_mode(int pair_mode, int pair_min_distance, int pair_max_distance, 
+int cmpint(const void * a, const void * b) { return ( *(int*)a - *(int*)b ); }
+
+void infer_insert_size(int *pair_min_distance, int *pair_max_distance, 
+		       int num_lists, array_list_t **cal_lists) {
+
+  seed_cal_t *cal1, *cal2;
+  array_list_t *cal_list1, *cal_list2;
+
+  int distances[num_lists];
+  int diff, total_distance = 0, count = 0;
+
+  for (int i = 0; i < num_lists; i += 2) {
+    cal_list1 = cal_lists[i];
+    cal_list2 = cal_lists[i+1];
+    if (array_list_size(cal_list1) == 1 && array_list_size(cal_list2) == 1) {
+      cal1 = array_list_get(0, cal_list1);
+      cal2 = array_list_get(0, cal_list2);
+      if (cal1->chromosome_id == cal2->chromosome_id) {
+	diff = (cal1->start > cal2->end) 
+	  ? (cal1->end - cal2->start + 1) 
+	  : (cal2->end - cal1->start + 1);
+	if (diff < 10000) {
+	  total_distance += diff;
+	  distances[count] = diff;
+	  count++;
+	}
+      }
+    }
+  }
+  qsort(distances, count, sizeof(int), cmpint);
+  //  printf("count = %i (total %i), mean distance = %i, (%i, %i, %i)\n", 
+  //  	 count, (num_lists / 2), total_distance / count, distances[(int)(0.25*count)], distances[(int)(0.5*count)], distances[(int)(0.75*count)]);
+  //  printf("(%i %i)\n", distances[(int)(0.10 * count)], distances[(int)(0.90 * count)]);
+  //*pair_min_distance = 200;
+  //*pair_max_distance = 800;
+
+  if (count > 10) {
+    int m = 0.5f * count;
+    *pair_min_distance = distances[m] - 300;
+    if (*pair_min_distance < 1) *pair_min_distance = 1;
+    *pair_max_distance = distances[m] + 300;
+    //    printf("distance [%i, %i]\n", *pair_min_distance, *pair_max_distance);
+  } else {
+    // default values
+    *pair_min_distance = 200;
+    *pair_max_distance = 800;
+  }
+}
+
+//--------------------------------------------------------------------
+
+void filter_cals_by_pair_mode(int pair_min_distance, int pair_max_distance, 
 			      int num_lists, array_list_t **cal_lists) {
 
   int diff, pairs, size1, size2;
   seed_cal_t *cal1, *cal2;
   array_list_t *cal_list1, *cal_list2;
   array_list_t *new_cal_list1 = NULL, *new_cal_list2 = NULL;
+
+  // filtering cals by pairs
   for (int i = 0; i < num_lists; i += 2) {
     cal_list1 = cal_lists[i];
     cal_list2 = cal_lists[i+1];
@@ -851,8 +904,10 @@ void filter_cals_by_pair_mode(int pair_mode, int pair_min_distance, int pair_max
 	  cal2 = array_list_get(i2, cal_list2);
 
 	  if ((cal1->chromosome_id == cal2->chromosome_id)) {
-	    diff = abs(cal2->start - cal1->start) + 1;
-
+	    diff = (cal1->start > cal2->end) 
+	      ? (cal1->end - cal2->start + 1) 
+	      : (cal2->end - cal1->start + 1);
+	    
 	    if (diff >= pair_min_distance && diff <= pair_max_distance) {
 	      pair1[i1] = 1;
 	      pair2[i2] = 1;
@@ -923,8 +978,8 @@ void complete_pairs(sa_mapping_batch_t *batch) {
   size_t num_items1, num_items2, num_pairs, num_reads = array_list_size(batch->fq_reads);
 
   int distance;
-  int min_distance = batch->options->pair_min_distance;
-  int max_distance = batch->options->pair_max_distance;
+  int min_distance = batch->pair_min_distance;
+  int max_distance = batch->pair_max_distance;
 
   int report_only_paired = batch->options->report_only_paired;
 

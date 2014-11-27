@@ -89,12 +89,12 @@ void dna_aligner(options_t *options) {
   batch_writer_input_t writer_input;
   batch_writer_input_init(out_filename, NULL, NULL, NULL, NULL, &writer_input);
   if (bam_format) {
-    bam_header_t *bam_header = create_bam_header(sa_index->genome);
+    bam_header_t *bam_header = create_bam_header(options, sa_index->genome);
     writer_input.bam_file = bam_fopen_mode(out_filename, bam_header, "w");
     bam_fwrite_header(bam_header, writer_input.bam_file);
   } else {
     writer_input.bam_file = (bam_file_t *) fopen(out_filename, "w");    
-    write_sam_header(sa_index->genome, (FILE *) writer_input.bam_file);
+    write_sam_header(options, sa_index->genome, (FILE *) writer_input.bam_file);
   }
 
   char *fq_list1 = options->in_filename, *fq_list2 = options->in_filename2;
@@ -182,7 +182,7 @@ void dna_aligner(options_t *options) {
 
     if (options->input_format == BAM_FORMAT) {
       if (options->pair_mode == PAIRED_END_MODE){
-	bam_header_t *bam_header = create_bam_header(sa_index->genome);
+	bam_header_t *bam_header = create_bam_header(options, sa_index->genome);
 	fnomapped = bam_fopen_mode("Unmapped.bam", bam_header, "w");
 	bam_fwrite_header(bam_header, fnomapped);//write the header in fnomapped
 	idx = bam_index_load(file1); //idx_filename);//load the index
@@ -242,9 +242,9 @@ void dna_aligner(options_t *options) {
       wf_input->stats = stats;
       wf_input->data = fnomapped;
       if (options->pair_mode == PAIRED_END_MODE) {
-	workflow_set_producer(sa_bam_reader_pairend, "BAM reader", wf);
+	workflow_set_producer(&sa_bam_reader_pairend, "BAM reader", wf);
       } else {
-	workflow_set_producer(sa_bam_reader_single, "BAM reader", wf);
+	workflow_set_producer(&sa_bam_reader_single, "BAM reader", wf);
       }
     } else if (options->input_format == SAM_FORMAT) {
       // workflow_set_producer(sa_sam_reader, "SAM reader", wf);
@@ -262,6 +262,7 @@ void dna_aligner(options_t *options) {
     printf("Starting mapping...\n");
     gettimeofday(&start, NULL);
     workflow_run_with(num_threads, wf_input, wf);
+    gettimeofday(&stop, NULL);
 
     #ifdef _TIMING
     char func_name[1024];

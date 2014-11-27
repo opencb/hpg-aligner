@@ -528,6 +528,7 @@ void suffix_mng_search_read_cals_by_region(fastq_read_t *read, int num_seeds,
 					   size_t start, size_t end, 
 					   array_list_t *cal_list, 
 					   suffix_mng_t *suffix_mng) {
+  int max_prefixes = MAX_NUM_SUFFIXES * 5;
   int chrom, num_prefixes, num_suffixes, suffix_len = 0;
   size_t low, high, r_start_suf, r_end_suf, g_start_suf, g_end_suf;
 
@@ -547,7 +548,7 @@ void suffix_mng_search_read_cals_by_region(fastq_read_t *read, int num_seeds,
     num_prefixes = search_prefix(&r_seq[read_pos], &low, &high, sa_index, 0);
     num_suffixes = num_prefixes;
     suffix_len = num_suffixes > 0 ? sa_index->k_value : 0;
-    if (num_suffixes > 0) {
+    if (num_suffixes > 0 && num_suffixes < max_prefixes) {
       for (size_t suff = low; suff <= high; suff++) {
 	chrom = sa_index->CHROM[suff];
 	if (chrom == chromosome) {
@@ -572,7 +573,7 @@ void suffix_mng_search_read_cals_by_region(fastq_read_t *read, int num_seeds,
     num_suffixes = num_prefixes;
     suffix_len = num_suffixes > 0 ? sa_index->k_value : 0;
 
-    if (num_suffixes > 0) {
+    if (num_suffixes > 0 && num_suffixes < max_prefixes) {
       for (size_t suff = low; suff <= high; suff++) {
 	chrom = sa_index->CHROM[suff];
 	if (chrom == chromosome) {
