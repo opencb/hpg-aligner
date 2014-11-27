@@ -15,7 +15,7 @@ CONTACT
   You can contact any of the following developers:
 
     * Joaquín Tárraga (jtarraga@cipf.es)
-    * Héctor Martínez (martineh@cipf.es)
+    * Héctor Martínez (martineh@icc.uji.es)
     * Ignacio Medina (imedina@cipf.es)
 
 
