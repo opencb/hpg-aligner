@@ -1713,8 +1713,8 @@ int apply_caling_bs(cal_seeker_input_t* input, batch_t *batch) {
     //printf("---------------------------> SEEDING 1\nindex1 %s\tindex2 %s\n", bwt_index->nucleotides, bwt_index2->nucleotides);
 
       max_seeds = (read->length / 15) * 2 + 10;      
-      num_cals = bwt_generate_cals_bs(read->sequence, read2->sequence, seed_size, 
-				      bwt_optarg, bwt_index2, bwt_index, list);
+      //num_cals = bwt_generate_cals_bs(read->sequence, read2->sequence, seed_size, 
+      //			      bwt_optarg, bwt_index2, bwt_index, list);
       //    }
     
     for (int c = 0; c < array_list_size(list); c++) {
@@ -1750,8 +1750,8 @@ int apply_caling_bs(cal_seeker_input_t* input, batch_t *batch) {
     //    if (array_list_get_flag(list) == DOUBLE_ANCHORS) {
     //    } else {
       max_seeds = (read->length / 15) * 2 + 10;      
-      num_cals = bwt_generate_cals_bs(read->sequence, read2->sequence, seed_size, 
-				      bwt_optarg, bwt_index, bwt_index2, list);
+      //num_cals = bwt_generate_cals_bs(read->sequence, read2->sequence, seed_size, 
+      //			      bwt_optarg, bwt_index, bwt_index2, list);
       //    }
     
     for (int c = 0; c < array_list_size(list); c++) {
