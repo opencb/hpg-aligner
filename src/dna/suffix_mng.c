@@ -60,7 +60,7 @@ void suffix_mng_clear(suffix_mng_t *p) {
     p->num_seeds = 0;
     if (p->suffix_lists) {
       for (unsigned short int i = 0; i < p->num_chroms; i++) {
-	if (p->suffix_lists[i]) {
+	if (p->suffix_lists[i]->size > 0) {
 	  linked_list_clear(p->suffix_lists[i], (void *)seed_free);
 	}
       }
@@ -345,7 +345,7 @@ void suffix_mng_create_cals(fastq_read_t *read, int min_area, int strand,
   linked_list_t *suffix_list;
   for (unsigned short int i = 0; i < p->num_chroms; i++) {
     suffix_list = p->suffix_lists[i];
-    if (suffix_list) {
+    if (suffix_list->size > 0) {
       for (linked_list_item_t *item = suffix_list->first; 
 	   item != NULL; 
 	   item = item->next) {
@@ -609,7 +609,7 @@ void suffix_mng_display(suffix_mng_t *p) {
       linked_list_t *suffix_list;
       for (unsigned short int i = 0; i < p->num_chroms; i++) {
 	suffix_list = p->suffix_lists[i];
-	if (suffix_list) {
+	if (suffix_list->size > 0) {
 	  for (linked_list_item_t *item = suffix_list->first; 
 	       item != NULL; 
 	       item = item->next) {

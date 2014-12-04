@@ -312,7 +312,7 @@ void cal_mng_simple_clear(cal_mng_t *p) {
     if (p->cals_lists) {
       for (unsigned short int i = 0; i < p->num_chroms; i++) {
 	list = p->cals_lists[i];
-	if (list) {
+	if (list->size > 0) {
 	  item = list->first;
 	  while (item) {
 	    cal = item->item;
@@ -332,9 +332,11 @@ void cal_mng_simple_clear(cal_mng_t *p) {
 void cal_mng_clear(cal_mng_t *p) {
   if (p) {
     if (p->cals_lists) {
+      linked_list_t *list;
       for (unsigned short int i = 0; i < p->num_chroms; i++) {
-	if (p->cals_lists[i]) {
-	  linked_list_clear(p->cals_lists[i], (void *)seed_cal_free);
+	list = p->cals_lists[i];
+	if (list->size > 0) {
+	  linked_list_clear(list, (void *)seed_cal_free);
 	}
       }
     }
@@ -430,7 +432,7 @@ int cal_mng_find(int strand, unsigned short int chrom, size_t start, size_t end,
   int found_cal = 0;
   if (p->cals_lists) {
     linked_list_t *cal_list = p->cals_lists[chrom];
-    if (cal_list) {
+    if (cal_list->size > 0) {
       seed_cal_t *cal;
       for (linked_list_item_t *item = cal_list->first; 
 	   item != NULL; 
@@ -471,22 +473,24 @@ void cal_mng_to_array_list(int min_read_area, array_list_t *out_list, cal_mng_t 
     linked_list_t *cal_list;
     for (unsigned short int i = 0; i < p->num_chroms; i++) {
       cal_list = p->cals_lists[i];
-      while ((cal = (seed_cal_t *) linked_list_remove_last(cal_list))) {
-	#ifdef _VERBOSE
-	seed_cal_print(cal);
-	#endif
-	first = linked_list_get_first(cal->seed_list);
-	last = linked_list_get_last(cal->seed_list);
-	cal->start = first->genome_start;
-	cal->end = last->genome_end;
-	seed_cal_update_info(cal);
-	if (cal->read_area >= min_read_area &&
-	    cal->num_open_gaps < (0.05f * cal->read->length) &&
-	    cal->num_mismatches < (0.09f * cal->read->length) ) {
-	  array_list_insert(cal, out_list);
-	} else {
-	  // free CAL
-	  seed_cal_free(cal);
+      if (cal_list->size > 0) {
+	while ((cal = (seed_cal_t *) linked_list_remove_last(cal_list))) {
+          #ifdef _VERBOSE
+	  seed_cal_print(cal);
+          #endif
+	  first = linked_list_get_first(cal->seed_list);
+	  last = linked_list_get_last(cal->seed_list);
+	  cal->start = first->genome_start;
+	  cal->end = last->genome_end;
+	  seed_cal_update_info(cal);
+	  if (cal->read_area >= min_read_area &&
+	      cal->num_open_gaps < (0.05f * cal->read->length) &&
+	      cal->num_mismatches < (0.09f * cal->read->length) ) {
+	    array_list_insert(cal, out_list);
+	  } else {
+	    // free CAL
+	    seed_cal_free(cal);
+	  }
 	}
       }
     }
@@ -503,17 +507,18 @@ void cal_mng_select_best(int read_area, array_list_t *valid_list, array_list_t *
     linked_list_t *cal_list;
     for (unsigned short int i = 0; i < p->num_chroms; i++) {
       cal_list = p->cals_lists[i];
-      while ((cal = (seed_cal_t *) linked_list_remove_last(cal_list))) {
-	if (p->min_read_area <= read_area && cal->read_area <= read_area) {
-	  array_list_insert(cal, valid_list);
-	} else {
-	  array_list_insert(cal, invalid_list);
+      if (cal_list->size > 0) {
+	while ((cal = (seed_cal_t *) linked_list_remove_last(cal_list))) {
+	  if (p->min_read_area <= read_area && cal->read_area <= read_area) {
+	    array_list_insert(cal, valid_list);
+	  } else {
+	    array_list_insert(cal, invalid_list);
+	  }
 	}
       }
     }
   }
 }
-
 
 //--------------------------------------------------------------------
 //
