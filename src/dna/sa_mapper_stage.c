@@ -262,6 +262,9 @@ cal_mng_t * cal_mng_new(sa_genome3_t *genome) {
   p->num_chroms = num_chroms;
   p->cals_lists = cals_lists;
 
+  memset(p->active_mask, 0, sizeof(p->active_mask));
+  p->num_active = 0;
+
   p->suffix_mng = suffix_mng_new(genome);
 
   return p;
@@ -305,13 +308,15 @@ void cal_mng_simple_free(cal_mng_t *p) {
 
 void cal_mng_simple_clear(cal_mng_t *p) {
 
+  unsigned short int chrom;
   linked_list_item_t *item;
   linked_list_t *list;
   cal_t *cal;
   if (p) {
-    if (p->cals_lists) {
-      for (unsigned short int i = 0; i < p->num_chroms; i++) {
-	list = p->cals_lists[i];
+    if (p->cals_lists) {     
+      for (int i = 0; i < p->num_active; i++) {
+	chrom = p->active[i];
+	list = p->cals_lists[chrom];
 	if (list->size > 0) {
 	  item = list->first;
 	  while (item) {
@@ -323,6 +328,8 @@ void cal_mng_simple_clear(cal_mng_t *p) {
 	  linked_list_clear(p->cals_lists[i], (void *)NULL);
 	}
       }
+      p->num_active = 0;
+      memset(p->active_mask, 0, sizeof(p->active_mask));
     }
   }
 }
@@ -333,12 +340,16 @@ void cal_mng_clear(cal_mng_t *p) {
   if (p) {
     if (p->cals_lists) {
       linked_list_t *list;
-      for (unsigned short int i = 0; i < p->num_chroms; i++) {
-	list = p->cals_lists[i];
+      unsigned short int chrom;
+      for (int i = 0; i < p->num_active; i++) {
+	chrom = p->active[i];
+	list = p->cals_lists[chrom];
 	if (list->size > 0) {
 	  linked_list_clear(list, (void *)seed_cal_free);
 	}
       }
+      p->num_active = 0;
+      memset(p->active_mask, 0, sizeof(p->active_mask));
     }
   }
 }
@@ -353,6 +364,12 @@ void cal_mng_update(seed_t *seed, fastq_read_t *read, cal_mng_t *p) {
     linked_list_t *seed_list;
     linked_list_t *cal_list = p->cals_lists[seed->chromosome_id];
     if (cal_list) {
+
+      if (!p->active_mask[seed->chromosome_id]) {
+	p->active[p->num_active++] = seed->chromosome_id;	
+	p->active_mask[seed->chromosome_id] = 1;
+      }
+      
       int r_gap, g_gap;
       #ifdef _VERBOSE
       printf("\t\t\tinsert this seed to the CAL manager:\n");
@@ -471,8 +488,10 @@ void cal_mng_to_array_list(int min_read_area, array_list_t *out_list, cal_mng_t 
 
   if (p->cals_lists) {
     linked_list_t *cal_list;
-    for (unsigned short int i = 0; i < p->num_chroms; i++) {
-      cal_list = p->cals_lists[i];
+    unsigned short int chrom;
+    for (int i = 0; i < p->num_active; i++) {
+      chrom = p->active[i];
+      cal_list = p->cals_lists[chrom];
       if (cal_list->size > 0) {
 	while ((cal = (seed_cal_t *) linked_list_remove_last(cal_list))) {
           #ifdef _VERBOSE
@@ -505,8 +524,10 @@ void cal_mng_select_best(int read_area, array_list_t *valid_list, array_list_t *
   
   if (p->cals_lists) {
     linked_list_t *cal_list;
-    for (unsigned short int i = 0; i < p->num_chroms; i++) {
-      cal_list = p->cals_lists[i];
+    unsigned short int chrom;
+    for (int i = 0; i < p->num_active; i++) {
+      chrom = p->active[i];
+      cal_list = p->cals_lists[chrom];
       if (cal_list->size > 0) {
 	while ((cal = (seed_cal_t *) linked_list_remove_last(cal_list))) {
 	  if (p->min_read_area <= read_area && cal->read_area <= read_area) {

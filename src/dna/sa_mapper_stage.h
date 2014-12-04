@@ -19,6 +19,10 @@ typedef struct cal_mng {
   int read_length;
   int num_chroms;
 
+  int num_active;
+  unsigned short int active[MAX_NUM_SUFFIXES];
+  char active_mask[MAX_NUM_SUFFIXES];
+
   size_t low_prefix[MAX_NUM_SUFFIXES];
   size_t high_prefix[MAX_NUM_SUFFIXES];
   size_t low_suffix[MAX_NUM_SUFFIXES];
