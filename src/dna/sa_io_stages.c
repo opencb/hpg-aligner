@@ -438,7 +438,7 @@ size_t num_unmapped_reads_by_cigar_length = 0;
 void write_sam_header(options_t *options, sa_genome3_t *genome, FILE *f) {
   fprintf(f, "@HD\tVN:1.4\tSO:unsorted\n");
   fprintf(f, "@PG\tID:HPG-Aligner\tVN:%s\tCL:%s\n", HPG_ALIGNER_VERSION, options->cmdline);
-  for (int i = 0; i < genome->num_chroms; i++) {
+  for (unsigned short int i = 0; i < genome->num_chroms; i++) {
     fprintf(f, "@SQ\tSN:%s\tLN:%lu\n", genome->chrom_names[i], genome->chrom_lengths[i]);
   }
 }

@@ -1045,7 +1045,7 @@ sa_index3_t *sa_index3_new(char *sa_index_dirname) {
       
       //      printf("\nreading CHROM table from file %s...\n", filename_tab);
       gettimeofday(&start, NULL);
-      num_items = fread(CHROM, sizeof(char), num_suffixes, f_tab);
+      num_items = fread(CHROM, sizeof(unsigned short int), num_suffixes, f_tab);
       if (num_items != num_suffixes) {
 	printf("Error: (%s) mismatch num_items = %lu vs num_suffixes = %lu\n", 
 	       filename_tab, num_items, num_suffixes);
