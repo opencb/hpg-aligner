@@ -506,6 +506,17 @@ int sa_sam_writer(void *data) {
 	for (size_t j = 0; j < num_mappings; j++) {
 	  alig = (alignment_t *) array_list_get(j, mapping_list);
 
+	  // decoy management
+	  if (genome->chrom_flags[alig->chromosome] == DECOY_FLAG) {
+	    if (num_mappings == 1) {
+	      fprintf(out_file, "%s\t4\t*\t0\t0\t*\t*\t0\t0\t%s\t%s\tXD:Z:%s\n", 
+		      read->id, alig->sequence, alig->quality, genome->chrom_names[alig->chromosome]);
+	    }
+	    // free alignment and continue
+	    alignment_free(alig);	 
+	    continue;
+	  }
+
 	  if (alig->optional_fields) {
 	    opt_fields = (char *)alig->optional_fields;
 	  } else {
@@ -618,7 +629,7 @@ int sa_sam_writer(void *data) {
 
 	for (size_t j = 0; j < num_mappings; j++) {
 	  cal = (seed_cal_t *) array_list_get(j, mapping_list);
-	  
+
 	  if (read->adapter) {
 	    // sequences and cigar
 	    len = read->length + abs(read->adapter_length);
@@ -669,6 +680,16 @@ int sa_sam_writer(void *data) {
 	    cigar = &cal->cigar;
 	  }
 
+	  // decoy management
+	  if (genome->chrom_flags[cal->chromosome_id] == DECOY_FLAG) {
+	    if (num_mappings == 1) {
+	      fprintf(out_file, "%s\t4\t*\t0\t0\t*\t*\t0\t0\t%s\t%s\tXD:Z:%s\n", 
+		      read->id, sequence, quality, genome->chrom_names[cal->chromosome_id]);
+	    }
+	    // go to free memory
+	    goto free_memory1;
+	  }
+
 	  if (cal->strand) {
 	    flag = 16;
 	    seq = revcomp;
@@ -701,6 +722,7 @@ int sa_sam_writer(void *data) {
 	  // free memory
 	  free(cigar_M_string);
 	  free(cigar_string);
+	free_memory1:
 	  seed_cal_free(cal);	 
 	  if (read->adapter) {
 	    free(sequence);
@@ -823,7 +845,7 @@ int sa_bam_writer(void *data) {
   array_list_t *mapping_list;
   bam_file_t *out_file = wf_batch->writer_input->bam_file;
 
-
+  sa_genome3_t *genome = wf_batch->sa_index->genome;
 
   size_t num_reads, num_mappings;
   num_reads = mapping_batch->num_reads;
@@ -847,6 +869,25 @@ int sa_bam_writer(void *data) {
       }
       for (size_t j = 0; j < num_mappings; j++) {
 	alig = (alignment_t *) array_list_get(j, mapping_list);
+	
+	// decoy management
+	if (genome->chrom_flags[alig->chromosome] == DECOY_FLAG) {
+	  if (num_mappings == 1) {
+	    alignment_t *aux_alig = alignment_new();       
+	    alignment_init_single_end(strdup(read->id), alig->sequence, alig->quality,
+				      0, -1, -1, "", 0, 0, 0, 0, 0, NULL, aux_alig);
+	    bam1_t *aux_bam1 = convert_to_bam(aux_alig, 33);
+	    bam_fwrite(aux_bam1, out_file);
+	    // free memory
+	    bam_destroy1(aux_bam1);
+	    alignment_free(aux_alig);
+	    alig->sequence = NULL;
+	    alig->quality = NULL;
+	  }
+	  // free alignment and continue
+	  alignment_free(alig);	 
+	  continue;
+	}
 
 	// update alignment
 	if (num_mappings > 1) {
