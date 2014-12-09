@@ -1,31 +1,31 @@
 import os
 
 # Initialize the environment with path variables, CFLAGS, and so on
-bioinfo_path = '#lib/hpg-libs/bioinfo-libs'
-commons_path = '#lib/hpg-libs/common-libs'
-#math_path = '#libs/math'
+hpglib_path = '#lib/hpg-libs/c/'
+third_party_path = '#/lib/hpg-libs/third_party'
+third_party_hts_path = '#/lib/hpg-libs/third_party/htslib'
+third_party_samtools_path = '#/lib/hpg-libs/third_party/samtools'
 
-system_include = '/usr/include'
-system_libs = '/usr/lib' 
+#system_include = '/usr/include'
+#system_libs = '/usr/lib' 
 
-extrae_include = '/home/hmartinez/opt/extrae-2.5.1/include'
-extrae_libs    = '/home/hmartinez/opt/extrae-2.5.1/lib'
+#extrae_include = '/home/hmartinez/opt/extrae-2.5.1/include'
+#extrae_libs    = '/home/hmartinez/opt/extrae-2.5.1/lib'
 
-other_libs = '/home/hmartinez/opt/lib/'
-other_include = '/home/hmartinez/opt/include/'
-
-vars = Variables('buildvars.py')
+#other_libs = '/home/hmartinez/opt/lib/'
+#other_include = '/home/hmartinez/opt/include/'
 
 compiler = ARGUMENTS.get('compiler', 'gcc')
+build_tools = [ 'default', 'packaging' ]
 
-env = Environment(tools = ['default', 'packaging'],
+env = Environment(tools = build_tools,
       		  CC = compiler,
-                  variables = vars,
                   CFLAGS = '-Wall -std=c99 -D_XOPEN_SOURCE=600 -D_GNU_SOURCE -fopenmp -D_REENTRANT',
-                  CPPPATH = ['#', '#src', '#src/tools/bam', bioinfo_path, commons_path, "%s/commons/argtable" % commons_path, "%s/commons/config" % commons_path, system_include, '%s/libxml2' % system_include ],
-                  LIBPATH = [commons_path, bioinfo_path, system_libs],
-                  LIBS = ['xml2', 'm', 'z', 'curl', 'dl', 'bioinfo', 'common'],
+		  CPPPATH = ['#', '#src', '#include', "#src/tools/bam/", hpglib_path + 'src', third_party_path, third_party_samtools_path, third_party_hts_path, '/usr/include', '/usr/local/include', '/usr/include/libxml2', '/usr/lib/openmpi/include'],
+		  LIBPATH = [hpglib_path + 'build', third_party_hts_path, third_party_samtools_path, '/usr/lib', '/usr/local/lib'],
+                  LIBS = ['curl', 'dl', 'gsl', 'gslcblas', 'm', 'xml2', 'z'],
                   LINKFLAGS = ['-fopenmp'])
+
 
 if os.environ.has_key('C_INCLUDE_PATH'):
    for dir in os.getenv('C_INCLUDE_PATH').split(':'):
@@ -56,25 +56,15 @@ if int(ARGUMENTS.get('timing', '0')) == 1:
 
 env['objects'] = []
 
-# Targets
+# Compile dependencies
+SConscript(['lib/hpg-libs/SConstruct'])
 
-SConscript(['%s/SConscript' % bioinfo_path,
-            '%s/SConscript' % commons_path
-            ], exports = ['env', 'debug', 'compiler'])
+#SConscript(['%s/SConscript' % bioinfo_path,
+#            '%s/SConscript' % commons_path
+#            ], exports = ['env', 'debug', 'compiler'])
 
 envprogram = env.Clone()
 envprogram['CFLAGS'] += ' -DNODEBUG -mssse3 -DD_TIME_DEBUG'
-
-bams = envprogram.Program('#bin/hpg-bam',
-             source = [Glob('src/tools/bam/*.c'), 
-	     	       Glob('src/tools/bam/aux/*.c'),
-	     	       Glob('src/tools/bam/bfwork/*.c'),
-	     	       Glob('src/tools/bam/recalibrate/*.c'),
-	     	       Glob('src/tools/bam/aligner/*.c'),
-                       "%s/libbioinfo.a" % bioinfo_path,
-                       "%s/libcommon.a" % commons_path
-                      ]
-           )
 
 aligner = envprogram.Program('#bin/hpg-aligner',
              source = [Glob('src/*.c'),
@@ -88,10 +78,28 @@ aligner = envprogram.Program('#bin/hpg-aligner',
 	               Glob('src/rna/*.c'),
 	               Glob('src/bs/*.c'),
 	               Glob('src/sa/*.c'),
-		       "%s/libcommon.a" % commons_path,
-		       "%s/libbioinfo.a" % bioinfo_path
+		       "%s/bam_sort.o" % third_party_samtools_path,
+		       "%s/bam_index.o" % third_party_samtools_path,
+                      "%s/build/libhpg.a" % hpglib_path,
+                      "%s/libbam.a" % third_party_samtools_path,
+                      "%s/libhts.a" % third_party_hts_path
                       ]
            )
+
+bams = envprogram.Program('#bin/hpg-bam',
+             source = [Glob('src/tools/bam/*.c'), 
+	     	       Glob('src/tools/bam/aux/*.c'),
+	     	       Glob('src/tools/bam/bfwork/*.c'),
+	     	       Glob('src/tools/bam/recalibrate/*.c'),
+	     	       Glob('src/tools/bam/aligner/*.c'),
+		       "%s/bam_sort.o" % third_party_samtools_path,
+		       "%s/bam_index.o" % third_party_samtools_path,
+                       "%s/build/libhpg.a" % hpglib_path,
+                       "%s/libbam.a" % third_party_samtools_path,
+                       "%s/libhts.a" % third_party_hts_path
+                      ]
+           )
+
 Depends(aligner, bams)
 
 '''

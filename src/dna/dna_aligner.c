@@ -22,7 +22,7 @@ sa_genome3_t *global_genome = NULL;
 
 #include "adapter.h"
 
-void bam_sort_core_ext(int is_by_qname, const char *fn, const char *prefix, size_t max_mem, int is_stdout);
+int bam_sort_core(int is_by_qname, const char *fn, const char *prefix, size_t max_mem);
 
 void dna_aligner(options_t *options) {
   for (int i = 0; i < NUM_COUNTERS; i++) {
@@ -189,9 +189,11 @@ void dna_aligner(options_t *options) {
 	if (idx == 0){
 	  char *idx_filename = malloc(strlen(file1) + 5);
 	  strcpy(idx_filename, file1);
-	  strcat(idx_filename, ".bai");
 	  printf("Creating BAM index...\n");
+	  samtools_bam_index_build(idx_filename);
+	  strcat(idx_filename, ".bai");
 	  //samtools index fastq_filename;
+	  /*
 	  bamFile bf = bam_open(file1, "r");
 	  idx = bam_index_core(bf);
 	  if (!idx) {
@@ -199,7 +201,11 @@ void dna_aligner(options_t *options) {
 	    exit(-1);
 	  }
 	  bam_close(bf);
+	  */
 	  printf("Done. BAM index: %s\n", idx_filename);
+
+	  //	  hts_idx_save(idx, idx_filename, HTS_FMT_BAI);
+	  /*
 	  FILE *idxf = fopen(idx_filename, "wb");
 	  if (idxf == NULL) {
 	    LOG_FATAL_F("Could not open the BAM index: %s", idx_filename);
@@ -207,11 +213,13 @@ void dna_aligner(options_t *options) {
 	  bam_index_save(idx, idxf);
 	  //bam_index_destroy(idx);
 	  fclose(idxf);
+
 	  idx = bam_index_load(file1);
 	  if (idx == 0){
 	    printf("Could not load the BAM index: %s", idx_filename);
 	    exit(-1);
 	  }
+          */
 	  free(idx_filename);
 	}
       }
@@ -294,7 +302,7 @@ void dna_aligner(options_t *options) {
 	// sort the bam
 	char *un = "Unmapped.bam";
 	char *sortname = "SortedUnmap";
-	bam_sort_core_ext(0, un, sortname, 500000000, 0);
+	bam_sort_core(0, un, sortname, 500000000);
 	fnomapped = bam_fopen("SortedUnmap.bam");
 
 	// free the previous wf_input
@@ -418,7 +426,7 @@ void dna_aligner(options_t *options) {
     strcat(sorted_filename, OUTPUT_FILENAME);
 
     // run sort
-    bam_sort_core_ext(0, out_filename, sorted_filename, 500000000, 0);
+    bam_sort_core(0, out_filename, sorted_filename, 500000000);
     printf("Done!\n");
 
     // and then, re-align

@@ -13,7 +13,7 @@
 #include "commons/system_utils.h"
 
 #include "containers/list.h"
-#include "containers/cprops/hashtable.h"
+#include "cprops/hashtable.h"
 
 #include "bioformats/fastq/fastq_file.h"
 #include "bioformats/fastq/fastq_batch.h"

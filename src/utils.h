@@ -9,7 +9,7 @@
  */
 
 #include "bioformats/bam/bam_file.h"
-#include "bioformats/bam/samtools/bam.h"
+#include "samtools/bam.h"
 
 //------------------------------------------------------------------------
 

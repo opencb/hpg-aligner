@@ -22,9 +22,11 @@
 #include "sort_options.h"
 
 
-bam_index_t *bam_index_core(bamFile fp);
-void bam_index_save(const bam_index_t *idx, FILE *fp);
-void bam_sort_core_ext(int is_by_qname, const char *fn, const char *prefix, size_t max_mem, int is_stdout);
+int bam_sort_core(int is_by_qname, const char *fn, const char *prefix, size_t max_mem);
+
+//bam_index_t *bam_index_core(bamFile fp);
+//void bam_index_save(const bam_index_t *idx, FILE *fp);
+//void bam_sort_core_ext(int is_by_qname, const char *fn, const char *prefix, size_t max_mem, int is_stdout);
 
 //------------------------------------------------------------------------
 
@@ -43,8 +45,8 @@ void usage(char *exec_name) {
     printf("         filter\t\tfilter a BAM file by using advanced criteria\n");
     printf("         recalibrate\tbase quality recalibrate from a BAM file\n");
     printf("         realign\tlocal realign from BAM file\n");
-    printf("         index\t\tindex a BAM file (using the samtools 0.1.18)\n");
-    printf("         sort\t\tsort a BAM file (using the samtools 0.1.18)\n");
+    printf("         index\t\tindex a BAM file (using the samtools)\n");
+    printf("         sort\t\tsort a BAM file (using the samtools)\n");
 
     //    printf("         compare\tcompare two BAM files\n");
     //    printf("         realignment\trealign locally a BAM file\n");
@@ -203,24 +205,32 @@ int main (int argc, char *argv[]) {
     char idx_filename[strlen(opts->out_dirname) + strlen(opts->in_filename) + 10];
     char *p = strrchr(opts->in_filename, '/');
     if (p) {
-      sprintf(idx_filename, "%s/%s.bai", opts->out_dirname, p + 1);
+      sprintf(idx_filename, "%s/%s", opts->out_dirname, p + 1);
     } else {
-      sprintf(idx_filename, "%s/%s.bai", opts->out_dirname, opts->in_filename);
+      sprintf(idx_filename, "%s/%s", opts->out_dirname, opts->in_filename);
     }
 
     // run index
+    samtools_bam_index_build(idx_filename);
+    strcat(idx_filename, ".bai");
+
+    /*
     bamFile bf = bam_open(opts->in_filename, "r");
     bam_index_t *idx = bam_index_core(bf);
     bam_close(bf);
-    
+    */
+
+    //    hts_idx_save(idx, idx_filename, HTS_FMT_BAI);
+
+    /*  
     FILE *idxf = fopen(idx_filename, "wb");
     if (idxf == NULL) {
       LOG_FATAL_F("Could not open file %s", idx_filename);
     }
     bam_index_save(idx, idxf);
-    bam_index_destroy(idx);
     fclose(idxf);
-
+    */
+    //    bam_index_destroy(idx);
     printf("Index created in %s\n", idx_filename);
 
     // free memory
@@ -239,7 +249,7 @@ int main (int argc, char *argv[]) {
     sort_options_display(opts);
 
     // set parameters
-    int is_by_qname = 0, is_stdout = 0;
+    int is_by_qname = 0;
     char sorted_filename[strlen(opts->in_filename)];
     char path[strlen(opts->out_dirname) + strlen(opts->in_filename) + 100];
 
@@ -255,7 +265,7 @@ int main (int argc, char *argv[]) {
     }
 
     // run sort
-    bam_sort_core_ext(is_by_qname, opts->in_filename, path, opts->max_memory, is_stdout);
+    bam_sort_core(is_by_qname, opts->in_filename, path, opts->max_memory);
 
     printf("Sorted BAM file in %s.bam\n", path);
 

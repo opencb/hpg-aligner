@@ -11,8 +11,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "commons/argtable/argtable2.h"
-#include "commons/config/libconfig.h"
+#include "argtable/argtable2.h"
+#include "config/libconfig.h"
 #include "commons/log.h"
 #include "commons/system_utils.h"
 #include "commons/file_utils.h"

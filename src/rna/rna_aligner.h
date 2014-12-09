@@ -12,7 +12,7 @@
 #include <unistd.h>
 #include <dirent.h>
 
-#include "containers/cprops/trie.h"
+#include "cprops/trie.h"
 
 #include "commons/log.h"
 #include "commons/file_utils.h"

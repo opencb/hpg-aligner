@@ -28,7 +28,7 @@
 #include <string.h>
 
 //Bioinfo libs
-#include "bioformats/bam/samtools/bam.h"
+#include "samtools/bam.h"
 #include "bioformats/bam/bam_file.h"
 #include "aligners/bwt/genome.h"
 

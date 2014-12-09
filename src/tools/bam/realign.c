@@ -8,12 +8,13 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
-#include <argtable2.h>
 #include <string.h>
 #include <libgen.h>
 #include <unistd.h>
 #include <sys/stat.h>
 #include <errno.h>
+
+#include "argtable/argtable2.h"
 
 #include "aux/timestats.h"
 #include "aux/aux_common.h"

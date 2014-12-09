@@ -9,7 +9,7 @@
 #include "aligners/bwt/genome.h"
 #include "commons/file_utils.h"
 #include "options.h"
-#include "argtable2.h"
+#include "argtable/argtable2.h"
 #include "sa/sa_index3.h"
 
 #define SA_INDEX  0

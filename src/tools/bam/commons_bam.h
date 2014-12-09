@@ -12,7 +12,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "commons/argtable/argtable2.h"
+#include "argtable/argtable2.h"
 
 #include "bioformats/features/region/region_table.h"
 #include "bioformats/features/region/region_table_utils.h"
