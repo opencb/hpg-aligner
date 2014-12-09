@@ -44,12 +44,12 @@ void** argtable_index_options_new(int mode) {
 
   int count = 0;
   argtable[count++] = arg_file1("i", "index", NULL, "Index directory name");
-  argtable[count++] = arg_file1("g", "ref-genome", NULL, "Reference genome");
+  argtable[count++] = arg_file1("g", "ref-genome", NULL, "Reference genome (FASTA format)");
 
   if (mode == BWT_INDEX) {
     argtable[count++] = arg_int0("r", "index-ratio", NULL, "BWT index compression ratio. Default: 8");
   } else {
-    argtable[count++] = arg_file0("d", "decoy-genome", NULL, "Decoy genome");
+    argtable[count++] = arg_file0("d", "decoy-genome", NULL, "Decoy genome (FASTA format)");
   }
 
   argtable[count++] = arg_lit0("v", "version", "Display version");
