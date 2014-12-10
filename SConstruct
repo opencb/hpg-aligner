@@ -86,7 +86,7 @@ aligner = envprogram.Program('#bin/hpg-aligner',
                       ]
            )
 
-bams = envprogram.Program('#bin/hpg-bam',
+bam  = envprogram.Program('#bin/hpg-bam',
              source = [Glob('src/tools/bam/*.c'), 
 	     	       Glob('src/tools/bam/aux/*.c'),
 	     	       Glob('src/tools/bam/bfwork/*.c'),
@@ -100,7 +100,13 @@ bams = envprogram.Program('#bin/hpg-bam',
                       ]
            )
 
-Depends(aligner, bams)
+fastq = envprogram.Program('#bin/hpg-fastq',
+             source = [Glob('src/tools/fastq/*.c'), 
+                       "%s/build/libhpg.a" % hpglib_path
+                      ]
+           )
+
+#Depends(aligner, bam, fastq)
 
 '''
 if 'debian' in COMMAND_LINE_TARGETS:
