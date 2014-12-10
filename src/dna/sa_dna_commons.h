@@ -16,6 +16,7 @@
 #define NUM_COUNTERS 10
 extern int counters[NUM_COUNTERS];
 KHASH_MAP_INIT_STR(ID, bam1_t *);
+//KHASH_MAP_INIT_STR(ID, array_list_t *);
 //--------------------------------------------------------------------
 
 #ifdef _TIMING

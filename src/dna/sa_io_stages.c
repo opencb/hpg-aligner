@@ -189,6 +189,17 @@ void *sa_bam_reader_pairend(void *input) {
 				stats->total_reads++;
 				stats->alone_reads++;
 			} else {
+				 //ckeck the mates
+				  if((bam1->core.flag & BAM_FREAD2)||(bam2->core.flag & BAM_FREAD1)){
+
+					  bam1_t *bamaux; // mate 1
+					  //bamaux = bam_init1();
+
+					  bamaux = bam1;
+					  bam1 = bam2;
+					  bam2 = bamaux;
+					  //bam_destroy1(bamaux);
+				  }
 				// convert bam1_t to fastq_read_t
 				header = strdup(bam1_qname(bam1));
 				sequence = calloc(sizeof(char), (int32_t) bam1->core.l_qseq + 1);
@@ -441,7 +452,7 @@ void *sa_bam_reader_pairendV3(void *input){ // crear estructura sam_file_t
 
 	khash_t(ID) *h = (khash_t(ID) *)wf_input->hash;
 	khiter_t k;
-	int  size = 0, total_reads = 0;
+	int  size = 0, total_reads = 0, found =0;
 	//printf("estoy en el reader (bam1, bam2) = (%x, %x)\n", bam1, bam2);
 
 	while ((bam_read1(bam_file->bam_fd, bam1) > 0) && (size < batch_size)) {
@@ -470,82 +481,106 @@ void *sa_bam_reader_pairendV3(void *input){ // crear estructura sam_file_t
 			}*/
 
 
-			// check if ret == 0
+			//Si ya existe algun bam que tenga la misma clave o al menos vaya a la misma posición de la hash (colisión)
 			if (is_missing == 0) {
-
+				array_list_t *lista = (array_list_t *) kh_val(h,k);
+				size_t size_lista = array_list_size(lista);
 				//printf("key %s is present in the hash\n", key);
+				found = 0;
+				size_t it = 0;
+				while(it <size_lista && !found){
+					bam2 = array_list_get(it, lista);
 
 				//The mate is present in the hash.
-				bam2 = kh_val(h,k);
+					if((!strcmp(bam1_qname(bam1),bam1_qname(bam2)))&& (bam1->core.mpos == bam2->core.pos)){
+						 if((bam1->core.flag & BAM_FREAD2)||(bam2->core.flag & BAM_FREAD1)){
+
+							  bam1_t *bamaux; // mate 1
+							  bamaux = bam1;
+							  bam1 = bam2;
+							  bam2 = bamaux;
+
+						 }
 
 
-				if((!strcmp(bam1_qname(bam1),bam1_qname(bam2)))&& (bam1->core.mpos == bam2->core.pos)){
-					char *header1 = strdup(bam1_qname(bam1));
-					char *sequence = calloc(sizeof(char), (int32_t)bam1->core.l_qseq + 1);
-					char *quality = calloc(sizeof(char), (int32_t)bam1->core.l_qseq + 1);
+						char *header1 = strdup(bam1_qname(bam1));
+						char *sequence = calloc(sizeof(char), (int32_t)bam1->core.l_qseq + 1);
+						char *quality = calloc(sizeof(char), (int32_t)bam1->core.l_qseq + 1);
 
-					fastq_read_t *read;
+						fastq_read_t *read;
 
-					bam1_get_sequence(bam1, sequence);
+						bam1_get_sequence(bam1, sequence);
 
-					if (bam1->core.flag & BAM_FREVERSE){
-						revcomp_seq(sequence);
+						if (bam1->core.flag & BAM_FREVERSE){
+							revcomp_seq(sequence);
+						}
+
+						bam1_get_quality(bam1, quality);
+
+						size += bam1->core.l_qname + 2 * bam1->core.l_qseq;
+						read = fastq_read_new(header1, sequence, quality);
+						array_list_insert(read, reads);
+
+						//printf("(tid, mtid) = (%lu, %lu), seq1 = %s\n", bam1->core.tid, bam1->core.mtid, sequence);
+
+						free(header1);
+						free(sequence);
+						free(quality);
+
+
+						char *header2 = strdup(bam1_qname(bam2));
+						char *sequence2 = calloc(sizeof(char), (int32_t)bam2->core.l_qseq + 1);
+						char *quality2 = calloc(sizeof(char), (int32_t)bam2->core.l_qseq + 1);
+
+						bam1_get_sequence(bam2, sequence2);
+						if (bam2->core.flag  & BAM_FREVERSE){
+							revcomp_seq(sequence2);
+						}
+
+						bam1_get_quality(bam2, quality2);
+
+						//printf("(tid, mtid) = (%lu, %lu), seq2 = %s\n", bam2->core.tid, bam2->core.mtid, sequence2);
+
+
+						size += bam2->core.l_qname + 2 * bam2->core.l_qseq;
+						read = fastq_read_new(header2, sequence2, quality2);
+						array_list_insert(read, reads);
+						free(header2);
+						free(sequence2);
+						free(quality2);
+						total_reads+=2;
+						array_list_remove_at(it,lista);
+						if(array_list_size(lista) == 0){
+							array_list_free(lista, NULL);
+							kh_del(ID, h, k);
+						}
+						//kh_del(ID, h, k);
+						bam2 = NULL;
+
+						bam_destroy1(bam1);
+						bam1 = bam_init1();
+						found = 1;
+					} else {
+						//printf(">>>>>> no es igual en la lista de desbordamiento key = %s\n", key);
+						//printf("From BAM1: (id, pos, mpos, flags) = (%s, %i, %i, %i)\n", bam1_qname(bam1), bam1->core.pos, bam1->core.mpos, bam1->core.flag);
+						//printf("From BAM2: (id, pos, mpos, flags) = (%s, %i, %i, %i)\n", bam1_qname(bam2), bam2->core.pos, bam2->core.mpos, bam2->core.flag);
+						//exit(-1);
 					}
-
-					bam1_get_quality(bam1, quality);
-
-					size += bam1->core.l_qname + 2 * bam1->core.l_qseq;
-					read = fastq_read_new(header1, sequence, quality);
-					array_list_insert(read, reads);
-
-					//printf("(tid, mtid) = (%lu, %lu), seq1 = %s\n", bam1->core.tid, bam1->core.mtid, sequence);
-
-					free(header1);
-					free(sequence);
-					free(quality);
-
-
-					char *header2 = strdup(bam1_qname(bam2));
-					char *sequence2 = calloc(sizeof(char), (int32_t)bam2->core.l_qseq + 1);
-					char *quality2 = calloc(sizeof(char), (int32_t)bam2->core.l_qseq + 1);
-
-					bam1_get_sequence(bam2, sequence2);
-					if (bam2->core.flag  & BAM_FREVERSE){
-						revcomp_seq(sequence2);
-					}
-
-					bam1_get_quality(bam2, quality2);
-
-					//printf("(tid, mtid) = (%lu, %lu), seq2 = %s\n", bam2->core.tid, bam2->core.mtid, sequence2);
-
-
-					size += bam2->core.l_qname + 2 * bam2->core.l_qseq;
-					read = fastq_read_new(header2, sequence2, quality2);
-					array_list_insert(read, reads);
-					free(header2);
-					free(sequence2);
-					free(quality2);
-					total_reads+=2;
-
-					kh_del(ID, h, k);
-					bam2 = NULL;
-
-					bam_destroy1(bam1);
-					bam1 = bam_init1();
-
-
-				} else {
-					printf(">>>>>> no es igual comprobar error key = %s\n", key);
-					printf("From BAM1: (id, pos, mpos, flags) = (%s, %i, %i, %i)\n", bam1_qname(bam1), bam1->core.pos, bam1->core.mpos, bam1->core.flag);
-					printf("From BAM2: (id, pos, mpos, flags) = (%s, %i, %i, %i)\n", bam1_qname(bam2), bam2->core.pos, bam2->core.mpos, bam2->core.flag);
-					exit(-1);
+					it++;
 				}
-
+				if(!found){
+					array_list_insert(bam1, lista);
+					if (array_list_size(lista) > 1) {
+						printf(">>>>>>>>>  list size = %i\n", array_list_size(lista));
+					}
+					bam1 = bam_init1();
+				}
 			}else{
-
+				array_list_t *desbordamiento = array_list_new(batch_size, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
 				//Put the bam in the hash table
+				array_list_insert(bam1, desbordamiento);
 				k = kh_put(ID, h, key, &ret);
-				kh_value(h, k)= bam1;
+				kh_value(h, k)= desbordamiento;
 				//bam_destroy1(bam1);
 				bam1 = bam_init1();
 

@@ -327,14 +327,20 @@ void dna_aligner(options_t *options) {
 				remove("Unmapped.bam");
 				remove("SortedUnmap.bam");
 				//h = (khash_t(ID) *)wf_input->hash;
-				 khiter_t k;
-				for (k = kh_begin(h); k != kh_end(h); ++k)
+				khiter_t k;
+				for (k = kh_begin(h); k != kh_end(h); ++k){
 					if (kh_exist(h, k)){
-						bam1_t *bam1; // mate 1
-						bam1 = kh_val(h,k);
-						printf("El bam %s", bam1_qname(bam1));
-						bam_destroy1(bam1);
+						array_list_t *listasobrante = kh_val(h,k);
+						for (size_t s =0; s< array_list_size(listasobrante); s++){
+							bam1_t *bam1; // mate 1
+							bam1= array_list_get(s, listasobrante);
+							printf("El bam %s \n", bam1_qname(bam1));
+							bam_destroy1(bam1);
+						}
+						free (listasobrante);
 					}
+
+				}
 				kh_destroy(ID, h);
 			}
 		} else if (options->gzip) {
