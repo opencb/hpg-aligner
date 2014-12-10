@@ -697,7 +697,7 @@ options_t *read_CLI_options(void **argtable, options_t *options) {
   if (options->adapter) options->adapter_length = strlen(options->adapter);
 
   if (((struct arg_int*)argtable[++count])->count) {
-    char *input_format = strdup(*(((struct arg_str*)argtable[count])->sval));
+    char *input_format = (*(((struct arg_str*)argtable[count])->sval));
     if (!strcmp(input_format, "sam") || !strcmp(input_format, "SAM")) {
       options->input_format = SAM_FORMAT;
     } else if (!strcmp(input_format, "bam") || !strcmp(input_format, "BAM")) {

@@ -8,14 +8,14 @@
 #include "buffers.h"
 #include "cal_seeker.h"
 #include "pair_server.h"
-
+#include "containers/khash.h"
 #include "sa/sa_index3.h"
 
 //--------------------------------------------------------------------
 
 #define NUM_COUNTERS 10
 extern int counters[NUM_COUNTERS];
-
+KHASH_MAP_INIT_STR(ID, bam1_t *);
 //--------------------------------------------------------------------
 
 #ifdef _TIMING
@@ -207,6 +207,7 @@ typedef struct sa_wf_input {
   bam_index_t *idx;
   stats_t *stats;
   void *data;
+  khash_t(ID) *hash;
 } sa_wf_input_t;
 
 //--------------------------------------------------------------------
@@ -221,6 +222,7 @@ static inline sa_wf_input_t *sa_wf_input_new(int bam_format,
   p->idx = NULL;
   p->stats = NULL;
   p->data = NULL;
+  p->hash = NULL;
   return p;
 }
 
