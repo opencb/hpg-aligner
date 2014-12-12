@@ -41,10 +41,10 @@
 
 #define DEFAULT_MIN_SCORE		60
 
-#define DEFAULT_SW_MATCH		5
-#define DEFAULT_SW_MISMATCH		-4
-#define DEFAULT_SW_GAP_OPEN		10
-#define DEFAULT_SW_GAP_EXTEND		0.5
+#define DEFAULT_SW_MATCH		5.0f
+#define DEFAULT_SW_MISMATCH		-4.0f
+#define DEFAULT_SW_GAP_OPEN		10.0f
+#define DEFAULT_SW_GAP_EXTEND		0.5f
 #define DEFAULT_PAIR_MODE	        0
 #define DEFAULT_PAIR_MIN_DISTANCE	200
 #define DEFAULT_PAIR_MAX_DISTANCE	800
@@ -52,10 +52,25 @@
 #define DEFAULT_FILTER_READ_MAPPINGS    500
 #define DEFAULT_FILTER_SEED_MAPPINGS    500
 
-//new variable for default uses
+//========================================================================
+
+#define DEFAULT_DNA_READ_BATCH_SIZE     200000
+#define DEFAULT_DNA_NUM_SEEDS	        20
+#define DEFAULT_DNA_MIN_CAL_SIZE        20
+
+//========================================================================
+
+#define DEFAULT_RNA_READ_BATCH_SIZE     200000
+#define DEFAULT_RNA_NUM_SEEDS	        20
+#define DEFAULT_RNA_MIN_CAL_SIZE        20
+#define DEFAULT_RNA_SEED_SIZE           16
+
+//========================================================================
+
 #define DEFAULT_NUCLEOTIDES             "ACGT"
 #define DEFAULT_FILTER_READ_MAPPINGS_BS 100
 #define DEFAULT_FILTER_SEED_MAPPINGS_BS 500
+
 //========================================================================
 
 #define NUM_OPTIONS			31
@@ -98,6 +113,7 @@ typedef struct options {
   int timming;
   int statistics;
   int input_format;
+  int output_format;
   int rna_seq; 
   int help;
   int cal_seeker_errors;
@@ -198,5 +214,15 @@ void usage(void **argtable, int mode);
 void display_version();
 
 char *create_cmdline(int argc, char **argv);
+
+void display_help(void **argtable, int mode);
+void display_dna_help();
+void display_rna_help();
+
+void display_options(options_t *options, FILE *file);
+void display_dna_options(options_t *options, FILE *file);
+void display_rna_options(options_t *options, FILE *file);
+
+
 
 #endif

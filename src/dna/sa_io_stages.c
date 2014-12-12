@@ -874,15 +874,14 @@ int sa_bam_writer(void *data) {
 	if (genome->chrom_flags[alig->chromosome] == DECOY_FLAG) {
 	  if (num_mappings == 1) {
 	    alignment_t *aux_alig = alignment_new();       
-	    alignment_init_single_end(strdup(read->id), alig->sequence, alig->quality,
+	    alignment_init_single_end(strdup(read->id), strdup(alig->sequence), strdup(alig->quality),
 				      0, -1, -1, "", 0, 0, 0, 0, 0, NULL, aux_alig);
 	    bam1_t *aux_bam1 = convert_to_bam(aux_alig, 33);
 	    bam_fwrite(aux_bam1, out_file);
 	    // free memory
 	    bam_destroy1(aux_bam1);
-	    alignment_free(aux_alig);
-	    alig->sequence = NULL;
-	    alig->quality = NULL;
+	    // memory-leak to fix !!!
+	    //alignment_free(aux_alig);
 	  }
 	  // free alignment and continue
 	  alignment_free(alig);	 

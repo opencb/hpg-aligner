@@ -803,13 +803,13 @@ void rna_aligner(options_t *options) {
   //======================================================================
 
   LOG_DEBUG("Displaying options...\n");
-  options_display(options);
+  display_options(options, NULL);
 
   fprintf(fd_log_input, "====================================================================================\n");
   fprintf(fd_log_input, "=            H P G    A L I G N E R    L O G    I N P U T    F I L E               =\n");
   fprintf(fd_log_input, "====================================================================================\n\n");
 
-  options_to_file(options, fd_log_input);
+  display_options(options, fd_log_input);
 
   fprintf(fd_log_input, "====================================================================================\n");
   fprintf(fd_log_input, "=                                                                                  =\n");

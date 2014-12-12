@@ -68,7 +68,7 @@ void dna_aligner(options_t *options) {
   }
 
   // display options
-  options_display(options);
+  display_options(options, NULL);
 
   // load SA index
   struct timeval stop, start;
