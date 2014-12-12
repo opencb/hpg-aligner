@@ -328,18 +328,20 @@ void dna_aligner(options_t *options) {
 				remove("SortedUnmap.bam");
 				//h = (khash_t(ID) *)wf_input->hash;
 				khiter_t k;
+				int count  = 0;
 				for (k = kh_begin(h); k != kh_end(h); ++k){
+
 					if (kh_exist(h, k)){
 						array_list_t *listasobrante = kh_val(h,k);
 						for (size_t s =0; s< array_list_size(listasobrante); s++){
 							bam1_t *bam1; // mate 1
 							bam1= array_list_get(s, listasobrante);
-							printf("El bam %s \n", bam1_qname(bam1));
+							printf("lista %d: El bam %s \n", count, bam1_qname(bam1));
 							bam_destroy1(bam1);
 						}
 						free (listasobrante);
 					}
-
+					count++;
 				}
 				kh_destroy(ID, h);
 			}

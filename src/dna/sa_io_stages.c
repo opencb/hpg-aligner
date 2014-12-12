@@ -159,7 +159,7 @@ void *sa_bam_reader_pairend(void *input) {
 	char *header, *sequence, *quality;
 	fastq_read_t *read;
 
-	while ((bam_read1(bam_file->bam_fd, bam1) > 0) && (size < batch_size)) {
+	while ((size < batch_size)&&(bam_read1(bam_file->bam_fd, bam1) > 0)  ) {
 
 		if ((bam1->core.flag & BAM_FREAD1)
 				&& !(bam1->core.flag & BAM_FMUNMAP)
@@ -193,12 +193,10 @@ void *sa_bam_reader_pairend(void *input) {
 				  if((bam1->core.flag & BAM_FREAD2)||(bam2->core.flag & BAM_FREAD1)){
 
 					  bam1_t *bamaux; // mate 1
-					  //bamaux = bam_init1();
-
 					  bamaux = bam1;
 					  bam1 = bam2;
 					  bam2 = bamaux;
-					  //bam_destroy1(bamaux);
+
 				  }
 				// convert bam1_t to fastq_read_t
 				header = strdup(bam1_qname(bam1));
@@ -428,7 +426,7 @@ void *sa_bam_reader_unmapped(void *input) {
 
 //KHASH_MAP_INIT_STR(ID, bam1_t *);
 
-void *sa_bam_reader_pairendV3(void *input){ // crear estructura sam_file_t
+void *sa_bam_reader_pairendV3(void *input){
 
 	sa_wf_input_t *wf_input = (sa_wf_input_t *) input;
 
@@ -448,24 +446,25 @@ void *sa_bam_reader_pairendV3(void *input){ // crear estructura sam_file_t
 	bam1 = bam_init1();
 
 	bam1_t *bam2 = NULL; // mate 2
-	//bam2 = bam_init1();
 
 	khash_t(ID) *h = (khash_t(ID) *)wf_input->hash;
 	khiter_t k;
 	int  size = 0, total_reads = 0, found =0;
 	//printf("estoy en el reader (bam1, bam2) = (%x, %x)\n", bam1, bam2);
 
-	while ((bam_read1(bam_file->bam_fd, bam1) > 0) && (size < batch_size)) {
+	while ((size < batch_size) && (bam_read1(bam_file->bam_fd, bam1) > 0)) {
 
 
-
-		if( (!(bam1->core.flag & BAM_FUNMAP)|| (!(bam1->core.flag & BAM_FMUNMAP)))&& (!(bam1->core.flag & BAM_FSECONDARY))){
+		if( (!(bam1->core.flag & BAM_FUNMAP) || (!(bam1->core.flag & BAM_FMUNMAP)))
+				&& (!(bam1->core.flag & BAM_FSECONDARY))) {
 
 			//MIRO SI EL SEGUNDO ESTA EN LA HASH;
 
 			int ret, is_missing;
 			char *key = strdup(bam1_qname(bam1));
-			k = kh_get(ID,h,key);
+
+
+			k = kh_get(ID, h, key);
 			is_missing = (k == kh_end(h));
 			//sprintf(key, "ID-%i", i);
 			/////////k = kh_put(ID, h, key, &ret);
@@ -482,7 +481,10 @@ void *sa_bam_reader_pairendV3(void *input){ // crear estructura sam_file_t
 
 
 			//Si ya existe algun bam que tenga la misma clave o al menos vaya a la misma posición de la hash (colisión)
-			if (is_missing == 0) {
+			if (!is_missing) {
+				// this key is already saved in the hash (by the mate)
+				free(key);
+
 				array_list_t *lista = (array_list_t *) kh_val(h,k);
 				size_t size_lista = array_list_size(lista);
 				//printf("key %s is present in the hash\n", key);
@@ -549,22 +551,19 @@ void *sa_bam_reader_pairendV3(void *input){ // crear estructura sam_file_t
 						free(sequence2);
 						free(quality2);
 						total_reads+=2;
-						array_list_remove_at(it,lista);
+						array_list_remove_at(it, lista);
 						if(array_list_size(lista) == 0){
 							array_list_free(lista, NULL);
+							free(kh_key(h,k)); // free the previously strdup
 							kh_del(ID, h, k);
 						}
 						//kh_del(ID, h, k);
+						bam_destroy1(bam2);
 						bam2 = NULL;
 
 						bam_destroy1(bam1);
 						bam1 = bam_init1();
 						found = 1;
-					} else {
-						//printf(">>>>>> no es igual en la lista de desbordamiento key = %s\n", key);
-						//printf("From BAM1: (id, pos, mpos, flags) = (%s, %i, %i, %i)\n", bam1_qname(bam1), bam1->core.pos, bam1->core.mpos, bam1->core.flag);
-						//printf("From BAM2: (id, pos, mpos, flags) = (%s, %i, %i, %i)\n", bam1_qname(bam2), bam2->core.pos, bam2->core.mpos, bam2->core.flag);
-						//exit(-1);
 					}
 					it++;
 				}
@@ -575,15 +574,15 @@ void *sa_bam_reader_pairendV3(void *input){ // crear estructura sam_file_t
 					}
 					bam1 = bam_init1();
 				}
-			}else{
-				array_list_t *desbordamiento = array_list_new(batch_size, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
+			} else {
+				// key is missing, put it into the hash
+				array_list_t *desbordamiento = array_list_new(10, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
 				//Put the bam in the hash table
 				array_list_insert(bam1, desbordamiento);
 				k = kh_put(ID, h, key, &ret);
 				kh_value(h, k)= desbordamiento;
 				//bam_destroy1(bam1);
 				bam1 = bam_init1();
-
 			}
 			/*printf("---> hash size = %i, num. buckets = %i\n", kh_size(h), kh_n_buckets(h));
 
@@ -594,7 +593,7 @@ void *sa_bam_reader_pairendV3(void *input){ // crear estructura sam_file_t
 			}
 
 			 */
-			free(key);
+			//free(key);
 		}else if(bam1->core.flag & BAM_FSECONDARY){
 			stats->secondary_reads++;
 			total_reads++;
