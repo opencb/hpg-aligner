@@ -681,7 +681,7 @@ options_t *read_CLI_options(void **argtable, options_t *options) {
   options->set_bam_format = 0;
   options->output_format = SAM_FORMAT;
   if (((struct arg_int*)argtable[++count])->count) {
-    char *format = *(((struct arg_str*)argtable[count])->sval);
+    char *format = (char *) (*((struct arg_str*)argtable[count])->sval);
     if (!strcmp(format, "bam") || !strcmp(format, "BAM")) {
       options->output_format = BAM_FORMAT;
       options->bam_format = 1; 
@@ -696,7 +696,7 @@ options_t *read_CLI_options(void **argtable, options_t *options) {
   if (options->adapter) options->adapter_length = strlen(options->adapter);
 
   if (((struct arg_int*)argtable[++count])->count) {
-    char *format = *(((struct arg_str*)argtable[count])->sval);
+    char *format = (char *) (*((struct arg_str*)argtable[count])->sval);
     if (!strcmp(format, "sam") || !strcmp(format, "SAM")) {
       options->input_format = SAM_FORMAT;
     } else if (!strcmp(format, "bam") || !strcmp(format, "BAM")) {
@@ -894,7 +894,7 @@ void display_dna_help() {
   printf("\n");
 
   printf("Architecture options:\n");
-  printf("\t-t, --cpu-threads=<int>            Number of CPU threads [%i]\n", get_optimal_cpu_num_threads());
+  printf("\t-t, --cpu-threads=<int>            Number of CPU threads [%lu]\n", get_optimal_cpu_num_threads());
   printf("\t--read-batch-size=<int>            Batch size in bytes [%i]\n", DEFAULT_DNA_READ_BATCH_SIZE);
   printf("\n");
 
@@ -974,7 +974,6 @@ void display_dna_options(options_t *options, FILE *f) {
   
   fprintf(file, "\tOutput file format: %s\n", 
 	 (options->bam_format || options->realignment || options->recalibration) ? "BAM" : "SAM");
-  fprintf(file, "\tAdapter sequence  : %s\n", (options->adapter ? options->adapter : "Not present"));
   fprintf(file, "\n");
   
   fprintf(file, "Architecture parameters:\n");
@@ -1008,8 +1007,8 @@ void display_dna_options(options_t *options, FILE *f) {
   fprintf(file, "\n");
   
   fprintf(file, "Pre-processing:\n");
-  fprintf(file, "\tAdapter : %s\n",
-	  (options->adapter ? options->adapter : "Disabled"));
+  fprintf(file, "\tAdapter sequence: %s\n",
+	  (options->adapter ? options->adapter : "Not present"));
   fprintf(file, "\n");
   
   fprintf(file, "Post-processing:\n");
@@ -1049,7 +1048,7 @@ void display_rna_help() {
   printf("\n");
 
   printf("Architecture options:\n");
-  printf("\t-t, --cpu-threads=<int>            Number of CPU threads [%i]\n", get_optimal_cpu_num_threads());
+  printf("\t-t, --cpu-threads=<int>            Number of CPU threads [%lu]\n", get_optimal_cpu_num_threads());
   printf("\t--read-batch-size=<int>            Batch size in bytes [%i]\n", DEFAULT_DNA_READ_BATCH_SIZE);
   printf("\n");
 
