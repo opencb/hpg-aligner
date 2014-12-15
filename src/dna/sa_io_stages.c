@@ -875,13 +875,12 @@ int sa_bam_writer(void *data) {
 	  if (num_mappings == 1) {
 	    alignment_t *aux_alig = alignment_new();       
 	    alignment_init_single_end(strdup(read->id), strdup(alig->sequence), strdup(alig->quality),
-				      0, -1, -1, "", 0, 0, 0, 0, 0, NULL, aux_alig);
+				      0, -1, -1, strdup(""), 0, 0, 0, 0, 0, NULL, aux_alig);
 	    bam1_t *aux_bam1 = convert_to_bam(aux_alig, 33);
 	    bam_fwrite(aux_bam1, out_file);
 	    // free memory
 	    bam_destroy1(aux_bam1);
-	    // memory-leak to fix !!!
-	    //alignment_free(aux_alig);
+	    alignment_free(aux_alig);
 	  }
 	  // free alignment and continue
 	  alignment_free(alig);	 
@@ -935,7 +934,7 @@ int sa_bam_writer(void *data) {
       
       alig = alignment_new();       
       alignment_init_single_end(strdup(read->id), sequence, quality,
-				0, -1, -1, "", 0, 0, 0, 0, 0, NULL, alig);
+				0, -1, -1, strdup(""), 0, 0, 0, 0, 0, NULL, alig);
       
       bam1 = convert_to_bam(alig, 33);
       bam_fwrite(bam1, out_file);
@@ -944,7 +943,6 @@ int sa_bam_writer(void *data) {
       bam_destroy1(bam1);
       alig->sequence = NULL;
       alig->quality = NULL;
-      alig->cigar = NULL;
       alignment_free(alig);
       if (read->adapter) {
 	free(sequence);
