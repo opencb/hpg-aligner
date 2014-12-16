@@ -55,6 +55,7 @@ void *sa_fq_reader(void *input) {
 
 //----------------------------------------------------------------------
 // BAM reader for single-end
+//
 //----------------------------------------------------------------------
 
 void *sa_bam_reader_single(void *input) {
@@ -80,7 +81,7 @@ void *sa_bam_reader_single(void *input) {
 	char *header, *sequence, *quality;
 
 	bam1 = bam_init1();
-	while ((bam_read1(bam_file->bam_fd, bam1) > 0) && (size < batch_size) ) {
+	while ((size < batch_size) && (bam_read1(bam_file->bam_fd, bam1) > 0) ) {
 		// convert bam1_t to fastq_read_t
 		total_reads++;
 		if (!(bam1->core.flag & BAM_FSECONDARY)) {
@@ -127,9 +128,12 @@ void *sa_bam_reader_single(void *input) {
 	return new_wf_batch;
 }
 
-//----------------------------------------------------------------------
-// BAM reader for paired-end)
-//----------------------------------------------------------------------
+
+/**********************************************************************************************************
+* sa_bam_reader_pairend:  BAM reader for paired-end: samtools index version
+* @param input -> sa_wf_input : input with all parameters(important param: wf_input->idx;the file index)
+* @return new_wf_batch : batch for the mapper
+**************************************************************************************************************/
 
 void *sa_bam_reader_pairend(void *input) { 
 	sa_wf_input_t *wf_input = (sa_wf_input_t *) input;
@@ -165,7 +169,7 @@ void *sa_bam_reader_pairend(void *input) {
 				&& !(bam1->core.flag & BAM_FMUNMAP)
 				&& !(bam1->core.flag & BAM_FSECONDARY)) {
 
-			// bam_fetch modified function
+			// bam_fetch modified function: query the mate position
 			iter = bam_iter_query(wf_input->idx, (int) bam1->core.mtid,
 					(int) bam1->core.mpos, (int) bam1->core.mpos + 1);
 			if (iter == NULL){
@@ -174,7 +178,8 @@ void *sa_bam_reader_pairend(void *input) {
 
 			found = 0;
 			bam_seek(bam_file_aux, 0, SEEK_SET);
-			while ((ret = bam_iter_read(bam_file_aux, iter, bam2)) >= 0) {
+			//check all matches
+			while ((ret = bam_iter_read(bam_file_aux, iter, bam2)) >= 0) { //
 				if ((!strcmp(bam1_qname(bam1), bam1_qname(bam2))) && (bam1->core.mtid == bam2->core.tid)) {
 					found = 1;
 					break;
@@ -192,7 +197,7 @@ void *sa_bam_reader_pairend(void *input) {
 				 //ckeck the mates
 				  if((bam1->core.flag & BAM_FREAD2)||(bam2->core.flag & BAM_FREAD1)){
 
-					  bam1_t *bamaux; // mate 1
+					  bam1_t *bamaux;
 					  bamaux = bam1;
 					  bam1 = bam2;
 					  bam2 = bamaux;
@@ -281,9 +286,11 @@ void *sa_bam_reader_pairend(void *input) {
 	return new_wf_batch;
 }
 
-//----------------------------------------------------------------------
-// BAM reader for tmp unmapped reads
-//----------------------------------------------------------------------
+/**********************************************************************************************************
+* sa_bam_reader_unmapped:  BAM reader for tmp unmapped reads
+* @param input -> sa_wf_input : input with all parameters(important param: wf_input->data;file for unmapped bams)
+* @return new_wf_batch : batch for the mapper
+**************************************************************************************************************/
 
 void *sa_bam_reader_unmapped(void *input) {
 
@@ -424,7 +431,12 @@ void *sa_bam_reader_unmapped(void *input) {
 	return new_wf_batch;
 }
 
-//KHASH_MAP_INIT_STR(ID, bam1_t *);
+
+/**********************************************************************************************************
+* sa_bam_reader_pairendV3:  BAM reader Khash table version
+* @param input -> sa_wf_input : input with all parameters(important param: KHASH_MAP_INIT_STR(ID, bam1_t *);)
+* @return new_wf_batch : batch for the mapper
+**************************************************************************************************************/
 
 void *sa_bam_reader_pairendV3(void *input){
 
@@ -450,7 +462,6 @@ void *sa_bam_reader_pairendV3(void *input){
 	khash_t(ID) *h = (khash_t(ID) *)wf_input->hash;
 	khiter_t k;
 	int  size = 0, total_reads = 0, found =0;
-	//printf("estoy en el reader (bam1, bam2) = (%x, %x)\n", bam1, bam2);
 
 	while ((size < batch_size) && (bam_read1(bam_file->bam_fd, bam1) > 0)) {
 
@@ -458,31 +469,18 @@ void *sa_bam_reader_pairendV3(void *input){
 		if( (!(bam1->core.flag & BAM_FUNMAP) || (!(bam1->core.flag & BAM_FMUNMAP)))
 				&& (!(bam1->core.flag & BAM_FSECONDARY))) {
 
-			//MIRO SI EL SEGUNDO ESTA EN LA HASH;
+			//Check if the second is in the khash;
 
 			int ret, is_missing;
 			char *key = strdup(bam1_qname(bam1));
 
-
 			k = kh_get(ID, h, key);
 			is_missing = (k == kh_end(h));
-			//sprintf(key, "ID-%i", i);
-			/////////k = kh_put(ID, h, key, &ret);
-			/*
-			char key1[100];
-			sprintf(key1, "ID-234");
-			k = kh_get(ID, h, key1);
-			is_missing = (k == kh_end(h));
-			if (is_missing) {
-				printf("key %s is missing !!!\n", key1);
-			} else {
-				printf("key %s -> value: %x\n", key1, kh_value(h, k));
-			}*/
 
 
-			//Si ya existe algun bam que tenga la misma clave o al menos vaya a la misma posición de la hash (colisión)
+			// this key is already saved in the hash (by the mate or collision)
 			if (!is_missing) {
-				// this key is already saved in the hash (by the mate)
+
 				free(key);
 
 				array_list_t *lista = (array_list_t *) kh_val(h,k);
@@ -493,17 +491,15 @@ void *sa_bam_reader_pairendV3(void *input){
 				while(it <size_lista && !found){
 					bam2 = array_list_get(it, lista);
 
-				//The mate is present in the hash.
+					//The mate is present in the hash.
 					if((!strcmp(bam1_qname(bam1),bam1_qname(bam2)))&& (bam1->core.mpos == bam2->core.pos)){
-						 if((bam1->core.flag & BAM_FREAD2)||(bam2->core.flag & BAM_FREAD1)){
+						if((bam1->core.flag & BAM_FREAD2)||(bam2->core.flag & BAM_FREAD1)){//check the correct strand
+							bam1_t *bamaux;
+							bamaux = bam1;
+							bam1 = bam2;
+							bam2 = bamaux;
 
-							  bam1_t *bamaux; // mate 1
-							  bamaux = bam1;
-							  bam1 = bam2;
-							  bam2 = bamaux;
-
-						 }
-
+						}
 
 						char *header1 = strdup(bam1_qname(bam1));
 						char *sequence = calloc(sizeof(char), (int32_t)bam1->core.l_qseq + 1);
@@ -523,8 +519,6 @@ void *sa_bam_reader_pairendV3(void *input){
 						read = fastq_read_new(header1, sequence, quality);
 						array_list_insert(read, reads);
 
-						//printf("(tid, mtid) = (%lu, %lu), seq1 = %s\n", bam1->core.tid, bam1->core.mtid, sequence);
-
 						free(header1);
 						free(sequence);
 						free(quality);
@@ -541,9 +535,6 @@ void *sa_bam_reader_pairendV3(void *input){
 
 						bam1_get_quality(bam2, quality2);
 
-						//printf("(tid, mtid) = (%lu, %lu), seq2 = %s\n", bam2->core.tid, bam2->core.mtid, sequence2);
-
-
 						size += bam2->core.l_qname + 2 * bam2->core.l_qseq;
 						read = fastq_read_new(header2, sequence2, quality2);
 						array_list_insert(read, reads);
@@ -551,13 +542,13 @@ void *sa_bam_reader_pairendV3(void *input){
 						free(sequence2);
 						free(quality2);
 						total_reads+=2;
-						array_list_remove_at(it, lista);
+						array_list_remove_at(it, lista);//remove the mate in the collision list
 						if(array_list_size(lista) == 0){
 							array_list_free(lista, NULL);
 							free(kh_key(h,k)); // free the previously strdup
 							kh_del(ID, h, k);
 						}
-						//kh_del(ID, h, k);
+
 						bam_destroy1(bam2);
 						bam2 = NULL;
 
@@ -569,9 +560,6 @@ void *sa_bam_reader_pairendV3(void *input){
 				}
 				if(!found){
 					array_list_insert(bam1, lista);
-					if (array_list_size(lista) > 1) {
-						printf(">>>>>>>>>  list size = %i\n", array_list_size(lista));
-					}
 					bam1 = bam_init1();
 				}
 			} else {
@@ -581,31 +569,19 @@ void *sa_bam_reader_pairendV3(void *input){
 				array_list_insert(bam1, desbordamiento);
 				k = kh_put(ID, h, key, &ret);
 				kh_value(h, k)= desbordamiento;
-				//bam_destroy1(bam1);
 				bam1 = bam_init1();
 			}
-			/*printf("---> hash size = %i, num. buckets = %i\n", kh_size(h), kh_n_buckets(h));
 
-			sprintf(key, "ID-234");
-			k = kh_put(ID, h, key, &ret);
-			if (ret == 0) {
-				printf("key %s is present in the hash\n", key);
-			}
-
-			 */
-			//free(key);
 		}else if(bam1->core.flag & BAM_FSECONDARY){
 			stats->secondary_reads++;
 			total_reads++;
 
 
 
-		}else {//if(((bam1->core.flag & BAM_FUNMAP)|| (bam1->core.flag & BAM_FMUNMAP))&& (!(bam1->core.flag & BAM_FSECONDARY)) ){// Si no está mapeado o su mate no está mapeado
-			//Save in no-maped file
+		}else {//If is not maped or the pair is not maped, save in no-maped file
 			total_reads++;
-			if(bam_fwrite(bam1,fnomapped) < 0){
+			if(bam_fwrite(bam1,fnomapped) < 0){//wrong writting in the file
 				bam_destroy1(bam1);
-
 				bam_destroy1(bam2);
 				printf("Fail in file fnomap\n");
 				exit(-1);
