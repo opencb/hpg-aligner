@@ -250,7 +250,8 @@ void dna_aligner(options_t *options) {
 				workflow_set_producer(&sa_bam_reader_single, "BAM reader", wf);
 			}
 		} else if (options->input_format == SAM_FORMAT) {
-			//workflow_set_producer(sa_sam_reader, "SAM reader", wf);
+		  LOG_FATAL("Not implemented yet\n");
+		  //workflow_set_producer(sa_sam_reader, "SAM reader", wf);
 		} else {
 			workflow_set_producer(sa_fq_reader, "FastQ reader", wf);
 		}

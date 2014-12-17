@@ -560,6 +560,7 @@ void *sa_bam_reader_pairendV3(void *input){
 				}
 				if(!found){
 					array_list_insert(bam1, lista);
+
 					bam1 = bam_init1();
 				}
 			} else {
