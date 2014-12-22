@@ -21,7 +21,7 @@
 
 typedef struct suffix_mng {
   int num_seeds;
-  int num_chroms;
+  unsigned short int num_chroms;
   Container *subject;
   linked_list_t **suffix_lists;
 } suffix_mng_t;
@@ -36,14 +36,14 @@ void suffix_mng_search_read_cals(fastq_read_t *read, int num_seeds,
 
 void suffix_mng_search_read_cals_by_region(fastq_read_t *read, int num_seeds, 
 					   sa_index3_t *sa_index, 
-					   int strand, int chromosome, 
+					   int strand, unsigned short int chromosome, 
 					   size_t start, size_t end, 
 					   array_list_t *cal_list, 
 					   suffix_mng_t *suffix_mng);
 
 void suffix_mng_clear(suffix_mng_t *p);
 
-void suffix_mng_update(int chrom, size_t read_start, size_t read_end, 
+void suffix_mng_update(unsigned short int chrom, size_t read_start, size_t read_end, 
 		       size_t genome_start, size_t genome_end, 
 		       suffix_mng_t *p);
 

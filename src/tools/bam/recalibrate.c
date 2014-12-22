@@ -17,13 +17,15 @@
 
 #include <stdlib.h>
 #include <stdio.h>
-#include <argtable2.h>
 #include <string.h>
 #include <libgen.h>
 #include <unistd.h>
 #include <sys/stat.h>
 #include "aux/aux_library.h"
 #include "aux/timestats.h"
+
+#include "argtable/argtable2.h"
+
 //#include "bfwork/bfwork.h"
 //#include "recalibrate/recal_config.h"
 //#include "recalibrate/recal_structs.h"

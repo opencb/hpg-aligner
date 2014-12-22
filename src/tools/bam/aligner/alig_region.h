@@ -27,7 +27,7 @@
 
 #include "containers/khash.h"
 #include "containers/linked_list.h"
-#include "bioformats/bam/samtools/bam.h"
+#include "samtools/bam.h"
 
 /**
  * Structure representing genome region.

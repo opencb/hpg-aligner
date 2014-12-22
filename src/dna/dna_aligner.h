@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "htslib/hts.h"
+
 #include "commons/workflow_scheduler.h"
 #include "bioformats/bam/bam_file.h"
 

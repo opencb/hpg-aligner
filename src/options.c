@@ -24,6 +24,7 @@ options_t *options_new(void) {
   options->recalibration = 0;
   options->adapter = NULL;
   options->input_format = FASTQ_FORMAT;
+  options->output_format = SAM_FORMAT;
 
   //GET Number System Cores
   //----------------------------------------------
@@ -107,30 +108,21 @@ void validate_options(options_t *options) {
 
   if (mode == DNA_MODE) {
     strcpy(options->str_mode, "DNA");
-    DEFAULT_READ_BATCH_SIZE = 200000;
-    DEFAULT_NUM_SEEDS	= 20;
+    DEFAULT_READ_BATCH_SIZE = DEFAULT_DNA_READ_BATCH_SIZE;
+    DEFAULT_NUM_SEEDS	= DEFAULT_DNA_NUM_SEEDS;
     DEFAULT_SEED_SIZE	= 18;
     DEFAULT_FLANK_LENGTH = 5;
     DEFAULT_MIN_SEED_SIZE = 16;
-    DEFAULT_MIN_CAL_SIZE = 20;
+    DEFAULT_MIN_CAL_SIZE = DEFAULT_DNA_MIN_CAL_SIZE;
     DEFAULT_SEEDS_MAX_DISTANCE = 100;
-  } else if (mode == BS_MODE) {
-    strcpy(options->str_mode, "BS");
-    DEFAULT_READ_BATCH_SIZE = 20000;
-    DEFAULT_NUM_SEEDS	= 20;
-    DEFAULT_SEED_SIZE	= 20;
-    DEFAULT_FLANK_LENGTH = 5;
-    DEFAULT_MIN_SEED_SIZE = 16;
-    DEFAULT_MIN_CAL_SIZE = 30;
-    DEFAULT_SEEDS_MAX_DISTANCE = 100;
-  }else if (mode == RNA_MODE) {
+  } else if (mode == RNA_MODE) {
     strcpy(options->str_mode, "RNA");
-    DEFAULT_READ_BATCH_SIZE = 20000;
-    DEFAULT_NUM_SEEDS	= 20;
-    DEFAULT_SEED_SIZE = 16;
+    DEFAULT_READ_BATCH_SIZE = DEFAULT_RNA_READ_BATCH_SIZE;;
+    DEFAULT_NUM_SEEDS	= DEFAULT_RNA_NUM_SEEDS;
+    DEFAULT_SEED_SIZE = DEFAULT_RNA_SEED_SIZE;
     DEFAULT_FLANK_LENGTH = 30;
     DEFAULT_MIN_SEED_SIZE = 16;
-    DEFAULT_MIN_CAL_SIZE = 20;
+    DEFAULT_MIN_CAL_SIZE = DEFAULT_RNA_MIN_CAL_SIZE;
     DEFAULT_SEEDS_MAX_DISTANCE = 60;
     options->pair_max_distance = DEFAULT_PAIR_MAX_DISTANCE + options->max_intron_length;
   }
@@ -294,7 +286,7 @@ void options_display(options_t *options) {
      printf("HPG Aligner version: %s\n", HPG_ALIGNER_VERSION);
      printf("Command line: %s\n", options->cmdline);
      printf("\n");
-     printf("General parameters\n");
+     printf("General options\n");
      printf("\tMode: %s\n", options->str_mode);
      if (in_filename2) {
        printf("\tInput FastQ filename, pair #1: %s\n", in_filename);
@@ -313,7 +305,7 @@ void options_display(options_t *options) {
      printf("\tAdapter: %s\n", (adapter ? adapter : "Not present"));
      printf("\n");
 
-     printf("Architecture parameters\n");
+     printf("Architecture options:\n");
      printf("\tNumber of cpu threads: %d\n",  num_cpu_threads);
      //printf("CAL seeker errors: %d\n",  cal_seeker_errors);
      printf("\tBatch size: %d bytes\n",  batch_size);
@@ -560,10 +552,10 @@ void** argtable_options_new(int mode) {
   
   // NOTICE that order cannot be changed as is accessed by index in other functions
   int count = 0;
-  argtable[count++] = arg_file0("f", "fq,fastq", NULL, "Reads file input. For more than one file: f1.fq,f2.fq,...");
+  argtable[count++] = arg_file1("f", "fq,fastq", NULL, "Reads file input. For more than one file: f1.fq,f2.fq,...");
   argtable[count++] = arg_file0("j", "fq2,fastq2", NULL, "Reads file input #2 (for paired mode)");
   argtable[count++] = arg_lit0("z", "gzip", "FastQ input files are gzip");
-  argtable[count++] = arg_file0("i", "index", NULL, "Index directory name");
+  argtable[count++] = arg_file1("i", "index", NULL, "Index directory name");
   argtable[count++] = arg_file0("o", "outdir", NULL, "Output directory");
   argtable[count++] = arg_int0(NULL, "filter-read-mappings", NULL, "Reads that map in more than <n> locations are discarded");
   argtable[count++] = arg_int0(NULL, "filter-seed-mappings", NULL, "Seeds that map in more than <n> locations are discarded");
@@ -586,7 +578,7 @@ void** argtable_options_new(int mode) {
   argtable[count++] = arg_str0(NULL, "prefix", NULL, "File prefix name");
   argtable[count++] = arg_int0("l", "log-level", NULL, "Log debug level");
   argtable[count++] = arg_lit0("h", "help", "Help option");
-  argtable[count++] = arg_lit0(NULL, "bam-format", "BAM output format (otherwise, SAM format. This option is only available for SA mode, BWT mode always report in BAM format), this option turn the process slow");
+  argtable[count++] = arg_str0(NULL, "output-format", NULL, "BAM output format (otherwise, SAM format. This option is only available for SA mode, BWT mode always report in BAM format), this option turn the process slow");
   argtable[count++] = arg_lit0(NULL, "indel-realignment", "Indel-based realignment");
   argtable[count++] = arg_lit0(NULL, "recalibration", "Base quality score recalibration");
   argtable[count++] = arg_str0("a", "adapter", NULL, "Adapter sequence in the read");
@@ -685,9 +677,16 @@ options_t *read_CLI_options(void **argtable, options_t *options) {
   if (((struct arg_file*)argtable[++count])->count) { options->log_level = *(((struct arg_int*)argtable[count])->ival); }
   if (((struct arg_int*)argtable[++count])->count) { options->help = ((struct arg_int*)argtable[count])->count; }
 
-  if (((struct arg_int*)argtable[++count])->count) { 
-    options->bam_format = ((struct arg_int*)argtable[count])->count; 
-    options->set_bam_format = 1;
+  options->bam_format = 0; 
+  options->set_bam_format = 0;
+  options->output_format = SAM_FORMAT;
+  if (((struct arg_int*)argtable[++count])->count) {
+    char *format = (char *) (*((struct arg_str*)argtable[count])->sval);
+    if (!strcmp(format, "bam") || !strcmp(format, "BAM")) {
+      options->output_format = BAM_FORMAT;
+      options->bam_format = 1; 
+      options->set_bam_format = 1;
+    }
   }
 
   if (((struct arg_int*)argtable[++count])->count) { options->realignment = ((struct arg_int*)argtable[count])->count; }
@@ -697,10 +696,10 @@ options_t *read_CLI_options(void **argtable, options_t *options) {
   if (options->adapter) options->adapter_length = strlen(options->adapter);
 
   if (((struct arg_int*)argtable[++count])->count) {
-    char *input_format = (*(((struct arg_str*)argtable[count])->sval));
-    if (!strcmp(input_format, "sam") || !strcmp(input_format, "SAM")) {
+    char *format = (char *) (*((struct arg_str*)argtable[count])->sval);
+    if (!strcmp(format, "sam") || !strcmp(format, "SAM")) {
       options->input_format = SAM_FORMAT;
-    } else if (!strcmp(input_format, "bam") || !strcmp(input_format, "BAM")) {
+    } else if (!strcmp(format, "bam") || !strcmp(format, "BAM")) {
       options->input_format = BAM_FORMAT;
     } else {
       options->input_format = FASTQ_FORMAT;
@@ -756,45 +755,29 @@ options_t *parse_options(int argc, char **argv) {
   options->mode = mode;
 
   if (argc < 2) {
-    usage(argtable, mode);
-    exit(-1);
+    display_help(argtable, mode);
+    exit(EXIT_FAILURE);
   } else {
     int num_errors = arg_parse(argc, argv, argtable);   
-    /*
-    if (((struct arg_int*)argtable[24])->count) {
-      usage(argtable);
-      argtable_options_free(argtable, num_options);
-      options_free(options);
-      exit(0);
-    }
-    */  
     if (num_errors > 0) {
       fprintf(stdout, "\nError:\n");
       // struct end is always allocated in the last position
       arg_print_errors(stdout, argtable[num_options], "\t");
-      usage(argtable, mode);
-      exit(-1);
+      display_help(argtable, mode);
+      exit(EXIT_FAILURE);
     } else {
       options = read_CLI_options(argtable, options);
       if (options->help) {
-	usage(argtable, mode);
+	display_help(argtable, mode);
 	argtable_options_free(argtable, num_options);
 	options_free(options);
-	exit(0);
+	exit(EXIT_SUCCESS);
       }
       // Check if 'help' option has been provided.
     }
     
   }
-  //	exit:
   argtable_options_free(argtable, num_options);
-  //	free(end);
-  //	free(argtable_options);
-
-  // in previous versions, min. flank length was 20
-  //  if (options->flank_length < 5) {
-  //    options->flank_length = 5;
-  //  }
 
   options->mode = mode;
   return options;
@@ -813,8 +796,7 @@ void usage(void **argtable, int mode) {
 
 void usage_cli(int mode) {
   void **argtable = argtable_options_new(mode);
-  usage(argtable, mode);
-  exit(0);
+  display_help(argtable, mode);
 }
 
 //--------------------------------------------------------------------
@@ -828,25 +810,361 @@ void display_version() {
 
 //--------------------------------------------------------------------
 
-void options_set_cmdline(int argc, char **argv, 
-			 options_t *options) {
-  if (!options) { return; }
+void display_help(void **argtable, int mode) {
+  if (mode == DNA_MODE) {
+    display_dna_help();
+    exit(EXIT_SUCCESS);
+  } else if (mode == RNA_MODE) {
+    //    usage(argtable, mode);
+    display_rna_help();
+    exit(EXIT_SUCCESS);
+  } else {
+    printf("Error: unknown command\n");
+    exit(EXIT_FAILURE);
+  }
+}
 
-  char *cmdline;
+//--------------------------------------------------------------------
+
+void display_options(options_t *options, FILE *file) {
+  if (options->mode == DNA_MODE) {
+    display_dna_options(options, file);
+  } else if (options->mode == RNA_MODE) {
+    display_rna_options(options, file);
+    //    if (!file) {
+    //      options_display(options);
+    //    } else {
+    //      options_to_file(options, file);
+    //    }
+  } else {
+    printf("Error: unknown command\n");
+    exit(EXIT_FAILURE);
+  }
+}
+
+//--------------------------------------------------------------------
+
+char* create_cmdline(int argc, char **argv) {
+  char *cmdline = NULL;
 
   int size = 0;
   for (int i = 0; i < argc; i++) {
     size += strlen(argv[i]);
   }
-  size += 100;
-  
-  cmdline = (char *) calloc(size, sizeof(char));
-  sprintf(cmdline, "%s ", HPG_ALIGNER_BIN);
-  for (int i = 0; i < argc; i++) {
-    sprintf(cmdline, "%s %s", cmdline, argv[i]);
+
+  if (size) {
+    size += 100;
+    
+    cmdline = (char *) calloc(size, sizeof(char));
+    sprintf(cmdline, "%s ", HPG_ALIGNER_BIN);
+    for (int i = 0; i < argc; i++) {
+      sprintf(cmdline, "%s %s", cmdline, argv[i]);
+    }
   }
   
-  options->cmdline = cmdline;
+  return cmdline;
+}
+
+//--------------------------------------------------------------------
+// DNA
+//--------------------------------------------------------------------
+
+void display_dna_help() {
+  printf("\n");
+  printf("+===============================================================+\n");
+  printf("|                HPG-Aligner help for DNA mapping               |\n");
+  printf("+===============================================================+\n");
+  printf("Usage:\n");
+  printf("\t%s dna -f=<input filename> -i=<index dirname> [options]\n", HPG_ALIGNER_BIN);
+  printf("\n");
+  printf("Mandatory parameters:\n");
+  printf("\t-f, --fq, --fastq=<file>         Input filename. For more than one file: f1.fq,f2.fq,...\n");
+  printf("\t-i, --index=<file>               Index directory name\n");
+  printf("\n");
+
+  printf("General options:\n");
+  printf("\t-j, --fq2, --fastq2=<file>        Input filename for mate #2 in paired-end mode\n");
+  printf("\t-o, --outdir=<file>               Output directory name\n");
+  printf("\t--prefix=<string>                 Prefix for the output filename\n");
+  printf("\t-z, --gzip                        FastQ input files are gzipped\n");
+  printf("\t--input-format=<string>           Input file format (fastq or bam) [fastq]\n");
+  printf("\t--output-format=<string>          Output file format (sam or bam) [sam]\n");
+  printf("\t-v,--version                      Display the current HPG-Aligner version\n");
+  printf("\t-h,--help                         Display this help\n");
+  printf("\n");
+
+  printf("Architecture options:\n");
+  printf("\t-t, --cpu-threads=<int>            Number of CPU threads [%lu]\n", get_optimal_cpu_num_threads());
+  printf("\t--read-batch-size=<int>            Batch size in bytes [%i]\n", DEFAULT_DNA_READ_BATCH_SIZE);
+  printf("\n");
+
+  printf("Paired-end:\n");
+  printf("\t--paired-min-distance=<int>        Minimum distance between pairs [%i]\n", DEFAULT_PAIR_MIN_DISTANCE);
+  printf("\t--paired-max-distance=<int>        Maximum distance between pairs [%i]\n", DEFAULT_PAIR_MAX_DISTANCE);
+  printf("\n");
+
+  printf("Seeding and CAL options:\n");
+  printf("\t--num-seeds=<int>                  Number of seeds [%i]\n", DEFAULT_DNA_NUM_SEEDS);
+  printf("\t--min-cal-size=<int>               Minimum CAL size [%i]\n", DEFAULT_DNA_MIN_CAL_SIZE);
+  //    --filter-read-mappings=<int>                      Reads that map in more than <n> locations are discarded
+  //    --filter-seed-mappings=<int>                      Seeds that map in more than <n> locations are discarded
+  printf("\n");
+
+  printf("Smith-Waterman options:\n");
+  printf("\t--sw-match=<double>                Match score for Smith-Waterman algorithm [%0.2f]\n", DEFAULT_SW_MATCH);
+  printf("\t--sw-mismatch=<double>             Mismatch penalty for Smith-Waterman algorithm [%0.2f]\n", DEFAULT_SW_MISMATCH);
+  printf("\t--sw-gap-open=<double>             Gap open penalty for Smith-Waterman algorithm [%0.2f]\n", DEFAULT_SW_GAP_OPEN);
+  printf("\t--sw-gap-extend=<double>           Gap extend penalty for Smith-Waterman algorithm [%0.2f]\n", DEFAULT_SW_GAP_EXTEND);
+  printf("\t--min-score=<int>                  Minimum Smith-Waterman score for valid mappings (normalized from 0 to 100) [%i]\n", DEFAULT_MIN_SCORE);
+  printf("\n");
+
+  printf("Report options:\n");
+  printf("\t--report-best                      Report all alignments with best score\n");
+  printf("\t--report-all                       Report all alignments\n");
+  printf("\t--report-n-best=<int>              Report the <n> best alignments\n");
+  printf("\t--report-n-hits=<int>              Report <n> hits\n");
+  printf("\t--report-only-paired               Report only the paired reads\n");
+  printf("\n");
+
+  printf("Pre-processing options:\n");
+  printf("\t-a,--adapter=<string>              Adapter sequence in the read to remove before mapping\n");
+  printf("\n");
+
+  printf("Post-processing options:\n");
+  printf("\t--indel-realignment                Perform the indel-based realignment after mapping\n");
+  printf("\t--recalibration                    Perform the base-quality recalibration after mapping\n");  
+  printf("+===============================================================+\n");
+}
+
+//--------------------------------------------------------------------
+
+void display_dna_options(options_t *options, FILE *f) {
+  FILE *file = (f == NULL ? stdout : f);
+
+  fprintf(file, "\n");
+  fprintf(file, "+===============================================================+\n");
+  fprintf(file, "|             HPG ALIGNER PARAMETERS CONFIGURATION              |\n");
+  fprintf(file, "+===============================================================+\n");
+  fprintf(file, "HPG Aligner version: %s\n", HPG_ALIGNER_VERSION);
+  fprintf(file, "Command line       : %s\n", options->cmdline);
+  fprintf(file, "\n");
+  fprintf(file, "General parameters:\n");
+  fprintf(file, "\tType of sequence: %s\n", options->str_mode);
+  if (options->in_filename2) {
+    fprintf(file, "\tInput FastQ filename #1: %s\n", options->in_filename);
+    fprintf(file, "\tInput FastQ filename #2: %s\n", options->in_filename2);
+    fprintf(file, "\tPaired-end:\n");
+    fprintf(file, "\t\tMin. distance: %d\n", options->pair_min_distance);
+    fprintf(file, "\t\tMax. distance: %d\n", options->pair_max_distance);
+  } else {
+    fprintf(file, "\tInput %s filename: %s\n", FORMAT_STR(options->input_format), options->in_filename);
+    if (options->input_format == FASTQ_FORMAT) {
+      fprintf(file, "\tSingle-end\n");
+    }
+  }
+  printf("\n");
+  if (options->input_format == FASTQ_FORMAT) {
+    fprintf(file, "\tFastQ gzip mode    : %s\n", options->gzip == 1 ? "Enabled" : "Disabled");
+  }
+  fprintf(file, "\tIndex directory name : %s\n", options->bwt_dirname);
+  fprintf(file, "\tOutput directory name: %s\n", options->output_name);
+  if (options->prefix_name) {
+    fprintf(file, "\tOutput prefix      : %s\n", options->prefix_name);
+  }
+  
+  fprintf(file, "\tOutput file format: %s\n", 
+	 (options->bam_format || options->realignment || options->recalibration) ? "BAM" : "SAM");
+  fprintf(file, "\n");
+  
+  fprintf(file, "Architecture parameters:\n");
+  fprintf(file, "\tNumber of cpu threads: %d\n",  options->num_cpu_threads);
+  fprintf(file, "\tBatch size (in bytes): %d\n",  options->batch_size);
+  fprintf(file, "\n");
+
+  fprintf(file, "Seeding and CAL parameters:\n");
+  fprintf(file, "\tNum. seeds  : %d\n",  options->num_seeds);
+  fprintf(file, "\tMin CAL size: %d\n",  options->min_cal_size);
+  fprintf(file, "\n");
+  
+  //fprintf(file, "Mapping filters\n");
+  //fprintf(file, "\tFor reads: %d mappings maximum, otherwise discarded\n", options->filter_read_mappings);
+  //fprintf(file, "\tFor seeds: %d mappings maximum, otherwise discarded\n", options->filter_seed_mappings);
+  //fprintf(file, "\n");
+    
+  fprintf(file, "Smith-Waterman parameters:\n");
+  fprintf(file, "\tMatch score       : %0.4f\n", options->match);
+  fprintf(file, "\tMismatch penalty  : %0.4f\n", options->mismatch);
+  fprintf(file, "\tGap open penalty  : %0.4f\n", options->gap_open);
+  fprintf(file, "\tGap extend penalty: %0.4f\n", options->gap_extend);
+  fprintf(file, "\n");
+  
+  fprintf(file, "Report parameters:\n");
+  fprintf(file, "\tReport all hits      : %s\n",  options->report_all == 0 ? "Disabled" : "Enabled");
+  fprintf(file, "\tReport n best hits   : %d\n",  options->report_n_best);
+  fprintf(file, "\tReport n hits        : %d\n",  options->report_n_hits);
+  fprintf(file, "\tReport best hits     : %s\n",  options->report_best == 0 ? "Disabled" : "Enabled");
+  fprintf(file, "\tReport unpaired reads: %s\n",  options->report_only_paired == 0 ? "Enabled" : "Disabled");
+  fprintf(file, "\n");
+  
+  fprintf(file, "Pre-processing:\n");
+  fprintf(file, "\tAdapter sequence: %s\n",
+	  (options->adapter ? options->adapter : "Not present"));
+  fprintf(file, "\n");
+  
+  fprintf(file, "Post-processing:\n");
+  fprintf(file, "\tIndel realignment         : %s\n",
+	  (options->realignment ? "Enabled" : "Disabled"));
+  fprintf(file, "\tBase-quality recalibration: %s\n",
+	  (options->recalibration ? "Enabled" : "Disabled"));
+  fprintf(file, "+===============================================================+\n");
+}
+
+//--------------------------------------------------------------------
+// RNA
+//--------------------------------------------------------------------
+
+void display_rna_help() {
+  printf("\n");
+  printf("+===============================================================+\n");
+  printf("|                HPG-Aligner help for RNA mapping               |\n");
+  printf("+===============================================================+\n");
+  printf("Usage:\n");
+  printf("\t%s rna -f=<input filename> -i=<index dirname> [options]\n", HPG_ALIGNER_BIN);
+  printf("\n");
+  printf("Mandatory parameters:\n");
+  printf("\t-f, --fq, --fastq=<file>         Input filename. For more than one file: f1.fq,f2.fq,...\n");
+  printf("\t-i, --index=<file>               Index directory name\n");
+  printf("\n");
+
+  printf("General options:\n");
+  printf("\t-j, --fq2, --fastq2=<file>        Input filename for mate #2 in paired-end mode\n");
+  printf("\t-o, --outdir=<file>               Output directory name\n");
+  printf("\t--prefix=<string>                 Prefix for the output filename\n");
+  printf("\t-z, --gzip                        FastQ input files are gzipped\n");
+  printf("\t--output-format=<string>          Output file format (sam or bam) [sam]. Only available for SA index (for BWT index, output format is always bam)\n");
+  printf("\t-l,--log-level                    Set log debug level\n");
+  printf("\t-v,--version                      Display the current HPG-Aligner version\n");
+  printf("\t-h,--help                         Display this help\n");
+  printf("\n");
+
+  printf("Architecture options:\n");
+  printf("\t-t, --cpu-threads=<int>            Number of CPU threads [%lu]\n", get_optimal_cpu_num_threads());
+  printf("\t--read-batch-size=<int>            Batch size in bytes [%i]\n", DEFAULT_DNA_READ_BATCH_SIZE);
+  printf("\n");
+
+  printf("Paired-end:\n");
+  printf("\t--paired-min-distance=<int>        Minimum distance between pairs [%i]\n", DEFAULT_PAIR_MIN_DISTANCE);
+  printf("\t--paired-max-distance=<int>        Maximum distance between pairs [%i]\n", DEFAULT_PAIR_MAX_DISTANCE);
+  printf("\n");
+
+  printf("Seeding and CAL options:\n");
+  printf("\t--num-seeds=<int>                  Number of seeds [%i]\n", DEFAULT_DNA_NUM_SEEDS);
+  printf("\t--min-cal-size=<int>               Minimum CAL size [%i]\n", DEFAULT_DNA_MIN_CAL_SIZE);
+  printf("\t--seed-size=<int>                  Seed size [%i]. Only available for BWT index (for SA index, seed size is always 18)\n", DEFAULT_RNA_SEED_SIZE);
+  printf("\n");
+
+  printf("Filtering options:\n");
+  printf("\t--filter-read-mappings=<int>       Reads that map in more than <n> locations are discarded [%i]\n", DEFAULT_FILTER_READ_MAPPINGS);
+  printf("\t--filter-seed-mappings=<int>       Seeds that map in more than <n> locations are discarded [%i]\n", DEFAULT_FILTER_SEED_MAPPINGS);
+  printf("\n");
+
+  printf("Intron and transcriptome options:\n");
+  printf("\t--transcriptome-file=<file>        Transcriptome file to help searching splice junctions\n");
+  printf("\t--max-intron-size=<int>            Maximum intron size [%i]\n", DEFAULT_MAX_INTRON_LENGTH);
+  printf("\t--min-intron-size=<int>            Maximum intron size [%i]\n", DEFAULT_MIN_INTRON_LENGTH);
+  printf("\n");
+
+  printf("Smith-Waterman options:\n");
+  printf("\t--sw-match=<double>                Match score for Smith-Waterman algorithm [%0.2f]\n", DEFAULT_SW_MATCH);
+  printf("\t--sw-mismatch=<double>             Mismatch penalty for Smith-Waterman algorithm [%0.2f]\n", DEFAULT_SW_MISMATCH);
+  printf("\t--sw-gap-open=<double>             Gap open penalty for Smith-Waterman algorithm [%0.2f]\n", DEFAULT_SW_GAP_OPEN);
+  printf("\t--sw-gap-extend=<double>           Gap extend penalty for Smith-Waterman algorithm [%0.2f]\n", DEFAULT_SW_GAP_EXTEND);
+  printf("\t--min-score=<int>                  Minimum Smith-Waterman score for valid mappings (normalized from 0 to 100) [%i]\n", DEFAULT_MIN_SCORE);
+  printf("\n");
+
+  printf("Report options:\n");
+  printf("\t--report-best                      Report all alignments with best score\n");
+  printf("\t--report-all                       Report all alignments\n");
+  printf("\t--report-n-best=<int>              Report the <n> best alignments\n");
+  printf("\t--report-n-hits=<int>              Report <n> hits\n");
+  printf("\t--report-only-paired               Report only the paired reads\n");
+  printf("+===============================================================+\n");
+}
+
+//--------------------------------------------------------------------
+
+void display_rna_options(options_t *options, FILE *f) {
+  FILE *file = (f == NULL ? stdout : f);
+
+  fprintf(file, "\n");
+  fprintf(file, "+===============================================================+\n");
+  fprintf(file, "|             HPG ALIGNER PARAMETERS CONFIGURATION              |\n");
+  fprintf(file, "+===============================================================+\n");
+  fprintf(file, "HPG Aligner version: %s\n", HPG_ALIGNER_VERSION);
+  fprintf(file, "Command line       : %s\n", options->cmdline);
+  fprintf(file, "\n");
+  fprintf(file, "General parameters:\n");
+  fprintf(file, "\tType of sequence: %s\n", options->str_mode);
+  if (options->in_filename2) {
+    fprintf(file, "\tInput FastQ filename #1: %s\n", options->in_filename);
+    fprintf(file, "\tInput FastQ filename #2: %s\n", options->in_filename2);
+    fprintf(file, "\tPaired-end:\n");
+    fprintf(file, "\t\tMin. distance: %d\n", options->pair_min_distance);
+    fprintf(file, "\t\tMax. distance: %d\n", options->pair_max_distance);
+  } else {
+    fprintf(file, "\tInput %s filename: %s\n", FORMAT_STR(options->input_format), options->in_filename);
+    fprintf(file, "\tSingle-end\n");
+  }
+  printf("\n");
+  if (options->input_format == FASTQ_FORMAT) {
+    fprintf(file, "\tFastQ gzip mode    : %s\n", options->gzip == 1 ? "Enabled" : "Disabled");
+  }
+  fprintf(file, "\tIndex directory name : %s\n", options->bwt_dirname);
+  fprintf(file, "\tOutput directory name: %s\n", options->output_name);
+  if (options->prefix_name) {
+    fprintf(file, "\tOutput prefix      : %s\n", options->prefix_name);
+  }
+  
+  fprintf(file, "\tOutput file format: %s\n", 
+	 (options->bam_format || options->realignment || options->recalibration) ? "BAM" : "SAM");
+  fprintf(file, "\n");
+  
+  fprintf(file, "Architecture parameters:\n");
+  fprintf(file, "\tNumber of cpu threads: %d\n",  options->num_cpu_threads);
+  fprintf(file, "\tBatch size (in bytes): %d\n",  options->batch_size);
+  fprintf(file, "\n");
+
+  fprintf(file, "Seeding and CAL parameters:\n");
+  fprintf(file, "\tNum. seeds  : %d\n",  options->num_seeds);
+  fprintf(file, "\tMin CAL size: %d\n",  options->min_cal_size);
+  fprintf(file, "\n");
+  
+  fprintf(file, "Filtering options:\n");
+  fprintf(file, "\tFor reads: %d mappings maximum, otherwise discarded\n", options->filter_read_mappings);
+  fprintf(file, "\tFor seeds: %d mappings maximum, otherwise discarded\n", options->filter_seed_mappings);
+  fprintf(file, "\n");
+    
+  fprintf(file, "Intron and transcriptome options:\n");
+  fprintf(file, "\tTranscriptome filename: %s\n", 
+	  (options->transcriptome_filename ? options->transcriptome_filename : "Not present"));
+  fprintf(file, "\tMinimum intron size   : %i\n", options->min_intron_length);
+  fprintf(file, "\tMaximum intron size   : %i\n", options->max_intron_length);
+  fprintf(file, "\n");
+
+  fprintf(file, "Smith-Waterman parameters:\n");
+  fprintf(file, "\tMatch score       : %0.2f\n", options->match);
+  fprintf(file, "\tMismatch penalty  : %0.2f\n", options->mismatch);
+  fprintf(file, "\tGap open penalty  : %0.2f\n", options->gap_open);
+  fprintf(file, "\tGap extend penalty: %0.2f\n", options->gap_extend);
+  fprintf(file, "\n");
+  
+  fprintf(file, "Report parameters:\n");
+  fprintf(file, "\tReport all hits      : %s\n",  options->report_all == 0 ? "Disabled" : "Enabled");
+  fprintf(file, "\tReport n best hits   : %d\n",  options->report_n_best);
+  fprintf(file, "\tReport n hits        : %d\n",  options->report_n_hits);
+  fprintf(file, "\tReport best hits     : %s\n",  options->report_best == 0 ? "Disabled" : "Enabled");
+  fprintf(file, "\tReport unpaired reads: %s\n",  options->report_only_paired == 0 ? "Enabled" : "Disabled");
+  fprintf(file, "+===============================================================+\n");
 }
 
 //--------------------------------------------------------------------

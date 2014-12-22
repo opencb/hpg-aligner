@@ -1,5 +1,5 @@
-#ifndef COMMONS_BAM_H
-#define COMMONS_BAM_H
+#ifndef COMMONS_FASTQ_H
+#define COMMONS_FASTQ_H
 
 /*
  * fastq_commons.h
@@ -14,9 +14,7 @@
 
 #include "argtable/argtable2.h"
 
-#include "bioformats/features/region/region_table.h"
-#include "bioformats/features/region/region_table_utils.h"
-#include "bioformats/bam/bam_file.h"
+#include "bioformats/fastq/fastq_filter.h"
 
 //------------------------------------------------------------------------
 
@@ -26,19 +24,12 @@
 
 //------------------------------------------------------------------------
 
-extern int read_progress;
-
-//------------------------------------------------------------------------
+int parse_range(int *min, int *max, char *range, char *msg);
 
 void free_argtable(int num_filter_options, void **argtable);
 void usage_argtable(char *exec_name, char *command_name, void **argtable);
 
-int parse_range(int *min, int *max, char *range, char *msg);
-
-region_table_t *build_region_table(char *bam_filename, char *by_string, 
-				   char *by_gff_file);
-
-#endif	/*  COMMONS_BAM_H  */
+#endif	/*  COMMONS_FASTQ_H  */
 
 //------------------------------------------------------------------------
 //------------------------------------------------------------------------

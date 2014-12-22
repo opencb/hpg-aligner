@@ -18,10 +18,10 @@
 #ifndef BAM_RECAL_LIBRARY_H_
 #define BAM_RECAL_LIBRARY_H_
 
-#include <bioformats/bam/samtools/bam.h>
-#include <bioformats/bam/bam_file.h>
-#include <bioformats/bam/alignment.h>
-#include <aligners/bwt/genome.h>
+#include "samtools/bam.h"
+#include "bioformats/bam/bam_file.h"
+#include "bioformats/bam/alignment.h"
+#include "aligners/bwt/genome.h"
 #include "aux/aux_common.h"
 #include "bfwork/bfwork.h"
 

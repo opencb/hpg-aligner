@@ -346,15 +346,17 @@ void sa_index3_parallel_genome_new(char *sa_index_dirname, int num_threads,
 
   size_t *chrom_lengths = (size_t *) malloc(num_chroms * sizeof(size_t));
   char **chrom_names = (char **) malloc(num_chroms * sizeof(char *));
-  char chrom_name[1024];
+  char *chrom_flags = (char *) malloc(num_chroms * sizeof(char));
+  char chrom_flag, chrom_name[1024];
   size_t chrom_len;
 		  
   for (int i = 0; i < num_chroms; i++) {
     res = fgets(line, 1024, f_tab);
-    sscanf(line, "%s %lu\n", chrom_name, &chrom_len);
+    sscanf(line, "%s\t%lu\t%c\n", chrom_name, &chrom_len, &chrom_flag);
     //printf("chrom_name: %s, chrom_len: %lu\n", chrom_name, chrom_len);
     chrom_names[i] = strdup(chrom_name);
     chrom_lengths[i] = chrom_len;
+    chrom_flags[i] = chrom_flag;
   }
 
   fclose(f_tab);
@@ -406,8 +408,8 @@ void sa_index3_parallel_genome_new(char *sa_index_dirname, int num_threads,
 	//	     (stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);      
 	fclose(f_tab);
       
-	genome = sa_genome3_new(genome_len, num_chroms, 
-				chrom_lengths, chrom_names, S);
+	genome = sa_genome3_new(genome_len, num_chroms, chrom_lengths, 
+				chrom_flags, chrom_names, S);
       
 	for (size_t i = 0; i < genome->length; i++) {
 	  if (genome->S[i] == 'N' || genome->S[i] == 'n') {
@@ -801,13 +803,13 @@ void rna_aligner(options_t *options) {
   //======================================================================
 
   LOG_DEBUG("Displaying options...\n");
-  options_display(options);
+  display_options(options, NULL);
 
   fprintf(fd_log_input, "====================================================================================\n");
   fprintf(fd_log_input, "=            H P G    A L I G N E R    L O G    I N P U T    F I L E               =\n");
   fprintf(fd_log_input, "====================================================================================\n\n");
 
-  options_to_file(options, fd_log_input);
+  display_options(options, fd_log_input);
 
   fprintf(fd_log_input, "====================================================================================\n");
   fprintf(fd_log_input, "=                                                                                  =\n");

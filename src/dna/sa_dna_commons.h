@@ -580,7 +580,7 @@ typedef struct seed {
   size_t suf_genome_end;
 
   int strand;
-  unsigned int chromosome_id;
+  unsigned short int chromosome_id;
   int num_mismatches;
   int num_open_gaps;
   int num_extend_gaps;
@@ -877,7 +877,7 @@ static inline void cigarset_free(cigarset_t *p) {
 //--------------------------------------------------------------------
 
 typedef struct seed_cal {
-  unsigned int chromosome_id;
+  unsigned short int chromosome_id;
   short int strand;
   size_t start;
   size_t end;
@@ -906,7 +906,7 @@ typedef struct seed_cal {
 
 //--------------------------------------------------------------------
 
-static inline seed_cal_t *seed_cal_new(const unsigned int chromosome_id,
+static inline seed_cal_t *seed_cal_new(const unsigned short int chromosome_id,
 				const short int strand,
 				const size_t start,
 				const size_t end,
@@ -940,7 +940,7 @@ static inline seed_cal_t *seed_cal_new(const unsigned int chromosome_id,
   return p;
 }
 
-seed_cal_t *seed_cal_new(const unsigned int chromosome_id,
+seed_cal_t *seed_cal_new(const unsigned short int chromosome_id,
 			 const short int strand,
 			 const size_t start,
 			 const size_t end,
@@ -995,7 +995,7 @@ void seed_cal_merge_seeds(seed_cal_t *cal);
 void print_seed(char *msg, seed_t *s);
 
 static inline void seed_cal_print(seed_cal_t *cal) {
-  printf(" CAL (%c)[%i:%lu-%lu] (%s, x:%i, og:%i, eg:%i) area = %i score = %0.2f mapq = %i (invalid = %i): (read id %s)\n", 
+  printf(" CAL (%c)[%u:%lu-%lu] (%s, x:%i, og:%i, eg:%i) area = %i score = %0.2f mapq = %i (invalid = %i): (read id %s)\n", 
 	 (cal->strand == 0 ? '+' : '-'), 
 	 cal->chromosome_id, cal->start, cal->end, cigar_to_string(&cal->cigar), cal->num_mismatches,
 	 cal->num_open_gaps, cal->num_extend_gaps, cal->read_area, cal->score, cal->mapq,

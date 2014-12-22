@@ -17,8 +17,10 @@
 //#include "commons/system_utils.h"
 //#include "commons/file_utils.h"
 
+#include "sqlite/sqlite3.h"
+#include "samtools/bam.h"
+
 #include "commons/workflow_scheduler.h"
-#include "commons/sqlite/sqlite3.h"
 #include "containers/khash.h"
 #include "containers/array_list.h"
 #include "bioformats/features/region/region_table.h"
@@ -27,7 +29,6 @@
 #include "bioformats/bam/bam_db.h"
 #include "bioformats/bam/bam_stats.h"
 #include "bioformats/bam/bam_filter.h"
-#include "bioformats/bam/samtools/bam.h"
 
 
 #include "stats_options.h"

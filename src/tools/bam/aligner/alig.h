@@ -28,9 +28,9 @@
 
 #include <omp.h>
 
-#include <bioformats/bam/samtools/bam.h>
-#include <bioformats/bam/bam_file.h>
-#include <aligners/bwt/genome.h>
+#include "samtools/bam.h"
+#include "bioformats/bam/bam_file.h"
+#include "aligners/bwt/genome.h"
 #include "aux/aux_common.h"
 #include "aux/aux_library.h"
 #include "aux/timestats.h"

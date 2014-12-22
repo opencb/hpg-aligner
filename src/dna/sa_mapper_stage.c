@@ -251,7 +251,7 @@ cal_mng_t * cal_mng_new(sa_genome3_t *genome) {
   int num_chroms = genome->num_chroms;
 
   linked_list_t **cals_lists = (linked_list_t **) malloc (sizeof(linked_list_t *) * num_chroms);
-  for (unsigned int i = 0; i < num_chroms; i++) {
+  for (unsigned short int i = 0; i < num_chroms; i++) {
     cals_lists[i] = linked_list_new(COLLECTION_MODE_ASYNCHRONIZED);
   }
 
@@ -261,6 +261,9 @@ cal_mng_t * cal_mng_new(sa_genome3_t *genome) {
   p->max_read_area = 0;
   p->num_chroms = num_chroms;
   p->cals_lists = cals_lists;
+
+  memset(p->active_mask, 0, sizeof(p->active_mask));
+  p->num_active = 0;
 
   p->suffix_mng = suffix_mng_new(genome);
 
@@ -272,7 +275,7 @@ cal_mng_t * cal_mng_new(sa_genome3_t *genome) {
 void cal_mng_free(cal_mng_t *p) {
   if (p) {
     if (p->cals_lists) {
-      for (unsigned int i = 0; i < p->num_chroms; i++) {
+      for (unsigned short int i = 0; i < p->num_chroms; i++) {
 	if (p->cals_lists[i]) {
 	  linked_list_free(p->cals_lists[i], (void *)seed_cal_free);
 	}
@@ -290,7 +293,7 @@ void cal_mng_free(cal_mng_t *p) {
 void cal_mng_simple_free(cal_mng_t *p) {
   if (p) {
     if (p->cals_lists) {
-      for (unsigned int i = 0; i < p->num_chroms; i++) {
+      for (unsigned short int i = 0; i < p->num_chroms; i++) {
 	if (p->cals_lists[i]) {
 	  linked_list_free(p->cals_lists[i], (void *)NULL);
 	}
@@ -305,14 +308,16 @@ void cal_mng_simple_free(cal_mng_t *p) {
 
 void cal_mng_simple_clear(cal_mng_t *p) {
 
+  unsigned short int chrom;
   linked_list_item_t *item;
   linked_list_t *list;
   cal_t *cal;
   if (p) {
-    if (p->cals_lists) {
-      for (unsigned int i = 0; i < p->num_chroms; i++) {
-	list = p->cals_lists[i];
-	if (list) {
+    if (p->cals_lists) {     
+      for (int i = 0; i < p->num_active; i++) {
+	chrom = p->active[i];
+	list = p->cals_lists[chrom];
+	if (list->size > 0) {
 	  item = list->first;
 	  while (item) {
 	    cal = item->item;
@@ -323,6 +328,8 @@ void cal_mng_simple_clear(cal_mng_t *p) {
 	  linked_list_clear(p->cals_lists[i], (void *)NULL);
 	}
       }
+      p->num_active = 0;
+      memset(p->active_mask, 0, sizeof(p->active_mask));
     }
   }
 }
@@ -332,11 +339,17 @@ void cal_mng_simple_clear(cal_mng_t *p) {
 void cal_mng_clear(cal_mng_t *p) {
   if (p) {
     if (p->cals_lists) {
-      for (unsigned int i = 0; i < p->num_chroms; i++) {
-	if (p->cals_lists[i]) {
-	  linked_list_clear(p->cals_lists[i], (void *)seed_cal_free);
+      linked_list_t *list;
+      unsigned short int chrom;
+      for (int i = 0; i < p->num_active; i++) {
+	chrom = p->active[i];
+	list = p->cals_lists[chrom];
+	if (list->size > 0) {
+	  linked_list_clear(list, (void *)seed_cal_free);
 	}
       }
+      p->num_active = 0;
+      memset(p->active_mask, 0, sizeof(p->active_mask));
     }
   }
 }
@@ -351,6 +364,12 @@ void cal_mng_update(seed_t *seed, fastq_read_t *read, cal_mng_t *p) {
     linked_list_t *seed_list;
     linked_list_t *cal_list = p->cals_lists[seed->chromosome_id];
     if (cal_list) {
+
+      if (!p->active_mask[seed->chromosome_id]) {
+	p->active[p->num_active++] = seed->chromosome_id;	
+	p->active_mask[seed->chromosome_id] = 1;
+      }
+      
       int r_gap, g_gap;
       #ifdef _VERBOSE
       printf("\t\t\tinsert this seed to the CAL manager:\n");
@@ -423,14 +442,14 @@ void cal_mng_update(seed_t *seed, fastq_read_t *read, cal_mng_t *p) {
 
 //--------------------------------------------------------------------
 
-int cal_mng_find(int strand, unsigned int chrom, size_t start, size_t end, cal_mng_t *p) {
+int cal_mng_find(int strand, unsigned short int chrom, size_t start, size_t end, cal_mng_t *p) {
   #ifdef _VERBOSE1
   printf("\t\t***** searching CAL: chrom %u: %lu-%lu\n", chrom, start, end);
   #endif
   int found_cal = 0;
   if (p->cals_lists) {
     linked_list_t *cal_list = p->cals_lists[chrom];
-    if (cal_list) {
+    if (cal_list->size > 0) {
       seed_cal_t *cal;
       for (linked_list_item_t *item = cal_list->first; 
 	   item != NULL; 
@@ -469,24 +488,28 @@ void cal_mng_to_array_list(int min_read_area, array_list_t *out_list, cal_mng_t 
 
   if (p->cals_lists) {
     linked_list_t *cal_list;
-    for (unsigned int i = 0; i < p->num_chroms; i++) {
-      cal_list = p->cals_lists[i];
-      while ((cal = (seed_cal_t *) linked_list_remove_last(cal_list))) {
-	#ifdef _VERBOSE
-	seed_cal_print(cal);
-	#endif
-	first = linked_list_get_first(cal->seed_list);
-	last = linked_list_get_last(cal->seed_list);
-	cal->start = first->genome_start;
-	cal->end = last->genome_end;
-	seed_cal_update_info(cal);
-	if (cal->read_area >= min_read_area &&
-	    cal->num_open_gaps < (0.05f * cal->read->length) &&
-	    cal->num_mismatches < (0.09f * cal->read->length) ) {
-	  array_list_insert(cal, out_list);
-	} else {
-	  // free CAL
-	  seed_cal_free(cal);
+    unsigned short int chrom;
+    for (int i = 0; i < p->num_active; i++) {
+      chrom = p->active[i];
+      cal_list = p->cals_lists[chrom];
+      if (cal_list->size > 0) {
+	while ((cal = (seed_cal_t *) linked_list_remove_last(cal_list))) {
+          #ifdef _VERBOSE
+	  seed_cal_print(cal);
+          #endif
+	  first = linked_list_get_first(cal->seed_list);
+	  last = linked_list_get_last(cal->seed_list);
+	  cal->start = first->genome_start;
+	  cal->end = last->genome_end;
+	  seed_cal_update_info(cal);
+	  if (cal->read_area >= min_read_area &&
+	      cal->num_open_gaps < (0.05f * cal->read->length) &&
+	      cal->num_mismatches < (0.09f * cal->read->length) ) {
+	    array_list_insert(cal, out_list);
+	  } else {
+	    // free CAL
+	    seed_cal_free(cal);
+	  }
 	}
       }
     }
@@ -501,19 +524,22 @@ void cal_mng_select_best(int read_area, array_list_t *valid_list, array_list_t *
   
   if (p->cals_lists) {
     linked_list_t *cal_list;
-    for (unsigned int i = 0; i < p->num_chroms; i++) {
-      cal_list = p->cals_lists[i];
-      while ((cal = (seed_cal_t *) linked_list_remove_last(cal_list))) {
-	if (p->min_read_area <= read_area && cal->read_area <= read_area) {
-	  array_list_insert(cal, valid_list);
-	} else {
-	  array_list_insert(cal, invalid_list);
+    unsigned short int chrom;
+    for (int i = 0; i < p->num_active; i++) {
+      chrom = p->active[i];
+      cal_list = p->cals_lists[chrom];
+      if (cal_list->size > 0) {
+	while ((cal = (seed_cal_t *) linked_list_remove_last(cal_list))) {
+	  if (p->min_read_area <= read_area && cal->read_area <= read_area) {
+	    array_list_insert(cal, valid_list);
+	  } else {
+	    array_list_insert(cal, invalid_list);
+	  }
 	}
       }
     }
   }
 }
-
 
 //--------------------------------------------------------------------
 //
@@ -525,7 +551,7 @@ array_list_t *search_mate_cal_by_prefixes(seed_cal_t *cal, fastq_read_t *read,
   array_list_t *cal_list = array_list_new(10, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
   char *seq;
 
-  unsigned int chromosome;
+  unsigned short int chromosome;
   int start, end;
   int read_pos, read_inc, read_end_pos;
 
@@ -549,7 +575,7 @@ array_list_t *search_mate_cal_by_prefixes(seed_cal_t *cal, fastq_read_t *read,
   
   size_t num_prefixes, low, high;
   size_t g_start_suf, g_end_suf;
-  unsigned int chrom;
+  unsigned short int chrom;
 
   for (read_pos = 0; read_pos < read_end_pos; read_pos += read_inc)  {	
 
@@ -557,7 +583,7 @@ array_list_t *search_mate_cal_by_prefixes(seed_cal_t *cal, fastq_read_t *read,
     if (num_prefixes <= 0) continue;
 
     for (size_t i = low; i <= high; i++) {
-      chrom = (unsigned int) sa_index->CHROM[i];
+      chrom = (unsigned short int) sa_index->CHROM[i];
       if (chrom == chromosome) {
 	g_start_suf = sa_index->SA[i] - sa_index->genome->chrom_offsets[chrom];
 	g_end_suf = g_start_suf + sa_index->k_value - 1;
@@ -901,12 +927,12 @@ void generate_cals_from_exact_read(int strand, fastq_read_t *read,
 				   size_t low, size_t high, sa_index3_t *sa_index, 
 				   cal_mng_t *cal_mng) {
   size_t g_start, g_end;
-  unsigned int chrom;
+  unsigned short int chrom;
 
   seed_t *seed;
   
   for (size_t suff = low; suff <= high; suff++) {
-    chrom = (unsigned int) sa_index->CHROM[suff];
+    chrom = (unsigned short int) sa_index->CHROM[suff];
     g_start = sa_index->SA[suff] - sa_index->genome->chrom_offsets[chrom];
     g_end = g_start + read->length - 1;
 
@@ -944,7 +970,7 @@ int generate_cals_from_suffixes(int strand, fastq_read_t *read,
   size_t r_start_suf, r_end_suf, g_start_suf, g_end_suf;
   size_t r_start, r_end, r_len, g_start, g_end, g_len;
   int found_cal, diff;
-  unsigned int chrom;
+  unsigned short int chrom;
 
   float score;
   alig_out_t alig_out;
@@ -966,7 +992,7 @@ int generate_cals_from_suffixes(int strand, fastq_read_t *read,
     #ifdef _TIMING
     gettimeofday(&start, NULL);
     #endif
-    chrom = (unsigned int) sa_index->CHROM[suff];
+    chrom = (unsigned short int) sa_index->CHROM[suff];
 
     // extend suffix to right side
     r_start_suf = read_pos;
@@ -2458,13 +2484,13 @@ int sa_pair_mapper(void *data) {
 
     if (array_list_size(cal_list) > 0) {
 
-      //      printf("------------------> %s:%i: before select_best_cals (%i):\n", __FILE__, __LINE__, array_list_size(cal_list));
-      //      for (int i = 0; i < array_list_size(cal_list); i++) { seed_cal_print(array_list_get(i, cal_list)); }
+      //printf("------------------> %s:%i: before select_best_cals (%i):\n", __FILE__, __LINE__, array_list_size(cal_list));
+      //for (int i = 0; i < array_list_size(cal_list); i++) { seed_cal_print(array_list_get(i, cal_list)); }
 
       select_best_cals(read, &cal_list);
 
-      //      printf("-----------------> %s:%i: after select_best_cals (%i):\n", __FILE__, __LINE__, array_list_size(cal_list));
-      //      for (int i = 0; i < array_list_size(cal_list); i++) { seed_cal_print(array_list_get(i, cal_list)); }
+      //printf("-----------------> %s:%i: after select_best_cals (%i):\n", __FILE__, __LINE__, array_list_size(cal_list));
+      //for (int i = 0; i < array_list_size(cal_list); i++) { seed_cal_print(array_list_get(i, cal_list)); }
 
       if (array_list_size(cal_list) <= 0) {
 	suffix_mng_search_read_cals(read, num_seeds, sa_index, cal_list, cal_mng->suffix_mng);
@@ -2528,6 +2554,9 @@ int sa_pair_mapper(void *data) {
   for (int i = 0; i < num_reads; i++) {
     cal_list = cal_lists[i];
     read = array_list_get(i, mapping_batch->fq_reads);
+
+    //printf("-----------------> %s:%i: before create_alignments (%lu):\n", __FILE__, __LINE__, array_list_size(cal_list));
+    //for (int i = 0; i < array_list_size(cal_list); i++) { seed_cal_print(array_list_get(i, cal_list)); }
 
     // create alignments structures
     #ifdef _TIMING

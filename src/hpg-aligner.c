@@ -113,7 +113,7 @@ int main(int argc, char* argv[]) {
   log_file = NULL;
 
   if (argc <= 1) {
-    LOG_FATAL("Missing command.\nValid commands are:\n\tdna: to map DNA sequences\n\trna: to map RNA sequences\n\tbuild-sa-index: to create the genome SA index (suffix array).\n\tbuild-bwt-index: to create the genome BWT index.\nUse -h or --help to display hpg-aligner options.\nUse -v or --version to display hpg-aligner version.\n");
+    LOG_FATAL("Missing command.\nValid commands are:\n\tdna: to map DNA sequences\n\trna: to map RNA sequences\n\tbuild-sa-index: to create the genome SA index (suffix array).\n\tbuild-bwt-index: to create the genome BWT index (only available for RNA mapping).\nUse -h or --help to display hpg-aligner options.\nUse -v or --version to display hpg-aligner version.\n");
   }
 
   if (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") == 0) {
@@ -133,16 +133,17 @@ int main(int argc, char* argv[]) {
   
   if(strcmp(command, "dna") != 0 && 
      strcmp(command, "rna") != 0 &&
-     strcmp(command, "bs" ) != 0 && 
      strcmp(command, "build-sa-index") != 0 &&
      strcmp(command, "build-bwt-index") != 0) {
     LOG_FATAL("Command unknown.\nValid commands are:\n\tdna: to map DNA sequences\n\trna: to map RNA sequences\n\tbs: to map BS sequences\n\tbuild-sa-index: to create the genome sa index.\n\tbuild-bwt-index: to create the genome bwt index.\nUse -h or --help to display hpg-aligner options.\n");
 
   }
 
+
   if (!strcmp(command, "build-bwt-index") || 
       !strcmp(command, "build-sa-index")) {
-      run_index_builder(argc, argv, command);
+    run_index_builder(argc, argv, command);
+    exit(0);
   }
 
   // parsing options
@@ -154,7 +155,7 @@ int main(int argc, char* argv[]) {
     exit(0);
   }
 
-  options_set_cmdline(argc, argv, options);
+  options->cmdline = create_cmdline(argc, argv);
 
   if (options->adapter) {
     options->adapter_revcomp = strdup(options->adapter);

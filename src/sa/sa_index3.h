@@ -9,11 +9,22 @@
 #include <sys/stat.h>
 #include <assert.h>
 
+#include "containers/array_list.h"
+
 #include "sa_tools.h"
 
 //--------------------------------------------------------------------------------------
 
 #define max_uint 4294967295
+
+#define MAX_GENOME_LENGTH 4294967295
+#define MAX_NUM_SEQUENCES      16384
+
+#define UNKNOWN_CHROM  15555
+
+#define CHROM_FLAG    0
+#define ALT_FLAG      1
+#define DECOY_FLAG    2
 
 //--------------------------------------------------------------------------------------
 
@@ -27,17 +38,19 @@ typedef struct sa_genome3 {
   size_t num_T;
   size_t *chrom_lengths;
   size_t *chrom_offsets;
+  char *chrom_flags;
   char **chrom_names;
   char *S;
 } sa_genome3_t;
 
 static inline sa_genome3_t *sa_genome3_new(size_t length, size_t num_chroms,
-				    size_t *chrom_lengths,
-				    char **chrom_names, char *S) {
+					   size_t *chrom_lengths, char *chrom_flags,
+					   char **chrom_names, char *S) {
   sa_genome3_t *p = (sa_genome3_t *) calloc(1, sizeof(sa_genome3_t));
   p->length = length;
   p->num_chroms = num_chroms;
   p->chrom_lengths = chrom_lengths;
+  p->chrom_flags = chrom_flags;
   if (num_chroms && chrom_lengths) {
     p->chrom_offsets = (size_t *) calloc(num_chroms, sizeof(size_t));
     size_t offset = 0;
@@ -58,6 +71,7 @@ static inline sa_genome3_t *sa_genome3_new(size_t length, size_t num_chroms,
 static inline void sa_genome3_free(sa_genome3_t *p) {
   if (p) {
     if (p->chrom_lengths) free(p->chrom_lengths);
+    if (p->chrom_flags) free(p->chrom_flags);
     if (p->chrom_offsets) free(p->chrom_offsets);
     if (p->chrom_names) {
       for (int i = 0; i < p->num_chroms; i++) {
@@ -103,9 +117,9 @@ static inline void sa_genome3_display(sa_genome3_t *p) {
   printf("Genome length: %lu\n", p->length);
   printf("Number of chromosomes: %lu\n", p->num_chroms);
   for (size_t i = 0; i < p->num_chroms; i++) {
-    printf("\tChrom %lu: (name, length, offset) = (%s, %lu, %lu)\n", 
+    printf("\tchrom. %lu: (name, flag, length, offset) = (%s, %i, %lu, %lu)\n", 
 	   i, (p->chrom_names ? p->chrom_names[i] : "no-name"), 
-	   p->chrom_lengths[i], p->chrom_offsets[i]);
+	   (int) p->chrom_flags[i], p->chrom_lengths[i], p->chrom_offsets[i]);
   }
   printf("Nucleotide counters:\n");
   printf("\tNumber of A: %lu\n", p->num_A);
@@ -195,7 +209,7 @@ typedef struct sa_index3 {
   uint prefix_length;
   uint A_items; // JA_items = A_items
   uint IA_items;
-  unsigned char *CHROM;
+  unsigned short int *CHROM;
   uint *PRE;
   uint *SA;
   uint *A;
@@ -214,6 +228,9 @@ void sa_index3_build_k18(char *genome_filename, uint k_value, char *sa_index_dir
 sa_index3_t *sa_index3_parallel_new(char *sa_index_dirname, int num_threads);
 sa_index3_t *sa_index3_new(char *sa_index_dirname);
 void sa_index3_free(sa_index3_t *sa_index);
+
+void sa_index3_set_decoy_names(array_list_t *seqs_names, char *sa_index_dirname);
+void sa_index3_set_decoy(char *decoy_genome, char *sa_index_dirname);
 
 //--------------------------------------------------------------------------------------
 
@@ -238,7 +255,9 @@ static inline void display_prefix(char *S, int len) {
   }
 }
 
+//--------------------------------------------------------------------------------------
 
+void merge_genomes(char *genome1, char *genome2, char *out_genome);
 
 //--------------------------------------------------------------------------------------
 //--------------------------------------------------------------------------------------
