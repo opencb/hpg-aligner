@@ -462,30 +462,27 @@ void *sa_bam_reader_pairendV3(void *input){
 	khash_t(ID) *h = (khash_t(ID) *)wf_input->hash;
 	khiter_t k;
 	int  size = 0, total_reads = 0, found =0;
-	printf ("estoy en la función sa_bam_ reader\n");
-	int count = 1;
+
 	while ((size < batch_size) && (bam_read1(bam_file->bam_fd, bam1) > 0)) {
-		printf ("leo en %d \n",count);
-		count++;
+
+
 		if( (!(bam1->core.flag & BAM_FUNMAP) || (!(bam1->core.flag & BAM_FMUNMAP)))
 				&& (!(bam1->core.flag & BAM_FSECONDARY))) {
 
 			//Check if the second is in the khash;
-			printf("estoy dentro del if \n");
+
 			int ret, is_missing;
 			char *key = strdup(bam1_qname(bam1));
-			printf("me he declarado la key \n");
+
 			k = kh_get(ID, h, key);
-			printf ("miro en la tabla \n");
 			is_missing = (k == kh_end(h));
 
-			printf("he mirado la tabla \n");
+
 
 			// this key is already saved in the hash (by the mate or collision)
 			if (!is_missing) {
 
 				free(key);
-				printf("existe la key \n");
 				array_list_t *lista = (array_list_t *) kh_val(h,k);
 				size_t size_lista = array_list_size(lista);
 				//printf("key %s is present in the hash\n", key);
@@ -503,7 +500,7 @@ void *sa_bam_reader_pairendV3(void *input){
 							bam2 = bamaux;
 
 						}
-						printf ("pareja encontrada \n");
+
 						char *header1 = strdup(bam1_qname(bam1));
 						char *sequence = calloc(sizeof(char), (int32_t)bam1->core.l_qseq + 1);
 						char *quality = calloc(sizeof(char), (int32_t)bam1->core.l_qseq + 1);
@@ -594,11 +591,10 @@ void *sa_bam_reader_pairendV3(void *input){
 		}
 
 	} // end of while
-	printf("destruyo bam1 \n");
+
 	bam_destroy1(bam1);
-	printf ("destruyo bam1 \n");
 	bam_destroy1(bam2);
-	printf("salgo \n");
+
 
 
 

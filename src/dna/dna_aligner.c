@@ -212,6 +212,7 @@ void dna_aligner(options_t *options) {
 		// optional producer and consumer functions
 		if (options->input_format == BAM_FORMAT) {
 			wf_input->idx = NULL;
+			wf_input->hash = h;
 			wf_input->stats = stats;
 			wf_input->data = fnomapped;
 			if (options->pair_mode == PAIRED_END_MODE) {
