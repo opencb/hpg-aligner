@@ -9,410 +9,613 @@
 //--------------------------------------------------------------------
 
 void *sa_fq_reader(void *input) {
-  sa_wf_input_t *wf_input = (sa_wf_input_t *) input;
-  
-  sa_wf_batch_t *new_wf_batch = NULL;
-  sa_wf_batch_t *curr_wf_batch = wf_input->wf_batch;
-  
-  fastq_batch_reader_input_t *fq_reader_input = wf_input->fq_reader_input;
-  array_list_t *reads = array_list_new(fq_reader_input->batch_size, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
+	sa_wf_input_t *wf_input = (sa_wf_input_t *) input;
 
-  if (fq_reader_input->gzip) {
-    // Gzip fastq file
-    if (fq_reader_input->flags == SINGLE_END_MODE) {
-      fastq_gzread_bytes_se(reads, fq_reader_input->batch_size, fq_reader_input->fq_gzip_file1);
-    } else {
-      fastq_gzread_bytes_pe(reads, fq_reader_input->batch_size, fq_reader_input->fq_gzip_file1, fq_reader_input->fq_gzip_file2);
-    }
-  } else {
-    // Fastq file
-    if (fq_reader_input->flags == SINGLE_END_MODE) {
-      fastq_fread_bytes_se(reads, fq_reader_input->batch_size, fq_reader_input->fq_file1);
-    } else {
-      fastq_fread_bytes_aligner_pe(reads, fq_reader_input->batch_size, 
-				   fq_reader_input->fq_file1, fq_reader_input->fq_file2);
-    }
-  }
-  
-  size_t num_reads = array_list_size(reads);
-  
-  if (num_reads == 0) {
-    array_list_free(reads, (void *)fastq_read_free);
-  } else {
-    sa_mapping_batch_t *sa_mapping_batch = sa_mapping_batch_new(reads);
-    sa_mapping_batch->bam_format = wf_input->bam_format;
+	sa_wf_batch_t *new_wf_batch = NULL;
+	sa_wf_batch_t *curr_wf_batch = wf_input->wf_batch;
 
-    new_wf_batch = sa_wf_batch_new(curr_wf_batch->options,
-				   curr_wf_batch->sa_index,
-				   curr_wf_batch->writer_input, 
-				   sa_mapping_batch,
-				   NULL);
-  }
+	fastq_batch_reader_input_t *fq_reader_input = wf_input->fq_reader_input;
+	array_list_t *reads = array_list_new(fq_reader_input->batch_size, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
 
-  return new_wf_batch;
+	if (fq_reader_input->gzip) {
+		// Gzip fastq file
+		if (fq_reader_input->flags == SINGLE_END_MODE) {
+			fastq_gzread_bytes_se(reads, fq_reader_input->batch_size, fq_reader_input->fq_gzip_file1);
+		} else {
+			fastq_gzread_bytes_pe(reads, fq_reader_input->batch_size, fq_reader_input->fq_gzip_file1, fq_reader_input->fq_gzip_file2);
+		}
+	} else {
+		// Fastq file
+		if (fq_reader_input->flags == SINGLE_END_MODE) {
+			fastq_fread_bytes_se(reads, fq_reader_input->batch_size, fq_reader_input->fq_file1);
+		} else {
+			fastq_fread_bytes_aligner_pe(reads, fq_reader_input->batch_size,
+					fq_reader_input->fq_file1, fq_reader_input->fq_file2);
+		}
+	}
+
+	size_t num_reads = array_list_size(reads);
+
+	if (num_reads == 0) {
+		array_list_free(reads, (void *)fastq_read_free);
+	} else {
+		sa_mapping_batch_t *sa_mapping_batch = sa_mapping_batch_new(reads);
+		sa_mapping_batch->bam_format = wf_input->bam_format;
+
+		new_wf_batch = sa_wf_batch_new(curr_wf_batch->options,
+				curr_wf_batch->sa_index,
+				curr_wf_batch->writer_input,
+				sa_mapping_batch,
+				NULL);
+	}
+
+	return new_wf_batch;
 
 }
 
 //----------------------------------------------------------------------
 // BAM reader for single-end
+//
 //----------------------------------------------------------------------
 
 void *sa_bam_reader_single(void *input) {
-  sa_wf_input_t *wf_input = (sa_wf_input_t *) input;
-  
-  sa_wf_batch_t *new_wf_batch = NULL;
-  sa_wf_batch_t *curr_wf_batch = wf_input->wf_batch;
-  
-  fastq_batch_reader_input_t *fq_reader_input = wf_input->fq_reader_input;
-  
-  int batch_size = fq_reader_input->batch_size;
-  array_list_t *reads = array_list_new(batch_size, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
-  
-  bam_file_t *bam_file = (bam_file_t *) fq_reader_input->fq_file1;
-  stats_t *stats = (stats_t *) wf_input->stats;
+	sa_wf_input_t *wf_input = (sa_wf_input_t *) input;
 
-  bam1_t *bam1;
-  
-  int size = 0;
-  int total_reads = 0;
-  
-  fastq_read_t *read;
-  char *header, *sequence, *quality;
+	sa_wf_batch_t *new_wf_batch = NULL;
+	sa_wf_batch_t *curr_wf_batch = wf_input->wf_batch;
 
-  bam1 = bam_init1();
-  while ((bam_read1(bam_file->bam_fd, bam1) > 0) && (size < batch_size) ) {
-    // convert bam1_t to fastq_read_t
-    total_reads++;
-    if (!(bam1->core.flag & BAM_FSECONDARY)) {
-      header = strdup(bam1_qname(bam1));
-      sequence = calloc(sizeof(char), (int32_t)bam1->core.l_qseq + 1);
-      quality = calloc(sizeof(char), (int32_t)bam1->core.l_qseq + 1);
-      
-      bam1_get_sequence(bam1, sequence);
-      if (bam1->core.flag & BAM_FREVERSE){
-	revcomp_seq(sequence);
-      }
-      
-      bam1_get_quality(bam1, quality);
-      
-      size += bam1->core.l_qname + 2 * bam1->core.l_qseq;
-      read = fastq_read_new(header, sequence, quality);
-      array_list_insert(read, reads);
-      free(header);
-      free(sequence);
-      free(quality);
-    } else {
-      stats->secondary_reads++;
-    }
-  } // end of while
-  bam_destroy1(bam1);
-  
-  size_t num_reads = array_list_size(reads);
-  
-  if (num_reads == 0) {
-    array_list_free(reads, (void *)fastq_read_free);
-  } else {
-    sa_mapping_batch_t *sa_mapping_batch = sa_mapping_batch_new(reads);
-    sa_mapping_batch->bam_format = wf_input->bam_format;
-    
-    new_wf_batch = sa_wf_batch_new(curr_wf_batch->options,
-				   curr_wf_batch->sa_index,
-				   curr_wf_batch->writer_input, 
-				   sa_mapping_batch,
-				   NULL);
-  }
-  
-  stats->total_reads+=total_reads;
-  
-  return new_wf_batch;
+	fastq_batch_reader_input_t *fq_reader_input = wf_input->fq_reader_input;
+
+	int batch_size = fq_reader_input->batch_size;
+	array_list_t *reads = array_list_new(batch_size, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
+
+	bam_file_t *bam_file = (bam_file_t *) fq_reader_input->fq_file1;
+	stats_t *stats = (stats_t *) wf_input->stats;
+
+	bam1_t *bam1;
+
+	int size = 0;
+	int total_reads = 0;
+
+	fastq_read_t *read;
+	char *header, *sequence, *quality;
+
+	bam1 = bam_init1();
+	while ((size < batch_size) && (bam_read1(bam_file->bam_fd, bam1) > 0) ) {
+		// convert bam1_t to fastq_read_t
+		total_reads++;
+		if (!(bam1->core.flag & BAM_FSECONDARY)) {
+			header = strdup(bam1_qname(bam1));
+			sequence = calloc(sizeof(char), (int32_t)bam1->core.l_qseq + 1);
+			quality = calloc(sizeof(char), (int32_t)bam1->core.l_qseq + 1);
+
+			bam1_get_sequence(bam1, sequence);
+			if (bam1->core.flag & BAM_FREVERSE){
+				revcomp_seq(sequence);
+			}
+
+			bam1_get_quality(bam1, quality);
+
+			size += bam1->core.l_qname + 2 * bam1->core.l_qseq;
+			read = fastq_read_new(header, sequence, quality);
+			array_list_insert(read, reads);
+			free(header);
+			free(sequence);
+			free(quality);
+		} else {
+			stats->secondary_reads++;
+		}
+	} // end of while
+	bam_destroy1(bam1);
+
+	size_t num_reads = array_list_size(reads);
+
+	if (num_reads == 0) {
+		array_list_free(reads, (void *)fastq_read_free);
+	} else {
+		sa_mapping_batch_t *sa_mapping_batch = sa_mapping_batch_new(reads);
+		sa_mapping_batch->bam_format = wf_input->bam_format;
+
+		new_wf_batch = sa_wf_batch_new(curr_wf_batch->options,
+				curr_wf_batch->sa_index,
+				curr_wf_batch->writer_input,
+				sa_mapping_batch,
+				NULL);
+	}
+
+	stats->total_reads+=total_reads;
+
+	return new_wf_batch;
 }
 
-//----------------------------------------------------------------------
-// BAM reader for paired-end)
-//----------------------------------------------------------------------
+
+/**********************************************************************************************************
+* sa_bam_reader_pairend:  BAM reader for paired-end: samtools index version
+* @param input -> sa_wf_input : input with all parameters(important param: wf_input->idx;the file index)
+* @return new_wf_batch : batch for the mapper
+**************************************************************************************************************/
 
 void *sa_bam_reader_pairend(void *input) { 
-  sa_wf_input_t *wf_input = (sa_wf_input_t *) input;
-  
-  sa_wf_batch_t *new_wf_batch = NULL;
-  sa_wf_batch_t *curr_wf_batch = wf_input->wf_batch;
-  
-  fastq_batch_reader_input_t *fq_reader_input = wf_input->fq_reader_input;
+	sa_wf_input_t *wf_input = (sa_wf_input_t *) input;
 
-  int batch_size = fq_reader_input->batch_size;
-  array_list_t *reads = array_list_new(batch_size, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
+	sa_wf_batch_t *new_wf_batch = NULL;
+	sa_wf_batch_t *curr_wf_batch = wf_input->wf_batch;
 
-  bam_file_t *bam_file = (bam_file_t *) fq_reader_input->fq_file1;
-  bamFile bam_file_aux = bam_open(fq_reader_input->filename1, "r");
-  bam_file_t *fnomapped = (bam_file_t *)wf_input->data;
-  stats_t *stats = (stats_t *)wf_input->stats;
+	fastq_batch_reader_input_t *fq_reader_input = wf_input->fq_reader_input;
 
-  bam1_t *bam1; // mate 1
-  bam1 = bam_init1();
-  
-  bam1_t *bam2; // mate 2
-  bam2 = bam_init1();
+	int batch_size = fq_reader_input->batch_size;
+	array_list_t *reads = array_list_new(batch_size, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
 
-  bam_iter_t iter;
-  
-  int ret, found, size = 0, total_reads = 0;
-  char *header, *sequence, *quality;
-  fastq_read_t *read;
-    
-  while ((bam_read1(bam_file->bam_fd, bam1) > 0) && (size < batch_size)) {
+	bam_file_t *bam_file = (bam_file_t *) fq_reader_input->fq_file1;
+	bamFile bam_file_aux = bam_open(fq_reader_input->filename1, "r");
+	bam_file_t *fnomapped = (bam_file_t *)wf_input->data;
+	stats_t *stats = (stats_t *)wf_input->stats;
 
-    if ((bam1->core.flag & BAM_FREAD1) 
-	&& !(bam1->core.flag & BAM_FMUNMAP) 
-	&& !(bam1->core.flag & BAM_FSECONDARY)) {
+	bam1_t *bam1; // mate 1
+	bam1 = bam_init1();
 
-      // bam_fetch modified function
-      iter = bam_iter_query(wf_input->idx, (int) bam1->core.mtid,
-			    (int) bam1->core.mpos, (int) bam1->core.mpos + 1);
-      if (iter == NULL){
-	printf("Wrong fail in the index or in bam file, pair not found");	
-      }
+	bam1_t *bam2; // mate 2
+	bam2 = bam_init1();
 
-      found = 0;
-      bam_seek(bam_file_aux, 0, SEEK_SET);
-      while ((ret = bam_iter_read(bam_file_aux, iter, bam2)) >= 0) {
-	if ((!strcmp(bam1_qname(bam1), bam1_qname(bam2))) && (bam1->core.mtid == bam2->core.tid)) {
-	  found = 1;
-	  break;
-	}
-      }
-      bam_iter_destroy(iter);
-      
-      if (!found) {
-	printf("\n Corrupt Bam, missing a mate, there is a single read \n");
-	printf("\n The single read is:  %s \n", bam1_qname(bam1));
-	printf("\n ***Check your Bam***\n\n");
-	stats->total_reads++;
-	stats->alone_reads++;
-      } else {
-	// convert bam1_t to fastq_read_t
-	header = strdup(bam1_qname(bam1));
-	sequence = calloc(sizeof(char), (int32_t) bam1->core.l_qseq + 1);
-	quality = calloc(sizeof(char), (int32_t) bam1->core.l_qseq + 1);
+	bam_iter_t iter;
 
-	bam1_get_sequence(bam1, sequence);
+	int ret, found, size = 0, total_reads = 0;
+	char *header, *sequence, *quality;
+	fastq_read_t *read;
 
-	if (bam1->core.flag & BAM_FREVERSE){
-	  revcomp_seq(sequence);
-	}
+	while ((size < batch_size)&&(bam_read1(bam_file->bam_fd, bam1) > 0)  ) {
 
-	bam1_get_quality(bam1, quality);
+		if ((bam1->core.flag & BAM_FREAD1)
+				&& !(bam1->core.flag & BAM_FMUNMAP)
+				&& !(bam1->core.flag & BAM_FSECONDARY)) {
 
-	size += bam1->core.l_qname + 2 * bam1->core.l_qseq;
-	read = fastq_read_new(header, sequence, quality);
-	array_list_insert(read, reads);
+			// bam_fetch modified function: query the mate position
+			iter = bam_iter_query(wf_input->idx, (int) bam1->core.mtid,
+					(int) bam1->core.mpos, (int) bam1->core.mpos + 1);
+			if (iter == NULL){
+				printf("Wrong fail in the index or in bam file, pair not found");
+			}
 
-	free(header);
-	free(sequence);
-	free(quality);
+			found = 0;
+			bam_seek(bam_file_aux, 0, SEEK_SET);
+			//check all matches
+			while ((ret = bam_iter_read(bam_file_aux, iter, bam2)) >= 0) { //
+				if ((!strcmp(bam1_qname(bam1), bam1_qname(bam2))) && (bam1->core.mtid == bam2->core.tid)) {
+					found = 1;
+					break;
+				}
+			}
+			bam_iter_destroy(iter);
 
-	header = strdup(bam1_qname(bam2));
-	sequence = calloc(sizeof(char), (int32_t) bam2->core.l_qseq + 1);
-	quality = calloc(sizeof(char), (int32_t) bam2->core.l_qseq + 1);
+			if (!found) {
+				printf("\n Corrupt Bam, missing a mate, there is a single read \n");
+				printf("\n The single read is:  %s \n", bam1_qname(bam1));
+				printf("\n ***Check your Bam***\n\n");
+				stats->total_reads++;
+				stats->alone_reads++;
+			} else {
+				 //ckeck the mates
+				  if((bam1->core.flag & BAM_FREAD2)||(bam2->core.flag & BAM_FREAD1)){
 
-	bam1_get_sequence(bam2, sequence);
-	if (bam2->core.flag  & BAM_FREVERSE) {
-	  revcomp_seq(sequence);
-	}
+					  bam1_t *bamaux;
+					  bamaux = bam1;
+					  bam1 = bam2;
+					  bam2 = bamaux;
 
-	bam1_get_quality(bam2, quality);
+				  }
+				// convert bam1_t to fastq_read_t
+				header = strdup(bam1_qname(bam1));
+				sequence = calloc(sizeof(char), (int32_t) bam1->core.l_qseq + 1);
+				quality = calloc(sizeof(char), (int32_t) bam1->core.l_qseq + 1);
 
-	size += bam2->core.l_qname + 2 * bam2->core.l_qseq;
-	read = fastq_read_new(header, sequence, quality);
-	array_list_insert(read, reads);
+				bam1_get_sequence(bam1, sequence);
 
-	free(header);
-	free(sequence);
-	free(quality);
+				if (bam1->core.flag & BAM_FREVERSE){
+					revcomp_seq(sequence);
+				}
 
-	total_reads += 2;
-      }
-    } else if (((bam1->core.flag & BAM_FUNMAP) || 
-		(bam1->core.flag & BAM_FMUNMAP)) && 
-	       !(bam1->core.flag & BAM_FSECONDARY)) { 
-      // Unmapped or mate, save it into a tmp file
-      total_reads++;
-      if (bam_fwrite(bam1, fnomapped) < 0) {
+				bam1_get_quality(bam1, quality);
+
+				size += bam1->core.l_qname + 2 * bam1->core.l_qseq;
+				read = fastq_read_new(header, sequence, quality);
+				array_list_insert(read, reads);
+
+				free(header);
+				free(sequence);
+				free(quality);
+
+				header = strdup(bam1_qname(bam2));
+				sequence = calloc(sizeof(char), (int32_t) bam2->core.l_qseq + 1);
+				quality = calloc(sizeof(char), (int32_t) bam2->core.l_qseq + 1);
+
+				bam1_get_sequence(bam2, sequence);
+				if (bam2->core.flag  & BAM_FREVERSE) {
+					revcomp_seq(sequence);
+				}
+
+				bam1_get_quality(bam2, quality);
+
+				size += bam2->core.l_qname + 2 * bam2->core.l_qseq;
+				read = fastq_read_new(header, sequence, quality);
+				array_list_insert(read, reads);
+
+				free(header);
+				free(sequence);
+				free(quality);
+
+				total_reads += 2;
+			}
+		} else if (((bam1->core.flag & BAM_FUNMAP) ||
+				(bam1->core.flag & BAM_FMUNMAP)) &&
+				!(bam1->core.flag & BAM_FSECONDARY)) {
+			// Unmapped or mate, save it into a tmp file
+			total_reads++;
+			if (bam_fwrite(bam1, fnomapped) < 0) {
+				bam_destroy1(bam1);
+				bam_destroy1(bam2);
+				printf("Fail in file fnomap");
+				exit(-1);
+			}
+		} else if (bam1->core.flag & BAM_FSECONDARY) {
+			stats->secondary_reads++;
+			total_reads++;
+		}
+	} // end of while
 	bam_destroy1(bam1);
 	bam_destroy1(bam2);
-	printf("Fail in file fnomap");
-	exit(-1);
-      }
-    } else if (bam1->core.flag & BAM_FSECONDARY) {
-      stats->secondary_reads++;
-      total_reads++;
-    }
-  } // end of while
-  bam_destroy1(bam1);
-  bam_destroy1(bam2);
-  
-  bam_close(bam_file_aux);
-  
-  size_t num_reads = array_list_size(reads);
-  
-  if (num_reads == 0) {
-    array_list_free(reads, (void *) fastq_read_free);
-  } else {
-    sa_mapping_batch_t *sa_mapping_batch = sa_mapping_batch_new(reads);
-    sa_mapping_batch->bam_format = wf_input->bam_format;
-    
-    new_wf_batch = sa_wf_batch_new(curr_wf_batch->options,
-				   curr_wf_batch->sa_index,
-				   curr_wf_batch->writer_input, 
-				   sa_mapping_batch,
-				   NULL);
-  }
-  
-  stats->total_reads+=total_reads;
-  
-  return new_wf_batch;
+
+	bam_close(bam_file_aux);
+
+	size_t num_reads = array_list_size(reads);
+
+	if (num_reads == 0) {
+		array_list_free(reads, (void *) fastq_read_free);
+	} else {
+		sa_mapping_batch_t *sa_mapping_batch = sa_mapping_batch_new(reads);
+		sa_mapping_batch->bam_format = wf_input->bam_format;
+
+		new_wf_batch = sa_wf_batch_new(curr_wf_batch->options,
+				curr_wf_batch->sa_index,
+				curr_wf_batch->writer_input,
+				sa_mapping_batch,
+				NULL);
+	}
+
+	stats->total_reads+=total_reads;
+
+	return new_wf_batch;
 }
 
-//----------------------------------------------------------------------
-// BAM reader for tmp unmapped reads
-//----------------------------------------------------------------------
+/**********************************************************************************************************
+* sa_bam_reader_unmapped:  BAM reader for tmp unmapped reads
+* @param input -> sa_wf_input : input with all parameters(important param: wf_input->data;file for unmapped bams)
+* @return new_wf_batch : batch for the mapper
+**************************************************************************************************************/
 
 void *sa_bam_reader_unmapped(void *input) {
 
-  sa_wf_input_t *wf_input = (sa_wf_input_t *) input;
+	sa_wf_input_t *wf_input = (sa_wf_input_t *) input;
 
-  sa_wf_batch_t *new_wf_batch = NULL;
-  sa_wf_batch_t *curr_wf_batch = wf_input->wf_batch;
+	sa_wf_batch_t *new_wf_batch = NULL;
+	sa_wf_batch_t *curr_wf_batch = wf_input->wf_batch;
 
-  fastq_batch_reader_input_t *fq_reader_input = wf_input->fq_reader_input;
+	fastq_batch_reader_input_t *fq_reader_input = wf_input->fq_reader_input;
 
-  int batch_size = fq_reader_input->batch_size;
-  array_list_t *reads = array_list_new(batch_size, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
+	int batch_size = fq_reader_input->batch_size;
+	array_list_t *reads = array_list_new(batch_size, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
 
-  bam_file_t *fnomap = (bam_file_t *)wf_input->data;
-  stats_t *stats = (stats_t *)wf_input->stats;
+	bam_file_t *fnomap = (bam_file_t *)wf_input->data;
+	stats_t *stats = (stats_t *)wf_input->stats;
 
-  bam1_t *bam1; // mate 1
-  bam1 = bam_init1();
+	bam1_t *bam1; // mate 1
+	bam1 = bam_init1();
 
-  bam1_t *bam2; // mate 2
-  bam2 = bam_init1();
+	bam1_t *bam2; // mate 2
+	bam2 = bam_init1();
 
-  int size = 0, found = 0;
-  char *header, *sequence, *quality;
-  fastq_read_t *read;
+	int size = 0, found = 0;
+	char *header, *sequence, *quality;
+	fastq_read_t *read;
 
-  char *id2 = "Hola:)";
+	char *id2 = "Hola:)";
 
-  while ((bam_read1(fnomap->bam_fd, bam1) > 0) && (size < batch_size)) {
+	while ((bam_read1(fnomap->bam_fd, bam1) > 0) && (size < batch_size)) {
 
-    char *id1 = bam1_qname(bam1);
-    if (!strcmp(id1, id2)) {
-      // if is same were sending
-    } else if (bam1->core.flag & BAM_FUNMAP) {
-      found = 0;
-      while (bam_read1(fnomap->bam_fd, bam2) > 0) {
-	id2 = bam1_qname(bam2);
-	if (!strcmp(id1, id2)) { 
-	  // need are same
-	  found = 1;
-	  break;
+		char *id1 = bam1_qname(bam1);
+		if (!strcmp(id1, id2)) {
+			// if is same were sending
+		} else if (bam1->core.flag & BAM_FUNMAP) {
+			found = 0;
+			while (bam_read1(fnomap->bam_fd, bam2) > 0) {
+				id2 = bam1_qname(bam2);
+				if (!strcmp(id1, id2)) {
+					// need are same
+					found = 1;
+					break;
+				} else {
+					printf("\n Corrupt Bam, missing a mate, there is a single read \n");
+					printf("\n The single read is:  %s \n", bam1_qname(bam1));
+					printf("\n ***Check your Bam***\n\n");
+					bam1 = bam2;
+					stats->alone_reads++;
+				}
+			}
+		} else {
+			found = 0;
+			while (bam_read1(fnomap->bam_fd, bam2) > 0) {
+				id2 = bam1_qname(bam2);
+				if (!strcmp(id1, id2) && (bam2->core.flag & BAM_FUNMAP)) {
+					found = 1;
+					break;
+				}
+			}
+		}
+		if (!found) {
+			printf("\n Corrupt Bam, missing a mate, there is a single read \n");
+			printf("\n The single read is:  %s \n", bam1_qname(bam1));
+			printf("\n ***Check your Bam***\n\n");
+			stats->alone_reads++;
+		} else {
+			// ckeck the mates
+			if ((bam1->core.flag & BAM_FREAD2) || (bam2->core.flag & BAM_FREAD1)) {
+
+				bam1_t *bamaux; // mate 1
+				bamaux = bam1;
+				bam1 = bam2;
+				bam2 = bamaux;
+			}
+
+			// convert bam1_t to fastq_read_t
+			header = strdup(bam1_qname(bam1));
+			sequence = calloc(sizeof(char), (int32_t) bam1->core.l_qseq + 1);
+			quality = calloc(sizeof(char), (int32_t) bam1->core.l_qseq + 1);
+
+			bam1_get_sequence(bam1, sequence);
+
+			//check if read is reverse
+			if (bam1->core.flag & BAM_FREVERSE){
+				revcomp_seq(sequence);
+			}
+
+			bam1_get_quality(bam1, quality);
+
+			size += bam1->core.l_qname + 2 * bam1->core.l_qseq;
+			read = fastq_read_new(header, sequence, quality);
+			array_list_insert(read, reads);
+
+			free(header);
+			free(sequence);
+			free(quality);
+
+			header = strdup(bam1_qname(bam2));
+			sequence = calloc(sizeof(char), (int32_t) bam2->core.l_qseq + 1);
+			quality = calloc(sizeof(char), (int32_t) bam2->core.l_qseq + 1);
+
+			bam1_get_sequence(bam2, sequence);
+
+			//check if read is reverse
+			if (bam2->core.flag & BAM_FREVERSE){
+				revcomp_seq(sequence);
+			}
+
+			bam1_get_quality(bam2, quality);
+
+			size += bam2->core.l_qname + 2 * bam2->core.l_qseq;
+			read = fastq_read_new(header, sequence, quality);
+			array_list_insert(read, reads);
+
+			free(header);
+			free(sequence);
+			free(quality);
+		}
+
+	} // end of while
+	bam_destroy1(bam1);
+	bam_destroy1(bam2);
+
+	size_t num_reads = array_list_size(reads);
+
+	if (num_reads == 0) {
+		array_list_free(reads, (void *)fastq_read_free);
 	} else {
-	  printf("\n Corrupt Bam, missing a mate, there is a single read \n");
-	  printf("\n The single read is:  %s \n", bam1_qname(bam1));
-	  printf("\n ***Check your Bam***\n\n");
-	  bam1 = bam2;
-	  stats->alone_reads++;
+		sa_mapping_batch_t *sa_mapping_batch = sa_mapping_batch_new(reads);
+		sa_mapping_batch->bam_format = wf_input->bam_format;
+
+		new_wf_batch = sa_wf_batch_new(curr_wf_batch->options,
+				curr_wf_batch->sa_index,
+				curr_wf_batch->writer_input,
+				sa_mapping_batch,
+				NULL);
 	}
-      }
-    } else {
-      found = 0;
-      while (bam_read1(fnomap->bam_fd, bam2) > 0) {
-	id2 = bam1_qname(bam2);
-	if (!strcmp(id1, id2) && (bam2->core.flag & BAM_FUNMAP)) {
-	  found = 1;
-	  break;
+
+	return new_wf_batch;
+}
+
+
+/**********************************************************************************************************
+* sa_bam_reader_pairendV3:  BAM reader Khash table version
+* @param input -> sa_wf_input : input with all parameters(important param: KHASH_MAP_INIT_STR(ID, bam1_t *);)
+* @return new_wf_batch : batch for the mapper
+**************************************************************************************************************/
+
+void *sa_bam_reader_pairendV3(void *input){
+
+	sa_wf_input_t *wf_input = (sa_wf_input_t *) input;
+
+	sa_wf_batch_t *new_wf_batch = NULL;
+	sa_wf_batch_t *curr_wf_batch = wf_input->wf_batch;
+
+	fastq_batch_reader_input_t *fq_reader_input = wf_input->fq_reader_input;
+
+	int batch_size = fq_reader_input->batch_size;
+	array_list_t *reads = array_list_new(batch_size, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
+
+	bam_file_t *bam_file = (bam_file_t *) fq_reader_input->fq_file1;
+
+	bam_file_t *fnomapped = (bam_file_t *)wf_input->data;
+	stats_t *stats = (stats_t *)wf_input->stats;
+	bam1_t *bam1; // mate 1
+	bam1 = bam_init1();
+
+	bam1_t *bam2 = NULL; // mate 2
+
+	khash_t(ID) *h = (khash_t(ID) *)wf_input->hash;
+	khiter_t k;
+	int  size = 0, total_reads = 0, found =0;
+
+	while ((size < batch_size) && (bam_read1(bam_file->bam_fd, bam1) > 0)) {
+
+
+		if( (!(bam1->core.flag & BAM_FUNMAP) || (!(bam1->core.flag & BAM_FMUNMAP)))
+				&& (!(bam1->core.flag & BAM_FSECONDARY))) {
+
+			//Check if the second is in the khash;
+
+			int ret, is_missing;
+			char *key = strdup(bam1_qname(bam1));
+
+			k = kh_get(ID, h, key);
+			is_missing = (k == kh_end(h));
+
+
+
+			// this key is already saved in the hash (by the mate or collision)
+			if (!is_missing) {
+
+				free(key);
+				array_list_t *lista = (array_list_t *) kh_val(h,k);
+				size_t size_lista = array_list_size(lista);
+				//printf("key %s is present in the hash\n", key);
+				found = 0;
+				size_t it = 0;
+				while(it <size_lista && !found){
+					bam2 = array_list_get(it, lista);
+
+					//The mate is present in the hash.
+					if((!strcmp(bam1_qname(bam1),bam1_qname(bam2)))&& (bam1->core.mpos == bam2->core.pos)){
+						if((bam1->core.flag & BAM_FREAD2)||(bam2->core.flag & BAM_FREAD1)){//check the correct strand
+							bam1_t *bamaux;
+							bamaux = bam1;
+							bam1 = bam2;
+							bam2 = bamaux;
+
+						}
+
+						char *header1 = strdup(bam1_qname(bam1));
+						char *sequence = calloc(sizeof(char), (int32_t)bam1->core.l_qseq + 1);
+						char *quality = calloc(sizeof(char), (int32_t)bam1->core.l_qseq + 1);
+
+						fastq_read_t *read;
+
+						bam1_get_sequence(bam1, sequence);
+
+						if (bam1->core.flag & BAM_FREVERSE){
+							revcomp_seq(sequence);
+						}
+
+						bam1_get_quality(bam1, quality);
+
+						size += bam1->core.l_qname + 2 * bam1->core.l_qseq;
+						read = fastq_read_new(header1, sequence, quality);
+						array_list_insert(read, reads);
+
+						free(header1);
+						free(sequence);
+						free(quality);
+
+
+						char *header2 = strdup(bam1_qname(bam2));
+						char *sequence2 = calloc(sizeof(char), (int32_t)bam2->core.l_qseq + 1);
+						char *quality2 = calloc(sizeof(char), (int32_t)bam2->core.l_qseq + 1);
+
+						bam1_get_sequence(bam2, sequence2);
+						if (bam2->core.flag  & BAM_FREVERSE){
+							revcomp_seq(sequence2);
+						}
+
+						bam1_get_quality(bam2, quality2);
+
+						size += bam2->core.l_qname + 2 * bam2->core.l_qseq;
+						read = fastq_read_new(header2, sequence2, quality2);
+						array_list_insert(read, reads);
+						free(header2);
+						free(sequence2);
+						free(quality2);
+						total_reads+=2;
+						array_list_remove_at(it, lista);//remove the mate in the collision list
+						if(array_list_size(lista) == 0){
+							array_list_free(lista, NULL);
+							free(kh_key(h,k)); // free the previously strdup
+							kh_del(ID, h, k);
+						}
+
+						bam_destroy1(bam2);
+						bam2 = NULL;
+
+						bam_destroy1(bam1);
+						bam1 = bam_init1();
+						found = 1;
+					}
+					it++;
+				}
+				if(!found){
+					array_list_insert(bam1, lista);
+
+					bam1 = bam_init1();
+				}
+			} else {
+				// key is missing, put it into the hash
+				array_list_t *desbordamiento = array_list_new(10, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
+				//Put the bam in the hash table
+				array_list_insert(bam1, desbordamiento);
+				k = kh_put(ID, h, key, &ret);
+				kh_value(h, k)= desbordamiento;
+				bam1 = bam_init1();
+			}
+
+		}else if(bam1->core.flag & BAM_FSECONDARY){
+			stats->secondary_reads++;
+			total_reads++;
+
+
+
+		}else {//If is not maped or the pair is not maped, save in no-maped file
+			total_reads++;
+			if(bam_fwrite(bam1,fnomapped) < 0){//wrong writting in the file
+				bam_destroy1(bam1);
+				bam_destroy1(bam2);
+				printf("Fail in file fnomap\n");
+				exit(-1);
+			}
+
+		}
+
+	} // end of while
+
+	bam_destroy1(bam1);
+	bam_destroy1(bam2);
+
+
+
+
+	size_t num_reads = array_list_size(reads);
+
+	if (num_reads == 0) {
+		array_list_free(reads, (void *)fastq_read_free);
+	} else {
+		sa_mapping_batch_t *sa_mapping_batch = sa_mapping_batch_new(reads);
+		sa_mapping_batch->bam_format = wf_input->bam_format;
+
+		new_wf_batch = sa_wf_batch_new(curr_wf_batch->options,
+				curr_wf_batch->sa_index,
+				curr_wf_batch->writer_input,
+				sa_mapping_batch,
+				NULL);
 	}
-      }
-    }
-    if (!found) {
-      printf("\n Corrupt Bam, missing a mate, there is a single read \n");
-      printf("\n The single read is:  %s \n", bam1_qname(bam1));
-      printf("\n ***Check your Bam***\n\n");
-      stats->alone_reads++;
-    } else {
-      // ckeck the mates
-      if ((bam1->core.flag & BAM_FREAD2) || (bam2->core.flag & BAM_FREAD1)) {
 
-	bam1_t *bamaux; // mate 1
-	bamaux = bam1;
-	bam1 = bam2;
-	bam2 = bamaux;
-      }
+	stats->total_reads+=total_reads;
 
-      // convert bam1_t to fastq_read_t
-      header = strdup(bam1_qname(bam1));
-      sequence = calloc(sizeof(char), (int32_t) bam1->core.l_qseq + 1);
-      quality = calloc(sizeof(char), (int32_t) bam1->core.l_qseq + 1);
-
-      bam1_get_sequence(bam1, sequence);
-
-      //check if read is reverse
-      if (bam1->core.flag & BAM_FREVERSE){
-	revcomp_seq(sequence);
-      }
-
-      bam1_get_quality(bam1, quality);
-
-      size += bam1->core.l_qname + 2 * bam1->core.l_qseq;
-      read = fastq_read_new(header, sequence, quality);
-      array_list_insert(read, reads);
-
-      free(header);
-      free(sequence);
-      free(quality);
-
-      header = strdup(bam1_qname(bam2));
-      sequence = calloc(sizeof(char), (int32_t) bam2->core.l_qseq + 1);
-      quality = calloc(sizeof(char), (int32_t) bam2->core.l_qseq + 1);
-
-      bam1_get_sequence(bam2, sequence);
-
-      //check if read is reverse
-      if (bam2->core.flag & BAM_FREVERSE){
-	revcomp_seq(sequence);
-      }
-
-      bam1_get_quality(bam2, quality);
-
-      size += bam2->core.l_qname + 2 * bam2->core.l_qseq;
-      read = fastq_read_new(header, sequence, quality);
-      array_list_insert(read, reads);
-
-      free(header);
-      free(sequence);
-      free(quality);
-    }
-
-  } // end of while
-  bam_destroy1(bam1);
-  bam_destroy1(bam2);
-
-  size_t num_reads = array_list_size(reads);
-
-  if (num_reads == 0) {
-    array_list_free(reads, (void *)fastq_read_free);
-  } else {
-    sa_mapping_batch_t *sa_mapping_batch = sa_mapping_batch_new(reads);
-    sa_mapping_batch->bam_format = wf_input->bam_format;
-    
-    new_wf_batch = sa_wf_batch_new(curr_wf_batch->options,
-				   curr_wf_batch->sa_index,
-				   curr_wf_batch->writer_input,
-				   sa_mapping_batch,
-				   NULL);
-  }
-
-  return new_wf_batch;
+	return new_wf_batch;
 }
 
 //====================================================================
@@ -513,7 +716,7 @@ int sa_sam_writer(void *data) {
 		      read->id, alig->sequence, alig->quality, genome->chrom_names[alig->chromosome]);
 	    }
 	    // free alignment and continue
-	    alignment_free(alig);	 
+	    alignment_free(alig); 
 	    continue;
 	  }
 
@@ -529,7 +732,7 @@ int sa_sam_writer(void *data) {
 	  if (!alig->is_seq_mapped)                             flag += BAM_FUNMAP;   
 	  if ((!alig->is_mate_mapped) && (alig->is_paired_end)) flag += BAM_FMUNMAP;
 	  if (alig->mate_strand)                                flag += BAM_FMREVERSE;
-	  if (alig->pair_num == 1)	                        flag += BAM_FREAD1;
+	  if (alig->pair_num == 1)                        flag += BAM_FREAD1;
 	  if (alig->pair_num == 2)                              flag += BAM_FREAD2;
 	  if (alig->secondary_alignment)                        flag += BAM_FSECONDARY;
 	  if (alig->fails_quality_check)                        flag += BAM_FQCFAIL;
@@ -552,7 +755,7 @@ int sa_sam_writer(void *data) {
 		  );
 
 	  // free memory
-	  alignment_free(alig);	 
+	  alignment_free(alig); 
 	} // end for num_mappings
       } else {
 	num_unmapped_reads++;
@@ -569,7 +772,7 @@ int sa_sam_writer(void *data) {
 	    strcpy(quality, read->quality);
 	    strcat(quality, read->adapter_quality);
 	  }
-	  
+	    
 	  if ((read->adapter_strand == 0 && read->adapter_length < 0) || 
 	      (read->adapter_strand == 1 && read->adapter_length > 0)) {
 	    strcpy(sequence, read->adapter);
@@ -645,11 +848,11 @@ int sa_sam_writer(void *data) {
 	      strcpy(quality, read->quality);
 	      strcat(quality, read->adapter_quality);
 	    }
-	    
+	        
 	    if ( (cal->strand == 1 && 
 		  ((read->adapter_strand == 0 && read->adapter_length > 0) || 
 		   (read->adapter_strand == 1 && read->adapter_length < 0)))
-		 ||
+		  ||
 		 (cal->strand == 0 && 
 		  ((read->adapter_strand == 0 && read->adapter_length < 0) ||
 		   (read->adapter_strand == 1 && read->adapter_length > 0))) ) {
@@ -657,7 +860,7 @@ int sa_sam_writer(void *data) {
 	      strcat(sequence, read->sequence);
 	      strcpy(revcomp, read->adapter_revcomp);
 	      strcat(revcomp, read->revcomp);
-	      
+	            
 	      cigar_append_op(abs(read->adapter_length), 'S', cigar);
 	      cigar_concat(&cal->cigar, cigar);
 	    } else {
@@ -665,7 +868,7 @@ int sa_sam_writer(void *data) {
 	      strcat(sequence, read->adapter);
 	      strcpy(revcomp, read->revcomp);
 	      strcat(revcomp, read->adapter_revcomp);
-	      
+	            
 	      cigar_concat(&cal->cigar, cigar);
 	      cigar_append_op(read->adapter_length, 'S', cigar);
 	    }
@@ -716,14 +919,14 @@ int sa_sam_writer(void *data) {
 		  seq,
 		  quality,
 		  (int) cal->score,
-		  num_mismatches
+		    num_mismatches
 		  );
 
 	  // free memory
 	  free(cigar_M_string);
 	  free(cigar_string);
 	free_memory1:
-	  seed_cal_free(cal);	 
+	  seed_cal_free(cal); 
 	  if (read->adapter) {
 	    free(sequence);
 	    free(revcomp);
@@ -747,7 +950,7 @@ int sa_sam_writer(void *data) {
 	    strcpy(quality, read->quality);
 	    strcat(quality, read->adapter_quality);
 	  }
-	  
+	    
 	  if ((read->adapter_strand == 0 && read->adapter_length < 0) || 
 	      (read->adapter_strand == 1 && read->adapter_length > 0)) {
 	    strcpy(sequence, read->adapter);
@@ -796,25 +999,25 @@ int sa_sam_writer(void *data) {
 
 bam_header_t *create_bam_header(options_t *options, sa_genome3_t *genome) {
 
-  bam_header_t *bam_header = (bam_header_t *) calloc(1, sizeof(bam_header_t));
+	bam_header_t *bam_header = (bam_header_t *) calloc(1, sizeof(bam_header_t));
 
-  int num_targets = genome->num_chroms;
+	int num_targets = genome->num_chroms;
 
-  bam_header->n_targets = num_targets;
-  bam_header->target_name = (char **) calloc(num_targets, sizeof(char *));
-  bam_header->target_len = (uint32_t*) calloc(num_targets, sizeof(uint32_t));
-  for (int i = 0; i < num_targets; i++) {
-    bam_header->target_name[i] = strdup(genome->chrom_names[i]);
-    bam_header->target_len[i] = genome->chrom_lengths[i];
-  }
+	bam_header->n_targets = num_targets;
+	bam_header->target_name = (char **) calloc(num_targets, sizeof(char *));
+	bam_header->target_len = (uint32_t*) calloc(num_targets, sizeof(uint32_t));
+	for (int i = 0; i < num_targets; i++) {
+		bam_header->target_name[i] = strdup(genome->chrom_names[i]);
+		bam_header->target_len[i] = genome->chrom_lengths[i];
+	}
 
-  char pg[1024];
-  sprintf(pg, "@HD\tVN:1.4\tSO:unsorted\n");
-  sprintf(pg, "@PG\tID:HPG-Aligner\tVN:%s\tCL:%s\n", HPG_ALIGNER_VERSION, options->cmdline);
-  bam_header->text = strdup(pg);
-  bam_header->l_text = strlen(bam_header->text);
+	char pg[1024];
+	sprintf(pg, "@HD\tVN:1.4\tSO:unsorted\n");
+	sprintf(pg, "@PG\tID:HPG-Aligner\tVN:%s\tCL:%s\n", HPG_ALIGNER_VERSION, options->cmdline);
+	bam_header->text = strdup(pg);
+	bam_header->l_text = strlen(bam_header->text);
 
-  return bam_header;
+	return bam_header;
 }
 
 //--------------------------------------------------------------------
@@ -883,7 +1086,7 @@ int sa_bam_writer(void *data) {
 	    alignment_free(aux_alig);
 	  }
 	  // free alignment and continue
-	  alignment_free(alig);	 
+	  alignment_free(alig); 
 	  continue;
 	}
 
