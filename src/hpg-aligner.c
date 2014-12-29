@@ -77,6 +77,21 @@ size_t total_reads_w2, total_reads_w3;
 size_t reads_w2, reads_w3;
 
 //--------------------------------------------------------------------
+
+void display_main_help() {
+  printf("%s <command>\n", HPG_ALIGNER_BIN);
+  printf("\n");
+  printf("Commands:\n");
+  printf("\tdna: to map DNA sequences\n");
+  printf("\trna: to map RNA sequences\n");
+  printf("\tbuild-sa-index: to create the genome SA index (suffix array).\n");
+  printf("\tbuild-bwt-index: to create the genome BWT index (only available for RNA mapping).\n");
+  printf("\n");
+  printf("Use -h or --help to display hpg-aligner options.\n");
+  printf("Use -v or --version to display hpg-aligner version.\n");
+}
+
+//--------------------------------------------------------------------
 // main parameters support
 //--------------------------------------------------------------------
 
@@ -113,11 +128,14 @@ int main(int argc, char* argv[]) {
   log_file = NULL;
 
   if (argc <= 1) {
-    LOG_FATAL("Missing command.\nValid commands are:\n\tdna: to map DNA sequences\n\trna: to map RNA sequences\n\tbuild-sa-index: to create the genome SA index (suffix array).\n\tbuild-bwt-index: to create the genome BWT index (only available for RNA mapping).\nUse -h or --help to display hpg-aligner options.\nUse -v or --version to display hpg-aligner version.\n");
+    printf("Error: missing command.\n");
+    display_main_help();
+    exit(-1);
   }
 
   if (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") == 0) {
-    usage_cli(DNA_MODE);
+    display_main_help();
+    exit(0);
   }
 
   if (strcmp(argv[1], "-v") == 0 || strcmp(argv[1], "--version") == 0) {
@@ -127,7 +145,6 @@ int main(int argc, char* argv[]) {
 
   char *command = argv[1];  
 
-  // We need to consume command: {dna | rna | bs | build-index}
   argc -= 1;
   argv += 1;
   
@@ -135,8 +152,9 @@ int main(int argc, char* argv[]) {
      strcmp(command, "rna") != 0 &&
      strcmp(command, "build-sa-index") != 0 &&
      strcmp(command, "build-bwt-index") != 0) {
-    LOG_FATAL("Command unknown.\nValid commands are:\n\tdna: to map DNA sequences\n\trna: to map RNA sequences\n\tbs: to map BS sequences\n\tbuild-sa-index: to create the genome sa index.\n\tbuild-bwt-index: to create the genome bwt index.\nUse -h or --help to display hpg-aligner options.\n");
-
+    printf("Error: unknown command (%s)\n", command);
+    display_main_help();
+    exit(-1);
   }
 
 

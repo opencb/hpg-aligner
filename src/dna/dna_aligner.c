@@ -408,7 +408,7 @@ void dna_aligner(options_t *options) {
 		strcat(sorted_filename, OUTPUT_FILENAME);
 
 		// run sort
-		bam_sort_core_ext(0, out_filename, sorted_filename, 500000000, 0);
+		bam_sort_core(0, out_filename, sorted_filename, 500000000);
 		printf("Done!\n");
 
 		// and then, re-align
