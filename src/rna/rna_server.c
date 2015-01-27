@@ -3125,7 +3125,7 @@ int search_simple_splice_junction_semi_cannonical(seed_region_t *s_prev, seed_re
   int mismatches[array_list_size(splice_junction)];
   float max_score = 0.0f;
   float score;
-  int max_sp_pos;
+  int max_sp_pos = 0;
   int sp_pos;
   int read_pos;
   int genome_pos;
