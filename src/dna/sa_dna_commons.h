@@ -992,12 +992,12 @@ void seed_cal_merge_seeds(seed_cal_t *cal);
 
 //--------------------------------------------------------------------
 
-void print_seed(char *msg, seed_t *s);
+void print_seed(char *msg, seed_t *s, sa_genome3_t *genome);
 
-static inline void seed_cal_print(seed_cal_t *cal) {
-  printf(" CAL (%c)[%u:%lu-%lu] (%s, x:%i, og:%i, eg:%i) area = %i score = %0.2f mapq = %i (invalid = %i): (read id %s)\n", 
-	 (cal->strand == 0 ? '+' : '-'), 
-	 cal->chromosome_id, cal->start, cal->end, cigar_to_string(&cal->cigar), cal->num_mismatches,
+static inline void seed_cal_print(seed_cal_t *cal, sa_genome3_t *genome) {
+  printf(" CAL (%c)[%s:%lu-%lu] (%s, x:%i, og:%i, eg:%i) area = %i score = %0.2f mapq = %i (invalid = %i): (read id %s)\n", 
+	 "+-"[cal->strand],
+	 genome->chrom_names[cal->chromosome_id], cal->start, cal->end, cigar_to_string(&cal->cigar), cal->num_mismatches,
 	 cal->num_open_gaps, cal->num_extend_gaps, cal->read_area, cal->score, cal->mapq,
 	 cal->invalid, cal->read->id);
   printf("\tSEEDS LIST:\n");
@@ -1007,7 +1007,7 @@ static inline void seed_cal_print(seed_cal_t *cal) {
     for (linked_list_item_t *item = cal->seed_list->first; 
 	 item != NULL; item = item->next) {
       seed_t *seed = item->item;
-      print_seed("\t\t", seed);
+      print_seed("\t\t", seed, genome);
     }
     printf("\n");
   }

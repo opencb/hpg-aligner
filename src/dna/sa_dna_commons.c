@@ -720,9 +720,10 @@ void display_suffix_mappings(int strand, size_t r_start, size_t suffix_len,
 
 //--------------------------------------------------------------------
 
-void print_seed(char *msg, seed_t *s) {
-  printf("%s%c:%i[%lu|%lu - %lu|%lu] suf[%lu|%lu - %lu|%lu] (cigar (len = %i): %s, num. mismatches = %i)\n",  msg, (s->strand == 0 ? '+' : '-'),
-	 s->chromosome_id, s->genome_start, s->read_start, s->read_end, s->genome_end,
+void print_seed(char *msg, seed_t *s, sa_genome3_t *genome) {
+  printf("%s%c:%s[%lu|%lu - %lu|%lu] suf[%lu|%lu - %lu|%lu] (cigar (len = %i): %s, num. mismatches = %i)\n",  
+	 msg, "+-"[s->strand],
+	 genome->chrom_names[s->chromosome_id], s->genome_start, s->read_start, s->read_end, s->genome_end,
 	 s->suf_genome_start, s->suf_read_start, s->suf_read_end, s->suf_genome_end,
 	 cigar_get_length(&s->cigar), cigar_to_string(&s->cigar), s->num_mismatches);
 }

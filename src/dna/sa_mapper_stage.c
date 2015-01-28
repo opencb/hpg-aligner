@@ -755,6 +755,7 @@ void check_pairs(array_list_t **cal_lists, sa_index3_t *sa_index,
     first_score = 0;
     second_score = 0;
     valid_pair = 0;
+
     for (int i1 = 0; i1 < list1_size; i1++) {
       cal1 = array_list_get(i1, list1);
       for (int i2 = 0; i2 < list2_size; i2++) {
@@ -2480,17 +2481,19 @@ int sa_pair_mapper(void *data) {
     }
 
     // 1) extend using mini-sw from suffix
+    //cal_list = array_list_new(1000, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
+    //suffix_mng_search_read_cals(read, num_seeds, sa_index, cal_list, cal_mng->suffix_mng);
     cal_list = create_cals(num_seeds, read, mapping_batch, sa_index, cal_mng);
 
     if (array_list_size(cal_list) > 0) {
 
-      //printf("------------------> %s:%i: before select_best_cals (%i):\n", __FILE__, __LINE__, array_list_size(cal_list));
-      //for (int i = 0; i < array_list_size(cal_list); i++) { seed_cal_print(array_list_get(i, cal_list)); }
+      //      printf("------------------> %s:%i: before select_best_cals (%i):\n", __FILE__, __LINE__, array_list_size(cal_list));
+      //      for (int i = 0; i < array_list_size(cal_list); i++) { seed_cal_print(array_list_get(i, cal_list), sa_index->genome); }
 
       select_best_cals(read, &cal_list);
 
-      //printf("-----------------> %s:%i: after select_best_cals (%i):\n", __FILE__, __LINE__, array_list_size(cal_list));
-      //for (int i = 0; i < array_list_size(cal_list); i++) { seed_cal_print(array_list_get(i, cal_list)); }
+      //      printf("-----------------> %s:%i: after select_best_cals (%i):\n", __FILE__, __LINE__, array_list_size(cal_list));
+      //      for (int i = 0; i < array_list_size(cal_list); i++) { seed_cal_print(array_list_get(i, cal_list), sa_index->genome); }
 
       if (array_list_size(cal_list) <= 0) {
 	suffix_mng_search_read_cals(read, num_seeds, sa_index, cal_list, cal_mng->suffix_mng);
@@ -2525,10 +2528,18 @@ int sa_pair_mapper(void *data) {
     mapping_batch->pair_min_distance = pair_min_distance; 
     mapping_batch->pair_max_distance = pair_max_distance; 
   }
+  /*
+  check_pairs(cal_lists, sa_index, mapping_batch, cal_mng);
+
   filter_cals_by_pair_mode(pair_min_distance, pair_max_distance, 
     			   num_reads, cal_lists);
-  
+  */
+
+  filter_cals_by_pair_mode(pair_min_distance, pair_max_distance, 
+    			   num_reads, cal_lists);
+
   check_pairs(cal_lists, sa_index, mapping_batch, cal_mng);
+
 
   // 3) prepare Smith-Waterman to fill in the gaps
   for (int i = 0; i < num_reads; i++) {

@@ -602,7 +602,7 @@ void suffix_mng_search_read_cals_by_region(fastq_read_t *read, int num_seeds,
 
 //--------------------------------------------------------------------
 
-void suffix_mng_display(suffix_mng_t *p) {
+void suffix_mng_display(suffix_mng_t *p, sa_genome3_t *genome) {
   if (p) {
     if (p->suffix_lists) {
       seed_t *seed;
@@ -614,7 +614,7 @@ void suffix_mng_display(suffix_mng_t *p) {
 	       item != NULL; 
 	       item = item->next) {
 	    seed = item->item;
-	    print_seed("suffix mng display: ", seed);	    
+	    print_seed("suffix mng display: ", seed, genome);	    
 	  }
 	}
       }

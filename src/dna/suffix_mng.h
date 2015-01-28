@@ -55,7 +55,7 @@ void suffix_mng_search_seeds(fastq_read_t *read, int min_area, int strand,
 			     sa_index3_t *sa_index, array_list_t *cal_list,
 			     suffix_mng_t *p);
 
-void suffix_mng_display(suffix_mng_t *p);
+void suffix_mng_display(suffix_mng_t *p, sa_genome3_t *genome);
 
 //--------------------------------------------------------------------
 //--------------------------------------------------------------------
