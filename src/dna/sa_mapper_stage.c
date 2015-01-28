@@ -248,7 +248,7 @@ void append_seed_linked_list(seed_cal_t *cal,
 
 cal_mng_t * cal_mng_new(sa_genome3_t *genome) {
 
-  int num_chroms = genome->num_chroms;
+  int num_chroms = genome->num_seqs;
 
   linked_list_t **cals_lists = (linked_list_t **) malloc (sizeof(linked_list_t *) * num_chroms);
   for (unsigned short int i = 0; i < num_chroms; i++) {
@@ -585,7 +585,7 @@ array_list_t *search_mate_cal_by_prefixes(seed_cal_t *cal, fastq_read_t *read,
     for (size_t i = low; i <= high; i++) {
       chrom = (unsigned short int) sa_index->CHROM[i];
       if (chrom == chromosome) {
-	g_start_suf = sa_index->SA[i] - sa_index->genome->chrom_offsets[chrom];
+	g_start_suf = sa_index->SA[i] - sa_index->genome->seq_offsets[chrom];
 	g_end_suf = g_start_suf + sa_index->k_value - 1;
 	
 	if (start <= g_start_suf && end >= g_end_suf) {
@@ -934,7 +934,7 @@ void generate_cals_from_exact_read(int strand, fastq_read_t *read,
   
   for (size_t suff = low; suff <= high; suff++) {
     chrom = (unsigned short int) sa_index->CHROM[suff];
-    g_start = sa_index->SA[suff] - sa_index->genome->chrom_offsets[chrom];
+    g_start = sa_index->SA[suff] - sa_index->genome->seq_offsets[chrom];
     g_end = g_start + read->length - 1;
 
     //    seed_list = linked_list_new(COLLECTION_MODE_ASYNCHRONIZED);
@@ -999,7 +999,7 @@ int generate_cals_from_suffixes(int strand, fastq_read_t *read,
     r_start_suf = read_pos;
     r_end_suf = r_start_suf + suffix_len - 1;
     
-    g_start_suf = sa_index->SA[suff] - sa_index->genome->chrom_offsets[chrom];
+    g_start_suf = sa_index->SA[suff] - sa_index->genome->seq_offsets[chrom];
     g_end_suf = g_start_suf + suffix_len - 1;
 
     #ifdef _TIMING
@@ -1025,7 +1025,7 @@ int generate_cals_from_suffixes(int strand, fastq_read_t *read,
     #ifdef _VERBOSE
     printf("%s:%i:\t\tsuffix at [%lu|%lu-%lu|%lu] %c chrom %s\n", __FILE__, __LINE__,
     	   g_start_suf, r_start_suf, r_end_suf, g_end_suf, (strand == 0 ? '+' : '-'), 
-    	   sa_index->genome->chrom_names[chrom]);
+    	   sa_index->genome->seq_names[chrom]);
     #endif
 
     seed = seed_new(r_start_suf, r_end_suf, g_start_suf, g_end_suf);
@@ -1043,7 +1043,7 @@ int generate_cals_from_suffixes(int strand, fastq_read_t *read,
       #ifdef _TIMING
       gettimeofday(&start, NULL);
       #endif
-      g_seq = &sa_index->genome->S[g_start + sa_index->genome->chrom_offsets[chrom] + 1];
+      g_seq = &sa_index->genome->S[g_start + sa_index->genome->seq_offsets[chrom] + 1];
       #ifdef _TIMING
       gettimeofday(&stop, NULL);
       mapping_batch->func_times[FUNC_SET_REF_SEQUENCE] += 
@@ -1076,7 +1076,7 @@ int generate_cals_from_suffixes(int strand, fastq_read_t *read,
         #ifdef _TIMING
 	gettimeofday(&start, NULL);
         #endif
-	g_seq = &sa_index->genome->S[seed->genome_start + sa_index->genome->chrom_offsets[chrom] - seed->read_start];
+	g_seq = &sa_index->genome->S[seed->genome_start + sa_index->genome->seq_offsets[chrom] - seed->read_start];
 	for (size_t k1 = 0, k2 = 0; k1 < seed->read_start; k1++, k2++) {
 	  if (r_seq[k1] != g_seq[k2]) {
 	    seed->num_mismatches++;
@@ -1117,7 +1117,7 @@ int generate_cals_from_suffixes(int strand, fastq_read_t *read,
       #ifdef _TIMING
       gettimeofday(&start, NULL);
       #endif
-      g_seq = &sa_index->genome->S[g_start + sa_index->genome->chrom_offsets[chrom]];
+      g_seq = &sa_index->genome->S[g_start + sa_index->genome->seq_offsets[chrom]];
       #ifdef _TIMING
       gettimeofday(&stop, NULL);
       mapping_batch->func_times[FUNC_SET_REF_SEQUENCE] += 
@@ -1155,7 +1155,7 @@ int generate_cals_from_suffixes(int strand, fastq_read_t *read,
         #ifdef _TIMING
 	gettimeofday(&start, NULL);
         #endif
-	g_seq = &sa_index->genome->S[seed->genome_end + sa_index->genome->chrom_offsets[chrom] + 1];
+	g_seq = &sa_index->genome->S[seed->genome_end + sa_index->genome->seq_offsets[chrom] + 1];
 	for (size_t k1 = seed->read_end + 1, k2 = 0; k1 < read->length; k1++, k2++) {
 	  if (r_seq[k1] != g_seq[k2]) {
 	    seed->num_mismatches++;

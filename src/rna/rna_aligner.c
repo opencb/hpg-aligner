@@ -409,7 +409,7 @@ void sa_index3_parallel_genome_new(char *sa_index_dirname, int num_threads,
 	fclose(f_tab);
       
 	genome = sa_genome3_new(genome_len, num_chroms, chrom_lengths, 
-				chrom_flags, chrom_names, S);
+				chrom_flags, NULL, NULL, NULL, chrom_names, S);
       
 	for (size_t i = 0; i < genome->length; i++) {
 	  if (genome->S[i] == 'N' || genome->S[i] == 'n') {

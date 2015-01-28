@@ -15,7 +15,7 @@
 #define SA_INDEX  0
 #define BWT_INDEX 1
 
-#define NUM_INDEX_OPTIONS     5
+#define NUM_INDEX_OPTIONS     6
 #define NUM_INDEX_BWT_OPTIONS 0
 
 #define BWT_RATIO_DEFAULT  8
@@ -27,6 +27,7 @@ typedef struct index_options {
   int help;
   char *decoy_genome;
   char *ref_genome;
+  char *alt_filename;
   char *index_filename;  
   char *cmdline;
 } index_options_t;

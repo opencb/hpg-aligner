@@ -17,8 +17,8 @@ int is_cal_in(seed_cal_t *cal) {
   p1 = strstr(aux, "_");
   *p1 = 0;
   chrom_str = strdup(aux);
-  for (chrom = 0; chrom < global_genome->num_chroms; chrom++) {
-    if (strcmp(chrom_str, global_genome->chrom_names[chrom]) == 0) {
+  for (chrom = 0; chrom < global_genome->num_seqs; chrom++) {
+    if (strcmp(chrom_str, global_genome->seq_names[chrom]) == 0) {
       break;
     }
   }
@@ -710,11 +710,11 @@ void display_suffix_mappings(int strand, size_t r_start, size_t suffix_len,
   for (size_t suff = low; suff <= high; suff++) {
     r_end = r_start + suffix_len - 1;
     chrom = sa_index->CHROM[suff];
-    g_start = sa_index->SA[suff] - sa_index->genome->chrom_offsets[chrom];
+    g_start = sa_index->SA[suff] - sa_index->genome->seq_offsets[chrom];
     g_end = g_start + suffix_len - 1;
     printf("\t\t[%lu|%lu-%lu|%lu] %c chrom %s\n",
 	   g_start, r_start, r_end, g_end, (strand == 0 ? '+' : '-'), 
-	   sa_index->genome->chrom_names[chrom]);
+	   sa_index->genome->seq_names[chrom]);
   }
 }
 
@@ -723,7 +723,7 @@ void display_suffix_mappings(int strand, size_t r_start, size_t suffix_len,
 void print_seed(char *msg, seed_t *s, sa_genome3_t *genome) {
   printf("%s%c:%s[%lu|%lu - %lu|%lu] suf[%lu|%lu - %lu|%lu] (cigar (len = %i): %s, num. mismatches = %i)\n",  
 	 msg, "+-"[s->strand],
-	 genome->chrom_names[s->chromosome_id], s->genome_start, s->read_start, s->read_end, s->genome_end,
+	 genome->seq_names[s->chromosome_id], s->genome_start, s->read_start, s->read_end, s->genome_end,
 	 s->suf_genome_start, s->suf_read_start, s->suf_read_end, s->suf_genome_end,
 	 cigar_get_length(&s->cigar), cigar_to_string(&s->cigar), s->num_mismatches);
 }
@@ -738,7 +738,7 @@ void display_sequence(uint j, sa_index3_t *index, uint len) {
     p++;
   }
   printf("\t%u\t%s:%lu\n", index->SA[j], 
-	 index->genome->chrom_names[chrom], index->SA[j] - index->genome->chrom_offsets[chrom]);
+	 index->genome->seq_names[chrom], index->SA[j] - index->genome->seq_offsets[chrom]);
 }
 
 //--------------------------------------------------------------------
@@ -760,8 +760,8 @@ void display_cmp_sequences(fastq_read_t *read, sa_index3_t *sa_index) {
   p1 = strstr(aux, "_");
   *p1 = 0;
   chrom_str = strdup(aux);
-  for (chrom = 0; chrom < sa_index->genome->num_chroms; chrom++) {
-    if (strcmp(chrom_str, sa_index->genome->chrom_names[chrom]) == 0) {
+  for (chrom = 0; chrom < sa_index->genome->num_seqs; chrom++) {
+    if (strcmp(chrom_str, sa_index->genome->seq_names[chrom]) == 0) {
       break;
     }
   }
@@ -796,7 +796,7 @@ void display_cmp_sequences(fastq_read_t *read, sa_index3_t *sa_index) {
    seq = read->sequence;
   }
   printf("%s\n", seq);
-  ref = &sa_index->genome->S[pos + sa_index->genome->chrom_offsets[chrom] - 1];
+  ref = &sa_index->genome->S[pos + sa_index->genome->seq_offsets[chrom] - 1];
   for (int i = 0; i < read->length; i++) {
     if (seq[i] == ref[i]) {
       printf("|");

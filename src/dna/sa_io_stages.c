@@ -641,8 +641,8 @@ size_t num_unmapped_reads_by_cigar_length = 0;
 void write_sam_header(options_t *options, sa_genome3_t *genome, FILE *f) {
   fprintf(f, "@HD\tVN:1.4\tSO:unsorted\n");
   fprintf(f, "@PG\tID:HPG-Aligner\tVN:%s\tCL:%s\n", HPG_ALIGNER_VERSION, options->cmdline);
-  for (unsigned short int i = 0; i < genome->num_chroms; i++) {
-    fprintf(f, "@SQ\tSN:%s\tLN:%lu\n", genome->chrom_names[i], genome->chrom_lengths[i]);
+  for (unsigned short int i = 0; i < genome->num_seqs; i++) {
+    fprintf(f, "@SQ\tSN:%s\tLN:%lu\n", genome->seq_names[i], genome->seq_lengths[i]);
   }
 }
 
@@ -710,10 +710,10 @@ int sa_sam_writer(void *data) {
 	  alig = (alignment_t *) array_list_get(j, mapping_list);
 
 	  // decoy management
-	  if (genome->chrom_flags[alig->chromosome] == DECOY_FLAG) {
+	  if (genome->seq_flags[alig->chromosome] == DECOY_FLAG) {
 	    if (num_mappings == 1) {
 	      fprintf(out_file, "%s\t4\t*\t0\t0\t*\t*\t0\t0\t%s\t%s\tXD:Z:%s\n", 
-		      read->id, alig->sequence, alig->quality, genome->chrom_names[alig->chromosome]);
+		      read->id, alig->sequence, alig->quality, genome->seq_names[alig->chromosome]);
 	    }
 	    // free alignment and continue
 	    alignment_free(alig); 
@@ -742,11 +742,11 @@ int sa_sam_writer(void *data) {
 	  fprintf(out_file, "%s\t%lu\t%s\t%i\t%i\t%s\t%s\t%i\t%i\t%s\t%s\t%s\n", 
 		  read->id,
 		  flag,
-		  genome->chrom_names[alig->chromosome],
+		  genome->seq_names[alig->chromosome],
 		  alig->position + 1,
 		  (num_mappings > 1 ? 0 : alig->mapq),
 		  alig->cigar,
-		  (alig->chromosome == alig->mate_chromosome ? "=" : genome->chrom_names[alig->mate_chromosome]),
+		  (alig->chromosome == alig->mate_chromosome ? "=" : genome->seq_names[alig->mate_chromosome]),
 		  alig->mate_position + 1,
 		  alig->template_length,
 		  alig->sequence,
@@ -884,10 +884,10 @@ int sa_sam_writer(void *data) {
 	  }
 
 	  // decoy management
-	  if (genome->chrom_flags[cal->chromosome_id] == DECOY_FLAG) {
+	  if (genome->seq_flags[cal->chromosome_id] == DECOY_FLAG) {
 	    if (num_mappings == 1) {
 	      fprintf(out_file, "%s\t4\t*\t0\t0\t*\t*\t0\t0\t%s\t%s\tXD:Z:%s\n", 
-		      read->id, sequence, quality, genome->chrom_names[cal->chromosome_id]);
+		      read->id, sequence, quality, genome->seq_names[cal->chromosome_id]);
 	    }
 	    // go to free memory
 	    goto free_memory1;
@@ -909,7 +909,7 @@ int sa_sam_writer(void *data) {
 	  fprintf(out_file, "%s\t%lu\t%s\t%lu\t%i\t%s\t%s\t%lu\t%lu\t%s\t%s\tAS:i:%i\tNM:i:%i\n", 
 		  read->id,
 		  flag,
-		  genome->chrom_names[cal->chromosome_id],
+		  genome->seq_names[cal->chromosome_id],
 		  cal->start + 1,
 		  (num_mappings == 1 ? cal->mapq : 0),
 		  cigar_M_string,
@@ -1001,14 +1001,14 @@ bam_header_t *create_bam_header(options_t *options, sa_genome3_t *genome) {
 
 	bam_header_t *bam_header = (bam_header_t *) calloc(1, sizeof(bam_header_t));
 
-	int num_targets = genome->num_chroms;
+	int num_targets = genome->num_seqs;
 
 	bam_header->n_targets = num_targets;
 	bam_header->target_name = (char **) calloc(num_targets, sizeof(char *));
 	bam_header->target_len = (uint32_t*) calloc(num_targets, sizeof(uint32_t));
 	for (int i = 0; i < num_targets; i++) {
-		bam_header->target_name[i] = strdup(genome->chrom_names[i]);
-		bam_header->target_len[i] = genome->chrom_lengths[i];
+		bam_header->target_name[i] = strdup(genome->seq_names[i]);
+		bam_header->target_len[i] = genome->seq_lengths[i];
 	}
 
 	char pg[1024];
@@ -1074,7 +1074,7 @@ int sa_bam_writer(void *data) {
 	alig = (alignment_t *) array_list_get(j, mapping_list);
 	
 	// decoy management
-	if (genome->chrom_flags[alig->chromosome] == DECOY_FLAG) {
+	if (genome->seq_flags[alig->chromosome] == DECOY_FLAG) {
 	  if (num_mappings == 1) {
 	    alignment_t *aux_alig = alignment_new();       
 	    alignment_init_single_end(strdup(read->id), strdup(alig->sequence), strdup(alig->quality),

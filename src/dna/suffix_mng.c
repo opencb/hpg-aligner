@@ -7,7 +7,7 @@
 suffix_mng_t *suffix_mng_new(sa_genome3_t *genome) {
   suffix_mng_t *p = (suffix_mng_t *) calloc(1, sizeof(suffix_mng_t));
 
-  int num_chroms = genome->num_chroms;
+  int num_chroms = genome->num_seqs;
 
   char *name;
   Container *subject = (Container *) malloc(sizeof(Container));
@@ -149,7 +149,7 @@ void extend_to_left(seed_t *seed, int max_length,
   size_t g_len = r_len + 10;
   size_t g_end = seed->genome_start - 1;
   size_t g_start = g_end - g_len;
-  char *g_seq = &sa_index->genome->S[g_start + sa_index->genome->chrom_offsets[chrom] + 1];
+  char *g_seq = &sa_index->genome->S[g_start + sa_index->genome->seq_offsets[chrom] + 1];
   
   doscadfun_inv(r_seq, r_len, g_seq, g_len, MISMATCH_PERC,
 		alig_out);
@@ -172,7 +172,7 @@ void extend_to_right(seed_t *seed, int max_length,
   size_t g_start = seed->genome_end + 1;
   //size_t g_end = g_start + g_len;
 
-  char *g_seq = &sa_index->genome->S[g_start + sa_index->genome->chrom_offsets[chrom]];
+  char *g_seq = &sa_index->genome->S[g_start + sa_index->genome->seq_offsets[chrom]];
   
   doscadfun(&r_seq[r_start], r_len, g_seq, g_len, MISMATCH_PERC,
 	    alig_out);
@@ -481,7 +481,7 @@ void suffix_mng_search_read_cals(fastq_read_t *read, int num_seeds,
 	  r_start_suf = read_pos;
 	  r_end_suf = r_start_suf + suffix_len - 1;
 	  
-	  g_start_suf = sa_index->SA[suff] - sa_index->genome->chrom_offsets[chrom];
+	  g_start_suf = sa_index->SA[suff] - sa_index->genome->seq_offsets[chrom];
 	  g_end_suf = g_start_suf + suffix_len - 1;
 	  
 	  suffix_mng_update(chrom, r_start_suf, r_end_suf, g_start_suf, g_end_suf, suffix_mng);
@@ -505,7 +505,7 @@ void suffix_mng_search_read_cals(fastq_read_t *read, int num_seeds,
 	  r_start_suf = read_pos;
 	  r_end_suf = r_start_suf + suffix_len - 1;
 	  
-	  g_start_suf = sa_index->SA[suff] - sa_index->genome->chrom_offsets[chrom];
+	  g_start_suf = sa_index->SA[suff] - sa_index->genome->seq_offsets[chrom];
 	  g_end_suf = g_start_suf + suffix_len - 1;
 	  
 	  suffix_mng_update(chrom, r_start_suf, r_end_suf, g_start_suf, g_end_suf, suffix_mng);
@@ -559,7 +559,7 @@ void suffix_mng_search_read_cals_by_region(fastq_read_t *read, int num_seeds,
 	  r_start_suf = read_pos;
 	  r_end_suf = r_start_suf + suffix_len - 1;
 	  
-	  g_start_suf = sa_index->SA[suff] - sa_index->genome->chrom_offsets[chrom];
+	  g_start_suf = sa_index->SA[suff] - sa_index->genome->seq_offsets[chrom];
 	  g_end_suf = g_start_suf + suffix_len - 1;
 	  
 	  if (start <= g_start_suf && end >= g_end_suf) {
@@ -584,7 +584,7 @@ void suffix_mng_search_read_cals_by_region(fastq_read_t *read, int num_seeds,
 	  r_start_suf = read_pos;
 	  r_end_suf = r_start_suf + suffix_len - 1;
 	  
-	  g_start_suf = sa_index->SA[suff] - sa_index->genome->chrom_offsets[chrom];
+	  g_start_suf = sa_index->SA[suff] - sa_index->genome->seq_offsets[chrom];
 	  g_end_suf = g_start_suf + suffix_len - 1;
 	  
 	  if (start <= g_start_suf && end >= g_end_suf) {

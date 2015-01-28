@@ -26,43 +26,112 @@
 #define ALT_FLAG      1
 #define DECOY_FLAG    2
 
+#define GET_SEQ_FLAG_NAME(type) ((type) == CHROM_FLAG ? "CHROM" : ((type) == ALT_FLAG ? "ALT" : ((type) == DECOY_FLAG ? "DECOY" : "UNKNOWN")))
+
+//--------------------------------------------------------------------------------------
+
+typedef struct alt_names {
+  size_t size;
+  char **alt_names;
+  char **chrom_names;
+} alt_names_t;
+
+alt_names_t *alt_names_new(char *alt_filename);
+void alt_names_free(alt_names_t *p);
+
+int alt_names_exists(char *alt_name, alt_names_t *p);
+char *alt_names_get_chrom_name(char *alt_name, alt_names_t *p);
+char *alt_names_display(alt_names_t *p);
+
 //--------------------------------------------------------------------------------------
 
 typedef struct sa_genome3 {
   size_t length;
-  size_t num_chroms;
+  size_t num_refs;
+  size_t num_seqs;
   size_t num_A;
   size_t num_C;
   size_t num_G;
   size_t num_N;
   size_t num_T;
-  size_t *chrom_lengths;
-  size_t *chrom_offsets;
-  char *chrom_flags;
-  char **chrom_names;
+  size_t *seq_lengths;
+  size_t *seq_offsets;
+  size_t *seq_chroms;    // used by ALT sequences (chromosome)
+  size_t *seq_starts;    // used by ALT sequences (start point)
+  size_t *seq_ends;      // used by ALT sequences (end point)
+  size_t *left_flanks;   // used by ALT sequences (left flank)
+  size_t *right_flanks;  // used by ALT sequences (right flank)
+  char *seq_flags;     // CHROM, ALT, DECOY
+  char **seq_names;
   char *S;
 } sa_genome3_t;
 
-static inline sa_genome3_t *sa_genome3_new(size_t length, size_t num_chroms,
-					   size_t *chrom_lengths, char *chrom_flags,
-					   char **chrom_names, char *S) {
+//--------------------------------------------------------------------------------------
+
+sa_genome3_t *read_genome3(char *genome_filename);
+sa_genome3_t *read_genome3_ex(char *genome_filename, char *alt_filename);
+
+//--------------------------------------------------------------------------------------
+
+static inline sa_genome3_t *sa_genome3_new(size_t length, size_t num_seqs,
+					   size_t *seq_lengths, char *seq_flags,
+					   size_t *seq_chroms, size_t *seq_starts,
+					   size_t *seq_ends, char **seq_names, 
+					   char *S) {
   sa_genome3_t *p = (sa_genome3_t *) calloc(1, sizeof(sa_genome3_t));
   p->length = length;
-  p->num_chroms = num_chroms;
-  p->chrom_lengths = chrom_lengths;
-  p->chrom_flags = chrom_flags;
-  if (num_chroms && chrom_lengths) {
-    p->chrom_offsets = (size_t *) calloc(num_chroms, sizeof(size_t));
+  p->num_seqs = num_seqs;
+  p->seq_lengths = seq_lengths;
+  p->seq_flags = seq_flags;
+  if (num_seqs && seq_lengths) {
+    p->seq_offsets = (size_t *) calloc(num_seqs, sizeof(size_t));
     size_t offset = 0;
-    for (size_t i = 0; i < num_chroms; i++) {
-      p->chrom_offsets[i] = offset;
-      offset += chrom_lengths[i];
+    for (size_t i = 0; i < num_seqs; i++) {
+      if (seq_flags[i] == CHROM_FLAG) {
+	p->num_refs++;
+      }
+      p->seq_offsets[i] = offset;
+      offset += seq_lengths[i];
     }
   } else {
-    p->chrom_offsets = NULL;
+    p->seq_offsets = NULL;
   }
-  p->chrom_names = chrom_names;
+  p->seq_names = seq_names;
   p->S = S;
+
+  // calculate flanks
+  size_t *left_flanks = (size_t *) calloc(num_seqs, sizeof(size_t));
+  size_t *right_flanks = (size_t *) calloc(num_seqs, sizeof(size_t));
+  size_t flank_size;
+  char *alt_seq, *chrom_seq;
+  for (size_t i = 0; i < num_seqs; i++) {
+    if (seq_flags[i] == ALT_FLAG) {
+      // calculate left flank
+      flank_size = 0;
+      alt_seq = &S[p->seq_offsets[i]];
+      chrom_seq = &S[p->seq_offsets[seq_chroms[i]] + seq_starts[i]];
+      while (*alt_seq == *chrom_seq) {
+	alt_seq++;
+	chrom_seq++;
+	flank_size++;
+      }
+      left_flanks[i] = flank_size;
+
+      // calculate right flank
+      flank_size = 0;
+      alt_seq = &S[p->seq_offsets[i] + seq_lengths[i] - 1];
+      chrom_seq = &S[p->seq_offsets[seq_chroms[i]] + seq_lengths[seq_chroms[i]] - seq_ends[i] - 1];
+      while (*alt_seq == *chrom_seq) {
+	alt_seq--;
+	chrom_seq--;
+	flank_size++;
+      }
+      right_flanks[i] = flank_size;
+    }
+  }
+  p->left_flanks = left_flanks;
+  p->right_flanks = right_flanks;
+
   return p;
 }
 
@@ -70,16 +139,21 @@ static inline sa_genome3_t *sa_genome3_new(size_t length, size_t num_chroms,
 
 static inline void sa_genome3_free(sa_genome3_t *p) {
   if (p) {
-    if (p->chrom_lengths) free(p->chrom_lengths);
-    if (p->chrom_flags) free(p->chrom_flags);
-    if (p->chrom_offsets) free(p->chrom_offsets);
-    if (p->chrom_names) {
-      for (int i = 0; i < p->num_chroms; i++) {
-	free(p->chrom_names[i]);
+    if (p->seq_lengths) free(p->seq_lengths);
+    if (p->seq_flags) free(p->seq_flags);
+    if (p->seq_offsets) free(p->seq_offsets);
+    if (p->seq_names) {
+      for (int i = 0; i < p->num_seqs; i++) {
+	free(p->seq_names[i]);
       }
-      free(p->chrom_names);
+      free(p->seq_names);
     }
     if (p->S) free(p->S);
+    if (p->seq_chroms) free(p->seq_chroms);
+    if (p->seq_starts) free(p->seq_starts);
+    if (p->seq_ends) free(p->seq_ends);
+    if (p->left_flanks) free(p->left_flanks);
+    if (p->right_flanks) free(p->right_flanks);
     free(p);
   }
 }
@@ -89,7 +163,7 @@ static inline void sa_genome3_free(sa_genome3_t *p) {
 static inline char *sa_genome_get_sequence(unsigned int chrom, size_t start, size_t end, sa_genome3_t *p) {
   size_t len = end - start + 1;
   char *seq = (char *) malloc((len + 1) * sizeof(char));
-  for (size_t i = 0, pos = start + p->chrom_offsets[chrom]; i < len; i++, pos++) {
+  for (size_t i = 0, pos = start + p->seq_offsets[chrom]; i < len; i++, pos++) {
     seq[i] = p->S[pos];
   }
   seq[len] = 0;
@@ -99,7 +173,7 @@ static inline char *sa_genome_get_sequence(unsigned int chrom, size_t start, siz
 //--------------------------------------------------------------------------------------
 
 static inline void sa_genome3_set_nt_counters(size_t num_A, size_t num_C, size_t num_G,
-				      size_t num_N, size_t num_T, sa_genome3_t *p) {
+					      size_t num_N, size_t num_T, sa_genome3_t *p) {
   if (p) {
     p->num_A = num_A;
     p->num_C = num_C;
@@ -115,12 +189,17 @@ static inline void sa_genome3_display(sa_genome3_t *p) {
   if (!p) return;
 
   printf("Genome length: %lu\n", p->length);
-  printf("Number of chromosomes: %lu\n", p->num_chroms);
-  for (size_t i = 0; i < p->num_chroms; i++) {
-    printf("\tchrom. %lu: (name, flag, length, offset) = (%s, %i, %lu, %lu)\n", 
-	   i, (p->chrom_names ? p->chrom_names[i] : "no-name"), 
-	   (int) p->chrom_flags[i], p->chrom_lengths[i], p->chrom_offsets[i]);
+  printf("Number of refs.: %lu\n", p->num_refs);
+  printf("Number of sequences: %lu\n", p->num_seqs);
+  for (unsigned short int i = 0; i < p->num_seqs; i++) {
+    printf("%u\t%s\t%s\t%lu\t%lu\t%lu\t%s\t%lu\t%lu\t%lu\t%lu\n", 
+	   i, GET_SEQ_FLAG_NAME(p->seq_flags[i]), p->seq_names[i],
+	   p->seq_lengths[i], p->seq_offsets[i],
+	   p->seq_chroms[i], (p->seq_flags[i] == ALT_FLAG ? p->seq_names[p->seq_chroms[i]] : ""), 
+	   p->seq_starts[i], p->seq_ends[i],
+	   p->left_flanks[i], p->right_flanks[i]);
   }
+
   printf("Nucleotide counters:\n");
   printf("\tNumber of A: %lu\n", p->num_A);
   printf("\tNumber of C: %lu\n", p->num_C);
@@ -222,6 +301,8 @@ typedef struct sa_index3 {
 
 void sa_index3_build(char *genome_filename, uint k_value, char *sa_index_dirname);
 void sa_index3_build_k18(char *genome_filename, uint k_value, char *sa_index_dirname);
+void sa_index3_build_k18_alt(char *genome_filename, char *alt_filename,
+			    uint k_value, char *sa_index_dirname);
 
 //--------------------------------------------------------------------------------------
 

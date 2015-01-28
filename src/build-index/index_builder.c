@@ -14,6 +14,7 @@ index_options_t *index_options_new() {
   options->index_ratio = 0;
 
   options->ref_genome = NULL;
+  options->alt_filename = NULL;
   options->decoy_genome = NULL;
   options->index_filename = NULL;
 
@@ -25,6 +26,7 @@ index_options_t *index_options_new() {
 void index_options_free(index_options_t *options) {
   if (options) {
     if (options->ref_genome) { free(options->ref_genome); }
+    if (options->alt_filename) { free(options->alt_filename); }
     if (options->decoy_genome) { free(options->decoy_genome); }
     if (options->index_filename) { free(options->index_filename); }
     free(options);
@@ -49,7 +51,8 @@ void** argtable_index_options_new(int mode) {
   if (mode == BWT_INDEX) {
     argtable[count++] = arg_int0("r", "index-ratio", NULL, "BWT index compression ratio. Default: 8");
   } else {
-    argtable[count++] = arg_file0("d", "decoy-genome", NULL, "Decoy genome (FASTA format)");
+    argtable[count++] = arg_file0("a", "alternative-map", NULL, "Alternative mapping filename. This two-columns file contains the alternative sequence names with their corresponding chromosome names (only for SA index)");
+    argtable[count++] = arg_file0("d", "decoy-genome", NULL, "Decoy genome in FASTA format (only for SA index)");
   }
 
   argtable[count++] = arg_lit0("v", "version", "Display version");
@@ -81,6 +84,7 @@ index_options_t *read_CLI_index_options(void **argtable, index_options_t *option
       options->index_ratio = BWT_RATIO_DEFAULT;
     }
   } else {
+    if (((struct arg_file*)argtable[++count])->count) { options->alt_filename = strdup(*(((struct arg_file*)argtable[count])->filename)); }
     if (((struct arg_file*)argtable[++count])->count) { options->decoy_genome = strdup(*(((struct arg_file*)argtable[count])->filename)); }
   }
 
@@ -168,6 +172,12 @@ void validate_index_options(index_options_t *options, int mode) {
     exit(-1);
   }
 
+  if (options->alt_filename && !exists(options->alt_filename)) {
+    fprintf(stdout, "\nError: Your alternative mapping file (%s) does not exist.\n", 
+	    options->alt_filename);
+    exit(-1);
+  }
+
   if (options->decoy_genome && !exists(options->decoy_genome)) {
     fprintf(stdout, "\nError: Your decoy genome (%s) does not exist.\n", 
 	    options->decoy_genome);
@@ -208,13 +218,18 @@ void run_index_builder(int argc, char **argv, char *mode_str) {
     sprintf(binary_filename, "%s/dna_compression.bin", options->index_filename);
     printf("Generating SA Index...\n");
     if (options->decoy_genome) {
-      final_genome = calloc(strlen(options->index_filename) + 128, sizeof(char));;
+      final_genome = calloc(strlen(options->index_filename) + 128, sizeof(char));
       sprintf(final_genome, "%s/tmp.concat.genomes.fa", options->index_filename);
       merge_genomes(options->ref_genome, options->decoy_genome, final_genome);
     } else {
       final_genome = strdup(options->ref_genome);
     }
-    sa_index3_build_k18(final_genome, prefix_value, options->index_filename);
+    if (options->alt_filename) {
+      sa_index3_build_k18_alt(final_genome, options->alt_filename, 
+			      prefix_value, options->index_filename);
+    } else {
+      sa_index3_build_k18(final_genome, prefix_value, options->index_filename);
+    }
     if (options->decoy_genome) {
       sa_index3_set_decoy(options->decoy_genome, options->index_filename);
       remove(final_genome);
@@ -254,6 +269,7 @@ void index_options_display(index_options_t *options) {
      printf("General parameters\n");
      printf("\tReference genome: %s\n", options->ref_genome);
      if (options->mode == SA_INDEX) {
+       printf("\tAlternative sequence names: %s\n", (options->alt_filename ? options->alt_filename : "None"));
        printf("\tDecoy genome: %s\n", (options->decoy_genome ? options->decoy_genome : "None"));
      }
      printf("\t%s index directory name: %s\n", (options->mode == SA_INDEX ? "SA" : "BWT"),
