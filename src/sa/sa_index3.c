@@ -97,12 +97,12 @@ char *alt_names_display(alt_names_t *p) {
 //--------------------------------------------------------------------------------------
 
 sa_genome3_t *read_genome3(char *genome_filename) {
-  return read_genome3_ex(genome_filename, NULL);
+  return read_genome3_alt(genome_filename, NULL);
 }
 
 //--------------------------------------------------------------------------------------
 
-sa_genome3_t *read_genome3_ex(char *genome_filename, char *alt_filename) {
+sa_genome3_t *read_genome3_alt(char *genome_filename, char *alt_filename) {
 
   const int MAX_CHROM_NAME_LENGHT = 1024;
   uint reading_name, seq_name_count = 0;
@@ -289,6 +289,7 @@ sa_genome3_t *read_genome3_ex(char *genome_filename, char *alt_filename) {
   // update chromosomes for ALT sequences: chromosomes and flanks
   char *chrom_name;
   for (size_t i = 0; i < num_seqs; i++) {
+    seq_chroms[i] = i;
     if (seq_flags[i] == ALT_FLAG) {
       chrom_name = alt_names_get_chrom_name(seq_names[i], alt_names);
       if (chrom_name) {
@@ -1201,7 +1202,7 @@ void sa_index3_build_k18_alt(char *genome_filename, char *alt_filename,
   sprintf(filename_tab, "%s/%s.S", sa_index_dirname, prefix);
   printf("\nreading file genome %s...\n", genome_filename);
   gettimeofday(&start, NULL);
-  sa_genome3_t *genome = read_genome3_ex(genome_filename, alt_filename);
+  sa_genome3_t *genome = read_genome3_alt(genome_filename, alt_filename);
   gettimeofday(&stop, NULL);
   
   if (genome->length > MAX_GENOME_LENGTH || genome->num_seqs > MAX_NUM_SEQUENCES) {
@@ -1215,7 +1216,7 @@ void sa_index3_build_k18_alt(char *genome_filename, char *alt_filename,
     exit(-1);
   }
   
-  //sa_genome3_display(genome);
+  //  sa_genome3_display(genome);
 
   // write S to file
   f_tab = fopen(filename_tab, "wb");
@@ -1525,7 +1526,7 @@ void sa_index3_build_k18_alt(char *genome_filename, char *alt_filename,
   fprintf(f_tab, "6. Number of suffixes\n");
   fprintf(f_tab, "7. Genome length\n");
   fprintf(f_tab, "8. Number of sequencess\n");
-  fprintf(f_tab, "9. One line per sequence: name, length, type, chrom, start, end, left and right flanks (the last five fields for HAP sequences)\n");
+  fprintf(f_tab, "9. One line per sequence: name, length, type, chrom, start, end, left and right flanks (the last five fields for ALT sequences)\n");
   fclose(f_tab);
 
   sprintf(filename_tab, "%s/index", sa_index_dirname);

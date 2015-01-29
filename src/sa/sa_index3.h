@@ -69,7 +69,7 @@ typedef struct sa_genome3 {
 //--------------------------------------------------------------------------------------
 
 sa_genome3_t *read_genome3(char *genome_filename);
-sa_genome3_t *read_genome3_ex(char *genome_filename, char *alt_filename);
+sa_genome3_t *read_genome3_alt(char *genome_filename, char *alt_filename);
 
 //--------------------------------------------------------------------------------------
 
@@ -83,6 +83,9 @@ static inline sa_genome3_t *sa_genome3_new(size_t length, size_t num_seqs,
   p->num_seqs = num_seqs;
   p->seq_lengths = seq_lengths;
   p->seq_flags = seq_flags;
+  p->seq_chroms = seq_chroms;
+  p->seq_starts = seq_starts;
+  p->seq_ends = seq_ends;
   if (num_seqs && seq_lengths) {
     p->seq_offsets = (size_t *) calloc(num_seqs, sizeof(size_t));
     size_t offset = 0;
@@ -105,6 +108,8 @@ static inline sa_genome3_t *sa_genome3_new(size_t length, size_t num_seqs,
   size_t flank_size;
   char *alt_seq, *chrom_seq;
   for (size_t i = 0; i < num_seqs; i++) {
+    left_flanks[i] = 0;
+    right_flanks[i] = 0;
     if (seq_flags[i] == ALT_FLAG) {
       // calculate left flank
       flank_size = 0;
@@ -195,7 +200,7 @@ static inline void sa_genome3_display(sa_genome3_t *p) {
     printf("%u\t%s\t%s\t%lu\t%lu\t%lu\t%s\t%lu\t%lu\t%lu\t%lu\n", 
 	   i, GET_SEQ_FLAG_NAME(p->seq_flags[i]), p->seq_names[i],
 	   p->seq_lengths[i], p->seq_offsets[i],
-	   p->seq_chroms[i], (p->seq_flags[i] == ALT_FLAG ? p->seq_names[p->seq_chroms[i]] : ""), 
+	   p->seq_chroms[i], p->seq_names[p->seq_chroms[i]], 
 	   p->seq_starts[i], p->seq_ends[i],
 	   p->left_flanks[i], p->right_flanks[i]);
   }

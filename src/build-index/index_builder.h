@@ -15,8 +15,8 @@
 #define SA_INDEX  0
 #define BWT_INDEX 1
 
-#define NUM_INDEX_OPTIONS     6
-#define NUM_INDEX_BWT_OPTIONS 0
+#define NUM_INDEX_SA_OPTIONS  6
+#define NUM_INDEX_BWT_OPTIONS 5
 
 #define BWT_RATIO_DEFAULT  8
 

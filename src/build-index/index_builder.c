@@ -1,6 +1,5 @@
 #include "index_builder.h"
 
-
 //------------------------------------------------------------------------------------
 //------------------------------------------------------------------------------------
 
@@ -36,9 +35,11 @@ void index_options_free(index_options_t *options) {
 //------------------------------------------------------------------------------------
 
 void** argtable_index_options_new(int mode) {
-  int num_options = NUM_INDEX_OPTIONS;
+  int num_options;
   if (mode == BWT_INDEX) { 
-    num_options += NUM_INDEX_BWT_OPTIONS; 
+    num_options = NUM_INDEX_BWT_OPTIONS; 
+  } else {
+    num_options = NUM_INDEX_SA_OPTIONS; 
   }
     
   // NUM_OPTIONS +1 to allocate end structure
@@ -98,29 +99,51 @@ index_options_t *read_CLI_index_options(void **argtable, index_options_t *option
 //------------------------------------------------------------------------------------
 
 void usage_index(void **argtable, int mode) {
-  printf("\nUsage:\n\t%s %s <options>\n", HPG_ALIGNER_BIN, 
+  printf("\n");
+  printf("+===============================================================+\n");
+  if (mode == BWT_INDEX) {
+    printf("|                HPG-Aligner help for building BWT index        |\n");
+  } else {
+    printf("|                HPG-Aligner help for building SA index         |\n");
+  }
+  printf("+===============================================================+\n");
+  printf("Usage:\n");
+  printf("\t%s %s -g|--ref-genome=<file> -i|--index=<file> [options]\n", 
+	 HPG_ALIGNER_BIN,
 	 (mode == BWT_INDEX ? "build-bwt-index" : "build-sa-index"));
 
-  //arg_print_syntaxv(stdout, argtable, "\n");
-  printf("\nOptions:\n");
-  arg_print_glossary(stdout, argtable, "\t%-50s\t%s\n");
-
-  exit(0);
+  printf("\n");
+  printf("Mandatory parameters:\n");
+  printf("\t-g, --ref-genome              Reference genome (FASTA format)\n");
+  printf("\t-i, --index=<file>            Index directory name\n");
+  printf("\n");
+  printf("Options:\n");
+  printf("\t-a, --alternative-map=<file>  Alternative mapping filename. This two-columns file contains the alternative sequence names with their corresponding chromosome names (only for SA index)\n");
+  printf("\t-d, --decoy-genome=<file>     Decoy genome in FASTA format (only for SA index)\n");
+  printf("\t-v, --version                 Display version\n");
+  printf("\t-h, --help                    Help option\n");
 }
 
 //------------------------------------------------------------------------------------
 
 index_options_t *parse_index_options(int argc, char **argv) {
-  int mode = SA_INDEX, num_options = NUM_INDEX_OPTIONS;
+  int mode, num_options;
 
   if (strcmp(argv[0], "build-bwt-index") == 0) {
     mode = BWT_INDEX;
-    num_options += NUM_INDEX_BWT_OPTIONS;
+    num_options = NUM_INDEX_BWT_OPTIONS;
   } else if (strcmp(argv[0], "build-sa-index") == 0) {
     mode = SA_INDEX;
-  } 
+    num_options = NUM_INDEX_SA_OPTIONS;
+  } else {
+    fprintf(stdout, "\nErrors:\n");
+    printf("\tUnknown command: %s\n", argv[0]);
+    usage_index(NULL, mode);
+    exit(-1);
+  }
 
   void **argtable = argtable_index_options_new(mode);
+
   index_options_t *options = index_options_new();
   if (argc < 2) {
     usage_index(argtable, mode);
