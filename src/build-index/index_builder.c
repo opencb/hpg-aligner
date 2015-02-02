@@ -237,34 +237,17 @@ void run_index_builder(int argc, char **argv, char *mode_str) {
   if (mode == SA_INDEX) {
     const uint prefix_value = 18;
     char binary_filename[strlen(options->index_filename) + 128];
-    char *final_genome;
     sprintf(binary_filename, "%s/dna_compression.bin", options->index_filename);
     printf("Generating SA Index...\n");
-    if (options->decoy_genome) {
-      final_genome = calloc(strlen(options->index_filename) + 128, sizeof(char));
-      sprintf(final_genome, "%s/tmp.concat.genomes.fa", options->index_filename);
-      merge_genomes(options->ref_genome, options->decoy_genome, final_genome);
-    } else {
-      final_genome = strdup(options->ref_genome);
-    }
-    if (options->alt_filename) {
-      sa_index3_build_k18_alt(final_genome, options->alt_filename, 
-			      prefix_value, options->index_filename);
-    } else {
-      sa_index3_build_k18(final_genome, prefix_value, options->index_filename);
-    }
-    if (options->decoy_genome) {
-      sa_index3_set_decoy(options->decoy_genome, options->index_filename);
-      remove(final_genome);
-    }
-    free(final_genome);
-    generate_codes(binary_filename, options->ref_genome);
-    printf("SA Index generated!\n");
+
+    sa_index3_build_k18_alt(options->ref_genome, options->alt_filename, options->decoy_genome,
+			    prefix_value, options->index_filename);
 
     LOG_DEBUG("Compressing reference genome...\n");
     generate_codes(binary_filename, options->ref_genome);
     LOG_DEBUG("...done !\n");
 
+    printf("SA Index generated!\n");
   } else {
     char binary_filename[strlen(options->index_filename) + 128];
     sprintf(binary_filename, "%s/dna_compression.bin", options->index_filename);

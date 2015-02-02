@@ -61,7 +61,7 @@ typedef struct sa_genome3 {
   size_t *seq_ends;      // used by ALT sequences (end point)
   size_t *left_flanks;   // used by ALT sequences (left flank)
   size_t *right_flanks;  // used by ALT sequences (right flank)
-  char *seq_flags;     // CHROM, ALT, DECOY
+  int *seq_flags;     // CHROM, ALT, DECOY
   char **seq_names;
   char *S;
 } sa_genome3_t;
@@ -69,12 +69,13 @@ typedef struct sa_genome3 {
 //--------------------------------------------------------------------------------------
 
 sa_genome3_t *read_genome3(char *genome_filename);
-sa_genome3_t *read_genome3_alt(char *genome_filename, char *alt_filename);
+sa_genome3_t *read_genome3_alt(char *genome_filename, char *alt_filename, 
+			       char *decoy_filename);
 
 //--------------------------------------------------------------------------------------
 
 static inline sa_genome3_t *sa_genome3_new(size_t length, size_t num_seqs,
-					   size_t *seq_lengths, char *seq_flags,
+					   size_t *seq_lengths, int *seq_flags,
 					   size_t *seq_chroms, size_t *seq_starts,
 					   size_t *seq_ends, char **seq_names, 
 					   char *S) {
@@ -306,7 +307,7 @@ typedef struct sa_index3 {
 
 void sa_index3_build(char *genome_filename, uint k_value, char *sa_index_dirname);
 void sa_index3_build_k18(char *genome_filename, uint k_value, char *sa_index_dirname);
-void sa_index3_build_k18_alt(char *genome_filename, char *alt_filename,
+void sa_index3_build_k18_alt(char *genome_filename, char *alt_filename, char *decoy_filename,
 			    uint k_value, char *sa_index_dirname);
 
 //--------------------------------------------------------------------------------------
