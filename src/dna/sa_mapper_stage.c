@@ -1054,7 +1054,7 @@ int generate_cals_from_suffixes(int strand, fastq_read_t *read,
       #endif
       score = doscadfun_inv(r_seq, r_len, g_seq, g_len, MISMATCH_PERC,
 			    &alig_out);
-			    
+		    
       #ifdef _TIMING
       gettimeofday(&stop, NULL);
       mapping_batch->func_times[FUNC_MINI_SW_LEFT_SIDE] += 
@@ -1067,7 +1067,9 @@ int generate_cals_from_suffixes(int strand, fastq_read_t *read,
 	seed->num_extend_gaps += alig_out.gap_extend;
 
 	seed->read_start -= alig_out.map_len1;
+	if ( ((int) seed->read_start) < 0) seed->read_start = 0;
 	seed->genome_start -= alig_out.map_len2;
+	if ( ((int) seed->genome_start) < 0) seed->genome_start = 0;
       }
 
       // if there's a mini-gap then try to fill the mini-gap
@@ -1768,13 +1770,17 @@ int prepare_sw(fastq_read_t *read,   array_list_t *sw_prepare_list,
       print_seed("-------> after updating first left-side seed: ", seed);
       #endif
 
+      
       gap_genome_start = seed->genome_start - seed->read_start - 1 - SW_LEFT_FLANK_EX;
+      if ( ((int) gap_genome_start) < 0) {
+	gap_genome_start = 0;
+      }
       gap_genome_end = seed->genome_start + SW_RIGHT_FLANK;
       ref = sa_genome_get_sequence(cal->chromosome_id, gap_genome_start, gap_genome_end, sa_index->genome);
       
       seq = get_subsequence((cal->strand ? read->revcomp : read->sequence), 
 			    0, seed->read_start + SW_RIGHT_FLANK);
-      
+
       sw_prepare = sw_prepare_new(seq, ref, 0, SW_RIGHT_FLANK, FIRST_SW);
       sw_prepare->seed_region = (seed_region_t *)seed;
       sw_prepare->cal = (cal_t *)cal;
@@ -2047,9 +2053,6 @@ void execute_sw(array_list_t *sw_prepare_list, sa_mapping_batch_t *mapping_batch
     query_start = sw_output->query_start_p[i];
     ref_start = sw_output->ref_start_p[i];
     diff = query_start - ref_start;
-
-    //    printf("flanks (left, right) = (%i, %i), starts (query, ref) = (%i, %i)\n",
-    //	   left_flank, right_flank, query_start, ref_start);
 
     // check initial positions
     if (sw_prepare->ref_type == FIRST_SW) {
@@ -2361,7 +2364,6 @@ int sa_single_mapper(void *data) {
     read = array_list_get(i, mapping_batch->fq_reads);
     
     if (array_list_size(cal_list) > 0) {
-
       // filter by score
       #ifdef _TIMING
       gettimeofday(&start, NULL);
