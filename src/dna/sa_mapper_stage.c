@@ -666,18 +666,7 @@ void check_pairs(array_list_t **cal_lists, sa_index3_t *sa_index,
 
     list1 = cal_lists[i];
     list2 = cal_lists[i+1];
-    /*
-    ////////////////////////
-    printf(">>>> mate #1 (%i):\n", array_list_size(list1));
-    for (int i = 0; i < array_list_size(list1); i++) {
-      seed_cal_print(array_list_get(i, list1));
-    }
-    printf(">>>> mate #2 (%i):\n", array_list_size(list2));
-    for (int i = 0; i < array_list_size(list2); i++) {
-      seed_cal_print(array_list_get(i, list2));
-    }
-    ////////////////////////
-    */
+
     list1_size = array_list_size(list1);
     list2_size = array_list_size(list2);
 
@@ -692,9 +681,6 @@ void check_pairs(array_list_t **cal_lists, sa_index3_t *sa_index,
 	//if (i2 == 0 && cal2->mapq < 10) break;
 
 	list = search_mate_cal_by_prefixes(cal2, read1, sa_index, batch, cal_mng);
-	//printf("--> search mates for mate #1:\n");
-	//seed_cal_print(cal2);
-	//printf("----> mates found %i\n", array_list_size(list));
 	if (array_list_size(list) > 0) {
 	  for (int kk = 0; kk < array_list_size(list); kk++) { 
 	    cal = array_list_get(kk, list); 
@@ -1029,6 +1015,8 @@ int generate_cals_from_suffixes(int strand, fastq_read_t *read,
 
     seed = seed_new(r_start_suf, r_end_suf, g_start_suf, g_end_suf);
 
+    //    int check = 0;
+
     // extend suffix to left side, if necessary
     if (r_start_suf > 0) {
       r_start = 0;
@@ -1038,6 +1026,11 @@ int generate_cals_from_suffixes(int strand, fastq_read_t *read,
       g_len = r_len + 5;
       g_end = g_start_suf - 1;
       g_start = g_end - g_len;
+
+      if ((int) g_start < 0) {
+	g_start = 0;
+	g_len = g_start_suf;
+      }
 
       #ifdef _TIMING
       gettimeofday(&start, NULL);
@@ -1054,7 +1047,6 @@ int generate_cals_from_suffixes(int strand, fastq_read_t *read,
       #endif
       score = doscadfun_inv(r_seq, r_len, g_seq, g_len, MISMATCH_PERC,
 			    &alig_out);
-		    
       #ifdef _TIMING
       gettimeofday(&stop, NULL);
       mapping_batch->func_times[FUNC_MINI_SW_LEFT_SIDE] += 
@@ -1070,30 +1062,6 @@ int generate_cals_from_suffixes(int strand, fastq_read_t *read,
 	if ( ((int) seed->read_start) < 0) seed->read_start = 0;
 	seed->genome_start -= alig_out.map_len2;
 	if ( ((int) seed->genome_start) < 0) seed->genome_start = 0;
-      }
-
-      // if there's a mini-gap then try to fill the mini-gap
-      if (seed->read_start > 0 && seed->read_start < 5) {
-        #ifdef _TIMING
-	gettimeofday(&start, NULL);
-        #endif
-	g_seq = &sa_index->genome->S[seed->genome_start + sa_index->genome->chrom_offsets[chrom] - seed->read_start];
-	for (size_t k1 = 0, k2 = 0; k1 < seed->read_start; k1++, k2++) {
-	  if (r_seq[k1] != g_seq[k2]) {
-	    seed->num_mismatches++;
-	    cigar_append_op(1, 'X', &seed->cigar);
-	  } else {
-	    cigar_append_op(1, '=', &seed->cigar);
-	  }
-	}
-	  
-	seed->genome_start -= seed->read_start;
-	seed->read_start = 0;
-        #ifdef _TIMING
-	gettimeofday(&stop, NULL);
-	mapping_batch->func_times[FUNC_SEED_NEW] += 
-	  ((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);  
-        #endif
       }
 
       // update cigar with the sw output
@@ -1148,31 +1116,6 @@ int generate_cals_from_suffixes(int strand, fastq_read_t *read,
 	if (alig_out.cigar.num_ops > 0) {
 	  cigar_concat(&alig_out.cigar, &seed->cigar);
 	}
-      }
-
-      // if there's a mini-gap then try to fill the mini-gap
-      diff = read->length - seed->read_end - 1;
-      if (diff > 0 && diff < 5) {
-        #ifdef _TIMING
-	gettimeofday(&start, NULL);
-        #endif
-	g_seq = &sa_index->genome->S[seed->genome_end + sa_index->genome->chrom_offsets[chrom] + 1];
-	for (size_t k1 = seed->read_end + 1, k2 = 0; k1 < read->length; k1++, k2++) {
-	  if (r_seq[k1] != g_seq[k2]) {
-	    seed->num_mismatches++;
-	    cigar_append_op(1, 'X', &seed->cigar);
-	  } else {
-	    cigar_append_op(1, '=', &seed->cigar);
-	  }
-	}
-	
-	seed->read_end += diff;
-	seed->genome_end += diff;
-        #ifdef _TIMING
-	gettimeofday(&stop, NULL);
-	mapping_batch->func_times[FUNC_SEED_NEW] += 
-	  ((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);  
-          #endif
       }
     }
 
