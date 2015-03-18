@@ -209,6 +209,35 @@ void metaexons_print(metaexons_t *metaexons);
 void metaexons_print_chr(metaexons_t *metaexons, int chr);
 
 //--------------------------------------------------------------------------------------
+
+typedef struct MPI_breaks {
+  size_t pos;
+  int strand;
+} MPI_breaks_t;
+
+typedef struct MPI_metaexon {
+  size_t start;
+  size_t end;
+  size_t n_starts;
+  size_t n_ends;
+  int chromosome;
+} MPI_metaexon_t;
+
+typedef struct MPI_metaexon_package {
+  MPI_metaexon_t *MPI_metaexon;
+  MPI_breaks_t *starts_ends;
+  int n_metaexons;
+  int n_starts_ends;
+  int max_metaexons;
+  int max_starts_ends;
+} MPI_metaexon_package_t;
+
+void MPI_metaexon_package(metaexons_t *metaexons, 
+			  unsigned long num_meta, unsigned long *list_meta,
+			  unsigned long num_left_breaks, unsigned long *list_left_breaks,
+			  unsigned long num_right_breaks, unsigned long *list_right_breaks);
+//MPI_metaexon_package_t *merge_meta_packs(MPI_metaexon_package_t *my_mpi_meta_pack, MPI_metaexon_package_t *mpi_meta_pack);
+
 //--------------------------------------------------------------------------------------
 
 

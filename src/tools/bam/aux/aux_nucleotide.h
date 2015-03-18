@@ -19,7 +19,7 @@
 #define AUX_NUCLEOTIDE_H_
 
 #include "aux_library.h"
-#include "x86intrin.h"
+//#include "x86intrin.h"
 
 /***************************
  * NUCLEOTIDE OPERATIONS
@@ -264,6 +264,7 @@ nucleotide_miss_qual_sum(const char *ref_seq, const char *bam_seq, const char *b
 	}
 
 	//Horizontal add of four 32 bit partial sums
+	/*
 #ifdef __SSSE3__
 	v_sum = _mm_hadd_epi32(_mm_hadd_epi32(v_sum, v_zero), v_zero);
 #else
@@ -271,7 +272,7 @@ nucleotide_miss_qual_sum(const char *ref_seq, const char *bam_seq, const char *b
 	v_sum = _mm_add_epi32(v_sum, _mm_srli_si128(v_sum, 4));
 #endif
 	sum = _mm_cvtsi128_si32(v_sum);
-
+	*/
 	v_count = _mm_add_epi32(v_count, _mm_srli_si128(v_count, 8));
 	misses = _mm_cvtsi128_si32(v_count);
 

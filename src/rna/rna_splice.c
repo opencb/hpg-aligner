@@ -313,7 +313,7 @@ int avl_node_compare(avl_node_t* a, size_t b) {
 
 //--------------------------------------------------------------------------------
 
-void allocate_end_splice(size_t end, size_t end_extend, int type_orig, char type_sp, start_data_t *data, char *splice_nt) {
+int allocate_end_splice(size_t end, size_t end_extend, int type_orig, char type_sp, start_data_t *data, char *splice_nt) {
   int num_ends = array_list_size(data->list_ends);
   splice_end_t *splice_end;
 
@@ -330,13 +330,13 @@ void allocate_end_splice(size_t end, size_t end_extend, int type_orig, char type
       splice_end_type_new(type_sp, splice_nt, splice_end);
       
       if (type_orig != FROM_FILE) { splice_end->reads_number++; }
-      return;
+      return 0;
     }
   }
 
   splice_end = splice_end_new(end, end_extend, type_orig, type_sp, splice_nt);
   array_list_insert(splice_end, data->list_ends);
-  return;
+  return 1;
 }
 
 void allocate_start_splice(size_t start, end_data_t *data) {
@@ -371,7 +371,6 @@ void allocate_start_node(unsigned int chromosome, unsigned char strand,
     //	    strand, chromosome, start, end); 
     //exit(-1); 
     pthread_mutex_unlock(&(avls_list->avls[strand][chromosome].mutex));
-
     return;
   }
 
@@ -392,20 +391,19 @@ void allocate_start_node(unsigned int chromosome, unsigned char strand,
     start_data->start_extend = start_extend;
     }
   }
+  node_start->strand = strand;
 
-  allocate_end_splice(end, end_extend, type_orig, type_sp, start_data, splice_nt);
-
-  //For Extra speed we insert all ends in the other avl 
+  avls_list->avls[strand][chromosome].num_sp_diff += allocate_end_splice(end, end_extend, type_orig, type_sp, start_data, splice_nt);
   avl = avls_list->ends_avls[strand][chromosome].avl;
-  node_end = (avl_node_t *)cp_avltree_get(avl, (void *)end);
+  //For Extra speed we insert all ends in the other avl 
 
+  node_end = (avl_node_t *)cp_avltree_get(avl, (void *)end);
   if(node_end == NULL) {
     //printf("\tNot Exist E\n");
     node_end = cp_avltree_insert(avl, (void *)end, (void *)end);
-  }  //else {
-  //printf("\tExist E\n");
-  //}
-
+  }
+  node_end->strand = strand;
+  
   allocate_start_splice(start, (end_data_t *)node_end->data);
 
   if (ref_node_start != NULL && ref_node_end != NULL) {
@@ -436,6 +434,7 @@ avls_list_t* avls_list_new(size_t num_chromosomes) {
 								(cp_copy_fn) avl_node_new,
 								(cp_destructor_fn)avl_node_free);
       pthread_mutex_init(&(avls_list->avls[st][i].mutex), NULL);
+      avls_list->avls[st][i].num_sp_diff = 0;
     }
   }
 
@@ -454,6 +453,7 @@ avls_list_t* avls_list_new(size_t num_chromosomes) {
                                                                        (cp_copy_fn) avl_node_end_new,
                                                                        (cp_destructor_fn)avl_node_end_free);
       pthread_mutex_init(&(avls_list->ends_avls[st][i].mutex), NULL);
+      avls_list->ends_avls[st][i].num_sp_diff = 0;
     }
   }
 
@@ -596,6 +596,130 @@ void write_chromosome_avls( char *extend_sp, char *exact_sp,
   //basic_statistics_sp_init(total_splice, cannonical_sp, semi_cannonical_sp, basic_st);
     
 }
+
+
+
+void MPI_avlnode_package_ends(avl_node_t *node_val, unsigned char st,
+			      unsigned int chromosome,
+			      size_t *package_pos, unsigned long *list_sj, unsigned long num_sj) {
+  
+  start_data_t *start_data = node_val->data;
+  size_t num_ends = array_list_size(start_data->list_ends);
+
+  for (size_t i = 0; i < num_ends; i++) {
+    splice_end_t *end_sp = array_list_get(i, start_data->list_ends);
+    
+    if (end_sp->reads_number) {
+      list_sj[(*package_pos)] = node_val->position;
+      list_sj[num_sj   + (*package_pos)] = end_sp->end;
+      list_sj[num_sj*2 + (*package_pos)] = end_sp->reads_number;
+      list_sj[num_sj*3 + (*package_pos)] = st;
+      list_sj[num_sj*4 + (*package_pos)] = chromosome;
+      //MPI_package[*package_pos].start        = node_val->position;
+      //MPI_package[*package_pos].end          = end_sp->end;
+      //MPI_package[*package_pos].reads_number = end_sp->reads_number;
+      //MPI_package[*package_pos].strand       = st;
+      //MPI_package[(*package_pos)++].chr      = chromosome;
+      (*package_pos)++;
+    }
+  }
+
+  return;
+
+}
+
+
+
+void MPI_avlnode_package(cp_avlnode *node, unsigned char st,
+			 unsigned int chromosome,
+			 size_t *package_pos, unsigned long *list_sj, unsigned long num_sj) {
+
+  if (node->left) {
+    MPI_avlnode_package(node->left, st, chromosome, package_pos, list_sj, num_sj);
+  }
+
+  MPI_avlnode_package_ends((avl_node_t *)node->value, st,
+			   chromosome, package_pos, list_sj, num_sj);
+
+  if (node->right) {
+    MPI_avlnode_package(node->right, st, chromosome, package_pos, list_sj, num_sj);
+  }
+
+  return;
+
+}
+
+
+
+size_t get_total_items(size_t num_chromosomes, avls_list_t *avls_list) {
+  size_t total_items = 0;
+  for(int st = 0; st < NUM_STRANDS; st++) {
+    for(int c = 0; c < num_chromosomes; c++) {
+      total_items += avls_list->avls[st][c].num_sp_diff;
+    }
+  }
+  return total_items;
+}
+
+
+
+void MPI_avl_package(size_t num_chromosomes,
+		     avls_list_t *avls_list,
+		     unsigned long  num_sj,
+		     unsigned long  *list_sj) {
+
+  //size_t num_sj;
+  
+  //= 0;
+  //for (int st = 0; st < NUM_STRANDS; st++) {
+  //for (int i = 0; i < num_chromosomes; i++) {
+  //cp_avltree *avltree = avls_list->avls[st][i].avl;
+  //num_sj += cp_avltree_count(avltree);
+  //}
+  //}
+  
+  //num_sj = get_total_items(num_chromosomes, avls_list);
+  
+  //if (num_sj > *max_num_sj) {
+  //*max_num_sj = num_sj * 2;
+  //}
+  
+  //MPI_splice_t *MPI_splice_package = (MPI_splice_t *)malloc(sizeof(MPI_splice_t)*(*max_num_sj));
+  
+  size_t package_pos = 0;
+  
+  for(int st = 0; st < NUM_STRANDS; st++) {
+    for(int c = 0; c < num_chromosomes; c++) {
+      if(avls_list->avls[st][c].avl->root != NULL) {
+  	int chr = c + 1;
+  	MPI_avlnode_package(avls_list->avls[st][c].avl->root, st, chr, &package_pos, list_sj, num_sj);
+      }
+    }
+  }
+  
+  //*num_sj_return = num_sj;
+  
+  return;// MPI_splice_package;
+
+}
+
+/*
+MPI_splice_t *merge_avl_packs(MPI_splice_t *my_mpi_avl_pack, int *my_num_sj, MPI_splice_t *mpi_avl_pack, int num_sj, int *max_sj) {
+  
+  int old_num_sj = *my_num_sj;
+  
+  *my_num_sj += num_sj;
+  if (my_num_sj >= *max_sj) {
+    *max_sj = 2*(*my_num_sj);
+    my_mpi_avl_pack = realloc(my_mpi_avl_pack, *max_sj);
+  }
+  
+  memcpy(&my_mpi_avl_pack[old_num_sj], mpi_avl_pack, sizeof(MPI_splice_t)*num_sj);
+
+  return my_mpi_avl_pack;
+  
+}
+*/
 
 /*
 

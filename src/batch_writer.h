@@ -45,7 +45,7 @@ struct batch_writer_input {
   linked_list_t* list_p;
 
   // for methylation only
-  metil_file_t *metil_file;
+  void *metil_file;
 };
 
 //------------------------------------------------------------------------------------

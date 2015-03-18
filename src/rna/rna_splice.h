@@ -74,6 +74,7 @@ void avl_process(cp_avlnode *node);
 
 typedef struct avl_node {
   size_t position;
+  unsigned char strand;
   void *data;
 } avl_node_t;
 avl_node_t *avl_node_new();
@@ -105,7 +106,8 @@ splice_end_t *splice_end_new(size_t end, size_t end_extend,
 void splice_end_free(splice_end_t *splice_end);
 
 typedef struct avl_tree {
-  cp_avltree *avl; 
+  int num_sp_diff;
+  cp_avltree *avl;
   pthread_mutex_t mutex;  
 } avl_tree_t;
 
@@ -187,6 +189,29 @@ typedef struct allocate_splice_elements{
   cp_avltree *avl_splice; /**< avl tree for store splice junctions */
   pthread_mutex_t mutex;  /**< mutex for insertions synchronized */
 }allocate_splice_elements_t;
+
+
+//============= MPI FUNCTION ==============//
+
+typedef struct MPI_splice {
+  size_t start;
+  size_t end;
+  size_t reads_number;
+  int strand;
+  int chr;
+} MPI_splice_t;
+
+size_t get_total_items(size_t num_chromosomes, avls_list_t *avls_list);
+
+void MPI_avl_package(size_t num_chromosomes,
+		     avls_list_t *avls_list,
+		     unsigned long num_sj_return,
+		     unsigned long *list_sj);
+
+//void merge_avl_packs(MPI_splice_t *my_mpi_avl_pack, int *my_num_sj, MPI_splice_t *mpi_avl_pack, int num_sj, int *max_sj);
+
+//=========== MPI FUNCTION END ============//     
+
 
 /**
  * @brief  Compare one node of avl with one unsigned int.

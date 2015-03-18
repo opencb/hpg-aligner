@@ -91,7 +91,7 @@ void *fastq_reader(void *input) {
 
 	  new_batch = batch_new(batch->bwt_input, batch->region_input, batch->cal_input, 
 				batch->pair_input, batch->preprocess_rna, batch->sw_input, batch->writer_input, 
-				batch->mapping_mode, mapping_batch);
+				batch->mapping_mode, mapping_batch, batch->data_out);
      }
 
      //if (time_on) { stop_timer(start, end, time); timing_add(time, FASTQ_READER, timing); }
@@ -367,7 +367,7 @@ void *file_reader(void *input) {
 							     1.25f, 
 							     COLLECTION_MODE_ASYNCHRONIZED);
     //printf("(num items %i)\nID : %s\nSEQ: %s\nQUA: %s\n", num_items, fq_read->id, fq_read->sequence, fq_read->quality);
-
+    
     array_list_insert(fq_read, reads);
     
     if (type == CAL_TYPE) {
@@ -399,13 +399,13 @@ void *file_reader(void *input) {
   }
 
   //w2_r += num_reads;
-  //printf("W2 Reads: %i\n", w2_r);
+  //printf("\tW2 Reads: %i\n", num_reads);
 
   if (num_reads) {
     mapping_batch->num_allocated_targets = num_reads;
     new_batch = batch_new(batch->bwt_input, batch->region_input, batch->cal_input, 
 			  batch->pair_input, batch->preprocess_rna, batch->sw_input,
-			  batch->writer_input, batch->mapping_mode, mapping_batch); 
+			  batch->writer_input, batch->mapping_mode, mapping_batch, batch->data_out); 
   } else {
     //array_list_free(reads, NULL);
     mapping_batch_free(mapping_batch);
@@ -479,6 +479,7 @@ void *file_reader_2(void *input) {
   }
 
   tot_reads2 += num_reads;
+
   //printf("W3 Reads: %i | %i\n", tot_reads2, num_reads);
   //w3_r += num_reads;
   //printf("W3 Reads: %i\n", w3_r);
@@ -487,7 +488,8 @@ void *file_reader_2(void *input) {
     mapping_batch->num_allocated_targets = num_reads;
     new_batch = batch_new(batch->bwt_input, batch->region_input, batch->cal_input, 
 			  batch->pair_input, batch->preprocess_rna, batch->sw_input,
-			  batch->writer_input, batch->mapping_mode, mapping_batch); 
+			  batch->writer_input, batch->mapping_mode, mapping_batch,
+			  batch->data_out); 
   } else {
     mapping_batch_free(mapping_batch);
   }
@@ -509,7 +511,20 @@ void write_unmapped_read(fastq_read_t *fq_read, bam_file_t *bam_file);
 
 //--------------------------------------------------------------------
 
+
 int sam_writer(void *data) {
+  /*
+  batch_t *batch = data;
+  FILE *out_file = (FILE *) batch->writer_input->bam_file;
+  fwrite((char *)batch->data_output, sizeof(char), batch->data_output_size, out_file);    
+  free(batch->data_output);
+  batch_free(batch);
+  
+  return 0;
+  */
+  
+  extern size_t T_ALIG;
+  
   batch_t *batch = (batch_t *) data;
   batch_writer_input_t *writer_input = batch->writer_input;
   //bam_file_t *bam_file = writer_input->bam_file;    
@@ -536,6 +551,8 @@ int sam_writer(void *data) {
     mapping_list = mapping_batch->mapping_lists[i];
     num_mappings = array_list_size(mapping_list);
     total_mappings += num_mappings;
+
+    T_ALIG += num_mappings;
     //printf("%i.Read %s (num_mappings %i)\n", i, read->id, num_mappings);    
     if (num_mappings > 0) {
       if (num_mappings == 1) {
@@ -548,6 +565,7 @@ int sam_writer(void *data) {
       for (size_t j = 0; j < num_mappings; j++) {
 	alig = (alignment_t *) array_list_get(j, mapping_list);
 	flag = (alig->seq_strand ? 16 : 0);
+
 	fprintf(out_file, "%s\t%i\t%s\t%i\t%i\t%s\t%s\t%i\t%i\t%s\t%s\n", 
 		alig->query_name, 
 		flag,
@@ -561,7 +579,6 @@ int sam_writer(void *data) {
 		alig->sequence,
 		alig->quality);
 	//alig->optional_fields);
-	
 	alignment_free(alig);	 
       }
       array_list_free(mapping_list, NULL);
@@ -570,22 +587,24 @@ int sam_writer(void *data) {
       if (mapping_list) {
 	array_list_free(mapping_list, NULL);
       }	 
-      
+
       fprintf(out_file, "%s\t4\t*\t0\t0\t*\t*\t0\t0\t%s\t%s\n", 
 	      read->id,
 	      read->sequence,
 	      read->quality);
-
+      
     }
   }
-
+  
   if (mapping_batch) {
     mapping_batch_free(mapping_batch);
   }
   
   if (batch) batch_free(batch);
-
+  
   basic_statistics_add(num_reads, num_mapped_reads, total_mappings, 0, basic_st);
+  
+  
 }
 
 int bam_writer(void *data) {
@@ -732,6 +751,37 @@ void write_unmapped_read(fastq_read_t *fq_read, bam_file_t *bam_file) {
 // stage functions
 //--------------------------------------------------------------------
 
+int rna_wq(void *data) {
+
+  bwt_stage(data);
+  cal_stage(data);
+  sw_stage(data);
+  
+  return post_pair_stage(data);
+  
+}
+
+
+int rna_wq_w2(void *data) {
+
+  rna_last_stage(data);
+  
+  return post_pair_stage(data);
+
+}
+
+int rna_wq_w3(void *data) {
+
+  rna_last_hc_stage(data);
+  
+  return post_pair_stage(data);
+
+}
+
+
+  
+//--------------------------------------------------------------------
+
 int bwt_stage(void *data) {
   batch_t *batch = (batch_t *) data;
 
@@ -850,6 +900,15 @@ int rna_last_hc_stage(void *data) {
 int post_pair_stage(void *data) {
   batch_t *batch = (batch_t *) data;
   return prepare_alignments(batch->pair_input, batch);
+}
+
+//--------------------------------------------------------------------
+
+int post_pair_stage_w2_w3(void *data) {
+  batch_t *batch = (batch_t *) data;
+  prepare_alignments(batch->pair_input, batch);
+  
+  return MPI_OUTPUT_W2_W3;
 }
 
 //--------------------------------------------------------------------

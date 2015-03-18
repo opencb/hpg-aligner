@@ -250,4 +250,6 @@ cigar_code_t *meta_alignment_fill_extrem_gap(char *query,
 					     metaexons_t *metaexons, 
 					     avls_list_t *avls_list);
 
+//void bwt_convert_batch_to_str(batch_t *batch);
+
 #endif

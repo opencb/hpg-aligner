@@ -75,6 +75,9 @@
 #define RNA_CAL_STAGE           1
 #define RNA_STAGE               2
 #define RNA_POST_PAIR_STAGE     3
+#define MPI_OUTPUT              4
+
+#define MPI_OUTPUT_W2_W3        2
 
 //================================= LAST WORKFLOW ==================================
 
@@ -478,7 +481,6 @@ typedef struct pair_server_input pair_server_input_t;
 typedef struct sw_server_input sw_server_input_t;
 typedef struct batch_writer_input batch_writer_input_t;
 
-
 typedef struct batch {
   int mapping_mode;
   bwt_server_input_t *bwt_input;
@@ -489,7 +491,11 @@ typedef struct batch {
   sw_server_input_t *sw_input;
   batch_writer_input_t *writer_input;
   mapping_batch_t *mapping_batch;
-  void *optional_data;
+  void *data_out;
+
+  char *data_output;
+  size_t data_output_size;
+  
 } batch_t;
 
 
@@ -501,7 +507,8 @@ batch_t *batch_new(bwt_server_input_t *bwt_input,
                    sw_server_input_t *sw_input,
                    batch_writer_input_t *writer_input,
 		   int mapping_mode,
-                   mapping_batch_t *mapping_batch);
+                   mapping_batch_t *mapping_batch,
+		   void *data_out);
 
 void batch_free(batch_t *b);
 

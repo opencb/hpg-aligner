@@ -56,9 +56,11 @@ batch_t *batch_new(bwt_server_input_t *bwt_input,
                    sw_server_input_t *sw_input,
                    batch_writer_input_t *writer_input,
 		   int mapping_mode,
-                   mapping_batch_t *mapping_batch) {
+                   mapping_batch_t *mapping_batch,
+		   void *data_out) {
 
   batch_t *b = (batch_t *) calloc(1, sizeof(batch_t));
+
   b->bwt_input = bwt_input;
   b->region_input = region_input;
   b->cal_input = cal_input;
@@ -68,7 +70,8 @@ batch_t *batch_new(bwt_server_input_t *bwt_input,
   b->mapping_batch = mapping_batch;
   b->mapping_mode = mapping_mode;
   b->preprocess_rna = preprocess_rna;
-
+  b->data_out = data_out;
+  
   return b;
 }
 

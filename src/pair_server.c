@@ -1285,6 +1285,8 @@ char *cigar_code_find_and_report_sj(size_t start_map, cigar_code_t *cigar_code,
 
 //------------------------------------------------------------------------------------
 
+//------------------------------------------------------------------------------------
+
 int prepare_alignments(pair_server_input_t *input, batch_t *batch) {
 
   //if (batch->mapping_mode == DNA_MODE) {
@@ -1328,15 +1330,20 @@ int prepare_alignments(pair_server_input_t *input, batch_t *batch) {
 	}
       }
     }
-
+    
     if (input->pair_mng->pair_mode != SINGLE_END_MODE) {
       prepare_paired_alignments(input, batch->mapping_batch); 
     }
 
+    int max_alig = 0;
+    
     for (int i = 0; i < num_reads; i++) {
       fastq_read_t *read = array_list_get(i, batch->mapping_batch->fq_batch);
       array_list_t *mapping_list = batch->mapping_batch->mapping_lists[i];
       size_t n_alignments = array_list_size(mapping_list);
+
+      if (n_alignments > max_alig) max_alig = n_alignments;
+      
       for (int j = 0; j < n_alignments; j++) {
 	alignment_t *alig = array_list_get(j, mapping_list);
 	if (alig->alig_data) {
@@ -1350,10 +1357,14 @@ int prepare_alignments(pair_server_input_t *input, batch_t *batch) {
 	}
       }
     }
+    
+    //if (!batch->writer_input->bam_format)
+    //bwt_convert_batch_to_str(input, batch, max_alig);
+    
   }
 
   return CONSUMER_STAGE;
-
+      
   //printf("pair_server.c: prepare_alignments done (pair mode = %i)\n", input->pair_mng->pair_mode);
   //printf("pair_server.c: 1: after prepare_single_alignments\n");
 }

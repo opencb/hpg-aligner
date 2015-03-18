@@ -137,4 +137,7 @@ static inline void exon_display(exon_t *p) {
 void load_transcriptome(char *filename, genome_t *genome, 
 			avls_list_t *avls_list, metaexons_t *metaexons);
 
+void sa_index3_parallel_genome_new(char *sa_index_dirname, int num_threads,
+				   sa_index3_t **sa_index_out, genome_t **genome_out);
+
 #endif

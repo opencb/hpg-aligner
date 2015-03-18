@@ -711,6 +711,8 @@ void rna_aligner(options_t *options) {
     }
   }
 
+  options->bam_format = 0;
+  
   if (options->prefix_name) {
     strcat(reads_results, "/");
     strcat(reads_results, options->prefix_name);
@@ -868,39 +870,12 @@ void rna_aligner(options_t *options) {
     //////////////////////////////////////////////////////
   } else {    
     ///////////////// LOAD SA INDEX ////////////////////// 
-
     LOG_DEBUG("Load SA State");
 
     //sa_index = sa_index3_new(options->bwt_dirname);
     start_timer(time_genome_s);
     sa_index3_parallel_genome_new(options->bwt_dirname, options->num_cpu_threads, &sa_index, &genome);
     
-    /*
-    sa_index3_display(sa_index);
-    stop_timer(time_genome_s, time_genome_e, time_genome);
-    printf("1.TOTAL Carga genoma: %f(s)\n", time_genome / 1000000);
-    
-    start_timer(time_genome_s);
-    LOG_DEBUG("Reading genome...");
-    genome = genome_new("dna_compression.bin", options->bwt_dirname, SA_MODE);
-    
-    genome->num_chromosomes = sa_index->genome->num_chroms;
-    genome->chr_name = (char **) calloc(genome->num_chromosomes, sizeof(char *));
-    genome->chr_size = (size_t *) calloc(genome->num_chromosomes, sizeof(size_t));
-    genome->chr_offset = (size_t *) calloc(genome->num_chromosomes, sizeof(size_t));
-    size_t offset = 0;
-    
-    for (int c = 0; c < genome->num_chromosomes; c++) {
-      genome->chr_size[c] = sa_index->genome->chrom_lengths[c];
-      genome->chr_name[c] = strdup(sa_index->genome->chrom_names[c]);
-      genome->chr_offset[c] = offset;
-      offset += genome->chr_size[c];
-    }
-    stop_timer(time_genome_s, time_genome_e, time_genome);
-    printf("2.TOTAL Carga genoma: %f(s)\n", time_genome / 1000000);
-
-    LOG_DEBUG("Done !!");
-    */
   }
 
   num_chromosomes = genome->num_chromosomes;
@@ -975,17 +950,6 @@ void rna_aligner(options_t *options) {
 				options->pair_mode, options->batch_size, 
 				NULL, options->gzip, &reader_input);  
 
-  //buffer_reader_input_t buffer_reader_input;
-  //buffer_reader_input_init(&reader_input,
-  //buffer,
-  //buffer_reader_input);
-
-  //if (options->pair_mode == SINGLE_END_MODE) {
-  //reader_input.fq_file1 = fastq_fopen(options->in_filename);
-  //} else {
-  //reader_input.fq_file1 = fastq_fopen(options->in_filename);
-  //reader_input.fq_file2 = fastq_fopen(options->in_filename2);
-  //}
 
   linked_list_t *alignments_list = linked_list_new(COLLECTION_MODE_SYNCHRONIZED);
   linked_list_set_flag(options->pair_mode, alignments_list);
@@ -1061,7 +1025,8 @@ void rna_aligner(options_t *options) {
   int workflow_enable = 1;
 
   batch_t *batch = batch_new(&bwt_input, &region_input, &cal_input, 
-			     &pair_input, &preprocess_rna, &sw_input, &writer_input, RNA_MODE, NULL);
+			     &pair_input, &preprocess_rna, &sw_input, &writer_input, RNA_MODE,
+			     NULL, NULL);
 
   //  fastq_batch_reader_input_t reader_input;
 
@@ -1107,9 +1072,14 @@ void rna_aligner(options_t *options) {
   struct timeval time_start_alig, time_end_alig;  
   char *file1, *file2;
 
-  double time_total_1, time_total_2;
+  double time_total_1 = 0, time_total_2 = 0;
   struct timeval time_s1, time_e1, time_s2, time_e2;
-
+  
+  struct timeval start_sa, stop_sa;
+  double time_sa = 0;
+  
+  start_timer(start_sa);
+  
   for (int f = 0; f < num_files1; f++) {
     file1 = array_list_get(f, files_fq1);
 
@@ -1179,30 +1149,39 @@ void rna_aligner(options_t *options) {
       //
       // timing
       //struct timeval start, end;
-
       wf_input_t *wf_input = wf_input_new(&reader_input, batch);
       wf_input_file_t *wf_input_file = wf_input_file_new(f_sa, batch);   
       wf_input_file_t *wf_input_file_hc = wf_input_file_new(f_hc, batch);  
 
       //create and initialize workflow
       workflow_t *wf = workflow_new();
-      workflow_stage_function_t stage_functions[] = {bwt_stage, cal_stage, 
-						     sw_stage, post_pair_stage};
-      char *stage_labels[] = {"BWT", "CAL", "SW", "POST PAIR"};
-      workflow_set_stages(4, (workflow_stage_function_t *)&stage_functions, stage_labels, wf);
+      //workflow_stage_function_t stage_functions[] = {bwt_stage, cal_stage, 
+      //					     sw_stage, post_pair_stage};
+      //char *stage_labels[] = {"BWT", "CAL", "SW", "POST PAIR"};
+      //workflow_set_stages(4, (workflow_stage_function_t *)&stage_functions, stage_labels, wf);
+      
+      workflow_stage_function_t stage_functions[] = {rna_wq};
+      char *stage_labels[] = {"RNA"};
+      workflow_set_stages(1, (workflow_stage_function_t *)&stage_functions, stage_labels, wf);
+
       // optional producer and consumer functions
       workflow_set_producer((workflow_producer_function_t *)fastq_reader, "FastQ reader", wf);
-
       if (options->bam_format) {
 	workflow_set_consumer((workflow_consumer_function_t *)bam_writer, "BAM writer", wf);
       } else {
 	workflow_set_consumer((workflow_consumer_function_t *)sam_writer, "SAM writer", wf);
       }
 
+      
       workflow_t *wf_last = workflow_new();
-      workflow_stage_function_t stage_functions_last[] = {rna_last_stage, post_pair_stage};
-      char *stage_labels_last[] = {"RNA LAST STAGE", "POST PAIR"};
-      workflow_set_stages(2, (workflow_stage_function_t *)&stage_functions_last, stage_labels_last, wf_last);
+      //workflow_stage_function_t stage_functions_last[] = {rna_last_stage, post_pair_stage};
+      //char *stage_labels_last[] = {"RNA LAST STAGE", "POST PAIR"};
+      //workflow_set_stages(2, (workflow_stage_function_t *)&stage_functions_last, stage_labels_last, wf_last);
+
+      workflow_stage_function_t stage_functions_last[] = {rna_wq_w2};
+      char *stage_labels_last[] = {"RNA LAST STAGE"};
+      workflow_set_stages(1, (workflow_stage_function_t *)&stage_functions_last, stage_labels_last, wf_last);
+      
       workflow_set_producer((workflow_producer_function_t *)file_reader, "Buffer reader", wf_last);
 
       if (options->bam_format) {
@@ -1213,9 +1192,13 @@ void rna_aligner(options_t *options) {
 
 
       workflow_t *wf_hc = workflow_new();
-      workflow_stage_function_t stage_functions_hc[] = {rna_last_hc_stage, post_pair_stage};
-      char *stage_labels_hc[] = {"RNA HARD CLIPPINGS", "POST PAIR"};
-      workflow_set_stages(2, (workflow_stage_function_t *)&stage_functions_hc, stage_labels_hc, wf_hc);
+      //workflow_stage_function_t stage_functions_hc[] = {rna_last_hc_stage, post_pair_stage};
+      //char *stage_labels_hc[] = {"RNA HARD CLIPPINGS", "POST PAIR"};
+      //workflow_set_stages(2, (workflow_stage_function_t *)&stage_functions_hc, stage_labels_hc, wf_hc);
+      workflow_stage_function_t stage_functions_hc[] = {rna_wq_w3};
+      char *stage_labels_hc[] = {"RNA HARD CLIPPINGS"};
+      workflow_set_stages(1, (workflow_stage_function_t *)&stage_functions_hc, stage_labels_hc, wf_hc);
+      
       workflow_set_producer((workflow_producer_function_t *)file_reader_2, "Buffer reader", wf_hc);
 
       if (options->bam_format) {
@@ -1223,7 +1206,7 @@ void rna_aligner(options_t *options) {
       } else {
 	workflow_set_consumer((workflow_consumer_function_t *)sam_writer, "SAM writer", wf_hc);
       }
-     
+
       // Create new thread POSIX for search extra Splice Junctions
       //============================================================
       pthread_attr_t attr;
@@ -1242,8 +1225,8 @@ void rna_aligner(options_t *options) {
 	printf("\nPROCESS FILE: %s\n", file1);
       }
 
-      start_timer(time_start_alig);
-
+      //workflow_run_with(options->num_cpu_threads, wf_input, wf);
+      
       printf("\nWORKFLOW 1\n");
       w1_end = 0;
       fd_read_bytes = 0;
@@ -1251,7 +1234,16 @@ void rna_aligner(options_t *options) {
       {
           #pragma omp section
           {      
+
+	    start_timer(time_start_alig);
 	    workflow_run_with(options->num_cpu_threads, wf_input, wf);
+	    workflow_display_timing(wf);
+	    extern size_t T_ALIG;
+	    printf("======================== %lu alignments ======================\n", T_ALIG);
+
+	    stop_timer(time_start_alig, time_end_alig, time_alig);
+	    printf("Stop Timer. Mapping Time %0.2f(s)\n", time_alig / 1000000);
+	    
 	    w1_end = 1;
 	  }
           #pragma omp section
@@ -1259,7 +1251,7 @@ void rna_aligner(options_t *options) {
 	    display_progress();
 	  }
       }
-
+      
       printf("\nWORKFLOW 2\n");
       rewind(f_sa);
       w2_end = 0;
@@ -1296,19 +1288,19 @@ void rna_aligner(options_t *options) {
       printf("\n");
       total_reads_w3 = 0;
       total_reads_w2 = 0;
+      
 
-      stop_timer(time_start_alig, time_end_alig, time_alig);
       //start_timer(time_start_alig);
 
       
       // free memory
       workflow_free(wf);
-      workflow_free(wf_last);
-      workflow_free(wf_hc);
+      //workflow_free(wf_last);
+      //workflow_free(wf_hc);
 
       wf_input_free(wf_input);
-      wf_input_file_free(wf_input_file);
-      wf_input_file_free(wf_input_file_hc);
+      //wf_input_file_free(wf_input_file);
+      //wf_input_file_free(wf_input_file_hc);
 
     
     } else {
@@ -1371,64 +1363,60 @@ void rna_aligner(options_t *options) {
       //Extrae_init(); 
 
       printf("\nMapping Status (First Phase)\n");
-      #pragma omp parallel sections num_threads(2) 
+#pragma omp parallel sections num_threads(2)
       {
-          #pragma omp section
-          {      
-	    start_timer(time_s1);
-	    workflow_run_with_SA(options->num_cpu_threads, wf_input, wf);
-	    stop_timer(time_s1, time_e1, time_total_1);
-	    //printf("= = = = T I M I N G    W O R K F L O W    '1' = = = =\n");
-	    //workflow_display_timing(wf);
-	    //printf("= = = = - - - - - - - - - - - - - - - - - - - = = = =\n\n");
-	    w1_end = 1;
-	  }
-          #pragma omp section
-	  {
-	    display_progressX();
-	  }
+#pragma omp section
+	{
+	  start_timer(time_s1);
+	  workflow_run_with_SA(options->num_cpu_threads, wf_input, wf);
+	  stop_timer(time_s1, time_e1, time_total_1);
+	  //printf("= = = = T I M I N G W O R K F L O W '1' = = = =\n");
+	  //workflow_display_timing(wf);
+	  //printf("= = = = - - - - - - - - - - - - - - - - - - - = = = =\n\n");
+	  w1_end = 1;
+	}
+#pragma omp section
+	{
+	  display_progressX();
+	}
       }
-
-      
       printf("\nMapping Status (Second Phase)\n");
-      #pragma omp parallel sections num_threads(2) 
+#pragma omp parallel sections num_threads(2)
       {
-          #pragma omp section
-          {
-	    start_timer(time_s2);
-	    rewind(f_sa);
-	    workflow_run_with_SA(options->num_cpu_threads, wf_input, wf_last);      
-	    stop_timer(time_s2, time_e2, time_total_2);      
-	    //printf("= = = = T I M I N G    W O R K F L O W    '2' = = = =\n");
-	    //workflow_display_timing(wf_last);
-	    //printf("= = = = - - - - - - - - - - - - - - - - - - - = = = =\n\n");
-	  }
-          #pragma omp section
-	  {
-	    display_progress_2();
-	  }
+#pragma omp section
+	{
+	  start_timer(time_s2);
+	  rewind(f_sa);
+	  workflow_run_with_SA(options->num_cpu_threads, wf_input, wf_last);
+	  stop_timer(time_s2, time_e2, time_total_2);
+	  //printf("= = = = T I M I N G W O R K F L O W '2' = = = =\n");
+	  //workflow_display_timing(wf_last);
+	  //printf("= = = = - - - - - - - - - - - - - - - - - - - = = = =\n\n");
+	}
+#pragma omp section
+	{
+	  display_progress_2();
+	}
       }
-      printf("\n");
-      
-
+      printf("\n");      
       // free memory
       sa_wf_input_free(wf_input);
       sa_wf_batch_free(wf_batch);
       workflow_SA_free(wf);      
       workflow_SA_free(wf_last);      
-
+      
       //printf("\n");
       //for (int x = 0; x <= 10; x++) {
       //printf("%i CALs: %i reads (%f)\n", x, tot_cals[x], ((float)tot_cals[x]*100)/(float)total_reads );
       //}
-      extern size_t search_calls;
-      extern size_t insert_calls;
-      extern double time_search;
-      extern double time_insert;
+      //extern size_t search_calls;
+      //extern size_t insert_calls;
+      //extern double time_search;
+      //extern double time_insert;
 
       basic_statistics_display(basic_st, 1, 
-			       (time_total_1 + time_total_2) / 1000000, 
-			       time_genome / 1000000, total_reads_ph2);  
+      		       (time_total_1 + time_total_2) / 1000000, 
+      		       time_genome / 1000000, total_reads_ph2);  
       extern st_bwt_t st_bwt;
 
       printf("|    S P L I C E    J U N C T I O N S    S T A T I S T I C S    |\n");
@@ -1438,7 +1426,7 @@ void rna_aligner(options_t *options) {
       printf(" Total semi-cannonical splice junctions  :  %lu (%.2f%%)\n", st_bwt.semi_cannonical_sj, (float)(st_bwt.semi_cannonical_sj * 100)/(float)st_bwt.tot_sj);
       printf("+===============================================================+\n");
 
-     
+  
       //Write to file 
       size_t total_reads         = basic_st->total_reads;
       size_t num_mapped_reads    = basic_st->num_mapped_reads;
@@ -1475,7 +1463,7 @@ void rna_aligner(options_t *options) {
       fprintf(fd_log_output, "====================================================================================\n");
       fprintf(fd_log_output, "=                                                                                  =\n");
       fprintf(fd_log_output, "====================================================================================\n");
-
+  
       //printf("Load Genome Time : %f(s)\n", time_genome / 1000000);
       //printf("         W1 Time : %f(s)\n", time_total_1 / 1000000);
       //printf("         W2 Time : %f(s)\n", time_total_2 / 1000000);
@@ -1506,15 +1494,15 @@ void rna_aligner(options_t *options) {
       }
     }    
   }
-
-  array_list_free(files_fq1, NULL);
-  array_list_free(files_fq2, NULL);
-
+  
   //Write chromosome avls
   write_chromosome_avls(extend_filename,
 			exact_filename, num_chromosomes, avls_list);
   
-
+  array_list_free(files_fq1, NULL);
+  array_list_free(files_fq2, NULL);
+  
+  
   if (!options->fast_mode) {
     extern st_bwt_t st_bwt;
     size_t mapped = st_bwt.single_alig + st_bwt.multi_alig;
@@ -1584,7 +1572,8 @@ void rna_aligner(options_t *options) {
     fprintf(fd_log_output, "====================================================================================\n");
 
   }
-
+  
+    
   metaexons_free(metaexons);
 
   if (!options->fast_mode) {
@@ -1618,6 +1607,9 @@ void rna_aligner(options_t *options) {
   pair_mng_free(pair_mng);
   report_optarg_free(report_optarg);
 
+  stop_timer(start_sa, stop_sa, time_sa);  
+  printf("=========================================================\n");
+  printf("FINAL TIME SA : %0.2f\n", time_sa / 1000000);
 
 
   free(log_filename_input);

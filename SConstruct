@@ -1,3 +1,4 @@
+import os
 
 # Initialize the environment with path variables, CFLAGS, and so on
 bioinfo_path = '#lib/hpg-libs/bioinfo-libs'
@@ -18,6 +19,7 @@ vars = Variables('buildvars.py')
 compiler = ARGUMENTS.get('compiler', 'gcc')
 
 env = Environment(tools = ['default', 'packaging'],
+      		  ENV = {'PATH' : os.environ['PATH']},
       		  CC = compiler,
                   variables = vars,
                   CFLAGS = '-std=c99 -D_XOPEN_SOURCE=600 -D_GNU_SOURCE -fopenmp -D_REENTRANT',
@@ -25,6 +27,9 @@ env = Environment(tools = ['default', 'packaging'],
                   LIBPATH = [commons_path, bioinfo_path, system_libs],
                   LIBS = ['xml2', 'm', 'z', 'curl', 'dl', 'bioinfo', 'common'],
                   LINKFLAGS = ['-fopenmp'])
+
+if compiler == "mpicc":
+   env['CFLAGS'] += ' -D_MPI'
 
 if int(ARGUMENTS.get('debug', '0')) == 1:
     debug = 1
@@ -61,22 +66,26 @@ bams = envprogram.Program('#bin/hpg-bam',
                       ]
            )
 
-aligner = envprogram.Program('#bin/hpg-aligner',
-             source = [Glob('src/*.c'),
-		       Glob('src/tools/bam/aux/*.c'),
-	     	       Glob('src/tools/bam/bfwork/*.c'),
-		       Glob('src/tools/bam/recalibrate/*.c'),
-	     	       Glob('src/tools/bam/aligner/*.c'),
-		       Glob('src/build-index/*.c'),
-		       Glob('src/dna/clasp_v1_1/*.c'),
-		       Glob('src/dna/*.c'),
-	               Glob('src/rna/*.c'),
-	               Glob('src/bs/*.c'),
-	               Glob('src/sa/*.c'),
-		       "%s/libcommon.a" % commons_path,
-		       "%s/libbioinfo.a" % bioinfo_path
-                      ]
-           )
+source = [Glob('src/*.c'),
+		Glob('src/tools/bam/aux/*.c'),
+		Glob('src/tools/bam/bfwork/*.c'),
+		Glob('src/tools/bam/recalibrate/*.c'),
+		Glob('src/tools/bam/aligner/*.c'),
+		Glob('src/build-index/*.c'),
+		Glob('src/dna/clasp_v1_1/*.c'),
+		Glob('src/dna/*.c'),
+		Glob('src/rna/*.c'),
+		Glob('src/bs/*.c'),
+		Glob('src/sa/*.c'),
+		"%s/libcommon.a" % commons_path,
+		"%s/libbioinfo.a" % bioinfo_path
+	 ]
+
+if compiler == "mpicc":
+   source.insert(0, Glob('src/mpi/*.c'));
+
+aligner = envprogram.Program('#bin/hpg-aligner', source)
+
 Depends(aligner, bams)
 
 '''

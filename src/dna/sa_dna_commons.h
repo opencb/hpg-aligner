@@ -138,6 +138,8 @@ typedef struct sa_wf_batch {
   void *data_input;
   void *data_output;
   int data_output_size;
+
+  void *buffer_mpi;
 } sa_wf_batch_t;
 
 //--------------------------------------------------------------------

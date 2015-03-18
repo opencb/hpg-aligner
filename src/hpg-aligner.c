@@ -2,7 +2,9 @@
 #include "rna/rna_aligner.h"
 #include "bs/bs_aligner.h"
 #include "build-index/index_builder.h"
-
+#ifdef _MPI
+    #include "mpi/rna_aligner_mpi.h"
+#endif
 
 //--------------------------------------------------------------------
 // constants
@@ -76,10 +78,22 @@ int w3_end;
 size_t total_reads_w2, total_reads_w3;
 size_t reads_w2, reads_w3;
 
+size_t T_ALIG;
+
+pthread_mutex_t mtx;
+double time_search;
+
 //--------------------------------------------------------------------
 // main parameters support
 //--------------------------------------------------------------------
 int main(int argc, char* argv[]) {
+  pthread_mutex_init(&mtx, NULL);
+  time_search = 0;
+  
+  unsigned char MPI_mode = 0;
+
+  T_ALIG = 0;
+    
   redirect_stdout = 0;
   gziped_fileds = 0;
 
@@ -125,8 +139,13 @@ int main(int argc, char* argv[]) {
   argc -= 1;
   argv += 1;
   
+  if (MPI_mode && strcmp(command, "rna") != 0) {
+    LOG_FATAL("You have acompiled with MPICC, in this cased RNA mode is only allowed\n");
+  }
+  
   if(strcmp(command, "dna") != 0 && 
      strcmp(command, "rna") != 0 &&
+     //strcmp(command, "rna-mpi") != 0 &&
      strcmp(command, "bs" ) != 0 && 
      strcmp(command, "build-sa-index") != 0 &&
      strcmp(command, "build-bwt-index") != 0) {
@@ -134,6 +153,13 @@ int main(int argc, char* argv[]) {
 
   }
 
+  #ifdef _MPI
+  //if (strcmp(command, "rna-mpi") == 0) {
+  MPI_mode = 1;
+  //}
+  #endif
+
+  
   if (!strcmp(command, "build-bwt-index") || 
       !strcmp(command, "build-sa-index")) {
       run_index_builder(argc, argv, command);
@@ -167,18 +193,31 @@ int main(int argc, char* argv[]) {
   convert_ASCII['n'] = 'N';
   convert_ASCII['N'] = 'N';
 
-  
-  if(strcmp(command, "dna") == 0) { 
-    // DNA command
-    validate_options(options);
-    dna_aligner(options);
-  } else if (strcmp(command, "rna") == 0)  { 
-    // RNA command
-    validate_options(options);
-    rna_aligner(options);
+
+  validate_options(options);
+
+  if (MPI_mode) {
+    // RNA MPI mode
+    #ifdef _MPI
+    rna_aligner_mpi(options, argc, argv);
+    //rna_aligner_mpi_work_stealing(options, argc, argv);
+    #endif
+  } else {  
+    if(strcmp(command, "dna") == 0) { 
+      // DNA command
+      dna_aligner(options);
+    } else if (strcmp(command, "rna") == 0)  { 
+      // RNA command
+      rna_aligner(options);
+    }
   }
+  
   options_free(options);
 
+  //printf("====================================\n");
+  //printf(" Total Time by threads: %0.2f(s)\n", time_search / 1000000);
+  //printf("====================================\n");
+  
   return 0;
 
 }

@@ -47,6 +47,9 @@ int sam_writer(void *data);
 //--------------------------------------------------------------------
 // stage functions
 //--------------------------------------------------------------------
+int rna_wq(void *data);
+int rna_wq_w2(void *data);
+int rna_wq_w3(void *data);
 
 int bwt_stage(void *data);
 int bwt_stage_bs(void *data);
@@ -67,6 +70,7 @@ int sw_stage_bs(void *data);
 
 int post_pair_stage(void *data);
 int post_pair_stage_bs(void *data);
+int post_pair_stage_w2_w3(void *data);
 
 int bs_status_stage(void *data);
 

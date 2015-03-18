@@ -185,7 +185,7 @@ void run_bs_aligner(options_t *options) {
   double main_time;
 
   batch_t *batch = batch_new(&bwt_input, &region_input, &cal_input, 
-			     &pair_input, NULL, &sw_input, &writer_input, BS_MODE, NULL);
+			     &pair_input, NULL, &sw_input, &writer_input, BS_MODE, NULL, NULL);
   
   wf_input_t *wf_input = wf_input_new(&reader_input, batch);
   

@@ -1690,14 +1690,113 @@ int metaexon_insert(unsigned int strand, unsigned int chromosome,
     
 
 
+void MPI_metaexon_package(metaexons_t *metaexons, 
+			  unsigned long num_meta, unsigned long *list_meta,
+			  unsigned long num_left_breaks, unsigned long  *list_left_breaks,
+			  unsigned long num_right_breaks, unsigned long  *list_right_breaks) {
+
+  //printf("IN FUNCTION: %lu, %lu, %lu\n", num_meta, num_left_breaks, num_right_breaks);
+
+  size_t n_metaexons = 0;
+  size_t n_left = 0, n_right = 0;
+
+  //printf("CHROMOSOME: %i\n", metaexons->num_chromosomes);
+  for (int c = 0; c < metaexons->num_chromosomes; c++) {
+    linked_list_t *metaexon_list = metaexons->metaexons_list[c];
+    linked_list_item_t *item;
+    //printf("CHROMOSOME: %i/%i\n", c, metaexons->num_chromosomes);    
+    for (item = metaexon_list->first; item != NULL; item = item->next) {
+      metaexon_t *metaexon = item->item;
+      
+      //printf("PACK-META: %i:%lu-%lu (%lu|%lu)\n", c, metaexon->start, metaexon->end, array_list_size(metaexon->left_breaks), array_list_size(metaexon->right_breaks));
+
+      list_meta[n_metaexons]                = c;
+      list_meta[num_meta   + n_metaexons]   = metaexon->start;
+      list_meta[num_meta*2 + n_metaexons]   = metaexon->end;
+      list_meta[num_meta*3 + n_metaexons]   = array_list_size(metaexon->right_breaks);
+      list_meta[num_meta*4 + n_metaexons]   = array_list_size(metaexon->left_breaks);
+
+      //printf("IN-LOOP %i: %i, %i, %i, %i, %i\n", n_metaexons, list_meta[0], list_meta[1], list_meta[2], list_meta[3], list_meta[4]);
+      
+      //MPI_meta_pack[n_metaexons].chromosome   = c;
+      //MPI_meta_pack[n_metaexons].start        = metaexon->start;
+      //MPI_meta_pack[n_metaexons].end          = metaexon->end;
+      //MPI_meta_pack[n_metaexons].n_starts     = array_list_size(metaexon->right_breaks);
+      //MPI_meta_pack[n_metaexons++].n_ends     = array_list_size(metaexon->left_breaks);
+      
+      for (int i = 0; i < array_list_size(metaexon->right_breaks); i++) {
+	avl_node_t *node = array_list_get(i, metaexon->right_breaks);
+	list_right_breaks[n_right] = node->position;
+	//printf("Insert right breaks %i, %i\n", node->position, list_right_breaks[n_right]);
+	list_right_breaks[num_right_breaks + n_right] = node->strand;
+	n_right++;
+
+	//starts_ends_pack[n_starts_ends].pos = node->position;
+	//starts_ends_pack[n_starts_ends++].strand = node->strand;
+      }
+
+      for (int i = 0; i < array_list_size(metaexon->left_breaks); i++) {
+	avl_node_t *node = array_list_get(i, metaexon->left_breaks);
+	list_left_breaks[n_left] = node->position;
+	list_left_breaks[num_left_breaks + n_left] = node->strand;
+	n_left++;
+	//starts_ends_pack[n_starts_ends].pos = node->position;
+	//starts_ends_pack[n_starts_ends++].strand = node->strand;
+      }
+
+      n_metaexons++;
+
+      //printf("IN FUNCTION-END: %lu, %lu, %lu, %lu, %lu\n", list_right_breaks[0], list_right_breaks[1], list_right_breaks[2], list_right_breaks[3], list_right_breaks[4]);
+
+    }
+  }
+
+  //printf("IN-FUNCTION-END: %i, %i, %i, %i, %i\n", list_meta[0], list_meta[1], list_meta[2], list_meta[3], list_meta[4]);
+
+
+  /*
+  MPI_metaexon_package_t *MPI_package = (MPI_metaexon_package_t *)malloc(sizeof(MPI_metaexon_package_t));
+
+  MPI_package->MPI_metaexon   = MPI_meta_pack;
+  MPI_package->starts_ends    = starts_ends_pack;
+  
+  MPI_package->max_starts_ends  = max_starts_ends;
+  MPI_package->max_metaexons    = max_metaexons;
+  
+  MPI_package->n_starts_ends  = n_starts_ends;
+  MPI_package->n_metaexons    = n_metaexons;
+
+  return MPI_package;
+  */
+
+  return;
+
+}
 
 
 
+MPI_metaexon_package_t *merge_meta_packs(MPI_metaexon_package_t *my_mpi_meta_pack, MPI_metaexon_package_t *mpi_meta_pack) {
+  int old_n_starts_ends = my_mpi_meta_pack->n_starts_ends;
+  int old_n_metaexons   = my_mpi_meta_pack->n_metaexons;
+  
+  my_mpi_meta_pack->n_starts_ends += mpi_meta_pack->n_starts_ends;
+  my_mpi_meta_pack->n_metaexons += mpi_meta_pack->n_metaexons;
+
+  if (my_mpi_meta_pack->n_starts_ends >= mpi_meta_pack->max_starts_ends) {
+    my_mpi_meta_pack->max_starts_ends = my_mpi_meta_pack->n_starts_ends*2;
+  }
+
+  if (my_mpi_meta_pack->n_metaexons >= mpi_meta_pack->max_metaexons) {
+    my_mpi_meta_pack->max_metaexons = my_mpi_meta_pack->n_metaexons*2;
+  }
+
+  memcpy(&my_mpi_meta_pack->starts_ends[old_n_starts_ends], mpi_meta_pack->starts_ends, mpi_meta_pack->n_starts_ends);
+  memcpy(&my_mpi_meta_pack->MPI_metaexon[old_n_metaexons], mpi_meta_pack->MPI_metaexon, mpi_meta_pack->n_metaexons);
 
 
-
-
-
+  return my_mpi_meta_pack;
+  
+}
 
 
 

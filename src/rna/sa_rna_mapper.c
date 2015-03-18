@@ -133,7 +133,7 @@ void *sa_alignments_reader_rna(void *input) {
 			      fq_read, fd);
       array_list_set_flag(type, mapping_lists[num_reads]);
       num_reads++;
-
+      
       if (num_reads >= MAX_READS) { break; }
 
     }
@@ -191,6 +191,7 @@ void *sa_alignments_reader_rna(void *input) {
 				   curr_wf_batch->writer_input, 
 				   sa_batch,
 				   curr_wf_batch->data_input);
+    new_wf_batch->buffer_mpi = curr_wf_batch->buffer_mpi;
   } else {
     array_list_free(reads, (void *)fastq_read_free);
     free(mapping_lists);
@@ -243,6 +244,7 @@ void *sa_fq_reader_rna(void *input) {
 				   curr_wf_batch->writer_input, 
 				   sa_batch,
 				   curr_wf_batch->data_input);
+    new_wf_batch->buffer_mpi = curr_wf_batch->buffer_mpi;
   }
 
   return new_wf_batch;
@@ -2887,8 +2889,6 @@ int sa_rna_mapper(void *data) {
 
   char *read_quality_rev = NULL;
 
-  //printf("============================ X =======================\n");
-
   for (int r = 0; r < num_reads; r++) {
     delete_targets[r] = 0;
     read = array_list_get(r, sa_batch->fq_reads);
@@ -3550,7 +3550,7 @@ int sa_rna_mapper_last(void *data) {
   sw_depth.depth = 0;
 
   //metaexons_print(metaexons);
-  //printf("||======= SECOND WORKFLOW =========||\n");
+  //printf("||======= SECOND WORKFLOW (%i reads)=========||\n", num_reads);
 
   char *read_quality_rev = NULL;
   
