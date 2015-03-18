@@ -260,7 +260,8 @@ RUNING FOR RNA MPI
 
      	 $ export MV2_USE_LAZY_MEM_UNREGISTER=0
 
-     If you compile MPI HPG Aligner without tcmalloc the perferomance will be degraded
+
+  If you compile MPI HPG Aligner without tcmalloc the perferomance will be degraded
 
 
 DOCUMENTATION
