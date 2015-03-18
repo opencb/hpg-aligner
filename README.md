@@ -73,15 +73,56 @@ DOWNLOAD and BUILDING
     $ yum install gcc
     $ yum install scons
     $ yum install zlib-devel libcurl-devel libxml2-devel ncurses-devel gsl-devel check-devel
-     
 
+
+DOWNLOAD and BUILDING FOR MPI
+-----------------------------
+
+  HPG Aligner MPI (only available for RNA) has been opened to the community and released in GitHub, so you can download by invoking the following commands:
+
+    $ git clone https://github.com/opencb/hpg-aligner.git
+    Cloning into 'hpg-aligner'...
+    remote: Reusing existing pack: 1441, done.
+    remote: Total 1441 (delta 0), reused 0 (delta 0)
+    Receiving objects: 100% (1441/1441), 1.85 MiB | 122 KiB/s, done.
+    Resolving deltas: 100% (882/882), done.
+
+    $ cd hpg-aligner
+
+    $ git submodule update --init
+    Submodule 'lib/hpg-libs' (https://github.com/opencb/hpg-libs.git) registered for path 'lib/hpg-libs'
+    Cloning into 'lib/hpg-libs'...
+    remote: Reusing existing pack: 7735, done.
+    remote: Total 7735 (delta 0), reused 0 (delta 0)
+    Receiving objects: 100% (7735/7735), 26.82 MiB | 79 KiB/s, done.
+    Resolving deltas: 100% (4430/4430), done.
+    Submodule path 'lib/hpg-libs': checked out '962f531ef0ffa2a6a665ae6fba8bc2337c4351a9'
+  
+  Choose the 'master' Git branch in hpg-libs and 'develop-mpi' in HPG Aligner:
+
+    $ cd lib/hpg-libs
+    $ git checkout master
+    $ cd ../..
+    $ git checkout develop-mpi
+
+  Before you can build HPG Aligner MPI, you must install on your system:
+    
+    * the GSL (GNU Scientific Library), http://www.gnu.org/software/gsl/
+    * the Check library, http://check.sourceforge.net/
+    * the tcmalloc library, http://code.google.com/p/gperftools/
+    * the mvapich2 or openMPI, http://mvapich.cse.ohio-state.edu/downloads/
+
+  Finally, use Scons to build the HPG Aligner MPI application with mpicc compiler:
+
+    $ scons compiler=mpicc
+
+  
 RUNING
 -------
 
   For command line options invoke:
 
     $ ./bin/hpg-aligner -h
-
 
 
   In order to map DNA sequences:
@@ -200,6 +241,27 @@ RUNING
 
          $ ./bin/hpg-aligner rna  -i /home/user/INDEX/ -f reads.fq -o /home/user/sa_output --sa-mode
     
+
+RUNING FOR RNA MPI
+------------------
+  
+  For Map with MPI HPG Aligner for RNA, you can follow the same steps that HPG Aligner, but you should run the application with "mpirun" command. The number of process must be one more than the nodes that will be used (if you want use two nodes the number of process must be three) and the first and last process should be run in the same node:
+
+        A) Example, run with MPI RNA and two nodes:
+
+          $ mpirun -np 3 -hosts compute-0,compute-1,compute-0 ./bin/hpg-aligner rna -i index_path/ -f reads.fq 
+
+        B) Example, run with MPI RNA and four nodes:
+
+          $ mpirun -np 5 -hosts compute-0,compute-1,compute-2,compute-3,compute-0 ./bin/hpg-aligner rna -i index_path/ -f reads.fq 
+
+  ATENTION: 
+     Mvapich2 has an incompatibility with tcmalloc. You can install mvapich2 with "--disable-registration-cache" option or before you run HPG Aligner mpi do:
+
+     	 $ export MV2_USE_LAZY_MEM_UNREGISTER=0
+
+     If you compile MPI HPG Aligner without tcmalloc the perferomance will be degraded
+
 
 DOCUMENTATION
 -------------
