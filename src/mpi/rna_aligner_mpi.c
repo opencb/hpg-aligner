@@ -1358,6 +1358,12 @@ void rna_aligner_mpi(options_t *options, int argc, char *argv[]) {
     }
   }
 
+  if (rank == 0) {
+    if (options->set_bam_format && options->bam_format) {
+      printf("Warning: BAM format is not supported for MPI\n");
+    }
+  }
+
   options->bam_format = 0;
 
   if (options->prefix_name) {

@@ -578,11 +578,15 @@ void *thread_function_SA(void *wf_context) {
   //int max_write_batches = 1000;
 
   while (workflow_get_status_SA(wf) == WORKFLOW_STATUS_RUNNING) {
-    if (wf->num_pending_items < min_batches  && 
-	//workflow_get_num_completed_items_(wf) < max_write_batches && 
-	(!workflow_is_producer_finished_SA(wf)) &&
-	workflow_lock_producer_SA(wf)) {
-      
+   #ifdef _MPI
+      if ((!workflow_is_producer_finished_SA(wf)) &&
+	  workflow_lock_producer_SA(wf)) {
+   #else
+      if (wf->num_pending_items < min_batches  && 
+	  (!workflow_is_producer_finished_SA(wf)) &&
+	  workflow_lock_producer_SA(wf)) {
+   #endif      
+
       total_time = 0;
      
       //do {
