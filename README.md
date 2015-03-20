@@ -98,10 +98,10 @@ DOWNLOAD and BUILDING FOR MPI
     Resolving deltas: 100% (4430/4430), done.
     Submodule path 'lib/hpg-libs': checked out '962f531ef0ffa2a6a665ae6fba8bc2337c4351a9'
   
-  Choose the 'master' Git branch in hpg-libs and 'develop-mpi' in HPG Aligner:
+  Choose the 'develop-mpi' Git branch in hpg-libs and 'develop-mpi' in HPG Aligner:
 
     $ cd lib/hpg-libs
-    $ git checkout master
+    $ git checkout develop-mpi
     $ cd ../..
     $ git checkout develop-mpi
 
