@@ -109,7 +109,6 @@ DOWNLOAD and BUILDING FOR MPI
     
     * the GSL (GNU Scientific Library), http://www.gnu.org/software/gsl/
     * the Check library, http://check.sourceforge.net/
-    * the tcmalloc library, http://code.google.com/p/gperftools/
     * the mvapich2 or openMPI, http://mvapich.cse.ohio-state.edu/downloads/
 
   Finally, use Scons to build the HPG Aligner MPI application with mpicc compiler:
