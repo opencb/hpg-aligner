@@ -1,6 +1,6 @@
 HPG Aligner README
 
-Welcome to HPG Aligner !
+Welcome to HPG Aligner!
 
 HPG Aligner is an ultrafast and highly sensitive Next-Generation Sequencing (NGS) read mapping.
 
