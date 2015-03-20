@@ -1,0 +1,13 @@
+prefix=/clinicfs/userhomes/hmartinez/appl.mpi/hpg-aligner/src/mpi/gperftools-2.4/install
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: gperftools
+Version: 2.4
+Description: Performance tools for C++
+URL: http://code.google.com/p/gperftools/
+Requires:
+Libs: -L${libdir} -ltcmalloc_minimal
+Libs.private: -pthread -lpthread
+Cflags: -I${includedir}

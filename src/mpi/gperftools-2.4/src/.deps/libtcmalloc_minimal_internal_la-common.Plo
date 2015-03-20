@@ -1,0 +1,108 @@
+src/libtcmalloc_minimal_internal_la-common.lo: src/common.cc \
+ /usr/include/stdlib.h /usr/include/features.h /usr/include/sys/cdefs.h \
+ /usr/include/bits/wordsize.h /usr/include/gnu/stubs.h \
+ /usr/include/gnu/stubs-64.h \
+ /opt/gcc-4.8.2/lib/gcc/x86_64-unknown-linux-gnu/4.8.2/include/stddef.h \
+ /usr/include/bits/waitflags.h /usr/include/bits/waitstatus.h \
+ /usr/include/endian.h /usr/include/bits/endian.h \
+ /usr/include/bits/byteswap.h /usr/include/xlocale.h \
+ /usr/include/sys/types.h /usr/include/bits/types.h \
+ /usr/include/bits/typesizes.h /usr/include/time.h \
+ /usr/include/sys/select.h /usr/include/bits/select.h \
+ /usr/include/bits/sigset.h /usr/include/bits/time.h \
+ /usr/include/sys/sysmacros.h /usr/include/bits/pthreadtypes.h \
+ /usr/include/alloca.h src/config.h src/common.h \
+ /opt/gcc-4.8.2/lib/gcc/x86_64-unknown-linux-gnu/4.8.2/include/stdint.h \
+ /usr/include/stdint.h /usr/include/bits/wchar.h src/internal_logging.h \
+ src/config.h src/base/basictypes.h /usr/include/string.h \
+ /usr/include/inttypes.h src/system-alloc.h src/base/spinlock.h \
+ src/base/atomicops.h src/base/arm_instruction_set_select.h \
+ src/base/atomicops-internals-x86.h src/base/basictypes.h \
+ src/base/dynamic_annotations.h src/base/thread_annotations.h \
+ src/getenv_safe.h
+
+/usr/include/stdlib.h:
+
+/usr/include/features.h:
+
+/usr/include/sys/cdefs.h:
+
+/usr/include/bits/wordsize.h:
+
+/usr/include/gnu/stubs.h:
+
+/usr/include/gnu/stubs-64.h:
+
+/opt/gcc-4.8.2/lib/gcc/x86_64-unknown-linux-gnu/4.8.2/include/stddef.h:
+
+/usr/include/bits/waitflags.h:
+
+/usr/include/bits/waitstatus.h:
+
+/usr/include/endian.h:
+
+/usr/include/bits/endian.h:
+
+/usr/include/bits/byteswap.h:
+
+/usr/include/xlocale.h:
+
+/usr/include/sys/types.h:
+
+/usr/include/bits/types.h:
+
+/usr/include/bits/typesizes.h:
+
+/usr/include/time.h:
+
+/usr/include/sys/select.h:
+
+/usr/include/bits/select.h:
+
+/usr/include/bits/sigset.h:
+
+/usr/include/bits/time.h:
+
+/usr/include/sys/sysmacros.h:
+
+/usr/include/bits/pthreadtypes.h:
+
+/usr/include/alloca.h:
+
+src/config.h:
+
+src/common.h:
+
+/opt/gcc-4.8.2/lib/gcc/x86_64-unknown-linux-gnu/4.8.2/include/stdint.h:
+
+/usr/include/stdint.h:
+
+/usr/include/bits/wchar.h:
+
+src/internal_logging.h:
+
+src/config.h:
+
+src/base/basictypes.h:
+
+/usr/include/string.h:
+
+/usr/include/inttypes.h:
+
+src/system-alloc.h:
+
+src/base/spinlock.h:
+
+src/base/atomicops.h:
+
+src/base/arm_instruction_set_select.h:
+
+src/base/atomicops-internals-x86.h:
+
+src/base/basictypes.h:
+
+src/base/dynamic_annotations.h:
+
+src/base/thread_annotations.h:
+
+src/getenv_safe.h:

@@ -1,0 +1,331 @@
+src/libtcmalloc_minimal_internal_la-central_freelist.lo: \
+ src/central_freelist.cc src/config.h \
+ /opt/gcc-4.8.2/include/c++/4.8.2/algorithm \
+ /opt/gcc-4.8.2/include/c++/4.8.2/utility \
+ /opt/gcc-4.8.2/include/c++/4.8.2/x86_64-unknown-linux-gnu/bits/c++config.h \
+ /opt/gcc-4.8.2/include/c++/4.8.2/x86_64-unknown-linux-gnu/bits/os_defines.h \
+ /usr/include/features.h /usr/include/sys/cdefs.h \
+ /usr/include/bits/wordsize.h /usr/include/gnu/stubs.h \
+ /usr/include/gnu/stubs-64.h \
+ /opt/gcc-4.8.2/include/c++/4.8.2/x86_64-unknown-linux-gnu/bits/cpu_defines.h \
+ /opt/gcc-4.8.2/include/c++/4.8.2/bits/stl_relops.h \
+ /opt/gcc-4.8.2/include/c++/4.8.2/bits/stl_pair.h \
+ /opt/gcc-4.8.2/include/c++/4.8.2/bits/move.h \
+ /opt/gcc-4.8.2/include/c++/4.8.2/bits/concept_check.h \
+ /opt/gcc-4.8.2/include/c++/4.8.2/bits/stl_algobase.h \
+ /opt/gcc-4.8.2/include/c++/4.8.2/bits/functexcept.h \
+ /opt/gcc-4.8.2/include/c++/4.8.2/bits/exception_defines.h \
+ /opt/gcc-4.8.2/include/c++/4.8.2/bits/cpp_type_traits.h \
+ /opt/gcc-4.8.2/include/c++/4.8.2/ext/type_traits.h \
+ /opt/gcc-4.8.2/include/c++/4.8.2/ext/numeric_traits.h \
+ /opt/gcc-4.8.2/include/c++/4.8.2/bits/stl_iterator_base_types.h \
+ /opt/gcc-4.8.2/include/c++/4.8.2/bits/stl_iterator_base_funcs.h \
+ /opt/gcc-4.8.2/include/c++/4.8.2/debug/debug.h \
+ /opt/gcc-4.8.2/include/c++/4.8.2/bits/stl_iterator.h \
+ /opt/gcc-4.8.2/include/c++/4.8.2/bits/stl_algo.h \
+ /opt/gcc-4.8.2/include/c++/4.8.2/cstdlib /usr/include/stdlib.h \
+ /opt/gcc-4.8.2/lib/gcc/x86_64-unknown-linux-gnu/4.8.2/include/stddef.h \
+ /usr/include/bits/waitflags.h /usr/include/bits/waitstatus.h \
+ /usr/include/endian.h /usr/include/bits/endian.h \
+ /usr/include/bits/byteswap.h /usr/include/xlocale.h \
+ /usr/include/sys/types.h /usr/include/bits/types.h \
+ /usr/include/bits/typesizes.h /usr/include/time.h \
+ /usr/include/sys/select.h /usr/include/bits/select.h \
+ /usr/include/bits/sigset.h /usr/include/bits/time.h \
+ /usr/include/sys/sysmacros.h /usr/include/bits/pthreadtypes.h \
+ /usr/include/alloca.h \
+ /opt/gcc-4.8.2/include/c++/4.8.2/bits/algorithmfwd.h \
+ /opt/gcc-4.8.2/include/c++/4.8.2/bits/stl_heap.h \
+ /opt/gcc-4.8.2/include/c++/4.8.2/bits/stl_tempbuf.h \
+ /opt/gcc-4.8.2/include/c++/4.8.2/bits/stl_construct.h \
+ /opt/gcc-4.8.2/include/c++/4.8.2/new \
+ /opt/gcc-4.8.2/include/c++/4.8.2/exception \
+ /opt/gcc-4.8.2/include/c++/4.8.2/bits/atomic_lockfree_defines.h \
+ /opt/gcc-4.8.2/include/c++/4.8.2/ext/alloc_traits.h \
+ /opt/gcc-4.8.2/include/c++/4.8.2/bits/allocator.h \
+ /opt/gcc-4.8.2/include/c++/4.8.2/x86_64-unknown-linux-gnu/bits/c++allocator.h \
+ /opt/gcc-4.8.2/include/c++/4.8.2/ext/new_allocator.h \
+ /opt/gcc-4.8.2/include/c++/4.8.2/bits/memoryfwd.h src/central_freelist.h \
+ /opt/gcc-4.8.2/lib/gcc/x86_64-unknown-linux-gnu/4.8.2/include/stdint.h \
+ /usr/include/stdint.h /usr/include/bits/wchar.h src/base/spinlock.h \
+ src/config.h src/base/atomicops.h src/base/arm_instruction_set_select.h \
+ src/base/atomicops-internals-x86.h src/base/basictypes.h \
+ /usr/include/string.h /usr/include/inttypes.h \
+ src/base/dynamic_annotations.h src/base/thread_annotations.h \
+ src/base/thread_annotations.h src/common.h src/internal_logging.h \
+ src/base/basictypes.h src/span.h src/linked_list.h src/page_heap.h \
+ src/gperftools/malloc_extension.h \
+ /opt/gcc-4.8.2/include/c++/4.8.2/string \
+ /opt/gcc-4.8.2/include/c++/4.8.2/bits/stringfwd.h \
+ /opt/gcc-4.8.2/include/c++/4.8.2/bits/char_traits.h \
+ /opt/gcc-4.8.2/include/c++/4.8.2/bits/postypes.h \
+ /opt/gcc-4.8.2/include/c++/4.8.2/cwchar /usr/include/wchar.h \
+ /usr/include/stdio.h \
+ /opt/gcc-4.8.2/lib/gcc/x86_64-unknown-linux-gnu/4.8.2/include/stdarg.h \
+ /opt/gcc-4.8.2/include/c++/4.8.2/bits/localefwd.h \
+ /opt/gcc-4.8.2/include/c++/4.8.2/x86_64-unknown-linux-gnu/bits/c++locale.h \
+ /opt/gcc-4.8.2/include/c++/4.8.2/clocale /usr/include/locale.h \
+ /usr/include/bits/locale.h /opt/gcc-4.8.2/include/c++/4.8.2/iosfwd \
+ /opt/gcc-4.8.2/include/c++/4.8.2/cctype /usr/include/ctype.h \
+ /opt/gcc-4.8.2/include/c++/4.8.2/bits/ostream_insert.h \
+ /opt/gcc-4.8.2/include/c++/4.8.2/bits/cxxabi_forced.h \
+ /opt/gcc-4.8.2/include/c++/4.8.2/bits/stl_function.h \
+ /opt/gcc-4.8.2/include/c++/4.8.2/backward/binders.h \
+ /opt/gcc-4.8.2/include/c++/4.8.2/bits/range_access.h \
+ /opt/gcc-4.8.2/include/c++/4.8.2/bits/basic_string.h \
+ /opt/gcc-4.8.2/include/c++/4.8.2/ext/atomicity.h \
+ /opt/gcc-4.8.2/include/c++/4.8.2/x86_64-unknown-linux-gnu/bits/gthr.h \
+ /opt/gcc-4.8.2/include/c++/4.8.2/x86_64-unknown-linux-gnu/bits/gthr-default.h \
+ /usr/include/pthread.h /usr/include/sched.h /usr/include/bits/sched.h \
+ /usr/include/bits/setjmp.h \
+ /opt/gcc-4.8.2/include/c++/4.8.2/x86_64-unknown-linux-gnu/bits/atomic_word.h \
+ /opt/gcc-4.8.2/include/c++/4.8.2/bits/basic_string.tcc \
+ /opt/gcc-4.8.2/include/c++/4.8.2/vector \
+ /opt/gcc-4.8.2/include/c++/4.8.2/bits/stl_uninitialized.h \
+ /opt/gcc-4.8.2/include/c++/4.8.2/bits/stl_vector.h \
+ /opt/gcc-4.8.2/include/c++/4.8.2/bits/stl_bvector.h \
+ /opt/gcc-4.8.2/include/c++/4.8.2/bits/vector.tcc src/packed-cache-inl.h \
+ src/pagemap.h src/static_vars.h src/page_heap_allocator.h \
+ src/stack_trace_table.h
+
+src/config.h:
+
+/opt/gcc-4.8.2/include/c++/4.8.2/algorithm:
+
+/opt/gcc-4.8.2/include/c++/4.8.2/utility:
+
+/opt/gcc-4.8.2/include/c++/4.8.2/x86_64-unknown-linux-gnu/bits/c++config.h:
+
+/opt/gcc-4.8.2/include/c++/4.8.2/x86_64-unknown-linux-gnu/bits/os_defines.h:
+
+/usr/include/features.h:
+
+/usr/include/sys/cdefs.h:
+
+/usr/include/bits/wordsize.h:
+
+/usr/include/gnu/stubs.h:
+
+/usr/include/gnu/stubs-64.h:
+
+/opt/gcc-4.8.2/include/c++/4.8.2/x86_64-unknown-linux-gnu/bits/cpu_defines.h:
+
+/opt/gcc-4.8.2/include/c++/4.8.2/bits/stl_relops.h:
+
+/opt/gcc-4.8.2/include/c++/4.8.2/bits/stl_pair.h:
+
+/opt/gcc-4.8.2/include/c++/4.8.2/bits/move.h:
+
+/opt/gcc-4.8.2/include/c++/4.8.2/bits/concept_check.h:
+
+/opt/gcc-4.8.2/include/c++/4.8.2/bits/stl_algobase.h:
+
+/opt/gcc-4.8.2/include/c++/4.8.2/bits/functexcept.h:
+
+/opt/gcc-4.8.2/include/c++/4.8.2/bits/exception_defines.h:
+
+/opt/gcc-4.8.2/include/c++/4.8.2/bits/cpp_type_traits.h:
+
+/opt/gcc-4.8.2/include/c++/4.8.2/ext/type_traits.h:
+
+/opt/gcc-4.8.2/include/c++/4.8.2/ext/numeric_traits.h:
+
+/opt/gcc-4.8.2/include/c++/4.8.2/bits/stl_iterator_base_types.h:
+
+/opt/gcc-4.8.2/include/c++/4.8.2/bits/stl_iterator_base_funcs.h:
+
+/opt/gcc-4.8.2/include/c++/4.8.2/debug/debug.h:
+
+/opt/gcc-4.8.2/include/c++/4.8.2/bits/stl_iterator.h:
+
+/opt/gcc-4.8.2/include/c++/4.8.2/bits/stl_algo.h:
+
+/opt/gcc-4.8.2/include/c++/4.8.2/cstdlib:
+
+/usr/include/stdlib.h:
+
+/opt/gcc-4.8.2/lib/gcc/x86_64-unknown-linux-gnu/4.8.2/include/stddef.h:
+
+/usr/include/bits/waitflags.h:
+
+/usr/include/bits/waitstatus.h:
+
+/usr/include/endian.h:
+
+/usr/include/bits/endian.h:
+
+/usr/include/bits/byteswap.h:
+
+/usr/include/xlocale.h:
+
+/usr/include/sys/types.h:
+
+/usr/include/bits/types.h:
+
+/usr/include/bits/typesizes.h:
+
+/usr/include/time.h:
+
+/usr/include/sys/select.h:
+
+/usr/include/bits/select.h:
+
+/usr/include/bits/sigset.h:
+
+/usr/include/bits/time.h:
+
+/usr/include/sys/sysmacros.h:
+
+/usr/include/bits/pthreadtypes.h:
+
+/usr/include/alloca.h:
+
+/opt/gcc-4.8.2/include/c++/4.8.2/bits/algorithmfwd.h:
+
+/opt/gcc-4.8.2/include/c++/4.8.2/bits/stl_heap.h:
+
+/opt/gcc-4.8.2/include/c++/4.8.2/bits/stl_tempbuf.h:
+
+/opt/gcc-4.8.2/include/c++/4.8.2/bits/stl_construct.h:
+
+/opt/gcc-4.8.2/include/c++/4.8.2/new:
+
+/opt/gcc-4.8.2/include/c++/4.8.2/exception:
+
+/opt/gcc-4.8.2/include/c++/4.8.2/bits/atomic_lockfree_defines.h:
+
+/opt/gcc-4.8.2/include/c++/4.8.2/ext/alloc_traits.h:
+
+/opt/gcc-4.8.2/include/c++/4.8.2/bits/allocator.h:
+
+/opt/gcc-4.8.2/include/c++/4.8.2/x86_64-unknown-linux-gnu/bits/c++allocator.h:
+
+/opt/gcc-4.8.2/include/c++/4.8.2/ext/new_allocator.h:
+
+/opt/gcc-4.8.2/include/c++/4.8.2/bits/memoryfwd.h:
+
+src/central_freelist.h:
+
+/opt/gcc-4.8.2/lib/gcc/x86_64-unknown-linux-gnu/4.8.2/include/stdint.h:
+
+/usr/include/stdint.h:
+
+/usr/include/bits/wchar.h:
+
+src/base/spinlock.h:
+
+src/config.h:
+
+src/base/atomicops.h:
+
+src/base/arm_instruction_set_select.h:
+
+src/base/atomicops-internals-x86.h:
+
+src/base/basictypes.h:
+
+/usr/include/string.h:
+
+/usr/include/inttypes.h:
+
+src/base/dynamic_annotations.h:
+
+src/base/thread_annotations.h:
+
+src/base/thread_annotations.h:
+
+src/common.h:
+
+src/internal_logging.h:
+
+src/base/basictypes.h:
+
+src/span.h:
+
+src/linked_list.h:
+
+src/page_heap.h:
+
+src/gperftools/malloc_extension.h:
+
+/opt/gcc-4.8.2/include/c++/4.8.2/string:
+
+/opt/gcc-4.8.2/include/c++/4.8.2/bits/stringfwd.h:
+
+/opt/gcc-4.8.2/include/c++/4.8.2/bits/char_traits.h:
+
+/opt/gcc-4.8.2/include/c++/4.8.2/bits/postypes.h:
+
+/opt/gcc-4.8.2/include/c++/4.8.2/cwchar:
+
+/usr/include/wchar.h:
+
+/usr/include/stdio.h:
+
+/opt/gcc-4.8.2/lib/gcc/x86_64-unknown-linux-gnu/4.8.2/include/stdarg.h:
+
+/opt/gcc-4.8.2/include/c++/4.8.2/bits/localefwd.h:
+
+/opt/gcc-4.8.2/include/c++/4.8.2/x86_64-unknown-linux-gnu/bits/c++locale.h:
+
+/opt/gcc-4.8.2/include/c++/4.8.2/clocale:
+
+/usr/include/locale.h:
+
+/usr/include/bits/locale.h:
+
+/opt/gcc-4.8.2/include/c++/4.8.2/iosfwd:
+
+/opt/gcc-4.8.2/include/c++/4.8.2/cctype:
+
+/usr/include/ctype.h:
+
+/opt/gcc-4.8.2/include/c++/4.8.2/bits/ostream_insert.h:
+
+/opt/gcc-4.8.2/include/c++/4.8.2/bits/cxxabi_forced.h:
+
+/opt/gcc-4.8.2/include/c++/4.8.2/bits/stl_function.h:
+
+/opt/gcc-4.8.2/include/c++/4.8.2/backward/binders.h:
+
+/opt/gcc-4.8.2/include/c++/4.8.2/bits/range_access.h:
+
+/opt/gcc-4.8.2/include/c++/4.8.2/bits/basic_string.h:
+
+/opt/gcc-4.8.2/include/c++/4.8.2/ext/atomicity.h:
+
+/opt/gcc-4.8.2/include/c++/4.8.2/x86_64-unknown-linux-gnu/bits/gthr.h:
+
+/opt/gcc-4.8.2/include/c++/4.8.2/x86_64-unknown-linux-gnu/bits/gthr-default.h:
+
+/usr/include/pthread.h:
+
+/usr/include/sched.h:
+
+/usr/include/bits/sched.h:
+
+/usr/include/bits/setjmp.h:
+
+/opt/gcc-4.8.2/include/c++/4.8.2/x86_64-unknown-linux-gnu/bits/atomic_word.h:
+
+/opt/gcc-4.8.2/include/c++/4.8.2/bits/basic_string.tcc:
+
+/opt/gcc-4.8.2/include/c++/4.8.2/vector:
+
+/opt/gcc-4.8.2/include/c++/4.8.2/bits/stl_uninitialized.h:
+
+/opt/gcc-4.8.2/include/c++/4.8.2/bits/stl_vector.h:
+
+/opt/gcc-4.8.2/include/c++/4.8.2/bits/stl_bvector.h:
+
+/opt/gcc-4.8.2/include/c++/4.8.2/bits/vector.tcc:
+
+src/packed-cache-inl.h:
+
+src/pagemap.h:
+
+src/static_vars.h:
+
+src/page_heap_allocator.h:
+
+src/stack_trace_table.h:

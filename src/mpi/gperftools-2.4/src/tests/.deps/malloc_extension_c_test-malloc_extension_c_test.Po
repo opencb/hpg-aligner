@@ -1,0 +1,55 @@
+src/tests/malloc_extension_c_test-malloc_extension_c_test.o: \
+ src/tests/malloc_extension_c_test.c /usr/include/stdio.h \
+ /usr/include/features.h /usr/include/sys/cdefs.h \
+ /usr/include/bits/wordsize.h /usr/include/gnu/stubs.h \
+ /usr/include/gnu/stubs-64.h \
+ /opt/gcc-4.8.2/lib/gcc/x86_64-unknown-linux-gnu/4.8.2/include/stddef.h \
+ /usr/include/bits/types.h /usr/include/bits/typesizes.h \
+ /usr/include/libio.h /usr/include/_G_config.h /usr/include/wchar.h \
+ /opt/gcc-4.8.2/lib/gcc/x86_64-unknown-linux-gnu/4.8.2/include/stdarg.h \
+ /usr/include/bits/stdio_lim.h /usr/include/bits/sys_errlist.h \
+ /usr/include/bits/stdio.h /usr/include/stdlib.h \
+ src/gperftools/malloc_extension_c.h /usr/include/sys/types.h \
+ /usr/include/time.h src/gperftools/malloc_hook_c.h
+
+/usr/include/stdio.h:
+
+/usr/include/features.h:
+
+/usr/include/sys/cdefs.h:
+
+/usr/include/bits/wordsize.h:
+
+/usr/include/gnu/stubs.h:
+
+/usr/include/gnu/stubs-64.h:
+
+/opt/gcc-4.8.2/lib/gcc/x86_64-unknown-linux-gnu/4.8.2/include/stddef.h:
+
+/usr/include/bits/types.h:
+
+/usr/include/bits/typesizes.h:
+
+/usr/include/libio.h:
+
+/usr/include/_G_config.h:
+
+/usr/include/wchar.h:
+
+/opt/gcc-4.8.2/lib/gcc/x86_64-unknown-linux-gnu/4.8.2/include/stdarg.h:
+
+/usr/include/bits/stdio_lim.h:
+
+/usr/include/bits/sys_errlist.h:
+
+/usr/include/bits/stdio.h:
+
+/usr/include/stdlib.h:
+
+src/gperftools/malloc_extension_c.h:
+
+/usr/include/sys/types.h:
+
+/usr/include/time.h:
+
+src/gperftools/malloc_hook_c.h:
