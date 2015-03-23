@@ -36,18 +36,7 @@ env = Environment(tools = ['default', 'packaging'],
 
 if compiler == "mpicc":
    env['CFLAGS'] += ' -D_MPI'
-   env['LIBS']   += ["tcmalloc_minimal"]
-   
-   #Compile Tcmalloc
-   if not os.path.exists("src/mpi/gperftools-2.4/install/lib/"):
-      os.system("cd src/mpi/gperftools-2.4/ && ./configure --enable-minimal --prefix=%s/src/mpi/gperftools-2.4/install/ && make && make install" % os.getcwd())
-   
-   env['LIBPATH'] += ["#src/mpi/gperftools-2.4/install/lib/"]
-
-
-if clean:
-   os.system("cd src/mpi/gperftools-2.4/ && make clean && rm -rf install/*")
-
+   env['LIBS']   += ["tcmalloc"]
 
 
 if int(ARGUMENTS.get('debug', '0')) == 1:
