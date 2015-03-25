@@ -16,7 +16,12 @@
 #include "commons/log.h"
 #include "commons/system_utils.h"
 #include "commons/file_utils.h"
-#include "buffers.h"
+
+#define BS_MODE                          2
+#define RNA_MODE                         1
+#define DNA_MODE                         0
+
+//#include "buffers.h"
 
 //========================================================================
 
@@ -55,6 +60,7 @@
 #define DEFAULT_FILTER_READ_MAPPINGS_BS 100
 #define DEFAULT_FILTER_SEED_MAPPINGS_BS 500
 //========================================================================
+
 
 #define NUM_OPTIONS			30
 #define NUM_RNA_OPTIONS			 5

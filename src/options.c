@@ -527,6 +527,7 @@ void** argtable_options_new(int mode) {
   
   // NOTICE that order cannot be changed as is accessed by index in other functions
   int count = 0;
+
   argtable[count++] = arg_file0("f", "fq,fastq", NULL, "Reads file input. For more than one file: f1.fq,f2.fq,...");
   argtable[count++] = arg_file0("j", "fq2,fastq2", NULL, "Reads file input #2 (for paired mode)");
   argtable[count++] = arg_lit0("z", "gzip", "FastQ input files are gzip");

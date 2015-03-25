@@ -17,12 +17,7 @@ other_include = '/home/hmartinez/opt/include/'
 
 vars = Variables('buildvars.py')
 
-clean = 0
-for opt in sys.argv:
-    if opt == "-c":
-       clean = 1
-
-compiler = ARGUMENTS.get('compiler', 'gcc')
+compiler = 'mpicc'
 
 env = Environment(tools = ['default', 'packaging'],
       		  ENV = {'PATH' : os.environ['PATH']},
@@ -34,9 +29,11 @@ env = Environment(tools = ['default', 'packaging'],
                   LIBS = ['xml2', 'm', 'z', 'curl', 'dl', 'bioinfo', 'common'],
                   LINKFLAGS = ['-fopenmp'])
 
-if compiler == "mpicc":
-   env['CFLAGS'] += ' -D_MPI'
-   env['LIBS']   += ["tcmalloc"]
+
+env['CFLAGS']  += ' -D_MPI'
+env['LIBS']    += ["tcmalloc_minimal"]
+env['LIBPATH'] += ['/home/hmartinez/gperftools-install/lib/']
+   
 
 
 if int(ARGUMENTS.get('debug', '0')) == 1:
@@ -63,38 +60,28 @@ SConscript(['%s/SConscript' % bioinfo_path,
 envprogram = env.Clone()
 envprogram['CFLAGS'] += ' -DNODEBUG -mssse3 -DD_TIME_DEBUG'
 
-bams = envprogram.Program('#bin/hpg-bam',
-             source = [Glob('src/tools/bam/*.c'), 
-	     	       Glob('src/tools/bam/aux/*.c'),
-	     	       Glob('src/tools/bam/bfwork/*.c'),
-	     	       Glob('src/tools/bam/recalibrate/*.c'),
-	     	       Glob('src/tools/bam/aligner/*.c'),
-                       "%s/libbioinfo.a" % bioinfo_path,
-                       "%s/libcommon.a" % commons_path
-                      ]
-           )
-
-source = [Glob('src/*.c'),
-		Glob('src/tools/bam/aux/*.c'),
-		Glob('src/tools/bam/bfwork/*.c'),
-		Glob('src/tools/bam/recalibrate/*.c'),
-		Glob('src/tools/bam/aligner/*.c'),
-		Glob('src/build-index/*.c'),
-		Glob('src/dna/clasp_v1_1/*.c'),
-		Glob('src/dna/*.c'),
-		Glob('src/rna/*.c'),
-		Glob('src/bs/*.c'),
-		Glob('src/sa/*.c'),
+source_multi = [Glob('src/*.c'),
+	        Glob('src/multi/*.c'),
 		"%s/libcommon.a" % commons_path,
 		"%s/libbioinfo.a" % bioinfo_path
 	 ]
 
-if compiler == "mpicc":
-   source.insert(0, Glob('src/mpi/*.c'));
+multialigner = envprogram.Program('#bin/hpg-multialigner', source_multi)
 
-aligner = envprogram.Program('#bin/hpg-aligner', source)
-
-Depends(aligner, bams)
+'''
+Glob('src/*.c'),
+Glob('src/tools/bam/aux/*.c'),
+Glob('src/tools/bam/bfwork/*.c'),
+Glob('src/tools/bam/recalibrate/*.c'),
+Glob('src/tools/bam/aligner/*.c'),
+Glob('src/build-index/*.c'),
+Glob('src/dna/clasp_v1_1/*.c'),
+Glob('src/dna/*.c'),
+Glob('src/rna/*.c'),
+Glob('src/bs/*.c'),
+Glob('src/sa/*.c'),
+Glob('src/mpi/*.c'),	
+'''
 
 '''
 if 'debian' in COMMAND_LINE_TARGETS:
