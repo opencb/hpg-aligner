@@ -485,6 +485,7 @@ allocate_buffers_t* process_avlnode_ends(avl_node_t *node_val, unsigned char st,
     splice_end_t *end_sp = array_list_get(i, start_data->list_ends);
     if (end_sp->reads_number) {
       //printf("%lu - %lu\n", node_val->position, end_sp->end);
+      end_sp->splice_nt = "\0";
       bytes_exact = pack_junction(chromosome, st, 
 				  node_val->position, end_sp->end, 
 				  junction_id, end_sp->reads_number, 
