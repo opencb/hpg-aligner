@@ -530,13 +530,14 @@ void SA_MPI_consumer(void *data) {
   
   batch_buffer_t *buffer_mpi = wf_batch->buffer_mpi;
     
-  if (!wf_batch->data_output_size) { return; }
+  if (!wf_batch->data_output_size) { return 0; }
 
   write_to_buffer(buffer_mpi, str_output);
   free(str_output);
   
   if (wf_batch) sa_wf_batch_free(wf_batch);
 
+  return 0; 
 }
 
 void MPI_consumer(void *data) {
@@ -582,22 +583,24 @@ void MPI_consumer(void *data) {
 
   if (batch) batch_free(batch);
 
+  return 0;
+
 }
 
-/*
+
 array_list_t* new_steal_targets(int numprocs, int rank, int mode) {
   array_list_t *targets = array_list_new(numprocs, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
 
   if (mode == MODE_1) {
-    **************************************************************
+    /**************************************************************
      *           All Ranks Start Stealing to First Rank (0)       *
      *                 [ 0 | 1 | 2 | 3 | 4 | 5 ]                  *
      *                   <---|---|---|---|---|                    *
-     **************************************************************
+     **************************************************************/
     for (int i = 0; i < numprocs - 1; i++) {
       if (i != rank) {
 	printf("[%i]r-target %i (numprocs %i)\n", rank, i, numprocs);
-	array_list_insert((void *)i, targets);
+	array_list_insert(i, targets);
       }
     }
   } else if (mode == MODE_2) {
@@ -605,7 +608,7 @@ array_list_t* new_steal_targets(int numprocs, int rank, int mode) {
      *             All Ranks Start Stealing to next Rank (n+1)    *
      *                 [ 0 | 1 | 2 | 3 | 4 | 5 ]                  *
      *                 ->|-->|-->|-->|-->|-->|-                   *
-     **************************************************************
+     **************************************************************/
     for (int i = 0; i < numprocs - 1; i++) {
       int target = (i + 1) % (numprocs - 1);
       if (target != rank) {
@@ -739,7 +742,7 @@ void mpi_thread_polling(void *input) {
 
   
 }
-*/
+
 
 
 //Return TMP_PATH name
@@ -1283,7 +1286,7 @@ void rna_aligner_mpi(options_t *options, int argc, char *argv[]) {
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Get_processor_name(processor_name, &name_len);
 
-  printf("[%i/%i] %s\n", rank, numprocs, processor_name);
+  //printf("[%i/%i] %s\n", rank, numprocs, processor_name);
 
   //================= S Y N C ==================//
   //unsigned char sync_data[numprocs];
@@ -1309,6 +1312,9 @@ void rna_aligner_mpi(options_t *options, int argc, char *argv[]) {
   t_file = 0;
   //-------------------------------------------//
 
+
+  
+  
   
   //========================= F I L E S    P A T H S ==========================//
   //End fill 
@@ -1355,12 +1361,6 @@ void rna_aligner_mpi(options_t *options, int argc, char *argv[]) {
       options->min_cal_size = 30;
     } else if(options->min_cal_size > 100)  {
       options->min_cal_size = 100;
-    }
-  }
-
-  if (rank == 0) {
-    if (options->set_bam_format && options->bam_format) {
-      printf("Warning: BAM format is not supported for MPI\n");
     }
   }
 
@@ -1419,7 +1419,7 @@ void rna_aligner_mpi(options_t *options, int argc, char *argv[]) {
   MPI_Barrier(MPI_COMM_WORLD);
   
   if (rank == 0) {
-    printf("Split files...\n");
+    //printf("Split files...\n");
     start_timer(start_total);    
 
     //==== S P L I T    I N P U T    F I L E ====//
@@ -1502,6 +1502,9 @@ void rna_aligner_mpi(options_t *options, int argc, char *argv[]) {
   batch_buffer_t *data_out;
 
   sa_rna_input_t sa_rna;
+
+  size_t msj_1, msj_2, msj_3;
+  size_t mmeta_1, mmeta_2, mmeta_3;
   
   if (rank != numprocs - 1) {
     //==== T A S K S    I N S E R T S ====//
@@ -1682,7 +1685,8 @@ void rna_aligner_mpi(options_t *options, int argc, char *argv[]) {
 
   struct timeval wx_start, wx_stop;
   double wx_time;
-
+  double t_merge_1;
+  
   if (rank == 0) {
     start_timer(wx_start);
   }
@@ -1749,7 +1753,7 @@ void rna_aligner_mpi(options_t *options, int argc, char *argv[]) {
       workflow_run_with_SA(options->num_cpu_threads, sa_wf_input, sa_wf);
       stop_timer(start_SA, stop_SA, t_SA);
 
-      printf("[%i]Process SA file with %i threads in %0.2f, total(s) reads = %i\n", rank, options->num_cpu_threads, t_SA / 1000000, r_tot_reads);
+      //printf("[%i]Process SA file with %i threads in %0.2f, total(s) reads = %i\n", rank, options->num_cpu_threads, t_SA / 1000000, r_tot_reads);
     
       sa_wf->completed_producer = 0;
     } else {
@@ -1774,10 +1778,11 @@ void rna_aligner_mpi(options_t *options, int argc, char *argv[]) {
       //free(kaka);
       //}
       workflow_run_with(options->num_cpu_threads, wf_input, wf);
-      //workflow_display_timing(wf);
+      workflow_display_timing(wf);
+      
       stop_timer(start_BWT, stop_BWT, t_BWT);
       wf->completed_producer = 0;
-      printf("[%i]Process BWT file with %i threads in %0.2f, total(s) reads = %i\n", rank, options->num_cpu_threads, t_BWT / 1000000, reads_r);
+      //printf("[%i]Process BWT file with %i threads in %0.2f, total(s) reads = %i\n", rank, options->num_cpu_threads, t_BWT / 1000000, reads_r);
       fclose(f_sa); 
     }
 
@@ -1790,11 +1795,40 @@ void rna_aligner_mpi(options_t *options, int argc, char *argv[]) {
     MPI_Send(b->data, MAX_BUFFER, MPI_CHAR, numprocs - 1, 1, MPI_COMM_WORLD);
     b->len = 0;
 
+
     //==========================================================================//
     //= M E R G E    M E T A E X O N - A V L     T O    2nd    W O R K F L O W =//
     //==========================================================================//
-    //printf("[%i]Start merge...\n", rank);
+    printf("[%i]Start merge...\n", rank);
     MPI_Barrier(new_comm);
+
+    //////////////////////////////////////////////////////////////////
+    /*
+    {
+      unsigned long num_sj = get_total_items(num_chromosomes, avls_list);
+      //SEND METAEXON
+      unsigned long num_meta = 0;
+      unsigned long num_left_breaks = 0, num_right_breaks = 0;
+      for (int c = 0; c < metaexons->num_chromosomes; c++) {
+	linked_list_t *metaexon_list = metaexons->metaexons_list[c];
+	linked_list_item_t *item;
+	for (item = metaexon_list->first; item != NULL; item = item->next) {
+	  metaexon_t *metaexon = item->item;
+	  num_left_breaks  += array_list_size(metaexon->left_breaks);
+	  num_right_breaks += array_list_size(metaexon->right_breaks);
+	  num_meta++;	      
+	}
+      }
+      //printf("[%i]num_sj = %lu, num_meta = %lu\n", rank, num_sj, num_meta);      
+      msj_1 = num_sj;
+      mmeta_1 = num_meta;
+    }
+    MPI_Barrier(new_comm);
+    */
+    //////////////////////////////////////////////////////////////////
+
+    struct timeval start_BWT, stop_BWT;
+    start_timer(start_BWT);
     
     unsigned long num_sj;        
     int numprocs_merge = numprocs - 1;
@@ -1930,7 +1964,13 @@ void rna_aligner_mpi(options_t *options, int argc, char *argv[]) {
 	    mpi_meta.n_starts   = recv_list_meta[recv_num_meta*3 + m];
 	    mpi_meta.n_ends     = recv_list_meta[recv_num_meta*4 + m];
 
-	    //printf("[%i]M-%i:%lu-%lu  (%i|%i):\n", rank, mpi_meta.chromosome, mpi_meta.start, mpi_meta.end, mpi_meta.n_starts, mpi_meta.n_ends);
+	    if (!mpi_meta.n_starts && !mpi_meta.n_ends) {
+	      //printf("[%i]M-%i:%lu-%lu  (%i|%i):\n", rank, mpi_meta.chromosome, mpi_meta.start, mpi_meta.end, mpi_meta.n_starts, mpi_meta.n_ends);	      
+	      metaexon_insert(0, mpi_meta.chromosome, mpi_meta.start, mpi_meta.end, 40,
+			      METAEXON_LEFT_END, NULL, metaexons);
+	    }
+	    
+	    
 	    MPI_breaks_t bk;
 	    for (size_t s = 0; s < mpi_meta.n_starts; s++) {
 	      bk.pos    = recv_list_right_breaks[r_pos];
@@ -2086,6 +2126,12 @@ void rna_aligner_mpi(options_t *options, int argc, char *argv[]) {
       mpi_meta.end        = list_meta[num_meta*2 + m];
       mpi_meta.n_starts   = list_meta[num_meta*3 + m];
       mpi_meta.n_ends     = list_meta[num_meta*4 + m];
+
+      if (!mpi_meta.n_starts && !mpi_meta.n_ends) {
+	//printf("[%i]M-%i:%lu-%lu  (%i|%i):\n", rank, mpi_meta.chromosome, mpi_meta.start, mpi_meta.end, mpi_meta.n_starts, mpi_meta.n_ends)
+	metaexon_insert(0, mpi_meta.chromosome, mpi_meta.start, mpi_meta.end, 40,
+			METAEXON_LEFT_END, NULL, metaexons);
+      } 
       
       //printf("[%i]M-%i:%lu-%lu  (%i|%i):\n", rank, mpi_meta.chromosome, mpi_meta.start, mpi_meta.end, mpi_meta.n_starts, mpi_meta.n_ends);
       MPI_breaks_t bk;
@@ -2124,7 +2170,14 @@ void rna_aligner_mpi(options_t *options, int argc, char *argv[]) {
   
     //====                E N D    M E R G E                ====//
     //==========================================================//
+    MPI_Barrier(new_comm);
 
+    t_merge_1 = 0;
+    stop_timer(start_BWT, stop_BWT, t_merge_1);
+    
+    //if (rank == 0) {
+    //printf("Merge 1 time: %0.2f\n", t_BWT / 1000000);
+    //}
     
     //End Writer
     char *end = (char *)malloc(sizeof(char)*MAX_BUFFER);
@@ -2159,7 +2212,7 @@ void rna_aligner_mpi(options_t *options, int argc, char *argv[]) {
 	  fwrite(recv_buff, strlen(recv_buff), sizeof(char), fd_out);
 	}    
       }
-      
+
     } else {
       
       linked_list_t *writer_list = linked_list_new(COLLECTION_MODE_ASYNCHRONIZED);
@@ -2227,18 +2280,19 @@ void rna_aligner_mpi(options_t *options, int argc, char *argv[]) {
     }    
     
   }
-
+  /*
   if (rank == 0) {
     stop_timer(wx_start, wx_stop, wx_time);
-    printf("WORKFLOW 1 TIME %0.2fs\n", wx_time / 1000000);
+    printf("============================WORKFLOW 1 TIME %0.2fs=========================\n", wx_time / 1000000);
     wx_time = 0;
     start_timer(wx_start);
   }
-  
+  */
   if (options->fast_mode) { goto fast_mode_skip; }
 
   double t_task = 0, t_send = 0;
   struct timeval start_task, stop_task, start_send, stop_send;
+  double t_merge_2;
   
   if (rank != numprocs - 1) {
     //====            W2 - W O R K I N G               ====//
@@ -2298,6 +2352,8 @@ void rna_aligner_mpi(options_t *options, int argc, char *argv[]) {
     t_file = 0;
     //printf("===== STOP ====\n");
     workflow_run_with(options->num_cpu_threads, wf_input_file, wf_last);
+    //workflow_display_timing(wf_last);
+    
     //printf("===== START ====\n");
     //workflow_run_with(1, wf_input_file, wf_last);
     //printf("===== STOP ====\n");
@@ -2321,12 +2377,40 @@ void rna_aligner_mpi(options_t *options, int argc, char *argv[]) {
     MPI_Send(b->data, MAX_BUFFER, MPI_CHAR, numprocs - 1, 1, MPI_COMM_WORLD);
     b->len = 0;
 
-    
+
     //==========================================================================//
     //= M E R G E    M E T A E X O N - A V L     T O    3nd    W O R K F L O W =//
     //==========================================================================//
     MPI_Barrier(new_comm);
-    
+
+    //////////////////////////////////////////////////////////////////
+    /*
+    {
+      unsigned long num_sj = get_total_items(num_chromosomes, avls_list);
+      //SEND METAEXON
+      unsigned long num_meta = 0;
+      unsigned long num_left_breaks = 0, num_right_breaks = 0;
+      for (int c = 0; c < metaexons->num_chromosomes; c++) {
+	linked_list_t *metaexon_list = metaexons->metaexons_list[c];
+	linked_list_item_t *item;
+	for (item = metaexon_list->first; item != NULL; item = item->next) {
+	  metaexon_t *metaexon = item->item;
+	  num_left_breaks  += array_list_size(metaexon->left_breaks);
+	  num_right_breaks += array_list_size(metaexon->right_breaks);
+	  num_meta++;	      
+	}
+      }
+      printf("2.[%i]num_sj = %lu, num_meta = %lu\n", rank, num_sj, num_meta);
+      msj_2 = num_sj;
+      mmeta_2 = num_meta;
+    }
+    MPI_Barrier(new_comm);
+    */
+    //////////////////////////////////////////////////////////////////
+
+    struct timeval start_BWT_2, stop_BWT_2;
+    start_timer(start_BWT_2);
+
     unsigned long num_sj;        
     int numprocs_merge = numprocs - 1;
     int dec_s = 1;
@@ -2456,6 +2540,12 @@ void rna_aligner_mpi(options_t *options, int argc, char *argv[]) {
 	    mpi_meta.n_starts   = recv_list_meta[recv_num_meta*3 + m];
 	    mpi_meta.n_ends     = recv_list_meta[recv_num_meta*4 + m];
 
+	    if (!mpi_meta.n_starts && !mpi_meta.n_ends) {
+	      //printf("[%i]M-%i:%lu-%lu  (%i|%i):\n", rank, mpi_meta.chromosome, mpi_meta.start, mpi_meta.end, mpi_meta.n_starts, mpi_meta.n_ends)
+	      metaexon_insert(0, mpi_meta.chromosome, mpi_meta.start, mpi_meta.end, 40,
+			      METAEXON_LEFT_END, NULL, metaexons);
+	    } 
+	    
 	    //printf("[%i]M-%i:%lu-%lu  (%i|%i):\n", rank, mpi_meta.chromosome, mpi_meta.start, mpi_meta.end, mpi_meta.n_starts, mpi_meta.n_ends);
 	    MPI_breaks_t bk;
 	    for (size_t s = 0; s < mpi_meta.n_starts; s++) {
@@ -2627,6 +2717,12 @@ void rna_aligner_mpi(options_t *options, int argc, char *argv[]) {
       mpi_meta.end        = list_meta[num_meta*2 + m];
       mpi_meta.n_starts   = list_meta[num_meta*3 + m];
       mpi_meta.n_ends     = list_meta[num_meta*4 + m];
+
+      if (!mpi_meta.n_starts && !mpi_meta.n_ends) {
+	//printf("[%i]M-%i:%lu-%lu  (%i|%i):\n", rank, mpi_meta.chromosome, mpi_meta.start, mpi_meta.end, mpi_meta.n_starts, mpi_meta.n_ends)
+	metaexon_insert(0, mpi_meta.chromosome, mpi_meta.start, mpi_meta.end, 40,
+			METAEXON_LEFT_END, NULL, metaexons);
+      } 
       
       //printf("[%i]M-%i:%lu-%lu  (%i|%i):\n", rank, mpi_meta.chromosome, mpi_meta.start, mpi_meta.end, mpi_meta.n_starts, mpi_meta.n_ends);
       MPI_breaks_t bk;
@@ -2665,7 +2761,14 @@ void rna_aligner_mpi(options_t *options, int argc, char *argv[]) {
 
     //====                E N D    M E R G E                ====//
     //==========================================================//
-  
+
+    t_merge_2 = 0;
+    stop_timer(start_BWT_2, stop_BWT_2, t_merge_2);
+    
+    //if (rank == 0) {
+    //printf("Merge 2 time: %0.2f\n", t_BWT_2 / 1000000);
+    //}
+    
     //End Writer
     char *end = (char *)malloc(sizeof(char)*MAX_BUFFER);
     strcpy(end, "END\0");    
@@ -2705,14 +2808,14 @@ void rna_aligner_mpi(options_t *options, int argc, char *argv[]) {
 
   MPI_Barrier(MPI_COMM_WORLD);
 
-  
+  /*
   if (rank == 0) {
     stop_timer(wx_start, wx_stop, wx_time);
-    printf("WORKFLOW 2 TIME %0.2fs\n", wx_time / 1000000);
+    printf("================================= WORKFLOW 2 TIME %0.2fs ========================\n", wx_time / 1000000);
     wx_time = 0;
     start_timer(wx_start);
   }
-  
+  */
  fast_mode_skip:
   
   reads_wf2 = reads_wf;
@@ -2737,14 +2840,14 @@ void rna_aligner_mpi(options_t *options, int argc, char *argv[]) {
       wf_hc = workflow_new();
       workflow_stage_function_t stage_functions_hc[] = {rna_last_hc_stage, post_pair_stage};
       char *stage_labels_hc[] = {"RNA HARD CLIPPINGS", "POST PAIR"};
-      workflow_set_stages(3, (workflow_stage_function_t *)&stage_functions_hc, stage_labels_hc, wf_hc);
+      workflow_set_stages(2, (workflow_stage_function_t *)&stage_functions_hc, stage_labels_hc, wf_hc);
       workflow_set_producer((workflow_producer_function_t *)file_reader_2, "Buffer reader", wf_hc);
       workflow_set_consumer((workflow_consumer_function_t *)MPI_output, "SAM writer", wf_hc);
     }
   }
 
   MPI_Barrier(MPI_COMM_WORLD);
-  
+
   if (rank != numprocs - 1) {
     //=============================//
     //= W O R K E R - T H R E A D =//
@@ -2767,7 +2870,7 @@ void rna_aligner_mpi(options_t *options, int argc, char *argv[]) {
     }
       
     sw_input.f_hc = f_hc;
-    
+
     if (options->fast_mode) {
       //sa_wf_input->file = f_hc;
       sa_rna.file1 = f_hc;
@@ -2781,6 +2884,7 @@ void rna_aligner_mpi(options_t *options, int argc, char *argv[]) {
     } else {
       wf_input_file->file = f_hc;
       workflow_run_with(options->num_cpu_threads, wf_input_file, wf_hc);
+      //workflow_display_timing(wf_hc);
       wf_hc->completed_producer = 0;
     }
     
@@ -2824,23 +2928,55 @@ void rna_aligner_mpi(options_t *options, int argc, char *argv[]) {
   }
 
   MPI_Barrier(MPI_COMM_WORLD);
-  
+  /*  
   if (rank == 0) {
     wx_time = 0;
     stop_timer(wx_start, wx_stop, wx_time);
     printf("WORKFLOW 3 TIME %0.2fs\n", wx_time / 1000000);
     start_timer(wx_start);
   }
-
+  */
   reads_wf3 = reads_wf;
   reads_wf  = 0;
-
+   
   //============================================================//
   //= M E R G E    M E T A E X O N - A V L    T O    W R I T E =//
   //============================================================//
   //== Package structures ==//
 
+
+  //////////////////////////////////////////////////////////////////
+  MPI_Barrier(MPI_COMM_WORLD);
+  /*
   if (rank != numprocs - 1) {
+    unsigned long num_sj = get_total_items(num_chromosomes, avls_list);
+    //SEND METAEXON
+    unsigned long num_meta = 0;
+    unsigned long num_left_breaks = 0, num_right_breaks = 0;
+    for (int c = 0; c < metaexons->num_chromosomes; c++) {
+      linked_list_t *metaexon_list = metaexons->metaexons_list[c];
+      linked_list_item_t *item;
+      for (item = metaexon_list->first; item != NULL; item = item->next) {
+	metaexon_t *metaexon = item->item;
+	num_left_breaks  += array_list_size(metaexon->left_breaks);
+	num_right_breaks += array_list_size(metaexon->right_breaks);
+	num_meta++;	      
+      }
+    }
+    printf("3.[%i]num_sj = %lu, num_meta = %lu\n", rank, num_sj, num_meta);
+    msj_3 = num_sj;
+    mmeta_3 = num_meta;
+  }
+*/
+  //////////////////////////////////////////////////////////////////
+
+  struct timeval start_BWT_3, stop_BWT_3;
+  double t_merge_3;
+
+  start_timer(start_BWT_3);  
+
+  if (rank != numprocs - 1) {
+
     unsigned long num_sj;        
     int numprocs_merge = numprocs - 1;
     int dec_s = 1;
@@ -2944,7 +3080,8 @@ void rna_aligner_mpi(options_t *options, int argc, char *argv[]) {
 	    MPI_sj.reads_number   = recv_list_sj[recv_num_sj*2 + sj];
 	    MPI_sj.strand         = recv_list_sj[recv_num_sj*3 + sj];
 	    MPI_sj.chr            = recv_list_sj[recv_num_sj*4 + sj];
-	  
+
+	    
 	    //printf("\t[%i] %i/%i Merge (%i) %i: %lu - %lu\n", rank, sj, recv_num_sj, MPI_sj.strand, MPI_sj.chr, MPI_sj.start, MPI_sj.end);
 	    allocate_start_node(MPI_sj.chr - 1,
 				MPI_sj.strand,
@@ -2973,6 +3110,12 @@ void rna_aligner_mpi(options_t *options, int argc, char *argv[]) {
 	    mpi_meta.end        = recv_list_meta[recv_num_meta*2 + m];
 	    mpi_meta.n_starts   = recv_list_meta[recv_num_meta*3 + m];
 	    mpi_meta.n_ends     = recv_list_meta[recv_num_meta*4 + m];
+
+	    if (!mpi_meta.n_starts && !mpi_meta.n_ends) {
+	      //printf("[%i]M-%i:%lu-%lu  (%i|%i):\n", rank, mpi_meta.chromosome, mpi_meta.start, mpi_meta.end, mpi_meta.n_starts, mpi_meta.n_ends)
+	      metaexon_insert(0, mpi_meta.chromosome, mpi_meta.start, mpi_meta.end, 40,
+			      METAEXON_LEFT_END, NULL, metaexons);
+	    } 
 
 	    //printf("[%i]M-%i:%lu-%lu  (%i|%i):\n", rank, mpi_meta.chromosome, mpi_meta.start, mpi_meta.end, mpi_meta.n_starts, mpi_meta.n_ends);
 	    MPI_breaks_t bk;
@@ -3020,8 +3163,18 @@ void rna_aligner_mpi(options_t *options, int argc, char *argv[]) {
       dec   *= 2;
       dec_s *= 2;
       dec_r *= 2;
+
     }
-  
+
+    MPI_Barrier(new_comm);
+    
+    t_merge_3 = 0;
+    stop_timer(start_BWT_3, stop_BWT_3, t_merge_3);
+    
+    //if (rank == 0) {
+    //printf("Merge 3 time: %0.2f\n", t_BWT_3 / 1000000);
+    //}
+
     //printf("[%i]MERGE NODO 0 WORKFLOW 1 END...BROADCAST TO OTHER NODES\n", rank);
 
     if (rank == 0) {
@@ -3046,13 +3199,13 @@ void rna_aligner_mpi(options_t *options, int argc, char *argv[]) {
 
 
   MPI_Barrier(MPI_COMM_WORLD);
-
+  /*
   if (rank == 0) {
     wx_time = 0;
     stop_timer(wx_start, wx_stop, wx_time);
     printf("WRITE SJ TIME %0.2fs\n", wx_time / 1000000);
   }
-
+  */
   
   if (rank == 0) {
     //stop_timer(start_w, stop_w, t_m3);
@@ -3069,10 +3222,18 @@ void rna_aligner_mpi(options_t *options, int argc, char *argv[]) {
       genome_free(genome);
 
   }
-
+  /*
+  if (rank == 0) {
+    printf("MERGEs: %0.2f | %0.2f | %0.2f\n", rank, t_merge_1 / 1000000, t_merge_2 / 1000000, t_merge_3 / 1000000);
+  }
+  
+  if (rank != numprocs -1) {
+    printf("[%i] SJ:     %lu | %lu | %lu\n", rank, msj_1, msj_2, msj_3);
+    printf("[%i] MERGE:  %lu | %lu | %lu\n", rank, mmeta_1, mmeta_2, mmeta_3);
+  }
+  */
   if (rank == 0) {
     printf("==================================================================\n");
-    printf("TOTAL READS PROCESS  : wf1(%lu) + wf2(%lu) + wf3(%lu) = %lu\n", reads_wf1, reads_wf2, reads_wf3, reads_wf1 + reads_wf2 + reads_wf3);
     printf(" TOTAL TIME          : %0.2f(s)\n", t_total / 1000000);
     printf("==================================================================\n\n\n");
   }
@@ -3086,7 +3247,7 @@ void rna_aligner_mpi(options_t *options, int argc, char *argv[]) {
 
 
 
-/*
+
 void rna_aligner_mpi_work_stealing(options_t *options, int argc, char *argv[]) {
   //MPI Process Files  in the nodes
   FILE* fd_out;
@@ -3897,7 +4058,7 @@ void rna_aligner_mpi_work_stealing(options_t *options, int argc, char *argv[]) {
       free(MPI_breaks);
     }
   }
-  *
+  */
   MPI_Barrier(MPI_COMM_WORLD);
 
   if (rank == 0) {
@@ -4320,7 +4481,7 @@ void rna_aligner_mpi_work_stealing(options_t *options, int argc, char *argv[]) {
       free(MPI_breaks);
     }    
   }
-  *
+  */
   MPI_Barrier(MPI_COMM_WORLD);
 
   if (rank == 0) {
@@ -4610,7 +4771,7 @@ void rna_aligner_mpi_work_stealing(options_t *options, int argc, char *argv[]) {
 	dec_r *= 2;
       }
     }
-  *
+  */
     if (rank == 0) {
       double t_tmp = 0;
       struct timeval start_tmp, stop_tmp;
@@ -4690,4 +4851,3 @@ void rna_aligner_mpi_work_stealing(options_t *options, int argc, char *argv[]) {
   
 }
 
-*/

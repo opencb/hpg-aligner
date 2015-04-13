@@ -1667,8 +1667,8 @@ int metaexon_insert(unsigned int strand, unsigned int chromosome,
 
     for (int i = array_list_size(delete_items) - 1; i >= 0; i--) {
       list_item = array_list_get(i, delete_items);
-      //metaexon = (metaexon_t *)list_item->item;
-      //metaexon_merge_breaks(metaexon, metaexon_ref);
+      metaexon = (metaexon_t *)list_item->item;
+      metaexon_merge_breaks(metaexon, metaexon_ref);
       
       linked_list_item_free(list_item, (void *)metaexon_free);
     }
