@@ -3,9 +3,10 @@
 
 #include <mpi.h>
 
-#include <options.h>
+#include "options.h"
+#include "bioformats/fastq/fastq_file.h"
 
-int hpg_multialigner_main(options_t *options);
+int hpg_multialigner_main(options_t *options, int argc, char *argv[]);
 
 
 

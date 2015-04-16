@@ -24,7 +24,8 @@
 //--------------------------------------------------------------------
 int main(int argc, char* argv[]) {
 
-  if (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") == 0) {
+
+  if (argc <= 1 || strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") == 0) {
     usage_cli(DNA_MODE);
   }
 
@@ -33,7 +34,7 @@ int main(int argc, char* argv[]) {
 
   validate_options(options);
   
-  hpg_multialigner_main(options);
+  hpg_multialigner_main(options, argc, argv);
   
   options_free(options);
   

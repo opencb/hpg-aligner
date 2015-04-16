@@ -25,7 +25,7 @@
 
 //========================================================================
 
-#define HPG_ALIGNER_VERSION  "2.0.0"
+#define HPG_ALIGNER_VERSION  "0.0.0"
 #define OUTPUT_FILENAME      "alignments"
 
 //============================ DEFAULT VALUES ============================
@@ -62,7 +62,7 @@
 //========================================================================
 
 
-#define NUM_OPTIONS			30
+#define NUM_OPTIONS			31
 #define NUM_RNA_OPTIONS			 5
 #define NUM_DNA_OPTIONS			 1
 
@@ -134,6 +134,7 @@ typedef struct options {
   char* intron_filename;
   char* adapter;
   char* adapter_revcomp;
+  char* command;
   // new variables for bisulphite case
 } options_t;
 

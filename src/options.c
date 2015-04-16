@@ -14,9 +14,10 @@ options_t *options_new(void) {
   options->version = 0;
   options->in_filename = NULL;
   options->in_filename2 = NULL;
+  options->command = NULL;
   options->report_all =  0;
   options->log_level = LOG_ERROR_LEVEL;
-  options->output_name = strdup(DEFAULT_OUTPUT_NAME);
+  options->output_name = NULL;
   options->num_gpu_threads = DEFAULT_GPU_THREADS;
 
   options->realignment = 0;
@@ -136,11 +137,17 @@ void validate_options(options_t *options) {
       usage_cli(mode);
     }
 
-    
-    if (!options->bwt_dirname) {
-      printf("Index directory is missing. Please, insert it with option '-i DIRNAME'.\n");
+    if (!options->command) {
+      printf("Command line of mapper is missing. Please, insert it with option '-c \"CLI MAPPER\"'.\n");
       usage_cli(mode);
     }
+
+    
+    //if (!options->bwt_dirname) {
+    //printf("Index directory is missing. Please, insert it with option '-i DIRNAME'.\n");
+    //usage_cli(mode);
+    //}
+
   }
 
   if (!options->num_seeds) {
@@ -517,10 +524,7 @@ void options_to_file(options_t *options, FILE *fd) {
 
 void** argtable_options_new(int mode) {
 
-  int num_options = NUM_OPTIONS;
-
-  if      (mode == DNA_MODE) num_options += NUM_DNA_OPTIONS;
-  else if (mode == RNA_MODE) num_options += NUM_RNA_OPTIONS;
+  int num_options = NUM_OPTIONS + NUM_RNA_OPTIONS;
 
   // NUM_OPTIONS +1 to allocate end structure
   void **argtable = (void**)malloc((num_options + 1) * sizeof(void*));	
@@ -560,15 +564,14 @@ void** argtable_options_new(int mode) {
   argtable[count++] = arg_str0("a", "adapter", NULL, "Adapter sequence in the read");
   argtable[count++] = arg_lit0("v", "version", "Display the HPG Aligner version");
 
-  if (mode == DNA_MODE) {
-    argtable[count++] = arg_int0(NULL, "num-seeds", NULL, "Number of seeds");
-  } else if (mode == RNA_MODE) {
-    argtable[count++] = arg_int0(NULL, "max-distance-seeds", NULL, "Maximum distance between seeds");
-    argtable[count++] = arg_file0(NULL, "transcriptome-file", NULL, "Transcriptome file to help search splice junctions");
-    argtable[count++] = arg_int0(NULL, "seed-size", NULL, "Number of nucleotides in a seed");
-    argtable[count++] = arg_int0(NULL, "max-intron-size", NULL, "Maximum intron size");
-    argtable[count++] = arg_int0(NULL, "min-intron-size", NULL, "Minimum intron size");
-  }
+
+  argtable[count++] = arg_int0(NULL, "max-distance-seeds", NULL, "Maximum distance between seeds");
+  argtable[count++] = arg_file0(NULL, "transcriptome-file", NULL, "Transcriptome file to help search splice junctions");
+  argtable[count++] = arg_int0(NULL, "seed-size", NULL, "Number of nucleotides in a seed");
+  argtable[count++] = arg_int0(NULL, "max-intron-size", NULL, "Maximum intron size");
+  argtable[count++] = arg_int0(NULL, "min-intron-size", NULL, "Minimum intron size");
+  argtable[count++] = arg_file0("c", "command", NULL, "Mapper command line");
+
 
   argtable[num_options] = arg_end(count);
      
@@ -619,6 +622,7 @@ int read_config_file(const char *filename, options_t *options) {
  */
 options_t *read_CLI_options(void **argtable, options_t *options) {	
   int count = -1;
+
   if (((struct arg_file*)argtable[++count])->count) { options->in_filename = strdup(*(((struct arg_file*)argtable[count])->filename)); }
   if (((struct arg_file*)argtable[++count])->count) { 
     options->pair_mode = 1;
@@ -664,29 +668,21 @@ options_t *read_CLI_options(void **argtable, options_t *options) {
   if (options->adapter) options->adapter_length = strlen(options->adapter);
   if (((struct arg_int*)argtable[++count])->count) { options->version = ((struct arg_int*)argtable[count])->count; }
 
-  if (options->mode == DNA_MODE) {
-    if (((struct arg_int*)argtable[++count])->count) { options->num_seeds = *(((struct arg_int*)argtable[count])->ival); }
-  } else if (options->mode == RNA_MODE) {
-    if (((struct arg_int*)argtable[++count])->count) { options->seeds_max_distance = *(((struct arg_int*)argtable[count])->ival); }
-    if (((struct arg_file*)argtable[++count])->count) { options->transcriptome_filename = strdup(*(((struct arg_file*)argtable[count])->filename)); }
-    if (((struct arg_int*)argtable[++count])->count) { options->seed_size = *(((struct arg_int*)argtable[count])->ival); }
-    if (((struct arg_int*)argtable[++count])->count) { options->max_intron_length = *(((struct arg_int*)argtable[count])->ival); }
-    if (((struct arg_int*)argtable[++count])->count) { options->min_intron_length = *(((struct arg_int*)argtable[count])->ival); }
 
-    if (((struct arg_file*)argtable[++count])->count) { options->fast_mode = (((struct arg_int *)argtable[count])->count); }
+  if (((struct arg_int*)argtable[++count])->count) { options->seeds_max_distance = *(((struct arg_int*)argtable[count])->ival); }
+  if (((struct arg_file*)argtable[++count])->count) { options->transcriptome_filename = strdup(*(((struct arg_file*)argtable[count])->filename)); }
+  if (((struct arg_int*)argtable[++count])->count) { options->seed_size = *(((struct arg_int*)argtable[count])->ival); }
+  if (((struct arg_int*)argtable[++count])->count) { options->max_intron_length = *(((struct arg_int*)argtable[count])->ival); }
+  if (((struct arg_int*)argtable[++count])->count) { options->min_intron_length = *(((struct arg_int*)argtable[count])->ival); }  
 
-    /*
-    if (!set_bam_format) {
-      if (options->fast_mode) {
-	options->bam_format = 0;
-      } else {
-	options->bam_format = 1;
-      }
-    }
-    */
+  //printf(" ================= Value %i (%i)==============\n", ((struct arg_file*)argtable[++count])->count, count);
+
+  if (((struct arg_file*)argtable[++count])->count) { 
+    options->command  = strdup(*(((struct arg_file*)argtable[count])->filename)); 
   }
 
   return options;
+
 }
 
 
@@ -694,16 +690,9 @@ options_t *parse_options(int argc, char **argv) {
   //	struct arg_end *end = arg_end(10);
   //	void **argtable = argtable_options_get(argtable_options, end);
 
-  int mode, num_options = NUM_OPTIONS;
-  if (strcmp(argv[0], "dna") == 0) {
-    mode = DNA_MODE;
-    num_options += NUM_DNA_OPTIONS;
-  } else if (strcmp(argv[0], "rna") == 0) {
-    mode = RNA_MODE;
-    num_options += NUM_RNA_OPTIONS;
-  } else {
-    LOG_FATAL("Command unknown.\nValid commands are:\n\tdna: to map DNA sequences\n\trna: to map RNA sequences\n\tbs: to map BS sequences\n\tbuild-index: to create the genome index.\nUse -h or --help to display hpg-aligner options.\n");
-  }
+  int mode, num_options = NUM_OPTIONS + NUM_RNA_OPTIONS;
+
+  mode = RNA_MODE;
 
   void **argtable = argtable_options_new(mode);
   options_t *options = options_new();
@@ -724,7 +713,7 @@ options_t *parse_options(int argc, char **argv) {
     if (num_errors > 0) {
       fprintf(stdout, "Errors:\n");
       // struct end is always allocated in the last position
-      arg_print_errors(stdout, argtable[num_options], "hpg-aligner");
+      arg_print_errors(stdout, argtable[num_options], "hpg-multialigner");
       usage(argtable);
       exit(-1);
     }else {
@@ -754,7 +743,7 @@ options_t *parse_options(int argc, char **argv) {
 }
 
 void usage(void **argtable) {
-  printf("Usage:\nhpg-aligner {dna | rna | build-bwt-index | build-sa-index}");
+  printf("Usage:\nhpg-multialigner ");
   arg_print_syntaxv(stdout, argtable, "\n");
   arg_print_glossary(stdout, argtable, "%-50s\t%s\n");
 }
@@ -766,7 +755,7 @@ void usage_cli(int mode) {
 }
 
 void display_version() {
-  printf("HPG Aligner version %s\n", HPG_ALIGNER_VERSION);
+  printf("HPG MultiAligner version %s\n", HPG_ALIGNER_VERSION);
   printf("\n");
   printf("Source code at https://github.com/opencb/hpg-aligner\n");
   printf("Documentation at https://github.com/opencb/hpg-aligner/wiki/\n");
