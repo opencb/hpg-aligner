@@ -1298,16 +1298,11 @@ int prepare_alignments(pair_server_input_t *input, batch_t *batch) {
       size_t n_alig = array_list_size(mapping_list);
       for (int a = 0; a < n_alig; a++) {
 	alignment_t *alig = array_list_get(a, mapping_list);
-	if (alig->alig_data != NULL) {
-	  alig->cigar = new_cigar_code_string(alig->alig_data);
-	} else {
+	if (alig->alig_data == NULL) {
 	  alig->alig_data = cigar_code_new_by_string(alig->cigar);
+	  free(alig->cigar);
 	}
       }
-    }
-
-    if (input->pair_mng->pair_mode != SINGLE_END_MODE) {
-      prepare_paired_alignments(input, batch->mapping_batch); 
     }
 
     for (int i = 0; i < num_reads; i++) {
@@ -1324,9 +1319,14 @@ int prepare_alignments(pair_server_input_t *input, batch_t *batch) {
 	  array_list_clear(c->ops, (void *)cigar_op_free);
 	  cigar_code_free(c);
 	  alig->alig_data = NULL;
-	}
+	} 
       }
     }
+
+    if (input->pair_mng->pair_mode != SINGLE_END_MODE) {
+      prepare_paired_alignments(input, batch->mapping_batch); 
+    }
+
   }
 
   return CONSUMER_STAGE;

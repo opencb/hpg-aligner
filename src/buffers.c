@@ -894,7 +894,8 @@ void file_write_alignments(fastq_read_t *fq_read, array_list_t *items, FILE *fd)
   fwrite(buffer_of, sizeof(uint8_t), tot_len_of, fd);  
 
   //free(buffer);
-  free(buffer_cigar);  
+  free(buffer_cigar);
+  free(buffer_of);
 
 }
 
@@ -958,6 +959,7 @@ void file_write_meta_alignments(fastq_read_t *fq_read, array_list_t *items, FILE
       cigar_buffer = realloc(cigar_buffer, max_len); 
     }
 
+    free(cigar_str);
   }
 
   fwrite(simple_alignment, sizeof(simple_alignment_t), num_items, fd);
@@ -1144,6 +1146,7 @@ void sa_file_write_alignments(fastq_read_t *fq_read, array_list_t *items, FILE *
       max_len = max_len * 2;
       cigar_buffer = realloc(cigar_buffer, max_len); 
     }
+    free(cigar_str);
   }
 
   fwrite(simple_alignment, sizeof(simple_alignment_t), num_items, fd);

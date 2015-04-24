@@ -220,8 +220,11 @@ size_t bwt_search_pair_anchors(array_list_t *list, unsigned int read_length) {
 	  cal = convert_bwt_anchor_to_CAL(bwt_anchor_back, read_length - seed_size, read_length - 1);
 	  //printf("INSERT-2 (%i)[%i:%lu-%lu]\n", cal->strand, cal->chromosome_id, cal->start, cal->end);
 	  array_list_insert(cal, list);
-	  if (array_list_size(list) > 5) { goto exit; }
-	  //}
+	  if (array_list_size(list) > 5) { 
+	    free(set_backward);
+	    free(set_forward);	    
+	    goto exit;
+	  }
 
 	  array_list_set_flag(DOUBLE_ANCHORS, list);
 	  found_double_anchor = 1;

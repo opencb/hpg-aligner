@@ -415,6 +415,7 @@ void cigar_code_delete_nt(int nt, int direction, cigar_code_t *cigar_code) {
       } else {
 	op = array_list_remove_at(pos--, cigar_code->ops);
 	refresh -= op->number;
+	cigar_op_free(op);
       }
     }
   } else {
@@ -437,7 +438,8 @@ void cigar_code_delete_nt(int nt, int direction, cigar_code_t *cigar_code) {
     }
 
     for (int i = pos - 1; i >= 0; i--) {
-      array_list_remove_at(i, cigar_code->ops);
+      cigar_op_t *op = array_list_remove_at(i, cigar_code->ops);
+      cigar_op_free(op);
     }
   }
 

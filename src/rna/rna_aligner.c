@@ -1248,6 +1248,7 @@ void rna_aligner(options_t *options) {
 	  }
       }
 
+
       printf("\nWORKFLOW 2\n");
       rewind(f_sa);
       w2_end = 0;
@@ -1284,6 +1285,7 @@ void rna_aligner(options_t *options) {
       printf("\n");
       total_reads_w3 = 0;
       total_reads_w2 = 0;
+
 
       stop_timer(time_start_alig, time_end_alig, time_alig);
       //start_timer(time_start_alig);
