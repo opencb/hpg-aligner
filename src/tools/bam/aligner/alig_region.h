@@ -136,7 +136,7 @@ region_get(uint32_t *cigar, uint32_t cigar_l, size_t pos, size_t *r_pos, size_t 
 	size_t reg_end_pos;
 
 	int i;
-
+	
 	//CHECK ARGUMENTS
 	{
 		//Check nulls

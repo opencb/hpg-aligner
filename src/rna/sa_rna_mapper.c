@@ -44,7 +44,7 @@ int get_score (cigar_code_t *cc, fastq_read_t *read, float match, float mismatch
 
 sa_batch_t *sa_batch_new(array_list_t *fq_reads) {
 
-  fastq_read_t *read;
+
   size_t num_reads = array_list_size(fq_reads);
 
   sa_batch_t *p = (sa_batch_t *) malloc(sizeof(sa_batch_t));
@@ -62,7 +62,7 @@ sa_batch_t *sa_batch_new(array_list_t *fq_reads) {
 
 sa_batch_t *sa_batch_simple_new(array_list_t *fq_reads) {
 
-  fastq_read_t *read;
+
   size_t num_reads = array_list_size(fq_reads);
 
   sa_batch_t *p = (sa_batch_t *) malloc(sizeof(sa_batch_t));
@@ -106,7 +106,7 @@ void *sa_alignments_reader_rna(void *input) {
   FILE *fd = sa_rna->file1;
  
   const int MAX_READS = 100;
-  fastq_batch_reader_input_t *fq_reader_input = wf_input->fq_reader_input;
+
   array_list_t *reads = array_list_new(MAX_READS, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
   size_t num_reads = 0;
   array_list_t **mapping_lists = (array_list_t **) malloc(MAX_READS * sizeof(array_list_t *));
@@ -261,11 +261,11 @@ int sa_bam_writer_rna(void *data) {
   array_list_t *read_list = mapping_batch->fq_reads;
   //=======================
   
-  struct timeval start, end;
-  double time;
+
+
   
   //batch_t *batch = (batch_t *) data;
-  array_list_t *array_list;
+
 
   //mapping_batch_t *mapping_batch = (mapping_batch_t *) batch->mapping_batch;
   
@@ -303,7 +303,9 @@ int sa_bam_writer_rna(void *data) {
   sa_batch_free(mapping_batch);
   
   if (wf_batch) sa_wf_batch_free(wf_batch);
-  
+
+  return 0;
+
 }
 
 //Fastq Writer
@@ -327,7 +329,7 @@ int sa_sam_writer_rna(void *data) {
 
   sa_genome3_t *genome = wf_batch->sa_index->genome;
 
-  size_t num_reads, num_mappings, num_mate_mappings;
+  size_t num_reads, num_mappings;
 
   num_reads = mapping_batch->num_reads;
 
@@ -437,7 +439,7 @@ int sa_sam_writer_rna(void *data) {
 	  alig = (alignment_t *) array_list_get(j, mapping_list);
 	  flag = (alig->seq_strand ? 16 : 0);
 
-	  int score = ((read->length * 0.5 - alig->map_quality*0.4)*100) / (read->length * 0.5);
+
 
 	  fprintf(out_file, "%s\t%i\t%s\t%i\t%i\t%s\t%s\t%i\t%i\t%s\t%s\t%s\n", 
 		  alig->query_name,
@@ -738,7 +740,7 @@ void generate_cals(size_t chromosome_id,
 	    item->end = item_aux->end;
 	    //item->seq_end = item_aux->seq_end;	    
 	    seed_region_t *seed_aux;
-	    while (seed_aux = linked_list_remove_first(item_aux->sr_list)) {
+	    while ((seed_aux = linked_list_remove_first(item_aux->sr_list))) {
 	      //Insert Seed
 	      insert_seed_to_cal(seed_aux->genome_start, seed_aux->genome_end, 
 				 seed_aux->read_start, seed_aux->read_end, item, seed_aux->id);
@@ -832,7 +834,7 @@ array_list_t *rna_seeding(fastq_read_t *read,
 
 
 void cal_purge (cal_t *cal) {
-  linked_list_item_t *list_item, *list_item_prev = NULL;
+
   seed_region_t *seed_prev = NULL, *seed_next;
   linked_list_iterator_t iter;
   //printf("///////////////////////////////// purge ................\n");
@@ -953,7 +955,7 @@ float generate_cals_merge_score(array_list_t *cals_list, int read_length) {
   size_t num_cals = array_list_size(cals_list);
   cal_t *cal;
   linked_list_iterator_t itr;  
-  seed_region_t *s, *s_prev;
+  seed_region_t *s;
   int i;
 
   //for (i = 0; i < num_cals; i++) {    
@@ -1090,8 +1092,8 @@ void cal_fill_gaps(cal_t *cal,
   int first, last;
   int min_distance;
   int closed;  
-  avl_node_t *node_avl_start;
-  avl_node_t *node_avl_end;
+
+
   int add_seed, sw_add, sp_found;
   //sw_item_t *sw_item;
 
@@ -1102,18 +1104,18 @@ void cal_fill_gaps(cal_t *cal,
   int distance_aux;
   
   const int FLANK = 8;
-  const int MAX_GAPS = 1024;
+
   const int MIN_GAP = 5;
   //int *gaps_info = (int *)calloc(MAX_GAPS, sizeof(int));
-  int total_gaps = 0;
-  int set_sw;
+
+
 
   //Last. Generate cigars and smith-watermans
   list_item = cal->sr_list->first;
   seed_prev = NULL;
   while (list_item != NULL) {
     seed_next = (seed_region_t *)list_item->item;
-    int num_match = seed_next->read_end - seed_next->read_start + 1;
+
     if (seed_prev != NULL) {
       //Close nt 
       if (seed_next->read_start <= seed_prev->read_end || 
@@ -1145,7 +1147,7 @@ void cal_fill_gaps(cal_t *cal,
       } else if (gap_read == gap_genome) {
 	size_t genome_end   = seed_next->genome_start - 1;
 	size_t genome_start = seed_prev->genome_end + 1;
-	int read_end        = seed_next->read_start - 1;
+
 	int read_start      = seed_prev->read_end + 1;
 	char *query         = &query_map[read_start];
 	first = -1;
@@ -1327,8 +1329,8 @@ void cal_fill_gaps_2(cal_t *cal,
   int first, last;
   int min_distance;
   int closed;  
-  avl_node_t *node_avl_start;
-  avl_node_t *node_avl_end;
+
+
   int add_seed, sw_add, sp_found;
   //sw_item_t *sw_item;
 
@@ -1336,15 +1338,15 @@ void cal_fill_gaps_2(cal_t *cal,
   seed_region_t *seed_prev = NULL, *seed_next;
   linked_list_item_t *list_item, *list_item_prev;
   size_t sp_start, sp_end;
-  int distance_aux;
+
   int distance, sp_type;
 
   const int FLANK = 8;
-  const int MAX_GAPS = 1024;
+
   const int MIN_GAP = 5;
   //int *gaps_info = (int *)calloc(MAX_GAPS, sizeof(int));
-  int total_gaps = 0;
-  int set_sw;
+
+
   cigar_code_t *cc_sj;
 
   //Last. Generate cigars and smith-watermans
@@ -1352,7 +1354,7 @@ void cal_fill_gaps_2(cal_t *cal,
   seed_prev = NULL;
   while (list_item != NULL) {
     seed_next = (seed_region_t *)list_item->item;
-    int num_match = seed_next->read_end - seed_next->read_start + 1;
+
     if (seed_prev != NULL) {      
       cc_sj = NULL;
       size_t gap_read = seed_next->read_start - seed_prev->read_end  - 1;
@@ -1426,7 +1428,7 @@ void cal_fill_gaps_2(cal_t *cal,
 	if (gap_read == gap_genome) {
 	  size_t genome_end   = seed_next->genome_start - 1;
 	  size_t genome_start = seed_prev->genome_end + 1;
-	  int read_end        = seed_next->read_start - 1;
+
 	  int read_start      = seed_prev->read_end + 1;
 	  char *query         = &query_map[read_start];
 	  
@@ -1480,7 +1482,7 @@ void cal_fill_gaps_2(cal_t *cal,
 	cal->sr_list->size++;
 	
 	if (!closed) {
-	  int gap = gap_genome - gap_read; 	
+
 	  //SMITH-WATERMAN
 	  
 	  char reference[2048];
@@ -1537,12 +1539,12 @@ void convert_batch_to_str(sa_wf_batch_t *wf_batch) {
   sa_batch_t *sa_batch = wf_batch->mapping_batch;
   sa_rna_input_t *sa_rna = wf_batch->data_input;
   pair_server_input_t *pair_input = sa_rna->pair_input;
-  pair_mng_t *pair_mng = pair_input->pair_mng;
-  report_optarg_t *report_optarg = pair_input->report_optarg;
+
+
   int bam_format = wf_batch->writer_input->bam_format;
   int pair_mode = pair_input->pair_mng->pair_mode;  
   //sa_batch_t *sa_batch = wf_batch->mapping_batch;  
-  size_t num_reads, num_mappings;
+  size_t num_reads, num_mappings = 0;
   //sa_rna_input_t *sa_rna = wf_batch->data;
   //pair_server_input_t *pair_input = sa_rna->pair_input;
 
@@ -1566,8 +1568,8 @@ void convert_batch_to_str(sa_wf_batch_t *wf_batch) {
   extern size_t total_reads;
   extern size_t reads_no_map;
   extern pthread_mutex_t mutex_sp;
-  struct timeval time_free_s, time_free_e;
-  extern double time_free_alig, time_free_list, time_free_batch;
+
+
 
   int num_mate_mappings;
   
@@ -1590,9 +1592,9 @@ void convert_batch_to_str(sa_wf_batch_t *wf_batch) {
 
     if (pair_mode != SINGLE_END_MODE) {
       // PAIR MODE
-      int len;
-      char *sequence, *quality;
-      char *seq;
+
+
+
       alignment_t *alig;
       array_list_t *mate_list;
 
@@ -1825,8 +1827,8 @@ int write_to_file(void *data) {
   if (!wf_batch->data_output_size) { return 0; }
 
   extern pthread_mutex_t mutex_sp;
-  struct timeval time_free_s, time_free_e;
-  extern double time_write, time_free;
+
+
 
   int bam_format = wf_batch->writer_input->bam_format;
 
@@ -2092,7 +2094,7 @@ int sa_generate_cals(fastq_read_t *read,
   int id_seed = 2;
   cal_mng_t *cal_mng;
   size_t high, low, suffix_len;
-  float score;
+
   int cal_pos;
   seed_region_t *s_prev, *s;
   linked_list_item_t *item;
@@ -2105,7 +2107,7 @@ int sa_generate_cals(fastq_read_t *read,
   size_t num_cals;
 
   //===== Seeding Strategy =====//
-  int max_read_pos = read->length - seed_size - 1;
+
   for (int s = 0; s < 2; s++) { //Strand
     read_pos  = 0;
     if (!s) {
@@ -2338,7 +2340,7 @@ void sa_complete_pairs(sa_wf_batch_t *wf_batch) {
 
   int min_distance = pair_mng->min_distance;
   int max_distance = pair_mng->max_distance;
-  int pair_mode = pair_mng->pair_mode;
+
 
   int report_only_paired = report_optarg->only_paired;
 
@@ -2353,10 +2355,10 @@ void sa_complete_pairs(sa_wf_batch_t *wf_batch) {
   short int chr1, chr2, strand1, strand2;
   size_t end1, start2;
 
-  int pair_found;
 
-  int num_best1, num_best2;
-  float best_score, best_score1, best_score2, score;
+
+
+  float best_score, score;
 
   pair_t *pair, *new_pair;
   linked_list_t *pair_list = linked_list_new(COLLECTION_MODE_ASYNCHRONIZED);
@@ -2791,14 +2793,14 @@ int sa_rna_mapper(void *data) {
   metaexons_t *metaexons = (metaexons_t *)sa_rna->metaexons;
   sw_optarg_t *sw_optarg = sa_rna->sw_optarg;
   FILE *file1 = sa_rna->file1;
-  FILE *file2 = sa_rna->file2;
+
   pair_server_input_t *pair_input = sa_rna->pair_input;
   int pair_mode = pair_input->pair_mng->pair_mode;
   report_optarg_t *report_optarg = pair_input->report_optarg;
   
   size_t num_reads = sa_batch->num_reads;
-  int max_read_area, min_num_mismatches;
-  float max_score;
+
+
 
   MAX_ALIG = sa_rna->max_alig;
   min_score = sa_rna->min_score;
@@ -2810,63 +2812,63 @@ int sa_rna_mapper(void *data) {
   // CAL management
   //size_t num_cals;
   //seed_cal_t *cal;
-  cal_mng_t *cal_mng;
+
   //array_list_t *cal_list;
   fastq_read_t *read;  
   //  int saved_pos[2][1024];
   // TODO !!! 20 = min. cal size
-  int min_cal_size = sa_rna->cal_optarg->min_cal_size;
 
-  int seed_size = 18;
+
+
   //Function old Seeding vars
   int min_cal_score = sa_rna->cal_optarg->min_cal_size;
   int len_seq;
   
-  const int MAX_SUFFIXES    = 50;
-  const int MIN_SEED_SIZE   = 30;
-  const int MIN_COVER       = len_seq * MIN_SEED_SIZE / 100;
+
+
+
   
-  double prefix_time, suffix_time;
-  int suffix_len0, suffix_len1, num_suffixes, num_suffixes_start, num_suffixes_end;
-  size_t low0, high0, low1, high1;
-  int read_pos, read_end_pos;
-  char reference[2048];
+
+
+
+
+
   char *seq;
   char *seq_revcomp;
   char *query;
-  int chrom;
-  size_t g_start, g_end;
-  seed_region_t *seed_region;
+
+
+
 
   cal_mng_t * cal_mng_p = cal_rna_mng_new(sa_index->genome); //(+)
   cal_mng_t * cal_mng_n = cal_rna_mng_new(sa_index->genome); //(-)
 
-  size_t low_p, high_p, suffix_len_p;
-  size_t low_n, high_n, suffix_len_n;  
-  size_t low, high, suffix_len;
 
-  size_t num_suffixes_p, num_suffixes_n;
-  size_t genome_start, genome_end;
+
+
+
+
+
   array_list_t *target_cals = array_list_new(100, 1.25f,
 					     COLLECTION_MODE_ASYNCHRONIZED);
 
   //CALs done! Search CALs with seeds (Double Anchors)
   cal_t *cal;
-  linked_list_iterator_t itr;
-  linked_list_t *cal_list;
+
+
   array_list_t *merge_cals;
   cal_t *cal_prev, *cal_next;
-  seed_region_t *seed_first, *seed_last, *seed_first_next;
-  size_t num_items, num_cals;
-  cal_mng_t *p;
+  seed_region_t *seed_first, *seed_last;
+  size_t num_cals;
+
   array_list_t *alignments_list;
   int total_suffix;
   array_list_t *sa_alignments_list[num_reads];
   
-  int kk;
+
 
   int distance;
-  avl_node_t *node_avl_start, *node_avl_end;
+
   size_t sp_start, sp_end;
   int sp_type;
 
@@ -2874,12 +2876,12 @@ int sa_rna_mapper(void *data) {
   sa_sw_depth_t sw_depth;
   sw_depth.depth = 0;
 
-  sa_alignment_t *sa_alignment_aux;
+
   int delete_targets[num_reads];
   
   //array_list_t *write_alignments = array_list_new(50, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
 
-  seed_region_t *seed_prev, *seed_next, *s_prev;
+  seed_region_t *s_prev;
   int num_sa_alignments;
 
   const int limit_cals = 200;
@@ -2936,11 +2938,11 @@ int sa_rna_mapper(void *data) {
        
     if (!n_report) { goto cal_mng; }
 
-    int cal_len_prev, cal_len_next, cal_len;
-    int fill_type;
-    seed_region_t *s_prev_first, *s_prev_last, *s_next_first, *s_next_last;
-    cigar_code_t *cc_left, *cc_right;
-    int full_left, full_right;
+
+
+
+
+
     
 
     // GENERATE ALIGNMENTS WITH METAEXON
@@ -3087,7 +3089,7 @@ int sa_rna_mapper(void *data) {
       
       //Close gaps intra CALs
       //----------- generate cigar for each seed ----------//
-      int n_sp = 0;
+
       for (int c = 0; c < num_cals; c++) {
 	cal = array_list_get(c, merge_cals);
 	if (cal->strand) {
@@ -3192,7 +3194,7 @@ int sa_rna_mapper(void *data) {
       //Right cigar operations
       if (sa_alignment->c_right) {
 	//printf("- right : %s\n", new_cigar_code_string(sa_alignment->c_right));
-	int dsp = 0;
+
 	for (int tt = 0; tt < sa_alignment->c_right->ops->size; tt++) {
 	  cigar_op_t *op = array_list_get(tt, sa_alignment->c_right->ops);
 	  //dsp += op->number;
@@ -3520,8 +3522,8 @@ int sa_rna_mapper_last(void *data) {
   avls_list_t *avls_list = (avls_list_t *)sa_rna->avls_list;
   metaexons_t *metaexons = (metaexons_t *)sa_rna->metaexons;
   sw_optarg_t *sw_optarg = sa_rna->sw_optarg;
-  FILE *file1 = sa_rna->file1;
-  FILE *file2 = sa_rna->file2;
+
+
   pair_server_input_t *pair_input = sa_rna->pair_input;
   int pair_mode = pair_input->pair_mng->pair_mode;
   report_optarg_t *report_optarg = pair_input->report_optarg;
@@ -3537,7 +3539,7 @@ int sa_rna_mapper_last(void *data) {
   //size_t num_reads = sa_batch->num_reads;
   //array_list_t *sa_list;
   //int min_score = 80;
-  array_list_t *alignments_list;
+
   sw_multi_output_t *output = sw_multi_output_new(MAX_DEPTH);
   sa_sw_depth_t sw_depth;
   extern pthread_mutex_t mutex_sp;
@@ -3776,7 +3778,7 @@ int sa_rna_mapper_last(void *data) {
 
       sa_alignment->c_final = c_final;
 
-      int read_score = cigar_code_score(c_final, read->length);  
+
 
       if (cigar_code_validate_(read, sa_alignment->c_final)) {
 	//Cigar generator, generate score
@@ -3847,7 +3849,7 @@ int sa_rna_mapper_last(void *data) {
       //-------------- Free sa alignments -------------------------
       array_list_t *merge_cals = sa_alignment->cals_list;
       int num_cals = array_list_size(merge_cals);      
-      cal_t *cal_aux = array_list_get(0, merge_cals);
+
       
       for (int k = 0; k < num_cals; k++) {
 	cal = array_list_get(k, merge_cals);
@@ -4105,9 +4107,9 @@ int sa_rna_mapper_last(void *data) {
       int seed_size = 18;
       int seed_inc  = seed_size / 2;
       int read_pos;
-      size_t num_suffixes, low, high, suffix_len, len_seq, id_seed;
+      size_t num_suffixes, low, high, suffix_len, id_seed = 0;
 
-      int max_read_pos = read->length - seed_size - 1;
+
       
       for (int s = 0; s < 2; s++) { //Strand
 	read_pos  = 0;//seed_size;
@@ -4332,8 +4334,8 @@ int sa_rna_mapper_last(void *data) {
       //printf("*************** FINAL CALS ******************\n");
       seed_region_t *seed_first;
       seed_region_t *seed_last;
-      linked_list_item_t *list_item, *list_item_prev;
-      seed_region_t *seed_prev, *seed_next;
+
+
       size_t sp_start, sp_end;
       int distance, sp_type;
 
@@ -4824,7 +4826,7 @@ cigar_code_t* search_splice_junction(sw_optarg_t *sw_optarg,
   assert(s_next != NULL);
 
   cigar_code_t *cc_final = NULL;
-  int seq_len = strlen(sequence);
+
   int read_start   = s_prev->read_end;
   int read_end     = s_next->read_start;
   int intron_size = 0;
@@ -4834,7 +4836,7 @@ cigar_code_t* search_splice_junction(sw_optarg_t *sw_optarg,
   
   const int FLANK = 20;
   const int SEQURITY_FLANK = 5;
-  const int SEQURITY_FLANK_2 = 10;
+
 
   int gap_read = read_end - read_start - 1;
 
@@ -4964,7 +4966,7 @@ cigar_code_t* search_splice_junction(sw_optarg_t *sw_optarg,
   }
 
 
-  char q[1024], rl[1024], rr[1024];
+  char q[1024], rl[1024];
   int read_pos = read_start + 1;
 
   assert(read_pos + gap_read < strlen(sequence));

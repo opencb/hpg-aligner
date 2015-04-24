@@ -11,68 +11,6 @@ char *global_sa_genome;
 
 //--------------------------------------------------------------------------------------
 
-char *read_s(char *filename, uint *len) {
-  // open fasta file
-  /*
-  FILE *f = fopen(filename, "r");
-  if (f == NULL) {
-    printf("Error reading filename %s\n", filename);
-    exit(-1);
-  }
-
-  // get file length
-  fseek(f, 0, SEEK_END);  //------- NOU: per saber el tamany del fitxer
-  unsigned int file_length = ftell(f);
-  printf("file length = %lu\n", file_length);
-  fseek(f, 0, SEEK_SET);	
-
-  // read genome
-  char *s = (char *) calloc(file_length + 1, sizeof(char));
-
-  uint skip = 0, l = 0, process = 0, num_n = 0;
-  char *c;
-
-  while ((c = getc(f)) != EOF) {
-    process++;
-    if (process % PROGRESS == 0) printf("reading %0.2f %c...\n", 100.0f * process / file_length, '%'); 
-   //printf("len %lu: c = %c\n", len, c);
-    if (c == '>') {
-      printf("%c", c);
-      skip = 1;
-    } else if (c == '\n') {
-      if (skip == 1) printf("%c", c);
-      skip = 0;
-    } else {
-      if (skip == 0) {
-	if      (c == 'A' || c == 'a') s[l++] = 'A';
-	else if (c == 'C' || c == 'c') s[l++] = 'C';
-	else if (c == 'G' || c == 'g') s[l++] = 'G';
-	else if (c == 'T' || c == 't') s[l++] = 'T';
-	else if (c == 'N' || c == 'n') { ++num_n; s[l++] = 'N'; }
-	else {
-	  printf("Unknown character %c at %lu position\n", c, process);
-	}
-      } else {
-	printf("%c", c);
-      }
-    }
-  }
-  s[l++] = '$';
-
-  fclose(f);
-  printf("reading %0.2f %c...\n", 100.0f, '%');
-  
-  *len = l;
-
-  //  printf("num. N : %u (%0.2f)\n", num_n, 100.0f * num_n / (*len));
-  //  exit(-1);
-
-  // must be global for the comparison function
-  global_sa_genome = s;
-
-  return s;
-  */
-}
 
 //--------------------------------------------------------------------------------------
 
@@ -90,7 +28,7 @@ void compute_lcp(char *s, uint *sa, uint *lcp, uint num_sufixes) {
   uint count = 0;
 
   char *curr, *prev;
-  int k, h = 0;
+  int h = 0;
   lcp[0] = 0;
   uint progress = 0;
   for (int i = 1; i < num_sufixes; i++) {
@@ -189,7 +127,7 @@ void compute_child(uint *lcp, int *child, uint num_sufixes) {
 inline size_t compute_prefix_value(char *prefix, int len) {
   size_t value = 0;
   for (int i = len - 1, j = 0; i >= 0; i--, j += 2) {
-    value += ((1LL * PREFIX_TABLE_NT_VALUE[prefix[i]]) << j);
+    value += ((1LL * PREFIX_TABLE_NT_VALUE[(unsigned char)prefix[i]]) << j);
   }
   return value;
 }

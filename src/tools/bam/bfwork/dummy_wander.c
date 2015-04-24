@@ -47,7 +47,7 @@ ERROR_CODE
 dummy_bam_file(const char *bam_path, const char *ref_path, const char *outbam, const char *stats_path)
 {
 	//Times
-	double times;
+
 
 	//Wanderer
 	bam_fwork_t fwork;

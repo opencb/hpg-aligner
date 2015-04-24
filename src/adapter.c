@@ -87,7 +87,7 @@ void match_adapter(char *adapter, int adapter_length,
 
 void cut_adapter(char *adapter, int adapter_length, fastq_read_t *read) {
 
-  int len, pos;
+  int pos;
   adapter_match_t *match = adapter_match_new();
 
   // search adapter in the 'forward' sequence

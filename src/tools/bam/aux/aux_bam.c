@@ -229,7 +229,7 @@ new_quality_from_bam(bam1_t *bam1, int base_quality)
 ERROR_CODE
 new_quality_from_bam_ref(bam1_t *bam1, U_QUALS base_quality, char *qual, U_CYCLES max_l)
 {
-	char *bam_qual = bam1_qual(bam1);
+        char *bam_qual = (char *)bam1_qual(bam1);
 	int qual_len = bam1->core.l_qseq;
 
 	if(qual_len > max_l)

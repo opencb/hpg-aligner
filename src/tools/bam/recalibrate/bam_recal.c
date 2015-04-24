@@ -25,7 +25,7 @@ ERROR_CODE
 recal_recalibrate_bam_file(const char *orig_bam_path, const recal_info_t *bam_info, const char *recal_bam_path)
 {
 	bam_file_t *orig_bam_f, *recal_bam_f;
-	bam_header_t *recal_bam_header;
+
 
 	//Open bam
 	printf("Opening BAM from \"%s\" to being recalibrated ...\n", orig_bam_path);
@@ -193,11 +193,11 @@ ERROR_CODE
 recal_recalibrate_batch(const bam_batch_t* batch, const recal_info_t *bam_info)
 {
 	int i;
-	ERROR_CODE err;
+
 	//int num_thr;
 
 	//Measures
-	double init_time, end_time;
+
 
 	//Get data environment
 	recal_recalibration_env_t *recalibration_env;
@@ -212,7 +212,7 @@ recal_recalibrate_batch(const bam_batch_t* batch, const recal_info_t *bam_info)
 	}
 
 	//num_thr = omp_get_num_procs();
-	#pragma omp parallel /*num_threads(num_thr)*/ private(recalibration_env, err, init_time, end_time)
+	#pragma omp parallel /*num_threads(num_thr)*/ private(recalibration_env)
 	{
 
 		//Initialize get data environment
@@ -296,8 +296,8 @@ recal_recalibrate_alignment_priv(bam1_t* alig, const recal_info_t *bam_info, rec
 	//Recalibration
 	double delta_r, delta_rc, delta_rd;
 
-	alignment_t* aux_alig;
-	bam1_t *aux_alig1;
+
+
 
 	//CHECK ARGUMENTS (Assuming this function is called always from recal_recalibrate_batch)
 	{
@@ -365,7 +365,7 @@ recal_recalibrate_alignment_priv(bam1_t* alig, const recal_info_t *bam_info, rec
 			}
 
 			//Recalibration formula
-			double global_delta = bam_info->total_delta;
+
 			double calidad = (double)bam_quals[i];
 			if(calidad > MIN_QUALITY_TO_STAT)
 			{

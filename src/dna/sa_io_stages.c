@@ -73,7 +73,7 @@ size_t num_unmapped_reads_by_cigar_length = 0;
 // SAM writer
 //--------------------------------------------------------------------
 
-void *write_sam_header(sa_genome3_t *genome, FILE *f) {
+void write_sam_header(sa_genome3_t *genome, FILE *f) {
   fprintf(f, "@PG\tID:HPG-Aligner\tVN:%s\n", HPG_ALIGNER_VERSION);
   for (int i = 0; i < genome->num_chroms; i++) {
     fprintf(f, "@SQ\tSN:%s\tLN:%lu\n", genome->chrom_names[i], genome->chrom_lengths[i]);
@@ -104,12 +104,12 @@ int sa_sam_writer(void *data) {
   fastq_read_t *read;
   array_list_t *read_list = mapping_batch->fq_reads;
 
-  array_list_t *mapping_list, *mate_list;
+  array_list_t *mapping_list;
   FILE *out_file = (FILE *) wf_batch->writer_input->bam_file;
 
   sa_genome3_t *genome = wf_batch->sa_index->genome;
 
-  size_t num_reads, num_mappings, num_mate_mappings;
+  size_t num_reads, num_mappings;
   num_reads = mapping_batch->num_reads;
 
   if (mapping_batch->options->pair_mode != SINGLE_END_MODE) {
@@ -117,7 +117,7 @@ int sa_sam_writer(void *data) {
     int len;
     char *sequence, *quality;
 
-    char *seq, *opt_fields;
+    char *opt_fields;
     alignment_t *alig;
   
 
@@ -144,7 +144,7 @@ int sa_sam_writer(void *data) {
 	  alig = (alignment_t *) array_list_get(j, mapping_list);
 
 	  if (alig->optional_fields) {
-	    opt_fields = alig->optional_fields;
+	    opt_fields = (char *)alig->optional_fields;
 	  } else {
 	    opt_fields = NULL;
 	  }
@@ -227,7 +227,7 @@ int sa_sam_writer(void *data) {
     }
   } else {
     // SINGLE MODE
-    int len, mapq;
+    int len;
     char *seq;
     seed_cal_t *cal;
 
@@ -448,7 +448,7 @@ int sa_bam_writer(void *data) {
   }
   #endif
 
-  int flag, len;
+  int len;
   char *sequence, *quality;
 
   fastq_read_t *read;
@@ -459,9 +459,9 @@ int sa_bam_writer(void *data) {
   array_list_t *mapping_list;
   bam_file_t *out_file = wf_batch->writer_input->bam_file;
 
-  sa_genome3_t *genome = wf_batch->sa_index->genome;
 
-  size_t num_reads, num_mappings, num_mate_mappings;
+
+  size_t num_reads, num_mappings;
   num_reads = mapping_batch->num_reads;
   for (size_t i = 0; i < num_reads; i++) {
     read = (fastq_read_t *) array_list_get(i, read_list);

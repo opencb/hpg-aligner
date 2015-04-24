@@ -120,10 +120,10 @@ void timing_and_statistics_display(statistics_t* statistics_p, timing_t *t_p) {
 void basic_statistics_display(basic_statistics_t *statistics, int rna_mode, float alig_time, float load_time, size_t reads_ph2) {
   size_t total_reads = statistics->total_reads;
   size_t num_mapped_reads = statistics->num_mapped_reads;
-  size_t total_mappings = statistics->total_mappings;
+  //size_t total_mappings = statistics->total_mappings;
   size_t reads_uniq_mappings = statistics->reads_uniq_mappings;
-  size_t total_sp = statistics->total_sp;
-  size_t uniq_sp = statistics->uniq_sp;
+  //size_t total_sp = statistics->total_sp;
+  //size_t uniq_sp = statistics->uniq_sp;
   size_t reads_ph1 = total_reads - reads_ph2;
 
   /*  printf("-------------------------------------------------\n");

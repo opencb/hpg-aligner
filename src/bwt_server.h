@@ -6,7 +6,6 @@
 
 #include "buffers.h"
 #include "pair_server.h"
-#include "bs/methylation.h"
 
 //====================================================================================
 //  structures and prototypes

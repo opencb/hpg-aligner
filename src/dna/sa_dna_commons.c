@@ -5,6 +5,42 @@
 // commons
 //--------------------------------------------------------------------
 
+extern sa_genome3_t *global_genome;
+
+int is_cal_in(seed_cal_t *cal) {
+  // Y_9911717_9912231_0:1:0_1:0:0_1677c
+  unsigned int chrom;
+  size_t start, end;
+  char *chrom_str, *aux, *p1, *p2;
+  
+  aux = strdup(cal->read->id);
+  p1 = strstr(aux, "_");
+  *p1 = 0;
+  chrom_str = strdup(aux);
+  for (chrom = 0; chrom < global_genome->num_chroms; chrom++) {
+    if (strcmp(chrom_str, global_genome->chrom_names[chrom]) == 0) {
+      break;
+    }
+  }
+  p2 = strstr(p1 + 1, "_");
+  *p2 = 0;
+  start = atol(p1 + 1);
+  
+  p1 = strstr(p2 + 1, "_");
+  *p1 = 0;
+  end = atol(p2 + 1);
+
+  free(aux);
+  free(chrom_str);
+
+  if (cal->start >= start && cal->end <= end) {
+    return 1;
+  }
+  return 0;
+}
+
+//--------------------------------------------------------------------
+
 void seed_free(seed_t *p) {
   if (p) {
     cigar_clean(&p->cigar);
@@ -21,6 +57,90 @@ void seed_cal_free(seed_cal_t *p) {
     if (p->cigarset) cigarset_free(p->cigarset);
     free(p);
   }
+}
+
+//--------------------------------------------------------------------
+
+void seed_cal_merge_seeds(seed_cal_t *cal) {
+  #ifdef _VERBOSE
+  int display = 0;
+  #endif
+  seed_t *seed;
+
+  size_t num_seeds = linked_list_size(cal->seed_list);
+  if (num_seeds > 1) {
+    // multiple seeds
+    seed_t *prev_seed;
+    linked_list_item_t *prev_item, *item;
+    prev_item = cal->seed_list->first; 
+    prev_seed = prev_item->item;
+    for (item = prev_item->next; 
+	 item != NULL; item = item->next) {
+      seed = item->item;
+
+      if (prev_seed->read_end == seed->read_start) {
+	seed_rtrim_read(1, prev_seed);
+      } 
+
+      if (prev_seed->genome_end == seed->genome_start) {
+	seed_rtrim_genome(1, prev_seed);
+      } 
+
+      //      if (prev_seed->read_end + 1 == seed->read_start && 
+      //	  prev_seed->genome_end + 1 == seed->genome_start) {
+      //	display = 1;
+      //      }
+
+      if (prev_seed->read_end + 1 == seed->read_start && 
+	  prev_seed->genome_end + 1 == seed->genome_start) {
+	#ifdef _VERBOSE
+	display = 1;
+	print_seed("prev_seed: ", prev_seed);
+	print_seed("seed     : ", seed);
+	#endif
+	
+	prev_seed->read_end = seed->read_end;
+	prev_seed->genome_end = seed->genome_end;
+
+	prev_seed->suf_read_end = seed->suf_read_end;
+	prev_seed->suf_genome_end = seed->suf_genome_end;
+
+	prev_seed->num_mismatches += seed->num_mismatches;
+	prev_seed->num_open_gaps += seed->num_open_gaps;
+	prev_seed->num_extend_gaps += seed->num_extend_gaps;
+
+	cigar_concat(&seed->cigar, &prev_seed->cigar);
+
+	linked_list_remove_item(item, cal->seed_list);
+	seed_free(seed);
+
+	#ifdef _VERBOSE
+	print_seed("result   : ", prev_seed);
+	printf("\n");
+	#endif
+	item = prev_item;
+      } else {
+	prev_item = item;
+	prev_seed = seed;
+      }
+    }
+    num_seeds = linked_list_size(cal->seed_list);
+  }
+
+  if (num_seeds == 1) {
+    // one seed
+    seed = linked_list_get_first(cal->seed_list);
+    if (cigar_get_length(&seed->cigar) == cal->read->length) {
+      seed_cal_set_cigar_by_seed(seed, cal);
+      linked_list_clear(cal->seed_list, (void *)seed_free);
+    }
+  }
+
+  #ifdef _VERBOSE
+  if (display) {
+    seed_cal_print(cal);
+  }
+  #endif
 }
 
 //--------------------------------------------------------------------
@@ -61,7 +181,7 @@ float get_max_score(array_list_t *cal_list,
 		    float match_score, float mismatch_penalty,
 		    float gap_open_penalty, float gap_extend_penalty) {
   seed_cal_t *cal;
-  int num_matches, num_mismatches, num_open_gaps, num_extend_gaps;
+
   int num_cals = array_list_size(cal_list);
   float max_score = -1000000.0f;
 
@@ -285,7 +405,7 @@ void select_best_cals(fastq_read_t *read, array_list_t **cal_list) {
   if (num_cals == 0) return;
 
   seed_cal_t *cal, *first_cal, *second_cal = NULL;
-  sort_cal_t *sort_cal;
+
 
   sort_cal_t sort_cals[num_cals];
   for (int i = 0; i < num_cals; i++) {
@@ -304,6 +424,17 @@ void select_best_cals(fastq_read_t *read, array_list_t **cal_list) {
 
   mapq = compute_mapq(first_cal, second_cal, num_hits);
 
+  //printf("%s:%i: num_hits = %i, mapq = %i\n", __FILE__, __LINE__, num_hits, mapq);
+
+  /////////////////
+  //  printf(">>>> best cals (%i):\n", num_cals);
+  //  for (int i = 0; i < 5; i++) {
+  //  if (i >= num_cals) break;
+  //  seed_cal_print(sort_cals[i].cal);
+  //}
+  ///////////////
+
+
   if (first_cal->invalid) {
     array_list_clear(*cal_list, (void *) seed_cal_free);
   } else {
@@ -312,6 +443,7 @@ void select_best_cals(fastq_read_t *read, array_list_t **cal_list) {
       if ( cal->invalid &&
 	   ((abs(cal->start - first_cal->end) <= (2 * cal->read->length)) ||
 	     (abs(cal->end - first_cal->start) <= (2 * cal->read->length))) ) {
+
 	array_list_clear(*cal_list, (void *) seed_cal_free);
 	return;
       }
@@ -392,7 +524,7 @@ void create_bam_alignments(array_list_t *cal_list, fastq_read_t *read,
   }
 
   int i, cigar_len;
-  linked_list_item_t *list_item; 
+
 
 
   for (i = 0; i < num_cals; i++) {
@@ -444,10 +576,15 @@ void create_alignments(array_list_t *cal_list, fastq_read_t *read,
 
   char *seq, *p, *optional_fields, *cigar_string, *cigar_M_string;
   int AS, optional_fields_length, num_mismatches, num_cigar_ops, len;
-  linked_list_item_t *list_item; 
+
 
   for (int i = 0; i < num_cals; i++) {
     cal = array_list_get(i, cal_list);
+    if (cal->invalid) {
+      // free memory
+      seed_cal_free(cal);
+      continue;
+    }
     
     #ifdef _VERBOSE	  
     printf("--> CAL #%i (cigar %s):\n", i, cigar_to_string(&cal->cigar));
@@ -545,7 +682,7 @@ void create_alignments(array_list_t *cal_list, fastq_read_t *read,
     alignment_init_single_end(strdup(read->id), strdup(seq), strdup(quality), 
 			      cal->strand, cal->chromosome_id, cal->start,
 			      cigar_M_string, num_cigar_ops, cal->mapq, 1, (num_cals > 1),
-			      optional_fields_length, optional_fields, alignment);  
+			      optional_fields_length, (uint8_t *)optional_fields, alignment);  
     alignment->mapq = cal->mapq;
     alignment->mate_chromosome = 0;
     alignment->mate_position = 0;
@@ -759,8 +896,8 @@ void filter_cals_by_pair_mode(int pair_mode, int pair_min_distance, int pair_max
 //--------------------------------------------------------------------
 
 array_list_t *create_list(size_t *valid_items, size_t num_valids, array_list_t *list) {
-  void *item;
-  int num = 0;
+
+
 
   size_t num_items = array_list_size(list);
 
@@ -788,7 +925,7 @@ void complete_pairs(sa_mapping_batch_t *batch) {
   int distance;
   int min_distance = batch->options->pair_min_distance;
   int max_distance = batch->options->pair_max_distance;
-  int pair_mode = batch->options->pair_mode;
+
   int report_only_paired = batch->options->report_only_paired;
 
   array_list_t *list1, *list2;
@@ -802,10 +939,10 @@ void complete_pairs(sa_mapping_batch_t *batch) {
   short int chr1, chr2, strand1, strand2;
   size_t end1, start2;
 
-  int pair_found;
 
-  int num_best1, num_best2;
-  float best_score, best_score1, best_score2, score;
+
+
+  float best_score, score;
 
   pair_t *pair, *new_pair;
   linked_list_t *pair_list = linked_list_new(COLLECTION_MODE_ASYNCHRONIZED);

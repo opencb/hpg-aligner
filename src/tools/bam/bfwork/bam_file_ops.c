@@ -47,7 +47,7 @@ ERROR_CODE
 alig_bam_file(const char *bam_path, const char *ref_path, const char *outbam, const char *stats_path)
 {
 	//Times
-	double times;
+
 
 	//Wanderer
 	bam_fwork_t fwork;
@@ -105,7 +105,7 @@ alig_bam_file(const char *bam_path, const char *ref_path, const char *outbam, co
 ERROR_CODE
 recal_bam_file(uint8_t flags, const char *bam_path, const char *ref, const char *data_file, const char *info_file, const char *outbam, int cycles, const char *stats_path)
 {
-	int bytes;
+
 
 	//Data
 	recal_info_t info;
@@ -113,7 +113,7 @@ recal_bam_file(uint8_t flags, const char *bam_path, const char *ref, const char 
 	int cycles_param;
 
 	//Times
-	double times;
+
 
 	//Wanderer
 	bam_fwork_t fwork;
@@ -271,7 +271,7 @@ recal_bam_file(uint8_t flags, const char *bam_path, const char *ref, const char 
 ERROR_CODE
 alig_recal_bam_file(const char *bam_path, const char *ref_path, const char *data_file, const char *info_file, const char *outbam, int cycles, const char *stats_path)
 {
-	int bytes;
+
 
 	//Data
 	recal_info_t info;
@@ -279,7 +279,7 @@ alig_recal_bam_file(const char *bam_path, const char *ref_path, const char *data
 	int cycles_param;
 
 	//Times
-	double times;
+
 
 	//Wanderer
 	bam_fwork_t fwork;
@@ -386,7 +386,7 @@ alig_recal_bam_file(const char *bam_path, const char *ref_path, const char *data
 int
 realigner_wanderer(bam_fwork_t *fwork, bam_region_t *region, bam1_t *read)
 {
-	int i, err;
+	int err;
 
 	//Current region
 	size_t aux_init_pos;
@@ -540,11 +540,12 @@ recalibrate_wanderer(bam_fwork_t *fwork, bam_region_t *region, bam1_t *read)
 int
 recalibrate_collect_processor(bam_fwork_t *fwork, bam_region_t *region)
 {
-	int err, i;
-	recal_info_t *data;
+	int i;
 	recal_data_collect_env_t *collect_env;
 	bam1_t *read;
 	size_t *cycles;
+
+	recal_info_t *data;
 
 	//Get data
 	bfwork_local_user_data(fwork, (void **)&data);
@@ -588,7 +589,7 @@ recalibrate_collect_processor(bam_fwork_t *fwork, bam_region_t *region)
 int
 recalibrate_recalibrate_processor(bam_fwork_t *fwork, bam_region_t *region)
 {
-	int err, i;
+	int i;
 	recal_info_t *gdata;
 	recal_info_t *data;
 	recal_recalibration_env_t *recal_env;

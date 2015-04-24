@@ -194,6 +194,9 @@ int bam_filter_consumer(void *data) {
 
   // free memory
   bam_filter_wf_batch_free(batch);
+
+  return 0;
+
 }
 
 //--------------------------------------------------------------------

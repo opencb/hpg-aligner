@@ -1,6 +1,6 @@
 #include "dna/dna_aligner.h"
 #include "rna/rna_aligner.h"
-#include "bs/bs_aligner.h"
+
 #include "build-index/index_builder.h"
 
 
@@ -112,11 +112,16 @@ int main(int argc, char* argv[]) {
   log_file = NULL;
 
   if (argc <= 1) {
-    LOG_FATAL("Missing command.\nValid commands are:\n\tdna: to map DNA sequences\n\trna: to map RNA sequences\n\tbuild-sa-index: to create the genome SA index (suffix array).\n\tbuild-bwt-index: to create the genome BWT index.\nUse -h or --help to display hpg-aligner options.\n");
+    LOG_FATAL("Missing command.\nValid commands are:\n\tdna: to map DNA sequences\n\trna: to map RNA sequences\n\tbuild-sa-index: to create the genome SA index (suffix array).\n\tbuild-bwt-index: to create the genome BWT index.\nUse -h or --help to display hpg-aligner options.\nUse -v or --version to display hpg-aligner version.\n");
   }
 
   if (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") == 0) {
     usage_cli(DNA_MODE);
+  }
+
+  if (strcmp(argv[1], "-v") == 0 || strcmp(argv[1], "--version") == 0) {
+    display_version();
+    exit(0);
   }
 
   char *command = argv[1];  
@@ -141,6 +146,12 @@ int main(int argc, char* argv[]) {
 
   // parsing options
   options_t *options = parse_options(argc, argv);
+
+  if (options->version) {
+    display_version();
+    options_free(options);
+    exit(0);
+  }
 
   if (options->adapter) {
     options->adapter_revcomp = strdup(options->adapter);

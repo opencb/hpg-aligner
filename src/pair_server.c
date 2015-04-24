@@ -54,8 +54,8 @@ void prepare_pair_server(pair_server_input_t* input) {
 //------------------------------------------------------------------------------------
 
 array_list_t *create_new_list(size_t *valid_items, size_t num_valids, array_list_t *list) {
-  void *item;
-  int num = 0;
+
+
 
   size_t num_items = array_list_size(list);
   int flag = array_list_get_flag(list);
@@ -81,6 +81,7 @@ array_list_t *create_new_list(size_t *valid_items, size_t num_valids, array_list
   return new_list;
 }
 
+/*
 static void prepare_single_alignments(pair_server_input_t *input, mapping_batch_t *batch) {
 
   static char aux[4096];
@@ -94,8 +95,8 @@ static void prepare_single_alignments(pair_server_input_t *input, mapping_batch_
   int num_items, distance, AS;
   size_t read_index, num_targets = batch->num_targets;
 
-  size_t read_len, header_len, mapped_len, len, pos;
-  size_t deletion_n, num_cigar_ops, shift;
+  size_t read_len, header_len, mapped_len, pos;
+  size_t num_cigar_ops;
   char *cigar, *header_match, *read_match, *quality_match;
 
   size_t mref_start, mquery_start;
@@ -170,16 +171,6 @@ static void prepare_single_alignments(pair_server_input_t *input, mapping_batch_
 				  &distance,
 				  (int *) &num_cigar_ops);
 
-      /*
-      printf(">>>>> %s : %s, pos = %lu\n", header_match, cigar, pos);
-      printf("\tref_start = %lu, ref_len = %lu, mref_start = %lu ,mref_len = %lu\n",
-	     sw_output->ref_start, sw_output->ref_len, mref_start, sw_output->mref_len);
-      printf("\tmquery = %s (start = %i)\n", sw_output->mquery, mquery_start);
-      printf("\tmref   = %s (start = %i)\n", sw_output->mref, mref_start);
-      */
-      // set optional fields
-      //      optional_fields_length = 0;
-      //      optional_fields = NULL;
       optional_fields_length = 100;
       optional_fields = (char *) calloc(optional_fields_length, sizeof(char));
 
@@ -211,7 +202,7 @@ static void prepare_single_alignments(pair_server_input_t *input, mapping_batch_
 				sw_output->chromosome - 1, 
 				pos,
 				cigar, num_cigar_ops, sw_output->norm_score * 254, 1, (num_items > 1),
-				optional_fields_length, optional_fields, alignment);
+				optional_fields_length, (uint8_t *)optional_fields, alignment);
 
       array_list_insert(alignment, alignment_list);
 
@@ -225,9 +216,9 @@ static void prepare_single_alignments(pair_server_input_t *input, mapping_batch_
   } // end for targets
   //  printf("pair_server.c, prepare_single_alignments: Done\n");
 }
-
+*/
 //------------------------------------------------------------------------------------
-
+/*
 static void prepare_single_alignments_bs(pair_server_input_t *input, mapping_batch_t *batch) {
 
   static char aux[4096];
@@ -241,8 +232,8 @@ static void prepare_single_alignments_bs(pair_server_input_t *input, mapping_bat
   int num_items, distance, AS;
   size_t read_index, num_targets = batch->num_targets, num_targets2 = batch->num_targets2;
 
-  size_t read_len, header_len, mapped_len, len, pos;
-  size_t deletion_n, num_cigar_ops, shift;
+  size_t read_len, header_len, mapped_len, pos;
+  size_t num_cigar_ops;
   char *cigar, *header_match, *read_match, *quality_match;
 
   size_t mref_start, mquery_start;
@@ -318,13 +309,6 @@ static void prepare_single_alignments_bs(pair_server_input_t *input, mapping_bat
 				  &distance,
 				  (int *) &num_cigar_ops);
 
-      /*
-      printf(">>>>> %s : %s, pos = %lu\n", header_match, cigar, pos);
-      printf("\tref_start = %lu, ref_len = %lu, mref_start = %lu ,mref_len = %lu\n",
-	     sw_output->ref_start, sw_output->ref_len, mref_start, sw_output->mref_len);
-      printf("\tmquery = %s (start = %i)\n", sw_output->mquery, mquery_start);
-      printf("\tmref   = %s (start = %i)\n", sw_output->mref, mref_start);
-      */
 
       // set optional fields
       //      optional_fields_length = 0;
@@ -360,7 +344,7 @@ static void prepare_single_alignments_bs(pair_server_input_t *input, mapping_bat
 				sw_output->chromosome - 1, 
 				pos,
 				cigar, num_cigar_ops, sw_output->norm_score * 254, 1, (num_items > 1),
-				optional_fields_length, optional_fields, alignment);
+				optional_fields_length, (uint8_t *)optional_fields, alignment);
 
       array_list_insert(alignment, alignment_list);
 
@@ -437,13 +421,6 @@ static void prepare_single_alignments_bs(pair_server_input_t *input, mapping_bat
 				  sw_output->mref_len, 
 				  &distance,
 				  (int *) &num_cigar_ops);
-      /*
-      printf(">>>>> %s : %s, pos = %lu\n", header_match, cigar, pos);
-      printf("\tref_start = %lu, ref_len = %lu, mref_start = %lu ,mref_len = %lu\n",
-	     sw_output->ref_start, sw_output->ref_len, mref_start, sw_output->mref_len);
-      printf("\tmquery = %s (start = %i)\n", sw_output->mquery, mquery_start);
-      printf("\tmref   = %s (start = %i)\n", sw_output->mref, mref_start);
-      */
       // set optional fields
       //      optional_fields_length = 0;
       //      optional_fields = NULL;
@@ -478,7 +455,7 @@ static void prepare_single_alignments_bs(pair_server_input_t *input, mapping_bat
 				sw_output->chromosome - 1, 
 				pos,
 				cigar, num_cigar_ops, sw_output->norm_score * 254, 1, (num_items > 1),
-				optional_fields_length, optional_fields, alignment);
+				optional_fields_length, (uint8_t *)optional_fields, alignment);
 
       array_list_insert(alignment, alignment_list);
 
@@ -492,7 +469,7 @@ static void prepare_single_alignments_bs(pair_server_input_t *input, mapping_bat
   } // end for targets
   //printf("pair_server.c, prepare_single_alignments: Done\n");
 }
-
+*/
 //------------------------------------------------------------------------------------
 
 void update_mispaired_pair(int pair_num, size_t num_items, array_list_t *list) {
@@ -610,7 +587,7 @@ void prepare_paired_alignments(pair_server_input_t *input, mapping_batch_t *batc
   int distance;
   int min_distance = input->pair_mng->min_distance;
   int max_distance = input->pair_mng->max_distance;
-  int pair_mode = input->pair_mng->pair_mode;
+
   int report_only_paired = input->pair_mng->report_only_paired;
 
   array_list_t *list1, *list2;
@@ -624,7 +601,7 @@ void prepare_paired_alignments(pair_server_input_t *input, mapping_batch_t *batc
   short int chr1, chr2, strand1, strand2;
   size_t end1, start2;
 
-  int pair_found;
+
 
   float score;
   pair_t *pair, *new_pair;
@@ -940,7 +917,7 @@ extern unsigned int alignmentcmp(alignment_t *alignment_1, alignment_t *alignmen
 
 static inline size_t select_best_hits(array_list_t *mapping_list,
 			       size_t report_n_best) {
-  int j, i, z;
+  int j, i;
   size_t best_pos, array_size;
   alignment_t *best_alignment, *aux_alignment;
   array_list_t *mapping_list_filter;
@@ -1131,11 +1108,11 @@ int apply_pair(pair_server_input_t* input, batch_t *batch) {
 
   printf("START: apply_pair\n"); 
   mapping_batch_t *mapping_batch = batch->mapping_batch;
-  char *seq;
-  list_t *list = NULL;
+
+
   array_list_t *fq_batch = mapping_batch->fq_batch;
 
-  int pair_mode = input->pair_mng->pair_mode;
+
   size_t min_distance = input->pair_mng->min_distance;
   size_t max_distance = input->pair_mng->max_distance;
   int distance;
@@ -1159,7 +1136,7 @@ int apply_pair(pair_server_input_t* input, batch_t *batch) {
   alignment_t *alig;
   cal_t *cal;
   
-  int total_removed = 0, num_to_do = 0;
+
 
   for (size_t i = 0; i < num_reads; i += 2) {
 
@@ -1321,16 +1298,11 @@ int prepare_alignments(pair_server_input_t *input, batch_t *batch) {
       size_t n_alig = array_list_size(mapping_list);
       for (int a = 0; a < n_alig; a++) {
 	alignment_t *alig = array_list_get(a, mapping_list);
-	if (alig->alig_data != NULL) {
-	  alig->cigar = new_cigar_code_string(alig->alig_data);
-	} else {
+	if (alig->alig_data == NULL) {
 	  alig->alig_data = cigar_code_new_by_string(alig->cigar);
+	  free(alig->cigar);
 	}
       }
-    }
-
-    if (input->pair_mng->pair_mode != SINGLE_END_MODE) {
-      prepare_paired_alignments(input, batch->mapping_batch); 
     }
 
     for (int i = 0; i < num_reads; i++) {
@@ -1347,9 +1319,14 @@ int prepare_alignments(pair_server_input_t *input, batch_t *batch) {
 	  array_list_clear(c->ops, (void *)cigar_op_free);
 	  cigar_code_free(c);
 	  alig->alig_data = NULL;
-	}
+	} 
       }
     }
+
+    if (input->pair_mng->pair_mode != SINGLE_END_MODE) {
+      prepare_paired_alignments(input, batch->mapping_batch); 
+    }
+
   }
 
   return CONSUMER_STAGE;

@@ -42,38 +42,35 @@ DOWNLOAD and BUILDING
     Resolving deltas: 100% (4430/4430), done.
     Submodule path 'lib/hpg-libs': checked out '962f531ef0ffa2a6a665ae6fba8bc2337c4351a9'
 
-  For the most recent HPG Aligner version, choose the 'master' Git branch (both for the hpg-libs and the HPG Aligner):
+  You can see the available HPG Aligner releases by using the command:
 
-    $ cd lib/hpg-libs
-    $ git checkout master
-    $ cd ../..
-    $ git checkout master
+    $ git tag
+    v2.0.0
+    v2.0.1
 
+  Select the HPG Aligner relesase you want to use, for instance, 
 
-  Before you can build HPG Aligner, you must install on your system:
+    $ git checkout v2.0.1
 
-    * the GSL (GNU Scientific Library), http://www.gnu.org/software/gsl/
-    * the Check library, http://check.sourceforge.net/
+  Before building the HPG Aligner, you must install on your system the following packages: git, gcc, scons, zlib, curl, xml, curses, gsl and check. 
 
-  Finally, use Scons to build the HPG Aligner application:
-
-    $ scons
-
-  For build HPG Aligner yo need Git, GCC, Scons, zlib, curl, xml, curses, gsl and check. If some of they are not install in your system, you can try for Ubuntu and Debian:
+   In Ubuntu and Debian distributions, you can install them by using theses commands:
     
-
     $ apt-get install git 
     $ apt-get install gcc
     $ apt-get install scons
     $ apt-get install zlib1g-dev libcurl4-gnutls-dev libxml2-dev libncurses5-dev libgsl0-dev check
 
-  And you can try for Centos and Fedora:
+  And in Centos and Fedora distributions:
     
     $ yum install git 
     $ yum install gcc
     $ yum install scons
     $ yum install zlib-devel libcurl-devel libxml2-devel ncurses-devel gsl-devel check-devel
-     
+
+  Finally, use Scons to build the HPG Aligner application:
+
+    $ scons
 
 RUNING
 -------
@@ -81,7 +78,6 @@ RUNING
   For command line options invoke:
 
     $ ./bin/hpg-aligner -h
-
 
 
   In order to map DNA sequences:

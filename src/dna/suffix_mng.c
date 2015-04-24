@@ -1,5 +1,5 @@
 #include "suffix_mng.h"
-
+ 
 //--------------------------------------------------------------------
 // suffix manager
 //--------------------------------------------------------------------
@@ -77,7 +77,7 @@ void suffix_mng_update(int chrom, size_t read_start, size_t read_end,
   if (!p) return;
   if (!p->suffix_lists) return;
 
-  int found_cal = 0;
+
   linked_list_t *suffix_list = p->suffix_lists[chrom];
   if (!suffix_list) return;
 
@@ -141,8 +141,8 @@ void extend_to_left(seed_t *seed, int max_length,
 
   int chrom = cal->chromosome_id;
 
-  size_t r_end = seed->read_start - 1;
-  size_t r_start = r_end - max_length;
+  //size_t r_end = seed->read_start - 1;
+  //size_t r_start = r_end - max_length;
   size_t r_len = max_length;
   char *r_seq = (cal->strand ? cal->read->revcomp : cal->read->sequence);
   
@@ -151,8 +151,8 @@ void extend_to_left(seed_t *seed, int max_length,
   size_t g_start = g_end - g_len;
   char *g_seq = &sa_index->genome->S[g_start + sa_index->genome->chrom_offsets[chrom] + 1];
   
-  float score = doscadfun_inv(r_seq, r_len, g_seq, g_len, MISMATCH_PERC,
-			      alig_out);
+  doscadfun_inv(r_seq, r_len, g_seq, g_len, MISMATCH_PERC,
+		alig_out);
 }
 
 void extend_to_right(seed_t *seed, int max_length, 
@@ -164,18 +164,18 @@ void extend_to_right(seed_t *seed, int max_length,
   int chrom = cal->chromosome_id;
 
   size_t r_start = seed->read_end + 1;
-  size_t r_end = seed->read_end + max_length;
+  //size_t r_end = seed->read_end + max_length;
   size_t r_len = max_length;
   char *r_seq = (cal->strand ? cal->read->revcomp : cal->read->sequence);
   
   size_t g_len = r_len + 10;
   size_t g_start = seed->genome_end + 1;
-  size_t g_end = g_start + g_len;
+  //size_t g_end = g_start + g_len;
 
   char *g_seq = &sa_index->genome->S[g_start + sa_index->genome->chrom_offsets[chrom]];
   
-  float score = doscadfun(&r_seq[r_start], r_len, g_seq, g_len, MISMATCH_PERC,
-			  alig_out);
+  doscadfun(&r_seq[r_start], r_len, g_seq, g_len, MISMATCH_PERC,
+	    alig_out);
 }
 
 
@@ -224,14 +224,14 @@ void update_seed_right(alig_out_t *alig_out, seed_t *seed, seed_cal_t *cal) {
 
 void extend_seeds(seed_cal_t *cal, sa_index3_t *sa_index) {
   size_t gap_read_start, gap_read_end;
-  size_t genome_pos, gap_genome_start, gap_genome_end;
+  size_t gap_genome_start, gap_genome_end;
   int chrom, gap_read_len, gap_genome_len;
 
   linked_list_item_t *item;
   seed_t *prev_seed, *seed;
 
-  int read_area, genome_area, num_seeds, num_matches, num_mismatches;
-  char *seq, *r_seq, *g_seq;
+  int read_area, genome_area, num_seeds;
+  char *seq;
   alig_out_t alig_out;
 
   fastq_read_t *read = cal->read;
@@ -528,8 +528,7 @@ void suffix_mng_search_read_cals_by_region(fastq_read_t *read, int num_seeds,
 					   size_t start, size_t end, 
 					   array_list_t *cal_list, 
 					   suffix_mng_t *suffix_mng) {
-  int max_suffixes = MAX_NUM_SUFFIXES;
-  int chrom, num_prefixes, num_suffixes, suffix_len;
+  int chrom, num_prefixes, num_suffixes, suffix_len = 0;
   size_t low, high, r_start_suf, r_end_suf, g_start_suf, g_end_suf;
 
   int read_pos, read_inc = read->length / num_seeds;

@@ -12,7 +12,6 @@
 #include "buffers.h"
 
 #include "breakpoint.h"
-#include "bs/methylation.h"
 
 //====================================================================================
 //  structures and prototypes

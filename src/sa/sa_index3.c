@@ -10,7 +10,7 @@
 sa_genome3_t *read_genome3(char *filename) {
 
   const int MAX_CHROM_NAME_LENGHT = 1024;
-  uint reading_name, chrom_name_count = 0;
+  uint reading_name = 0, chrom_name_count = 0;
   char chrom_name[MAX_CHROM_NAME_LENGHT];
 
   // open fasta file
@@ -226,7 +226,7 @@ void sa_index3_build(char *genome_filename, uint k_value, char *sa_index_dirname
   //-----------------------------------------
   // read genome S from file
   //-----------------------------------------
-  uint len = 0;
+
   printf("\nreading file genome %s...\n", genome_filename);
   gettimeofday(&start, NULL);
   sa_genome3_t *genome = read_genome3(genome_filename);
@@ -249,7 +249,7 @@ void sa_index3_build(char *genome_filename, uint k_value, char *sa_index_dirname
   //-----------------------------------------
   // compute SA table
   //-----------------------------------------
-  uint num_suffixes;
+  uint num_suffixes = 0;
   printf("\ncomputing SA and CHROM table...\n");
   gettimeofday(&start, NULL);
   suffix_tmp_t *tmp[4];
@@ -390,10 +390,10 @@ void sa_index3_build_k18(char *genome_filename, uint k_value, char *sa_index_dir
   //printf("\n***************** K value = 18 ***************************\n");
   k_value = 18;
 
-  const size_t value4M = 4194304; // 4 M
+  //const size_t value4M = 4194304; // 4 M
   const size_t value16M = 16777216; // 16 M
-  const size_t value64M = 67108864; // 64 M
-  const size_t value256M = 268435456; // 256 M
+  //const size_t value64M = 67108864; // 64 M
+  //const size_t value256M = 268435456; // 256 M
   
   size_t M_items = 256LLU * value16M;
   size_t M_bytes = M_items * sizeof(uint);
@@ -435,7 +435,7 @@ void sa_index3_build_k18(char *genome_filename, uint k_value, char *sa_index_dir
   if (genome->length > max_uint || genome->num_chroms > 256) {
     printf("Genome not supported: (%s)\n", genome_filename);
     printf("\tGenome length: %lu\n", genome->length);
-    printf("\tNumber segments (chromosomes, scaffolds,...): %i\n", genome->num_chroms);
+    printf("\tNumber segments (chromosomes, scaffolds,...): %lu\n", genome->num_chroms);
     printf("\n");
     printf("Genomes supported by HPG Aligner %s\n", HPG_ALIGNER_VERSION);
     printf("\tMax. genome length: %lu\n", max_uint);
@@ -645,7 +645,7 @@ p      display_prefix(&genome->S[tmp[0][i].value], k_value);
   unsigned char ja;
   uint row, col, m_value;
   
-  size_t matrix, matrix_items, value, min_value, max_value;
+  size_t matrix, matrix_items, value;
   // set matrix to 0
   matrix = 0;
   matrix_items = 0;
@@ -768,8 +768,8 @@ p      display_prefix(&genome->S[tmp[0][i].value], k_value);
   fclose(f_IA);
   fclose(f_JA);
 
-  uint pre_length;// = 1LLU << (2 * k_value);
-  uint *PRE;// = (uint *) calloc(pre_length, sizeof(uint));
+  uint pre_length = 0;// = 1LLU << (2 * k_value);
+
 /*
 
   gettimeofday(&stop, NULL);
@@ -842,7 +842,7 @@ sa_index3_t *sa_index3_new(char *sa_index_dirname) {
   char *prefix;
   uint k_value, pre_length, A_items, IA_items, num_suffixes, genome_len, num_chroms, num_items;
 
-  struct timeval stop, start;
+
 
   PREFIX_TABLE_NT_VALUE['A'] = 0;
   PREFIX_TABLE_NT_VALUE['N'] = 0;
@@ -901,7 +901,8 @@ sa_index3_t *sa_index3_new(char *sa_index_dirname) {
 
   fclose(f_tab);
 
-  char *S, *CHROM;
+  unsigned char *CHROM;
+  char *S;
   unsigned char *JA;
   sa_genome3_t *genome;
   uint *SA, *PRE, *A, *IA;
@@ -1028,7 +1029,7 @@ sa_index3_t *sa_index3_new(char *sa_index_dirname) {
 	exit(-1);
       }
       //      printf("CHROM: filename %s, num_suffixes = %lu\n", filename_tab, num_suffixes);
-      CHROM = (char *) malloc(num_suffixes * sizeof(char));
+      CHROM = (unsigned char *) malloc(num_suffixes * sizeof(unsigned char));
       
       //      printf("\nreading CHROM table from file %s...\n", filename_tab);
       gettimeofday(&start, NULL);

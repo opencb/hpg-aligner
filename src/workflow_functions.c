@@ -48,8 +48,8 @@ wf_input_file_t *wf_input_file_new(FILE *fd,
 //--------------------------------------------------------------------
 
 void *fastq_reader(void *input) {
-     struct timeval start, end;
-     double time;
+
+
      extern size_t fd_read_bytes;
      size_t read_bytes;
      //if (time_on) { start_timer(start); }
@@ -340,15 +340,15 @@ void *file_reader(void *input) {
   wf_input_file_t *wf_input = (wf_input_file_t *) input;
   FILE *fd = wf_input->file;
   batch_t *batch = wf_input->batch;
-  int pair_mode = batch->pair_input->pair_mng->pair_mode;
+
 
   const int MAX_READS = 100;
   int num_reads = 0;
   batch_t *new_batch = NULL;
 
-  size_t tot_size;
+
   size_t num_items;
-  char *buffer, *id, *sequence, *quality;
+
   size_t bytes;
   unsigned char type;
   array_list_t *reads = array_list_new(MAX_READS, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
@@ -423,15 +423,15 @@ void *file_reader_2(void *input) {
   wf_input_file_t *wf_input = (wf_input_file_t *) input;
   FILE *fd = wf_input->file;
   batch_t *batch = wf_input->batch;
-  int pair_mode = batch->pair_input->pair_mng->pair_mode;
+
   
   const int MAX_READS = 100;
   int num_reads = 0;
   batch_t *new_batch = NULL;
 
-  size_t sizes_to_read[3], head_len, seq_len, num_items;
-  size_t tot_size;
-  char *buffer, *id, *sequence, *quality;
+  size_t num_items;
+
+
   size_t bytes;
   unsigned char type;
   array_list_t *reads = array_list_new(MAX_READS, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
@@ -586,17 +586,17 @@ int sam_writer(void *data) {
   if (batch) batch_free(batch);
 
   basic_statistics_add(num_reads, num_mapped_reads, total_mappings, 0, basic_st);
+
+  return 0;
+
 }
 
-int bam_writer(void *data) {
-  struct timeval start, end;
-  double time;
-  
+int bam_writer(void *data) {  
   //if (time_on) { start_timer(start); }
   
   batch_t *batch = (batch_t *) data;
   fastq_read_t *fq_read;
-  array_list_t *array_list;
+
   size_t num_items;
   
   //bam1_t *bam1;
@@ -606,26 +606,13 @@ int bam_writer(void *data) {
   
   batch_writer_input_t *writer_input = batch->writer_input;
   bam_file_t *bam_file = writer_input->bam_file;     
-  linked_list_t *linked_list = writer_input->list_p;
+
   size_t num_reads_b = array_list_size(mapping_batch->fq_batch);
   size_t num_mapped_reads = 0;
   size_t total_mappings = 0;
-  unsigned char found_p1 = 0;
-  unsigned char found_p2 = 0;
-  int i = 0;
-  
-  extern size_t bwt_correct;
-  extern size_t bwt_error;
-  extern pthread_mutex_t bwt_mutex, mutex_sp;
-  
+
   writer_input->total_batches++;
-  
-  extern size_t *histogram_sw;
-  
-  extern size_t num_reads_map;
-  extern size_t num_reads;
-  extern size_t tot_reads;
-  
+   
   extern st_bwt_t st_bwt;
   st_bwt.total_reads += num_reads_b;
 
@@ -665,6 +652,9 @@ int bam_writer(void *data) {
   if (batch) batch_free(batch);
   
   basic_statistics_add(num_reads_b, num_mapped_reads, total_mappings, 0, basic_st);
+
+  return 0;
+
 }
 
 void write_mapped_read(array_list_t *array_list, bam_file_t *bam_file) {
@@ -698,10 +688,10 @@ void write_mapped_read(array_list_t *array_list, bam_file_t *bam_file) {
 //--------------------------------------------------------------------
 
 void write_unmapped_read(fastq_read_t *fq_read, bam_file_t *bam_file) {
-  static char aux[1024] = "";
+
   alignment_t *alig;
-  size_t header_len;
-  char *id;
+
+
   bam1_t *bam1;
 
   // calculating cigar
@@ -744,14 +734,6 @@ int bwt_stage(void *data) {
 
 //--------------------------------------------------------------------
 
-int bwt_stage_bs(void *data) {
-  batch_t *batch = (batch_t *) data;
-
-  //printf("Init BWT\n");
-  return apply_bwt_bs(batch->bwt_input, batch);     
-}
-
-//--------------------------------------------------------------------
 
 int seeding_stage(void *data) {
   batch_t *batch = (batch_t *) data;
@@ -761,14 +743,6 @@ int seeding_stage(void *data) {
 
 //--------------------------------------------------------------------
 
-int seeding_stage_bs(void *data) {
-  batch_t *batch = (batch_t *) data;
-
-  //printf("Init seeding\n");
-  return apply_seeding_bs(batch->region_input, batch);
-}
-
-//--------------------------------------------------------------------
 
 int cal_stage(void *data) {
   batch_t *batch = (batch_t *) data;
@@ -776,22 +750,6 @@ int cal_stage(void *data) {
   return apply_caling_rna(batch->cal_input, batch);
 }
 
-//--------------------------------------------------------------------
-
-int cal_stage_bs(void *data) {
-  batch_t *batch = (batch_t *) data;
-
-  //printf("Init CAL\n");
-  return apply_caling_bs(batch->cal_input, batch);
-}
-
-//--------------------------------------------------------------------
-
-int rna_preprocess_stage(void *data) {
-  batch_t *batch = (batch_t *) data;
-
-  return apply_preprocess_rna(batch->preprocess_rna, batch);  
-}
 
 //---------------------------------------------------------------------
 
@@ -803,14 +761,6 @@ int pre_pair_stage(void *data) {
 
 //---------------------------------------------------------------------
 
-int pre_pair_stage_bs(void *data) {
-  batch_t *batch = (batch_t *) data;
-
-  //printf("Init pre_pair\n");
-  return apply_pair(batch->pair_input, batch);
-}
-
-//--------------------------------------------------------------------
 
 int sw_stage(void *data) {
   batch_t *batch = (batch_t *) data;
@@ -824,14 +774,6 @@ int sw_stage(void *data) {
 
 //--------------------------------------------------------------------
 
-int sw_stage_bs(void *data) {
-  batch_t *batch = (batch_t *) data;
-
-  //printf("Init SW\n");
-  return apply_sw_bs(batch->sw_input, batch);
-}
-
-//--------------------------------------------------------------------
 
 int rna_last_stage(void *data) {
    batch_t *batch = (batch_t *) data;
@@ -854,67 +796,3 @@ int post_pair_stage(void *data) {
 
 //--------------------------------------------------------------------
 
-int post_pair_stage_bs(void *data) {
-  batch_t *batch = (batch_t *) data;
-
-  return prepare_alignments_bs(batch->pair_input, batch);
-}
-
-//--------------------------------------------------------------------
-
-int bs_status_stage(void *data) {
-  batch_t *batch = (batch_t *) data;
-
-  //printf("Init bs_status\n");
-  return methylation_status_report(batch->sw_input, batch);
-}
-
-//--------------------------------------------------------------------
-
-/*
-void *buffer_reader(void *input) {
-  wf_input_buffer_t *wf_input = (wf_input_t *) input;
-
-  linked_list_t *buffer = wf_input->buffer;
-  batch_t *batch = wf_input->batch;
-  buffer_item_t *buffer_item;
-  const int MAX_READS = 100;
-  int num_reads = 0;
-  batch_t *new_batch = NULL;
-
-  if (linked_list_size(buffer) > 0) {
-    array_list_t *reads = array_list_new(MAX_READS, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
-    mapping_batch_t *mapping_batch = mapping_batch_new_2(MAX_READS, 
-							 reads,
-							 batch->pair_input->pair_mng);
-    while (num_reads < MAX_READS) {
-      buffer_item = linked_list_remove_last(buffer);
-      if (buffer_item == NULL) { break; }
-      fastq_read_t *read = buffer_item->read;
-      array_list_insert(buffer_item->read, reads);
-      mapping_batch->mapping_lists[num_reads] = array_list_new(50,
-							       1.25f, 
-							       COLLECTION_MODE_ASYNCHRONIZED);
-
-      for (int i = 0; i < array_list_size(buffer_item->items_list); i++) {
-	void *item = array_list_get(i, buffer_item->items_list);
-	array_list_insert(item, mapping_batch->mapping_lists[num_reads]);
-      }
-
-      array_list_set_flag(array_list_get_flag(buffer_item->items_list),
-			  mapping_batch->mapping_lists[num_reads]);
-      num_reads++;
-      //printf("TOTAL READS %i\n", num_reads);
-      buffer_item_free(buffer_item);
-    }
-    
-    mapping_batch->num_allocated_targets = num_reads;
-    new_batch = batch_new(batch->bwt_input, batch->region_input, batch->cal_input, 
-			  batch->pair_input, batch->preprocess_rna, batch->sw_input,
-			  batch->writer_input, batch->mapping_mode, mapping_batch); 
-  }
-
-
-  return new_batch;
-}
-*/
