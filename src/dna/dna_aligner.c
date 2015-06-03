@@ -72,14 +72,38 @@ void dna_aligner(options_t *options) {
 	// display options
 	display_options(options, NULL);
 
-	// load SA index
+	// load index
+	search_support_t *search_support;
+
 	struct timeval stop, start;
 	printf("\n");
 	printf("-----------------------------------------------------------------\n");
 	printf("Loading SA tables...\n");
 	gettimeofday(&start, NULL);
-	sa_index3_t *sa_index = sa_index3_new(sa_dirname);
-	global_genome = sa_index->genome;
+
+	//void *index;
+	//sa_index3_t *sa_index = NULL;
+	//bwt_index_t *bwt_index = NULL;
+
+	char index_path[strlen(sa_dirname) + 100];
+	sprintf(index_path, "%s/params.txt", sa_dirname);
+	if (exists(index_path)) {
+	  search_support = sa_search_support_new(sa_dirname);
+	  
+	  // load SA index
+	  ((generic_function_t) search_support->load_index)(search_support);
+	  global_genome = ((sa_index3_t *)search_support->index)->genome;	  
+	  //	  sa_index = sa_index3_new(sa_dirname);
+	  //	  index = sa_index;
+	  //	  global_genome = sa_index->genome;
+	} else {
+	  // load BWT index
+	  search_support = bwt_search_support_new(sa_dirname);
+	  
+	  // load BWT index
+	  ((generic_function_t) search_support->load_index)(search_support);
+	}
+
 	gettimeofday(&stop, NULL);
 	printf("End of loading SA tables in %0.2f min. Done!!\n",
 			((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f) / 60.0f);
@@ -91,12 +115,12 @@ void dna_aligner(options_t *options) {
 	batch_writer_input_t writer_input;
 	batch_writer_input_init(out_filename, NULL, NULL, NULL, NULL, &writer_input);
 	if (bam_format) {
-		bam_header_t *bam_header = create_bam_header(options, sa_index->genome);
+		bam_header_t *bam_header = create_bam_header(options, global_genome);
 		writer_input.bam_file = bam_fopen_mode(out_filename, bam_header, "w");
 		bam_fwrite_header(bam_header, writer_input.bam_file);
 	} else {
 		writer_input.bam_file = (bam_file_t *) fopen(out_filename, "w");
-		write_sam_header(options, sa_index->genome, (FILE *) writer_input.bam_file);
+		write_sam_header(options, global_genome, (FILE *) writer_input.bam_file);
 	}
 
 	char *fq_list1 = options->in_filename, *fq_list2 = options->in_filename2;
@@ -184,7 +208,7 @@ void dna_aligner(options_t *options) {
 		khash_t(ID) *h = kh_init(ID);
 		if (options->input_format == BAM_FORMAT) {
 			if (options->pair_mode == PAIRED_END_MODE){
-				bam_header_t *bam_header = create_bam_header(options, sa_index->genome);
+				bam_header_t *bam_header = create_bam_header(options, global_genome);
 				fnomapped = bam_fopen_mode(UNMAPPED_BAM, bam_header, "w");
 				bam_fwrite_header(bam_header, fnomapped);//write the header in fnomapped
 			}
@@ -193,7 +217,7 @@ void dna_aligner(options_t *options) {
 		//--------------------------------------------------------------------------------------
 		// workflow management
 		//
-		sa_wf_batch_t *wf_batch = sa_wf_batch_new(options, (void *)sa_index, &writer_input, NULL, NULL);
+		sa_wf_batch_t *wf_batch = sa_wf_batch_new(options, search_support, &writer_input, NULL, NULL);
 		sa_wf_input_t *wf_input = sa_wf_input_new(bam_format, &reader_input, wf_batch);
 
 
@@ -369,7 +393,10 @@ void dna_aligner(options_t *options) {
 	// free memory
 	array_list_free(files_fq1, (void *) free);
 	array_list_free(files_fq2, (void *) free);
-	if (sa_index) sa_index3_free(sa_index);
+	//if (bwt_index) bwt_index_free(bwt_index);
+	//if (sa_index) sa_index3_free(sa_index);
+	((generic_function_t) search_support->free_index)(search_support);
+	search_support_free(search_support);
 
 	//closing files
 	if (bam_format) {

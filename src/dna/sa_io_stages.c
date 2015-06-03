@@ -43,7 +43,7 @@ void *sa_fq_reader(void *input) {
 		sa_mapping_batch->bam_format = wf_input->bam_format;
 
 		new_wf_batch = sa_wf_batch_new(curr_wf_batch->options,
-				curr_wf_batch->sa_index,
+				curr_wf_batch->search_support,
 				curr_wf_batch->writer_input,
 				sa_mapping_batch,
 				NULL);
@@ -117,7 +117,7 @@ void *sa_bam_reader_single(void *input) {
 		sa_mapping_batch->bam_format = wf_input->bam_format;
 
 		new_wf_batch = sa_wf_batch_new(curr_wf_batch->options,
-				curr_wf_batch->sa_index,
+				curr_wf_batch->search_support,
 				curr_wf_batch->writer_input,
 				sa_mapping_batch,
 				NULL);
@@ -275,7 +275,7 @@ void *sa_bam_reader_pairend(void *input) {
 		sa_mapping_batch->bam_format = wf_input->bam_format;
 
 		new_wf_batch = sa_wf_batch_new(curr_wf_batch->options,
-				curr_wf_batch->sa_index,
+				curr_wf_batch->search_support,
 				curr_wf_batch->writer_input,
 				sa_mapping_batch,
 				NULL);
@@ -422,7 +422,7 @@ void *sa_bam_reader_unmapped(void *input) {
 		sa_mapping_batch->bam_format = wf_input->bam_format;
 
 		new_wf_batch = sa_wf_batch_new(curr_wf_batch->options,
-				curr_wf_batch->sa_index,
+				curr_wf_batch->search_support,
 				curr_wf_batch->writer_input,
 				sa_mapping_batch,
 				NULL);
@@ -607,7 +607,7 @@ void *sa_bam_reader_pairendV3(void *input){
 		sa_mapping_batch->bam_format = wf_input->bam_format;
 
 		new_wf_batch = sa_wf_batch_new(curr_wf_batch->options,
-				curr_wf_batch->sa_index,
+				curr_wf_batch->search_support,
 				curr_wf_batch->writer_input,
 				sa_mapping_batch,
 				NULL);
@@ -673,7 +673,8 @@ int sa_sam_writer(void *data) {
   array_list_t *mapping_list;
   FILE *out_file = (FILE *) wf_batch->writer_input->bam_file;
 
-  sa_genome3_t *genome = wf_batch->sa_index->genome;
+  //  sa_genome3_t *genome = wf_batch->sa_index->genome;
+  sa_genome3_t *genome = ((sa_index3_t *) wf_batch->search_support->index)->genome;
 
   size_t num_reads, num_mappings;
   num_reads = mapping_batch->num_reads;
@@ -1048,7 +1049,8 @@ int sa_bam_writer(void *data) {
   array_list_t *mapping_list;
   bam_file_t *out_file = wf_batch->writer_input->bam_file;
 
-  sa_genome3_t *genome = wf_batch->sa_index->genome;
+  //sa_genome3_t *genome = wf_batch->sa_index->genome;
+  sa_genome3_t *genome = ((sa_index3_t *) wf_batch->search_support->index)->genome;
 
   size_t num_reads, num_mappings;
   num_reads = mapping_batch->num_reads;

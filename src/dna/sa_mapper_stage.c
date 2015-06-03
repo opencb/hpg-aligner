@@ -22,7 +22,7 @@ void cut_adapter(char *adapter, int adapter_length, fastq_read_t *read);
 
 int generate_cals_from_suffixes(int strand, fastq_read_t *read,
 				int read_pos, int suffix_len, size_t low, size_t high, 
-				sa_index3_t *sa_index, cal_mng_t *cal_mng
+				search_support_t *search_support, cal_mng_t *cal_mng
                                 #ifdef _TIMING
 				, sa_mapping_batch_t *mapping_batch
                                 #endif
@@ -546,7 +546,7 @@ void cal_mng_select_best(int read_area, array_list_t *valid_list, array_list_t *
 //--------------------------------------------------------------------
 
 array_list_t *search_mate_cal_by_prefixes(seed_cal_t *cal, fastq_read_t *read,
-					  sa_index3_t *sa_index, sa_mapping_batch_t *batch,
+					  search_support_t *search_support, sa_mapping_batch_t *batch,
 					  cal_mng_t *cal_mng) {
   array_list_t *cal_list = array_list_new(10, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
   char *seq;
@@ -561,11 +561,12 @@ array_list_t *search_mate_cal_by_prefixes(seed_cal_t *cal, fastq_read_t *read,
 
 
   int max_distance = batch->pair_max_distance;
+  int seed_size = search_support_get_seed_size(search_support);
   
-  read_end_pos = read->length - sa_index->k_value;
+  read_end_pos = read->length - seed_size;
   read_inc = read->length / num_seeds;
-  if (read_inc < sa_index->k_value / 2) {
-    read_inc = sa_index->k_value / 2;
+  if (read_inc < seed_size / 2) {
+    read_inc = seed_size / 2;
   }
   
   chromosome = cal->chromosome_id;
@@ -626,6 +627,7 @@ array_list_t *search_mate_cal_by_prefixes(seed_cal_t *cal, fastq_read_t *read,
 }
 
 //--------------------------------------------------------------------
+
 int is_valid_cal_pair(seed_cal_t *cal1, seed_cal_t *cal2,
 		      int min_distance, int max_distance, 
 		      int *out_distance) {
@@ -1472,7 +1474,7 @@ int check_gap_lengths(int max_gap_length, array_list_t *cal_list) {
 }
 
 
-void clean_cals(array_list_t **list, fastq_read_t *read, sa_index3_t *sa_index) {
+void clean_cals(array_list_t **list, fastq_read_t *read) {
 
   seed_t *prev_seed, *seed;
   linked_list_item_t *prev_item, *item;
@@ -2217,8 +2219,10 @@ int sa_single_mapper(void *data) {
   sa_mapping_batch_t *mapping_batch = wf_batch->mapping_batch;
   mapping_batch->options = wf_batch->options;
 
-  sa_index3_t *sa_index = (sa_index3_t *) wf_batch->sa_index;
-  
+  //  sa_index3_t *sa_index = (sa_index3_t *) wf_batch->sa_index;
+  //  sa_index3_t *sa_index = (sa_index3_t *) wf_batch->search_support->index;
+  search_support_t *search_support = wf_batch->search_support;
+
   int bam_format = mapping_batch->bam_format;
 
   size_t num_reads = mapping_batch->num_reads;
@@ -2245,7 +2249,7 @@ int sa_single_mapper(void *data) {
 
   fastq_read_t *read;
 
-  cal_mng = cal_mng_new(sa_index->genome);
+  cal_mng = cal_mng_new(search_support);
   #ifdef _TIMING
   gettimeofday(&stop, NULL);
   mapping_batch->func_times[FUNC_OTHER] += 
@@ -2262,14 +2266,14 @@ int sa_single_mapper(void *data) {
     }
 
     // 1) extend using mini-sw from suffix
-    cal_list = create_cals(num_seeds, read, mapping_batch, sa_index, cal_mng);
+    cal_list = create_cals(num_seeds, read, mapping_batch, search_support, cal_mng);
 
     if (array_list_size(cal_list) > 0) {
 
       select_best_cals(read, &cal_list);
 
       if (array_list_size(cal_list) <= 0) {
-	suffix_mng_search_read_cals(read, num_seeds, sa_index, cal_list, cal_mng->suffix_mng);
+	suffix_mng_search_read_cals(read, num_seeds, search_support, cal_list, cal_mng->suffix_mng);
 	if (array_list_size(cal_list) > 0) {
 	  select_best_cals(read, &cal_list);
 	} else {
@@ -2278,13 +2282,13 @@ int sa_single_mapper(void *data) {
       }
 
       //fill_seed_gaps(cal_list, read, sa_index);
-      clean_cals(&cal_list, read, sa_index);
+      clean_cals(&cal_list, read);
       if (array_list_size(cal_list) <= 0) {
 	mapping_batch->status[i] = 4; //clean cals
       }
 
       // 2) prepare Smith-Waterman to fill in the gaps
-      if (prepare_sw(read, sw_prepare_list, mapping_batch, sa_index, cal_list)) {
+      if (prepare_sw(read, sw_prepare_list, mapping_batch, search_support, cal_list)) {
 	sw_post_read[sw_post_read_counter++] = i;
       }
     } else {
@@ -2390,7 +2394,9 @@ int sa_pair_mapper(void *data) {
     infer_insert = 1;
   }
 
-  sa_index3_t *sa_index = (sa_index3_t *) wf_batch->sa_index;
+  //  sa_index3_t *sa_index = (sa_index3_t *) wf_batch->sa_index;
+  //  sa_index3_t *sa_index = (sa_index3_t *) wf_batch->search_support->index;
+  search_support_t *search_support = wf_batch->search_support;
   
   int bam_format = mapping_batch->bam_format;
 
@@ -2408,7 +2414,7 @@ int sa_pair_mapper(void *data) {
 
   fastq_read_t *read;
 
-  cal_mng = cal_mng_new(sa_index->genome);
+  cal_mng = cal_mng_new(search_support);
   #ifdef _TIMING
   gettimeofday(&stop, NULL);
   mapping_batch->func_times[FUNC_OTHER] += 
@@ -2425,7 +2431,7 @@ int sa_pair_mapper(void *data) {
     }
 
     // 1) extend using mini-sw from suffix
-    cal_list = create_cals(num_seeds, read, mapping_batch, sa_index, cal_mng);
+    cal_list = create_cals(num_seeds, read, mapping_batch, search_support, cal_mng);
 
     if (array_list_size(cal_list) > 0) {
 
@@ -2438,7 +2444,7 @@ int sa_pair_mapper(void *data) {
       //for (int i = 0; i < array_list_size(cal_list); i++) { seed_cal_print(array_list_get(i, cal_list)); }
 
       if (array_list_size(cal_list) <= 0) {
-	suffix_mng_search_read_cals(read, num_seeds, sa_index, cal_list, cal_mng->suffix_mng);
+	suffix_mng_search_read_cals(read, num_seeds, search_support, cal_list, cal_mng->suffix_mng);
 	if (array_list_size(cal_list) > 0) {
 	  select_best_cals(read, &cal_list);
 	} else {
@@ -2446,7 +2452,7 @@ int sa_pair_mapper(void *data) {
 	}
       }
 
-      clean_cals(&cal_list, read, sa_index);
+      clean_cals(&cal_list, read);
       if (array_list_size(cal_list) <= 0) {
 	if (mapping_batch->status[i] == 0) {
 	  mapping_batch->status[i] = 4; //clean cals
@@ -2473,7 +2479,7 @@ int sa_pair_mapper(void *data) {
   filter_cals_by_pair_mode(pair_min_distance, pair_max_distance, 
     			   num_reads, cal_lists);
   
-  check_pairs(cal_lists, sa_index, mapping_batch, cal_mng);
+  check_pairs(cal_lists, search_support, mapping_batch, cal_mng);
 
   // 3) prepare Smith-Waterman to fill in the gaps
   for (int i = 0; i < num_reads; i++) {
@@ -2482,7 +2488,7 @@ int sa_pair_mapper(void *data) {
     cal_list = cal_lists[i];
 
     if (array_list_size(cal_list) > 0) {
-      if (prepare_sw(read, sw_prepare_list, mapping_batch, sa_index, cal_list)) {
+      if (prepare_sw(read, sw_prepare_list, mapping_batch, search_support, cal_list)) {
 	sw_post_read[sw_post_read_counter++] = i;
       }
     }

@@ -14,8 +14,10 @@
 
 #include "tools/bam/bfwork/bam_file_ops.h"
 
-#include "sa/sa_index3.h"
-#include "sa/sa_search.h"
+//#include "sa/sa_index3.h"
+//#include "sa/sa_search.h"
+
+#include "sa_bwt_support.h"
 
 #include "dna/sa_dna_commons.h"
 #include "dna/doscadfun.h"

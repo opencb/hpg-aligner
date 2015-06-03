@@ -9,7 +9,9 @@
 #include "cal_seeker.h"
 #include "pair_server.h"
 #include "containers/khash.h"
+
 #include "sa/sa_index3.h"
+#include "sa_bwt_support.h"
 
 //--------------------------------------------------------------------
 
@@ -137,7 +139,7 @@ static inline void sa_mapping_batch_free(sa_mapping_batch_t *p) {
 
 typedef struct sa_wf_batch {
   options_t *options;
-  sa_index3_t *sa_index;
+  search_support_t *search_support;
   batch_writer_input_t *writer_input;
   void *mapping_batch;  
 
@@ -149,14 +151,14 @@ typedef struct sa_wf_batch {
 //--------------------------------------------------------------------
 
 static inline sa_wf_batch_t *sa_wf_batch_new(options_t *options,
-					     sa_index3_t *sa_index,
+					     search_support_t *search_support,
 					     batch_writer_input_t *writer_input,
 					     void *mapping_batch,
 					     void *data_input) {  
   sa_wf_batch_t *p = (sa_wf_batch_t *) malloc(sizeof(sa_wf_batch_t));
 
   p->options = options;
-  p->sa_index = sa_index;
+  p->search_support = search_support;
   p->writer_input = writer_input;
 
   p->mapping_batch = mapping_batch;
