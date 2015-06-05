@@ -67,24 +67,26 @@ envprogram = env.Clone()
 envprogram['CFLAGS'] += ' -DNODEBUG -mssse3 -DD_TIME_DEBUG'
 
 aligner = envprogram.Program('#bin/hpg-aligner',
-             source = [Glob('src/main/*.c'),
-             Glob('src/*.c'),
-		       Glob('src/tools/bam/aux/*.c'),
-	     	       Glob('src/tools/bam/bfwork/*.c'),
-		       Glob('src/tools/bam/recalibrate/*.c'),
-	     	       Glob('src/tools/bam/aligner/*.c'),
-		       Glob('src/build-index/*.c'),
-		       Glob('src/dna/clasp_v1_1/*.c'),
-		       Glob('src/dna/*.c'),
-	               Glob('src/rna/*.c'),
-	               Glob('src/bs/*.c'),
-	               Glob('src/sa/*.c'),
-		       "%s/bam_sort.o" % third_party_samtools_path,
-		       "%s/bam_index.o" % third_party_samtools_path,
-                      "%s/build/libhpg.a" % hpglib_path,
-                      "%s/libbam.a" % third_party_samtools_path,
-                      "%s/libhts.a" % third_party_hts_path
-                      ]
+    source = [Glob('src/main/*.c'),
+              Glob('src/*.c'),
+              Glob('src/tools/bam/aux/*.c'),
+              Glob('src/tools/bam/bfwork/*.c'),
+              Glob('src/tools/bam/recalibrate/*.c'),
+              Glob('src/tools/bam/aligner/*.c'),
+              Glob('src/build-index/*.c'),
+              Glob('src/dna/clasp_v1_1/*.c'),
+              Glob('src/dna/bwt/*.c'),
+              Glob('src/dna/sa/*.c'),
+              Glob('src/dna/*.c'),
+              Glob('src/rna/*.c'),
+              Glob('src/bs/*.c'),
+              Glob('src/sa/*.c'),
+              "%s/bam_sort.o" % third_party_samtools_path,
+              "%s/bam_index.o" % third_party_samtools_path,
+              "%s/build/libhpg.a" % hpglib_path,
+              "%s/libbam.a" % third_party_samtools_path,
+              "%s/libhts.a" % third_party_hts_path
+             ]
            )
 
 bam  = envprogram.Program('#bin/hpg-bam',

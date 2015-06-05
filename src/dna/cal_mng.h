@@ -1,5 +1,5 @@
-#ifndef _SA_MAPPER_STAGE_H
-#define _SA_MAPPER_STAGE_H
+#ifndef _CAL_MNG_H
+#define _CAL_MNG_H
 
 #include "adapter.h"
 
@@ -47,20 +47,9 @@ void cal_mng_select_best(int read_area, array_list_t *valid_list,
 			 array_list_t *invalid_list, cal_mng_t *p);
 
 //--------------------------------------------------------------------
-// sa mapper
-//--------------------------------------------------------------------
-
-int sa_single_mapper(void *data);
-int sa_pair_mapper(void *data);
-
-array_list_t *step_one(fastq_read_t *read, char *revcomp_seq,
-		       sa_mapping_batch_t *mapping_batch, 
-		       sa_index3_t *sa_index, cal_mng_t *cal_mng);
-
-//--------------------------------------------------------------------
 
 void fastq_read_revcomp(fastq_read_t *read);
 
 //--------------------------------------------------------------------
 //--------------------------------------------------------------------
-#endif // _SA_MAPPER_STAGE_H
+#endif // _CAL_MNG_H

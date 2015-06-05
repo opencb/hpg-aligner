@@ -9,7 +9,7 @@
 #include "sa/sa_search.h"
 #include "dna/sa_dna_commons.h"
 #include "dna/doscadfun.h"
-#include "dna/sa_mapper_stage.h"
+#include "dna/sa/sa_mapper_stage.h"
 #include "rna/rna_server.h"
 #include "breakpoint.h"
 #include "pair_server.h"

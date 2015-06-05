@@ -45,7 +45,7 @@
 #include "dna/sa_dna_commons.h"
 #include "dna/doscadfun.h"
 #include "dna/sa_io_stages.h"
-#include "dna/sa_mapper_stage.h"
+#include "dna/sa/sa_mapper_stage.h"
 
 
 typedef struct buffer_reader_input {

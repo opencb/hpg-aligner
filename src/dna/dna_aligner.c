@@ -72,16 +72,39 @@ void dna_aligner(options_t *options) {
 	// display options
 	display_options(options, NULL);
 
-	// load SA index
+	// generic worklfow stage functions and label
+	char *stage_labels[1] = {"Mapper Stage"};
+	workflow_stage_function_t single_mapper = NULL;
+	workflow_stage_function_t pair_mapper = NULL;
+
+	// load index
+	sa_index3_t *sa_index = NULL;
+	char index_path[strlen(sa_dirname) + 100];
+	sprintf(index_path, "%s/params.txt", sa_dirname);
+
 	struct timeval stop, start;
 	printf("\n");
 	printf("-----------------------------------------------------------------\n");
-	printf("Loading SA tables...\n");
 	gettimeofday(&start, NULL);
-	sa_index3_t *sa_index = sa_index3_new(sa_dirname);
-	global_genome = sa_index->genome;
+	if (exists(index_path)) {
+		// load SA index
+		printf("Loading SA tables...\n");
+		sa_index = sa_index3_new(sa_dirname);
+		global_genome = sa_index->genome;
+
+		//sprintf(&stage_labels[0][0], "SA mapper");
+		single_mapper = sa_single_mapper;
+		pair_mapper = sa_pair_mapper;
+	} else {
+		// load BWT index
+		printf("Loading BWT tables...\n");
+
+		//sprintf(&stage_labels[0][0], "BWT mapper");
+		single_mapper = bwt_single_mapper;
+		pair_mapper = bwt_pair_mapper;
+	}
 	gettimeofday(&stop, NULL);
-	printf("End of loading SA tables in %0.2f min. Done!!\n",
+	printf("End of loading index tables in %0.2f min. Done!!\n",
 			((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f) / 60.0f);
 
 	// preparing input FastQ file
@@ -201,11 +224,10 @@ void dna_aligner(options_t *options) {
 		workflow_t *wf = workflow_new();
 
 		workflow_stage_function_t stage_functions[1];
-		char *stage_labels[1] = {"SA mapper"};
 		if (options->pair_mode == SINGLE_END_MODE) {
-			stage_functions[0] = sa_single_mapper;
+			stage_functions[0] = single_mapper;
 		} else {
-			stage_functions[0] = sa_pair_mapper;
+			stage_functions[0] = pair_mapper;
 		}
 		workflow_set_stages(1, stage_functions, stage_labels, wf);
 
