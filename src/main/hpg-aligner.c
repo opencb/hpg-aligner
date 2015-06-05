@@ -3,7 +3,6 @@
 
 #include "build-index/index_builder.h"
 
-
 //--------------------------------------------------------------------
 // constants
 //--------------------------------------------------------------------
@@ -14,67 +13,13 @@
 #define NUM_SECTIONS_STATISTICS_SB     21
 
 //--------------------------------------------------------------------
-// global variables for timing and capacity meausures
-//--------------------------------------------------------------------
 
-//====================================================================
-int min_intron, max_intron;
-//====================================================================
+extern int redirect_stdout;
+extern int gziped_fileds;
 
-basic_statistics_t *basic_st;
+extern char convert_ASCII[128];
 
-pthread_mutex_t mutex_sp;
-
-FILE *fd_log;
-size_t junction_id;
-
-size_t total_reads = 0;
-size_t reads_no_map = 0;
-
-size_t total_sw = 0;
-
-unsigned char mute;
-
-double time_write = 0;
-double time_free = 0;
-double time_free_batch = 0;
-
-double time_timer0 = 0;
-double time_timer1 = 0;
-double time_timer2 = 0;
-double time_timer3 = 0;
-
-double time_read_fq   = 0;
-double time_read_fq_process   = 0;
-double time_read_alig = 0;
-double time_read_proc = 0;
-
-
-char convert_ASCII[128];
-
-
-size_t search_calls = 0;
-size_t insert_calls = 0;
-double time_search = 0.0;
-double time_insert = 0.0;
-pthread_mutex_t mutex_calls;
-
-size_t fd_read_bytes = 0;
-size_t fd_total_bytes = 0;
-
-size_t total_reads_ph2 = 0;
-size_t reads_ph2 = 0;
-
-int redirect_stdout = 0;
-int gziped_fileds = 0;
-
-st_bwt_t st_bwt;
-int w1_end;
-int w2_end;
-int w3_end;
-
-size_t total_reads_w2, total_reads_w3;
-size_t reads_w2, reads_w3;
+extern st_bwt_t st_bwt;
 
 //--------------------------------------------------------------------
 
@@ -143,12 +88,12 @@ int main(int argc, char* argv[]) {
     exit(0);
   }
 
-  char *command = argv[1];  
+  char *command = argv[1];
 
   argc -= 1;
   argv += 1;
-  
-  if(strcmp(command, "dna") != 0 && 
+
+  if(strcmp(command, "dna") != 0 &&
      strcmp(command, "rna") != 0 &&
      strcmp(command, "build-sa-index") != 0 &&
      strcmp(command, "build-bwt-index") != 0) {
@@ -158,7 +103,7 @@ int main(int argc, char* argv[]) {
   }
 
 
-  if (!strcmp(command, "build-bwt-index") || 
+  if (!strcmp(command, "build-bwt-index") ||
       !strcmp(command, "build-sa-index")) {
     run_index_builder(argc, argv, command);
     exit(0);
@@ -184,7 +129,7 @@ int main(int argc, char* argv[]) {
   init_log_custom(options->log_level, 1, "hpg-aligner.log", "w");
   LOG_DEBUG_F("Command Mode: %s\n", command);
 
-  //convert ASCII fill 
+  //convert ASCII fill
   convert_ASCII['a'] = 'T';
   convert_ASCII['A'] = 'T';
 
@@ -200,12 +145,12 @@ int main(int argc, char* argv[]) {
   convert_ASCII['n'] = 'N';
   convert_ASCII['N'] = 'N';
 
-  
-  if(strcmp(command, "dna") == 0) { 
+
+  if(strcmp(command, "dna") == 0) {
     // DNA command
     validate_options(options);
     dna_aligner(options);
-  } else if (strcmp(command, "rna") == 0)  { 
+  } else if (strcmp(command, "rna") == 0)  {
     // RNA command
     validate_options(options);
     rna_aligner(options);

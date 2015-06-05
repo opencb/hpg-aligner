@@ -2266,27 +2266,27 @@ int sa_single_mapper(void *data) {
 
     if (array_list_size(cal_list) > 0) {
 
-      select_best_cals(read, &cal_list);
+    	select_best_cals(read, &cal_list);
 
-      if (array_list_size(cal_list) <= 0) {
-	suffix_mng_search_read_cals(read, num_seeds, sa_index, cal_list, cal_mng->suffix_mng);
-	if (array_list_size(cal_list) > 0) {
-	  select_best_cals(read, &cal_list);
-	} else {
-	  mapping_batch->status[i] = 3; // invalid
-	}
-      }
+      	if (array_list_size(cal_list) <= 0) {
+			suffix_mng_search_read_cals(read, num_seeds, sa_index, cal_list, cal_mng->suffix_mng);
+			if (array_list_size(cal_list) > 0) {
+		  		select_best_cals(read, &cal_list);
+			} else {
+		  		mapping_batch->status[i] = 3; // invalid
+			}
+      	}
 
-      //fill_seed_gaps(cal_list, read, sa_index);
-      clean_cals(&cal_list, read, sa_index);
-      if (array_list_size(cal_list) <= 0) {
-	mapping_batch->status[i] = 4; //clean cals
-      }
+      	//fill_seed_gaps(cal_list, read, sa_index);
+      	clean_cals(&cal_list, read, sa_index);
+      	if (array_list_size(cal_list) <= 0) {
+			mapping_batch->status[i] = 4; //clean cals
+      	}
 
-      // 2) prepare Smith-Waterman to fill in the gaps
-      if (prepare_sw(read, sw_prepare_list, mapping_batch, sa_index, cal_list)) {
-	sw_post_read[sw_post_read_counter++] = i;
-      }
+      	// 2) prepare Smith-Waterman to fill in the gaps
+      	if (prepare_sw(read, sw_prepare_list, mapping_batch, sa_index, cal_list)) {
+			sw_post_read[sw_post_read_counter++] = i;
+      	}
     } else {
       mapping_batch->status[i] = 1; // no cals
     }
@@ -2417,7 +2417,7 @@ int sa_pair_mapper(void *data) {
 
   // for each read, create cals and prepare sw
   for (int i = 0; i < num_reads; i++) {
-    read = array_list_get(i, mapping_batch->fq_reads);
+  	read = array_list_get(i, mapping_batch->fq_reads);
     fastq_read_revcomp(read);
 
     if (wf_batch->options->adapter) {
@@ -2438,23 +2438,23 @@ int sa_pair_mapper(void *data) {
       //for (int i = 0; i < array_list_size(cal_list); i++) { seed_cal_print(array_list_get(i, cal_list)); }
 
       if (array_list_size(cal_list) <= 0) {
-	suffix_mng_search_read_cals(read, num_seeds, sa_index, cal_list, cal_mng->suffix_mng);
-	if (array_list_size(cal_list) > 0) {
-	  select_best_cals(read, &cal_list);
-	} else {
-	  mapping_batch->status[i] = 3; // invalid
-	}
+		suffix_mng_search_read_cals(read, num_seeds, sa_index, cal_list, cal_mng->suffix_mng);
+		if (array_list_size(cal_list) > 0) {
+	  		select_best_cals(read, &cal_list);
+		} else {
+	  		mapping_batch->status[i] = 3; // invalid
+		}
       }
 
       clean_cals(&cal_list, read, sa_index);
       if (array_list_size(cal_list) <= 0) {
-	if (mapping_batch->status[i] == 0) {
-	  mapping_batch->status[i] = 4; //clean cals
-	}
+		if (mapping_batch->status[i] == 0) {
+	  		mapping_batch->status[i] = 4; //clean cals
+		}
       } else {
-	if (((seed_cal_t *)array_list_get(0, cal_list))->mapq == 0) {
-	  mapping_batch->status[i] = 2; // mapq = 0
-	}
+		if (((seed_cal_t *)array_list_get(0, cal_list))->mapq == 0) {
+	  		mapping_batch->status[i] = 2; // mapq = 0
+		}
       }
     } else {
       mapping_batch->status[i] = 1; // no cals

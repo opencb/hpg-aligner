@@ -67,7 +67,8 @@ envprogram = env.Clone()
 envprogram['CFLAGS'] += ' -DNODEBUG -mssse3 -DD_TIME_DEBUG'
 
 aligner = envprogram.Program('#bin/hpg-aligner',
-             source = [Glob('src/*.c'),
+             source = [Glob('src/main/*.c'),
+             Glob('src/*.c'),
 		       Glob('src/tools/bam/aux/*.c'),
 	     	       Glob('src/tools/bam/bfwork/*.c'),
 		       Glob('src/tools/bam/recalibrate/*.c'),
