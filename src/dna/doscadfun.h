@@ -1,7 +1,7 @@
 #ifndef DOSCADFUN_H
 #define DOSCADFUN_H
 
-#include "dna/sa_dna_commons.h"
+#include "dna/sa/sa_dna_commons.h"
 
 //--------------------------------------------------------------------
 

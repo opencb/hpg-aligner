@@ -7,7 +7,7 @@
 
 #include "batch_writer.h"
 #include "containers/khash.h"
-#include "dna/sa_dna_commons.h"
+#include "dna/sa/sa_dna_commons.h"
 
 //--------------------------------------------------------------------
 

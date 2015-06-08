@@ -1,5 +1,4 @@
-#include "sa_dna_commons.h"
-
+#include "dna/sa/sa_dna_commons.h"
 
 //--------------------------------------------------------------------
 // commons

@@ -1690,7 +1690,7 @@ int sa_single_mapper(void *data) {
   sa_mapping_batch_t *mapping_batch = wf_batch->mapping_batch;
   mapping_batch->options = wf_batch->options;
 
-  sa_index3_t *sa_index = (sa_index3_t *) wf_batch->sa_index;
+  sa_index3_t *sa_index = (sa_index3_t *) wf_batch->index->sa_index;
   
   int bam_format = mapping_batch->bam_format;
 
@@ -1718,7 +1718,7 @@ int sa_single_mapper(void *data) {
 
   fastq_read_t *read;
 
-  cal_mng = cal_mng_new(sa_index->genome);
+  cal_mng = cal_mng_new(sa_index->genome->num_chroms);
   #ifdef _TIMING
   gettimeofday(&stop, NULL);
   mapping_batch->func_times[FUNC_OTHER] += 
@@ -1863,7 +1863,7 @@ int sa_pair_mapper(void *data) {
     infer_insert = 1;
   }
 
-  sa_index3_t *sa_index = (sa_index3_t *) wf_batch->sa_index;
+  sa_index3_t *sa_index = (sa_index3_t *) wf_batch->index->sa_index;
   
   int bam_format = mapping_batch->bam_format;
 
@@ -1881,7 +1881,7 @@ int sa_pair_mapper(void *data) {
 
   fastq_read_t *read;
 
-  cal_mng = cal_mng_new(sa_index->genome);
+  cal_mng = cal_mng_new(sa_index->genome->num_chroms);
   #ifdef _TIMING
   gettimeofday(&stop, NULL);
   mapping_batch->func_times[FUNC_OTHER] += 

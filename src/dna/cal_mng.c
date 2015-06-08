@@ -232,10 +232,7 @@ void append_seed_linked_list(seed_cal_t *cal,
 // cal_mng_t functions
 //--------------------------------------------------------------------
 
-cal_mng_t * cal_mng_new(sa_genome3_t *genome) {
-
-  int num_chroms = genome->num_chroms;
-
+cal_mng_t * cal_mng_new(int num_chroms) {
   linked_list_t **cals_lists = (linked_list_t **) malloc (sizeof(linked_list_t *) * num_chroms);
   for (unsigned short int i = 0; i < num_chroms; i++) {
     cals_lists[i] = linked_list_new(COLLECTION_MODE_ASYNCHRONIZED);
@@ -251,7 +248,7 @@ cal_mng_t * cal_mng_new(sa_genome3_t *genome) {
   memset(p->active_mask, 0, sizeof(p->active_mask));
   p->num_active = 0;
 
-  p->suffix_mng = suffix_mng_new(genome);
+  p->suffix_mng = suffix_mng_new(num_chroms);
 
   return p;
 }

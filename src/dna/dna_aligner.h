@@ -17,10 +17,11 @@
 #include "sa/sa_index3.h"
 #include "sa/sa_search.h"
 
-#include "dna/sa_dna_commons.h"
+#include "dna/index.h"
 #include "dna/doscadfun.h"
-#include "dna/sa_io_stages.h"
+#include "dna/sa/sa_io_stages.h"
 #include "dna/sa/sa_mapper_stage.h"
+#include "dna/sa/sa_dna_commons.h"
 
 #include "dna/bwt/bwt_mapper_stage.h"
 
@@ -31,3 +32,4 @@ void dna_aligner(options_t *options);
 //--------------------------------------------------------------------
 //--------------------------------------------------------------------
 #endif // DNA_ALIGNER_H
+

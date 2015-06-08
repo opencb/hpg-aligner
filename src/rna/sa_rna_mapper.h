@@ -7,7 +7,7 @@
 #include "workflow_functions.h"
 #include "batch_writer.h"
 #include "sa/sa_search.h"
-#include "dna/sa_dna_commons.h"
+#include "dna/sa/sa_dna_commons.h"
 #include "dna/doscadfun.h"
 #include "dna/sa/sa_mapper_stage.h"
 #include "rna/rna_server.h"

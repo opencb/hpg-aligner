@@ -42,9 +42,9 @@
 #include "sa/sa_search.h"
 #include "rna/sa_rna_mapper.h"
 
-#include "dna/sa_dna_commons.h"
 #include "dna/doscadfun.h"
-#include "dna/sa_io_stages.h"
+#include "dna/sa/sa_dna_commons.h"
+#include "dna/sa/sa_io_stages.h"
 #include "dna/sa/sa_mapper_stage.h"
 
 

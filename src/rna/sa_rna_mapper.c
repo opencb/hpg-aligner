@@ -187,7 +187,7 @@ void *sa_alignments_reader_rna(void *input) {
     sa_batch->mapping_lists = mapping_lists;
     sa_batch->num_reads = num_reads;
     new_wf_batch = sa_wf_batch_new(NULL,
-				   curr_wf_batch->sa_index,
+				   curr_wf_batch->index->sa_index,
 				   curr_wf_batch->writer_input, 
 				   sa_batch,
 				   curr_wf_batch->data_input);
@@ -239,7 +239,7 @@ void *sa_fq_reader_rna(void *input) {
     sa_batch_t *sa_batch = sa_batch_new(reads);
 
     new_wf_batch = sa_wf_batch_new(NULL,
-				   curr_wf_batch->sa_index,
+				   curr_wf_batch->index,
 				   curr_wf_batch->writer_input, 
 				   sa_batch,
 				   curr_wf_batch->data_input);
@@ -327,7 +327,7 @@ int sa_sam_writer_rna(void *data) {
   array_list_t *mapping_list;
   FILE *out_file = (FILE *) wf_batch->writer_input->bam_file;
 
-  sa_genome3_t *genome = wf_batch->sa_index->genome;
+  sa_genome3_t *genome = wf_batch->index->sa_index->genome;
 
   size_t num_reads, num_mappings;
 
@@ -1562,7 +1562,7 @@ void convert_batch_to_str(sa_wf_batch_t *wf_batch) {
   alignment_t *alig;
   array_list_t *mapping_list;
 
-  sa_genome3_t *genome = wf_batch->sa_index->genome;
+  sa_genome3_t *genome = wf_batch->index->sa_index->genome;
   
   //extern size_t total_reads, unmapped_reads, correct_reads;
   extern size_t total_reads;
@@ -2786,7 +2786,7 @@ void cal_rna_mng_free(cal_mng_t *p) {
 int sa_rna_mapper(void *data) {
   sa_wf_batch_t *wf_batch = (sa_wf_batch_t *) data;
   sa_batch_t *sa_batch = wf_batch->mapping_batch;
-  sa_index3_t *sa_index = (sa_index3_t *) wf_batch->sa_index;
+  sa_index3_t *sa_index = (sa_index3_t *) wf_batch->index->sa_index;
   sa_rna_input_t *sa_rna = wf_batch->data_input;
   genome_t *genome = (genome_t *)sa_rna->genome;
   avls_list_t *avls_list = (avls_list_t *)sa_rna->avls_list;
@@ -3516,7 +3516,7 @@ int sa_rna_mapper_last(void *data) {
   sa_wf_batch_t *wf_batch = (sa_wf_batch_t *) data;
   sa_batch_t *sa_batch = wf_batch->mapping_batch;
   size_t num_reads = sa_batch->num_reads;
-  sa_index3_t *sa_index = (sa_index3_t *) wf_batch->sa_index;
+  sa_index3_t *sa_index = (sa_index3_t *) wf_batch->index->sa_index;
   sa_rna_input_t *sa_rna = wf_batch->data_input;
   genome_t *genome = (genome_t *)sa_rna->genome;
   avls_list_t *avls_list = (avls_list_t *)sa_rna->avls_list;

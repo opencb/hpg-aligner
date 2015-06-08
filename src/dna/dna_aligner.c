@@ -72,40 +72,16 @@ void dna_aligner(options_t *options) {
 	// display options
 	display_options(options, NULL);
 
-	// generic worklfow stage functions and label
-	char *stage_labels[1] = {"Mapper Stage"};
-	workflow_stage_function_t single_mapper = NULL;
-	workflow_stage_function_t pair_mapper = NULL;
-
 	// load index
-	sa_index3_t *sa_index = NULL;
-	char index_path[strlen(sa_dirname) + 100];
-	sprintf(index_path, "%s/params.txt", sa_dirname);
-
-	struct timeval stop, start;
-	printf("\n");
 	printf("-----------------------------------------------------------------\n");
+	struct timeval stop, start;
 	gettimeofday(&start, NULL);
-	if (exists(index_path)) {
-		// load SA index
-		printf("Loading SA tables...\n");
-		sa_index = sa_index3_new(sa_dirname);
-		global_genome = sa_index->genome;
-
-		//sprintf(&stage_labels[0][0], "SA mapper");
-		single_mapper = sa_single_mapper;
-		pair_mapper = sa_pair_mapper;
-	} else {
-		// load BWT index
-		printf("Loading BWT tables...\n");
-
-		//sprintf(&stage_labels[0][0], "BWT mapper");
-		single_mapper = bwt_single_mapper;
-		pair_mapper = bwt_pair_mapper;
-	}
+	index_t *index = index_new(sa_dirname);
 	gettimeofday(&stop, NULL);
 	printf("End of loading index tables in %0.2f min. Done!!\n",
 			((stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f) / 60.0f);
+
+	global_genome = (index->mode == SA_MODE ? index->sa_index->genome : NULL);
 
 	// preparing input FastQ file
 	fastq_batch_reader_input_t reader_input;
@@ -114,12 +90,12 @@ void dna_aligner(options_t *options) {
 	batch_writer_input_t writer_input;
 	batch_writer_input_init(out_filename, NULL, NULL, NULL, NULL, &writer_input);
 	if (bam_format) {
-		bam_header_t *bam_header = create_bam_header(options, sa_index->genome);
+	    bam_header_t *bam_header = index_create_bam_header(options, index);
 		writer_input.bam_file = bam_fopen_mode(out_filename, bam_header, "w");
 		bam_fwrite_header(bam_header, writer_input.bam_file);
 	} else {
 		writer_input.bam_file = (bam_file_t *) fopen(out_filename, "w");
-		write_sam_header(options, sa_index->genome, (FILE *) writer_input.bam_file);
+		index_write_sam_header(options, (FILE *) writer_input.bam_file, index);
 	}
 
 	char *fq_list1 = options->in_filename, *fq_list2 = options->in_filename2;
@@ -207,7 +183,7 @@ void dna_aligner(options_t *options) {
 		khash_t(ID) *h = kh_init(ID);
 		if (options->input_format == BAM_FORMAT) {
 			if (options->pair_mode == PAIRED_END_MODE){
-				bam_header_t *bam_header = create_bam_header(options, sa_index->genome);
+				bam_header_t *bam_header = index_create_bam_header(options, index);
 				fnomapped = bam_fopen_mode(UNMAPPED_BAM, bam_header, "w");
 				bam_fwrite_header(bam_header, fnomapped);//write the header in fnomapped
 			}
@@ -216,18 +192,18 @@ void dna_aligner(options_t *options) {
 		//--------------------------------------------------------------------------------------
 		// workflow management
 		//
-		sa_wf_batch_t *wf_batch = sa_wf_batch_new(options, (void *)sa_index, &writer_input, NULL, NULL);
+		sa_wf_batch_t *wf_batch = sa_wf_batch_new(options, (void *)index, &writer_input, NULL, NULL);
 		sa_wf_input_t *wf_input = sa_wf_input_new(bam_format, &reader_input, wf_batch);
-
 
 		// create and initialize workflow
 		workflow_t *wf = workflow_new();
 
+		char *stage_labels[1] = {"Mapper Stage"};
 		workflow_stage_function_t stage_functions[1];
 		if (options->pair_mode == SINGLE_END_MODE) {
-			stage_functions[0] = single_mapper;
+			stage_functions[0] = (index->mode == SA_MODE ? sa_single_mapper : bwt_single_mapper);
 		} else {
-			stage_functions[0] = pair_mapper;
+			stage_functions[0] = (index->mode == SA_MODE ? sa_pair_mapper : bwt_pair_mapper);
 		}
 		workflow_set_stages(1, stage_functions, stage_labels, wf);
 
@@ -244,6 +220,7 @@ void dna_aligner(options_t *options) {
 			}
 		} else if (options->input_format == SAM_FORMAT) {
 			printf ("Sam format not implementated");
+			exit(-1);
 			// workflow_set_producer(sa_sam_reader, "SAM reader", wf);
 		} else {
 			workflow_set_producer(sa_fq_reader, "FastQ reader", wf);
@@ -391,7 +368,7 @@ void dna_aligner(options_t *options) {
 	// free memory
 	array_list_free(files_fq1, (void *) free);
 	array_list_free(files_fq2, (void *) free);
-	if (sa_index) sa_index3_free(sa_index);
+	index_free(index);
 
 	//closing files
 	if (bam_format) {

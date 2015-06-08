@@ -22,7 +22,6 @@ int bwt_single_mapper(void *data) {
 
   int num_seeds = wf_batch->options->num_seeds;
 
-  
   sa_mapping_batch_t *mapping_batch = wf_batch->mapping_batch;
   mapping_batch->options = wf_batch->options;
 

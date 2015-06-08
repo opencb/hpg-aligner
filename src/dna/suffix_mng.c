@@ -4,10 +4,8 @@
 // suffix manager
 //--------------------------------------------------------------------
 
-suffix_mng_t *suffix_mng_new(sa_genome3_t *genome) {
+suffix_mng_t *suffix_mng_new(int num_chroms) {
   suffix_mng_t *p = (suffix_mng_t *) calloc(1, sizeof(suffix_mng_t));
-
-  int num_chroms = genome->num_chroms;
 
   char *name;
   Container *subject = (Container *) malloc(sizeof(Container));

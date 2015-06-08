@@ -11,7 +11,7 @@
 #include "dna/clasp_v1_1/basic-types.h"
 #include "dna/clasp_v1_1/clasp.h"
 
-#include "dna/sa_dna_commons.h"
+#include "dna/sa/sa_dna_commons.h"
 #include "dna/doscadfun.h"
 #include "sa/sa_search.h"
 
@@ -26,7 +26,7 @@ typedef struct suffix_mng {
   linked_list_t **suffix_lists;
 } suffix_mng_t;
 
-suffix_mng_t *suffix_mng_new(sa_genome3_t *genome);
+suffix_mng_t *suffix_mng_new(int num_chroms);
 
 void suffix_mng_free(suffix_mng_t *p);
 

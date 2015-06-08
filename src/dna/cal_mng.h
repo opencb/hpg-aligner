@@ -4,7 +4,7 @@
 #include "adapter.h"
 
 #include "sa/sa_search.h"
-#include "dna/sa_dna_commons.h"
+#include "dna/sa/sa_dna_commons.h"
 #include "dna/doscadfun.h"
 
 #include "dna/suffix_mng.h"
@@ -33,7 +33,7 @@ typedef struct cal_mng {
   linked_list_t **cals_lists;
 } cal_mng_t;
 
-cal_mng_t * cal_mng_new(sa_genome3_t *genome);
+cal_mng_t * cal_mng_new(int num_chroms);
 void cal_mng_free(cal_mng_t *p);
 void cal_mng_simple_free(cal_mng_t *p);
 void cal_mng_simple_clear(cal_mng_t *p);

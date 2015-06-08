@@ -4,7 +4,7 @@
 #include "adapter.h"
 
 #include "sa/sa_search.h"
-#include "dna/sa_dna_commons.h"
+#include "dna/sa/sa_dna_commons.h"
 #include "dna/doscadfun.h"
 
 #include "dna/suffix_mng.h"
