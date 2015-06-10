@@ -12,8 +12,9 @@
 #include "argtable2.h"
 #include "sa/sa_index3.h"
 
-#define SA_INDEX  0
-#define BWT_INDEX 1
+#define SA_INDEX      0
+#define BWT_INDEX     1
+#define SIMPLE_INDEX  2
 
 #define NUM_INDEX_OPTIONS 4
 #define NUM_INDEX_BWT_OPTIONS 1

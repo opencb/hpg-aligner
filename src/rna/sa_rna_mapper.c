@@ -116,7 +116,6 @@ void *sa_alignments_reader_rna(void *input) {
   pair_server_input_t *pair_input = sa_rna->pair_input;
   int pair_mode = pair_input->pair_mng->pair_mode;
 
-  extern size_t reads_ph2;
 
   if (pair_mode == SINGLE_END_MODE) {
     while (1) { 
@@ -197,7 +196,6 @@ void *sa_alignments_reader_rna(void *input) {
     free(mapping_lists);
   }
 
-  reads_ph2 += num_reads;
 
   return new_wf_batch;
 
@@ -213,7 +211,7 @@ void *sa_fq_reader_rna(void *input) {
   array_list_t *reads = array_list_new(fq_reader_input->batch_size, 1.25f, 
 				       COLLECTION_MODE_ASYNCHRONIZED);
   
-  extern size_t fd_read_bytes;
+
 
   if (fq_reader_input->gzip) {
     // Gzip fastq file
@@ -225,9 +223,9 @@ void *sa_fq_reader_rna(void *input) {
   } else {
     // Fastq file
     if (fq_reader_input->flags == SINGLE_END_MODE) {
-      fd_read_bytes += fastq_fread_bytes_se(reads, fq_reader_input->batch_size, fq_reader_input->fq_file1);
+      fastq_fread_bytes_se(reads, fq_reader_input->batch_size, fq_reader_input->fq_file1);
     } else {
-      fd_read_bytes += fastq_fread_bytes_aligner_pe(reads, fq_reader_input->batch_size, 
+      fastq_fread_bytes_aligner_pe(reads, fq_reader_input->batch_size, 
 				   fq_reader_input->fq_file1, fq_reader_input->fq_file2);
     }
   }
@@ -271,13 +269,13 @@ int sa_bam_writer_rna(void *data) {
 
   //mapping_batch_t *mapping_batch = (mapping_batch_t *) batch->mapping_batch;
   
-  extern size_t total_reads;
-  extern size_t reads_no_map;
+
+
 
   extern pthread_mutex_t mutex_sp;
   
   pthread_mutex_lock(&mutex_sp);
-  total_reads += num_reads;
+
   pthread_mutex_unlock(&mutex_sp);
   
   //
@@ -290,7 +288,7 @@ int sa_bam_writer_rna(void *data) {
     // mapped or not mapped ?	 
     if (num_items == 0) {
       pthread_mutex_lock(&mutex_sp);
-      reads_no_map++;
+
       pthread_mutex_unlock(&mutex_sp);      
       write_unmapped_read(fq_read, bam_file);
       if (mapping_batch->mapping_lists[i]) {
@@ -334,8 +332,8 @@ int sa_sam_writer_rna(void *data) {
   num_reads = mapping_batch->num_reads;
 
   //extern size_t total_reads, unmapped_reads, correct_reads;
-  extern size_t total_reads;
-  extern size_t reads_no_map;
+
+
 
   extern pthread_mutex_t mutex_sp;
 
@@ -343,7 +341,7 @@ int sa_sam_writer_rna(void *data) {
   //extern double time_free_alig, time_free_list, time_free_batch;
 
   pthread_mutex_lock(&mutex_sp);
-  total_reads += num_reads;
+
   pthread_mutex_unlock(&mutex_sp);
 
   if (pair_mode != SINGLE_END_MODE) {
@@ -463,7 +461,7 @@ int sa_sam_writer_rna(void *data) {
 	}
       } else {
 	pthread_mutex_lock(&mutex_sp);
-	reads_no_map++;
+
 	pthread_mutex_unlock(&mutex_sp);
       
 	fprintf(out_file, "%s\t4\t*\t0\t0\t*\t*\t0\t0\t%s\t%s\n", 
@@ -1565,8 +1563,8 @@ void convert_batch_to_str(sa_wf_batch_t *wf_batch) {
   sa_genome3_t *genome = wf_batch->sa_index->genome;
   
   //extern size_t total_reads, unmapped_reads, correct_reads;
-  extern size_t total_reads;
-  extern size_t reads_no_map;
+
+
   extern pthread_mutex_t mutex_sp;
   struct timeval time_free_s, time_free_e;
   extern double time_free_alig, time_free_list, time_free_batch;
@@ -1585,7 +1583,7 @@ void convert_batch_to_str(sa_wf_batch_t *wf_batch) {
     buffer[0] = '\0';
 
     extern basic_statistics_t *basic_st;
-    size_t total_reads = num_reads;
+
     size_t num_mapped_reads = 0;
     size_t total_mappings = 0;
     size_t reads_uniq_mappings = 0;
@@ -1785,7 +1783,7 @@ void convert_batch_to_str(sa_wf_batch_t *wf_batch) {
     // free memory
     sa_batch_free(sa_batch);  
 
-    basic_statistics_add(total_reads, num_mapped_reads, total_mappings, reads_uniq_mappings, basic_st);
+
 
   } else {    
     for (size_t i = 0; i < num_reads; i++) {
@@ -3342,7 +3340,7 @@ int sa_rna_mapper(void *data) {
   array_list_t *alignments_list_aux;
   int n_reads = 0;
   extern pthread_mutex_t mutex_sp;
-  extern size_t total_reads_ph2;
+
 
   //printf("NUM READS %i:\n", num_reads);
   if (pair_mode == SINGLE_END_MODE) {
@@ -3353,7 +3351,7 @@ int sa_rna_mapper(void *data) {
 	//Write to buffer
 	pthread_mutex_lock(&mutex_sp);
 	sa_file_write_items(SA_PARTIAL_TYPE, read, alignments_list_aux, file1);
-	total_reads_ph2++;
+
 	pthread_mutex_unlock(&mutex_sp);
       
 	fastq_read_free(read);
@@ -3402,7 +3400,7 @@ int sa_rna_mapper(void *data) {
 	  fastq_read_free(read);
 	
 	  pthread_mutex_lock(&mutex_sp);
-	  total_reads_ph2 += 2;
+
 	  pthread_mutex_unlock(&mutex_sp);	  
   
 	  array_list_free(sa_batch->mapping_lists[r + 1], (void *)function_callback);
@@ -3541,7 +3539,7 @@ int sa_rna_mapper_last(void *data) {
   sw_multi_output_t *output = sw_multi_output_new(MAX_DEPTH);
   sa_sw_depth_t sw_depth;
   extern pthread_mutex_t mutex_sp;
-  extern size_t total_sw;
+
 
   float cals_score[2048];
   array_list_t *target_cals = array_list_new(100, 1.25f,
@@ -3591,6 +3589,7 @@ int sa_rna_mapper_last(void *data) {
       
       
       if (cal->strand) {
+
 	query = read->revcomp;
       } else {
 	query = read->sequence;
@@ -3622,7 +3621,7 @@ int sa_rna_mapper_last(void *data) {
 
 	if (!c_left && region->read_start <= 30) {
 	  pthread_mutex_lock(&mutex_sp);
-	  total_sw++;
+
 	  pthread_mutex_unlock(&mutex_sp);
 
 	  char reference_sw[2048];
@@ -3675,7 +3674,7 @@ int sa_rna_mapper_last(void *data) {
 
 	if (!c_right && gap_len <= 30) {
 	  pthread_mutex_lock(&mutex_sp);
-	  total_sw++;
+
 	  pthread_mutex_unlock(&mutex_sp);
 
 	  char reference_sw[2048];
@@ -4433,7 +4432,7 @@ int sa_rna_mapper_last(void *data) {
 	  
 	  //c_left = NULL;
 	  pthread_mutex_lock(&mutex_sp);
-	  total_sw++;
+
 	  pthread_mutex_unlock(&mutex_sp);
 	    
 	  char reference_sw[2048];
@@ -4491,7 +4490,7 @@ int sa_rna_mapper_last(void *data) {
 	  
 
 	  pthread_mutex_lock(&mutex_sp);
-	  total_sw++;
+
 	  pthread_mutex_unlock(&mutex_sp);
 	    
 	  char reference_sw[2048];

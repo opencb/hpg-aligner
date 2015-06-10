@@ -59,7 +59,7 @@
    time_t rawtime;
    struct tm *timeinfo;
   
-   if (mute) return 0;
+   //if (mute) return 0;
 
     time(&rawtime);
     timeinfo = localtime (&rawtime);
@@ -109,7 +109,7 @@ nfolevel( char *file,
   time_t rawtime;
   struct tm *timeinfo;
    
-  if (mute) return 0;
+  //if (mute) return 0;
   
   time(&rawtime);
   timeinfo = localtime (&rawtime);

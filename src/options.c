@@ -1,5 +1,7 @@
 #include "options.h"
 
+#include <mpi.h>
+
 const char DEFAULT_OUTPUT_NAME[29] = "hpg_aligner_output";
 
 //const char SPLICE_EXACT_FILENAME[30]   = "exact_junctions.bed";
@@ -20,6 +22,7 @@ options_t *options_new(void) {
   options->output_name = NULL;
   options->num_gpu_threads = DEFAULT_GPU_THREADS;
 
+  options->tmp_input  = NULL;
   options->realignment = 0;
   options->recalibration = 0;
   options->adapter = NULL;
@@ -130,24 +133,7 @@ void validate_options(options_t *options) {
     if (!value_dir) {
       //printf("Create directory %s\n", options->output_name);
       create_directory(options->output_name);
-    }
-    
-    if (!options->in_filename) {
-      printf("Filename input is missing. Please, insert it with option '-f FILENAME'.\n");
-      usage_cli(mode);
-    }
-
-    if (!options->command) {
-      printf("Command line of mapper is missing. Please, insert it with option '-c \"CLI MAPPER\"'.\n");
-      usage_cli(mode);
-    }
-
-    
-    //if (!options->bwt_dirname) {
-    //printf("Index directory is missing. Please, insert it with option '-i DIRNAME'.\n");
-    //usage_cli(mode);
-    //}
-
+    }    
   }
 
   if (!options->num_seeds) {
@@ -537,6 +523,7 @@ void** argtable_options_new(int mode) {
   argtable[count++] = arg_lit0("z", "gzip", "FastQ input files are gzip");
   argtable[count++] = arg_file0("i", "index", NULL, "Index directory name");
   argtable[count++] = arg_file0("o", "outdir", NULL, "Output directory");
+
   argtable[count++] = arg_int0(NULL, "filter-read-mappings", NULL, "Reads that map in more than <n> locations are discarded");
   argtable[count++] = arg_int0(NULL, "filter-seed-mappings", NULL, "Seeds that map in more than <n> locations are discarded");
   argtable[count++] = arg_int0(NULL, "min-cal-size", NULL, "Minimum CAL size");
@@ -571,8 +558,12 @@ void** argtable_options_new(int mode) {
   argtable[count++] = arg_int0(NULL, "max-intron-size", NULL, "Maximum intron size");
   argtable[count++] = arg_int0(NULL, "min-intron-size", NULL, "Minimum intron size");
   argtable[count++] = arg_file0("c", "command", NULL, "Mapper command line");
+  argtable[count++] = arg_file0(NULL, "tmp", NULL, "Temporal output directory");
+  argtable[count++] = arg_file0(NULL, "tmp-input", NULL, "Temporal input directory");
 
-
+  argtable[count++] = arg_lit0(NULL, "second-phase", "Enable second phase for improve alignments");
+  argtable[count++] = arg_file0(NULL, "second-command", NULL, "Second mapper command line");
+  
   argtable[num_options] = arg_end(count);
      
   return argtable;
@@ -681,6 +672,21 @@ options_t *read_CLI_options(void **argtable, options_t *options) {
     options->command  = strdup(*(((struct arg_file*)argtable[count])->filename)); 
   }
 
+  if (((struct arg_file*)argtable[++count])->count) { 
+    options->tmp_output  = strdup(*(((struct arg_file*)argtable[count])->filename)); 
+  } 
+
+  if (((struct arg_file*)argtable[++count])->count) { 
+    options->tmp_input  = strdup(*(((struct arg_file*)argtable[count])->filename)); 
+  } 
+
+  if (((struct arg_int*)argtable[++count])->count) { options->second_phase = ((struct arg_int*)argtable[count])->count; }
+
+  if (((struct arg_file*)argtable[++count])->count) { 
+    options->second_command  = strdup(*(((struct arg_file*)argtable[count])->filename)); 
+  }
+  
+  
   return options;
 
 }
@@ -749,6 +755,7 @@ void usage(void **argtable) {
 }
 
 void usage_cli(int mode) {
+  int rank;
   void **argtable = argtable_options_new(mode);
   usage(argtable);
   exit(0);

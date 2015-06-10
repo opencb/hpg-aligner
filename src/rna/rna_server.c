@@ -115,9 +115,6 @@ int ii = -1;
 
 //extern size_t TOTAL_READS_PROCESS, TOTAL_SW, TOTAL_READS_SA;
 extern pthread_mutex_t mutex_sp; 
-extern st_bwt_t st_bwt;
-extern size_t total_reads_w2, total_reads_w3;
-
 extern int min_intron, max_intron;
 
 //extern size_t tot_reads_in;
@@ -231,16 +228,13 @@ char *cigar_code_find_and_report_sj(size_t start_map, cigar_code_t *cigar_code,
 	if ((sj_ref[0] == 'C' && sj_ref[1] == 'T' && sj_ref[3] == 'A' && sj_ref[4] == 'C') ||
 	    (sj_ref[0] == 'G' && sj_ref[1] == 'T' && sj_ref[3] == 'A' && sj_ref[4] == 'G')) {
 	  pthread_mutex_lock(&mutex_sp);
-	  st_bwt.cannonical_sj++;
 	  pthread_mutex_unlock(&mutex_sp);
 	} else {
 	  pthread_mutex_lock(&mutex_sp);
-	  st_bwt.semi_cannonical_sj++;
 	  pthread_mutex_unlock(&mutex_sp);
 	}
 
 	pthread_mutex_lock(&mutex_sp);
-	st_bwt.tot_sj++;
 	pthread_mutex_unlock(&mutex_sp);
 
 	allocate_start_node(chromosome - 1,
@@ -6367,7 +6361,6 @@ int apply_sw_rna(sw_server_input_t* input_p, batch_t *batch) {
 
     if (n_alignments) {
       pthread_mutex_lock(&mutex_sp);
-      st_bwt.map_w1++;
       pthread_mutex_unlock(&mutex_sp);
     }
 
@@ -6430,10 +6423,8 @@ int apply_sw_rna(sw_server_input_t* input_p, batch_t *batch) {
 	if (data_type[i] == CAL_TYPE || 
 	    data_type[i + 1] == CAL_TYPE) {
 	  mode = 0;
-	  total_reads_w2 += 2;
 	} else {
 	  mode = 1;
-	  total_reads_w3 += 2;
 	}
 
 	pthread_mutex_lock(&mutex_sp);
@@ -6507,10 +6498,8 @@ int apply_sw_rna(sw_server_input_t* input_p, batch_t *batch) {
 	int mode;
 	if (data_type[i] == CAL_TYPE) {
 	  mode = 0;
-	  total_reads_w2 += 1;
 	} else {
 	  mode = 1;
-	  total_reads_w3 += 1;
 	}
 	pthread_mutex_lock(&mutex_sp);
 	file_write_items(fq_read, mapping_batch->mapping_lists[i],
@@ -7484,7 +7473,6 @@ int apply_rna_last(sw_server_input_t* input_p, batch_t *batch) {
 
     if (n_alignments) {
       pthread_mutex_lock(&mutex_sp);
-      st_bwt.map_w2++;
       pthread_mutex_unlock(&mutex_sp);
     }
 
@@ -7541,10 +7529,8 @@ int apply_rna_last(sw_server_input_t* input_p, batch_t *batch) {
 	if (data_type[i] == CAL_TYPE || 
 	    data_type[i + 1] == CAL_TYPE) {
 	  mode = 0;
-	  total_reads_w2 += 2;
 	} else {
 	  mode = 1;
-	  total_reads_w3 += 2;
 	}
 
 	pthread_mutex_lock(&mutex_sp);
@@ -7620,10 +7606,8 @@ int apply_rna_last(sw_server_input_t* input_p, batch_t *batch) {
 	int mode;
 	if (data_type[i] == CAL_TYPE) {
 	  mode = 0;
-	  total_reads_w2 += 1;
 	} else {
 	  mode = 1;
-	  total_reads_w3 += 1;
 	}
 	pthread_mutex_lock(&mutex_sp);
 	file_write_items(fq_read, mapping_batch->mapping_lists[i],
@@ -8329,7 +8313,7 @@ int apply_rna_last_hc(sw_server_input_t* input_p, batch_t *batch) {
 
     if (n_alignments) {
       pthread_mutex_lock(&mutex_sp);
-      st_bwt.map_w3++;
+
       pthread_mutex_unlock(&mutex_sp);
     }
 
@@ -9204,11 +9188,6 @@ int apply_rna_w2_w3(sw_server_input_t* input_p, batch_t *batch) {
 
     size_t n_alignments = array_list_size(mapping_batch->mapping_lists[i]);
 
-    if (n_alignments) {
-      pthread_mutex_lock(&mutex_sp);
-      st_bwt.map_w2++;
-      pthread_mutex_unlock(&mutex_sp);
-    }
 
     int final_distance;
     for (size_t a = 0; a < n_alignments; a++) {
@@ -9263,10 +9242,8 @@ int apply_rna_w2_w3(sw_server_input_t* input_p, batch_t *batch) {
 	if (data_type[i] == CAL_TYPE || 
 	    data_type[i + 1] == CAL_TYPE) {
 	  mode = 0;
-	  total_reads_w2 += 2;
 	} else {
 	  mode = 1;
-	  total_reads_w3 += 2;
 	}
 
 	pthread_mutex_lock(&mutex_sp);
@@ -9342,10 +9319,8 @@ int apply_rna_w2_w3(sw_server_input_t* input_p, batch_t *batch) {
 	int mode;
 	if (data_type[i] == CAL_TYPE) {
 	  mode = 0;
-	  total_reads_w2 += 1;
 	} else {
 	  mode = 1;
-	  total_reads_w3 += 1;
 	}
 	pthread_mutex_lock(&mutex_sp);
 	file_write_items(fq_read, mapping_batch->mapping_lists[i],

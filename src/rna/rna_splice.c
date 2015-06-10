@@ -1,6 +1,6 @@
 #include "rna_splice.h"
 
-extern size_t junction_id;
+size_t junction_id;
 size_t cannonical_sp = 0;
 size_t semi_cannonical_sp = 0;
 size_t total_splice = 0;
@@ -185,8 +185,9 @@ void load_intron_file(genome_t *genome, char* intron_filename, avls_list_t *avls
 
 void splice_end_type_new(char type_sp, char *splice_nt, splice_end_t *splice_end) {
 
-  splice_end->splice_nt = strdup(splice_nt);
-
+  //splice_end->splice_nt = strdup(splice_nt);
+  splice_end->splice_nt = NULL;
+  
   /*
   switch(type_sp) {
   case UNKNOWN_SPLICE:
@@ -235,7 +236,7 @@ splice_end_t *splice_end_new(size_t end, size_t end_extend, unsigned char type_o
 }
 
 void splice_end_free(splice_end_t *splice_end) { 
-  if (splice_end->splice_nt) { free(splice_end->splice_nt); }
+  //if (splice_end->splice_nt) { free(splice_end->splice_nt); }
   free(splice_end);
 }
 
@@ -324,9 +325,9 @@ int allocate_end_splice(size_t end, size_t end_extend, int type_orig, char type_
       if (splice_end->end_extend < end_extend) { 
 	splice_end->end_extend = end_extend;
       }
-      if (splice_end->splice_nt) {
-	  free(splice_end->splice_nt);
-      }
+      //if (splice_end->splice_nt) {
+      //free(splice_end->splice_nt);
+      //}
       splice_end_type_new(type_sp, splice_nt, splice_end);
       
       if (type_orig != FROM_FILE) { splice_end->reads_number++; }
@@ -477,15 +478,18 @@ allocate_buffers_t* process_avlnode_ends(avl_node_t *node_val, unsigned char st,
 
   for (i = 0; i < num_ends; i++) {
     if ((allocate_batches->write_exact_sp->size + 100) > write_size) {
+      //printf("Write to file..\n");
       fwrite((char *)allocate_batches->write_exact_sp->buffer_p, allocate_batches->write_exact_sp->size, 1, allocate_batches->fd_exact);
+      //printf("Write to file END\n");
       //fwrite((char *)allocate_batches->write_extend_sp->buffer_p, allocate_batches->write_extend_sp->size, 1, allocate_batches->fd_extend);
       allocate_batches->write_exact_sp->size = 0;
       //allocate_batches->write_extend_sp->size = 0;
-    } 
+    }
+    
     splice_end_t *end_sp = array_list_get(i, start_data->list_ends);
     if (end_sp->reads_number) {
       //printf("%lu - %lu\n", node_val->position, end_sp->end);
-      end_sp->splice_nt = "\0";
+      end_sp->splice_nt = NULL;
       bytes_exact = pack_junction(chromosome, st, 
 				  node_val->position, end_sp->end, 
 				  junction_id, end_sp->reads_number, 
@@ -565,11 +569,12 @@ void write_chromosome_avls( char *extend_sp, char *exact_sp,
 	chr = c + 1;	
 	//printf("Chromosome %i(%i)\n", chr, st);
 	allocate_batches = process_avlnode(avls_list->avls[st][c].avl->root, st, chr, allocate_batches);
-	
+	//printf("Chromosome %i(%i) END!\n", chr, st);
 	if(allocate_batches->write_exact_sp != NULL) {
-	  if(allocate_batches->write_exact_sp->size > 0) {	  
+	  if(allocate_batches->write_exact_sp->size > 0) {
+	    //printf("Write to file\n");
 	    fwrite((char *)allocate_batches->write_exact_sp->buffer_p, allocate_batches->write_exact_sp->size, 1, allocate_batches->fd_exact);
-	    //fwrite((char *)allocate_batches->write_extend_sp->buffer_p, allocate_batches->write_extend_sp->size, 1, allocate_batches->fd_extend);
+	    //printf("Write to file END\n");
 	    allocate_batches->write_exact_sp->size = 0;
 	    //allocate_batches->write_extend_sp->size = 0;
 	  }
@@ -688,6 +693,7 @@ void MPI_avl_package(size_t num_chromosomes,
   //MPI_splice_t *MPI_splice_package = (MPI_splice_t *)malloc(sizeof(MPI_splice_t)*(*max_num_sj));
   
   size_t package_pos = 0;
+  junction_id = 0;
   
   for(int st = 0; st < NUM_STRANDS; st++) {
     for(int c = 0; c < num_chromosomes; c++) {

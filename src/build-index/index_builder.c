@@ -1,5 +1,5 @@
 #include "index_builder.h"
-
+#define version_str "1.0"
 
 //------------------------------------------------------------------------------------
 //------------------------------------------------------------------------------------
@@ -124,8 +124,8 @@ index_options_t *parse_index_options(int argc, char **argv) {
         exit(0);
       }
       if (options->version) {
-	display_version();
-        argtable_index_options_free(argtable, num_options);
+	printf("Hpg-multialigner version %s\n", version_str);
+	argtable_index_options_free(argtable, num_options);
         index_options_free(options);
         exit(0);
       }
@@ -139,15 +139,18 @@ index_options_t *parse_index_options(int argc, char **argv) {
 
 void validate_index_options(index_options_t *options, int mode) {
   if (!exists(options->ref_genome)) {
-    LOG_FATAL("Reference genome does not exist.\n");
+    fprintf(stderr, "Reference genome does not exist.\n");
+    exit(-1);
   }
   
   if (!exists(options->index_filename)) {
-    LOG_FATAL("Index directory does not exist.\n");
+    fprintf(stderr, "Index directory does not exist.\n");
+    exit(-1);
   }
   
   if (mode == BWT_INDEX && options->index_ratio <= 0) {
-    LOG_FATAL("Invalid BWT index ratio. It must be greater than 0.\n");
+    fprintf(stderr, "Invalid BWT index ratio. It must be greater than 0.\n");
+    exit(-1);
   }
 
 }
@@ -157,17 +160,20 @@ void validate_index_options(index_options_t *options, int mode) {
 
 void run_index_builder(int argc, char **argv, char *mode_str) {
   int mode;
+  
   if (!strcmp(mode_str, "build-bwt-index")) {
     mode = BWT_INDEX;
   } else if (!strcmp(mode_str, "build-sa-index")) {
     mode = SA_INDEX;
+  } else if (!strcmp(mode_str, "build-simple-index")) {
+    mode = SIMPLE_INDEX;
   }
-
+  
   index_options_t *options = parse_index_options(argc, argv);
 
   argtable_index_options_new(mode);
   validate_index_options(options, mode);
-  
+
   if (mode == SA_INDEX) {
     const uint prefix_value = 18;
     char binary_filename[strlen(options->index_filename) + 128];
@@ -177,24 +183,33 @@ void run_index_builder(int argc, char **argv, char *mode_str) {
     generate_codes(binary_filename, options->ref_genome);
     printf("SA Index generated!\n");
 
-    LOG_DEBUG("Compressing reference genome...\n");
+    printf("Compressing reference genome...\n");
     generate_codes(binary_filename, options->ref_genome);
-    LOG_DEBUG("...done !\n");
+    printf("...done !\n");
 
-  } else {
+  } else if (mode == BWT_INDEX) {
+
     char binary_filename[strlen(options->index_filename) + 128];
     sprintf(binary_filename, "%s/dna_compression.bin", options->index_filename);
     
-    LOG_DEBUG("Compressing reference genome...\n");
+    printf("Compressing reference genome...\n");
     generate_codes(binary_filename, options->ref_genome);
-    LOG_DEBUG("...done !\n");
+    printf("...done !\n");
     
-    LOG_DEBUG("Building BWT index...\n");
+    printf("Building BWT index...\n");
     bwt_generate_index_files(options->ref_genome, options->index_filename, options->index_ratio, false, "ACGT");
-    LOG_DEBUG("...done !\n");    
+    printf("...done !\n");    
+  } else {
+    
+    char binary_filename[strlen(options->index_filename) + 128];
+    sprintf(binary_filename, "%s/dna_compression.bin", options->index_filename);
+    
+    printf("Compressing reference genome...\n");
+    generate_codes(binary_filename, options->ref_genome);
+    printf("...done !\n");
+    
   }
 
-  exit(0);
 }
 
 

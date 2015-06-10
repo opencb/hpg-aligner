@@ -62,7 +62,7 @@
 //========================================================================
 
 
-#define NUM_OPTIONS			31
+#define NUM_OPTIONS			35
 #define NUM_RNA_OPTIONS			 5
 #define NUM_DNA_OPTIONS			 1
 
@@ -123,6 +123,7 @@ typedef struct options {
   double gap_open;
   double gap_extend;  
   char str_mode[32];
+  int second_phase;
   char* prefix_name;
   char* in_filename;
   char* in_filename2;
@@ -135,7 +136,9 @@ typedef struct options {
   char* adapter;
   char* adapter_revcomp;
   char* command;
-  // new variables for bisulphite case
+  char* second_command;
+  char* tmp_output;
+  char* tmp_input;
 } options_t;
 
 options_t *options_new(void);
