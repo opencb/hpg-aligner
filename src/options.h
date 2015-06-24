@@ -137,8 +137,11 @@ typedef struct options {
   char* adapter_revcomp;
   char* command;
   char* second_command;
-  char* tmp_output;
   char* tmp_input;
+  char* tmp_path;
+  char* tmp_file;
+  char* second_tmp_path;
+  char* second_tmp_file;
 } options_t;
 
 options_t *options_new(void);

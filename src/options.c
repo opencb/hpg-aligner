@@ -21,7 +21,12 @@ options_t *options_new(void) {
   options->log_level = LOG_ERROR_LEVEL;
   options->output_name = NULL;
   options->num_gpu_threads = DEFAULT_GPU_THREADS;
-
+  
+  options->tmp_path  = NULL;
+  options->tmp_file  = NULL;
+  options->second_tmp_path  = NULL;
+  options->second_tmp_file  = NULL;
+  
   options->tmp_input  = NULL;
   options->realignment = 0;
   options->recalibration = 0;
@@ -510,7 +515,7 @@ void options_to_file(options_t *options, FILE *fd) {
 
 void** argtable_options_new(int mode) {
 
-  int num_options = NUM_OPTIONS + NUM_RNA_OPTIONS;
+  int num_options = NUM_OPTIONS;
 
   // NUM_OPTIONS +1 to allocate end structure
   void **argtable = (void**)malloc((num_options + 1) * sizeof(void*));	
@@ -518,12 +523,9 @@ void** argtable_options_new(int mode) {
   // NOTICE that order cannot be changed as is accessed by index in other functions
   int count = 0;
 
-  argtable[count++] = arg_file0("f", "fq,fastq", NULL, "Reads file input. For more than one file: f1.fq,f2.fq,...");
-  argtable[count++] = arg_file0("j", "fq2,fastq2", NULL, "Reads file input #2 (for paired mode)");
-  argtable[count++] = arg_lit0("z", "gzip", "FastQ input files are gzip");
+  argtable[count++] = arg_file0("f", "fq,fastq", NULL, "Reads file input. For more than one file: f1.fq,f2.fq,...");  
   argtable[count++] = arg_file0("i", "index", NULL, "Index directory name");
-  argtable[count++] = arg_file0("o", "outdir", NULL, "Output directory");
-
+  argtable[count++] = arg_file0("o", "outdir", NULL, "Output directory for framework");
   argtable[count++] = arg_int0(NULL, "filter-read-mappings", NULL, "Reads that map in more than <n> locations are discarded");
   argtable[count++] = arg_int0(NULL, "filter-seed-mappings", NULL, "Seeds that map in more than <n> locations are discarded");
   argtable[count++] = arg_int0(NULL, "min-cal-size", NULL, "Minimum CAL size");
@@ -534,36 +536,30 @@ void** argtable_options_new(int mode) {
   argtable[count++] = arg_dbl0(NULL, "sw-gap-open", NULL, "Gap open penalty for Smith-Waterman algorithm");
   argtable[count++] = arg_dbl0(NULL, "sw-gap-extend", NULL, "Gap extend penalty for Smith-Waterman algorithm");
   argtable[count++] = arg_int0(NULL, "min-score", NULL, "Minimum score for valid mappings (0 to 100 for RNA)"); //TODO: and DNA?
-  //  argtable[count++] = arg_int0(NULL, "paired-mode", NULL, "Pair mode: 0 = single-end, 1 = paired-end, 2 = mate-pair [Default 0]");
-  argtable[count++] = arg_int0(NULL, "paired-min-distance", NULL, "Minimum distance between pairs");
-  argtable[count++] = arg_int0(NULL, "paired-max-distance", NULL, "Maximum distance between pairs");
   argtable[count++] = arg_lit0(NULL, "report-best", "Report all alignments with best score");
   argtable[count++] = arg_lit0(NULL, "report-all", "Report all alignments");
   argtable[count++] = arg_int0(NULL, "report-n-best", NULL, "Report the <n> best alignments");
   argtable[count++] = arg_int0(NULL, "report-n-hits", NULL, "Report <n> hits");
   argtable[count++] = arg_lit0(NULL, "report-only-paired", "Report only the paired reads");
   argtable[count++] = arg_str0(NULL, "prefix", NULL, "File prefix name");
-  argtable[count++] = arg_int0("l", "log-level", NULL, "Log debug level");
   argtable[count++] = arg_lit0("h", "help", "Help option");
   argtable[count++] = arg_lit0(NULL, "bam-format", "BAM output format (otherwise, SAM format. This option is only available for SA mode, BWT mode always report in BAM format), this option turn the process slow");
-  argtable[count++] = arg_lit0(NULL, "indel-realignment", "Indel-based realignment");
-  argtable[count++] = arg_lit0(NULL, "recalibration", "Base quality score recalibration");
-  argtable[count++] = arg_str0("a", "adapter", NULL, "Adapter sequence in the read");
   argtable[count++] = arg_lit0("v", "version", "Display the HPG Aligner version");
-
-
   argtable[count++] = arg_int0(NULL, "max-distance-seeds", NULL, "Maximum distance between seeds");
   argtable[count++] = arg_file0(NULL, "transcriptome-file", NULL, "Transcriptome file to help search splice junctions");
   argtable[count++] = arg_int0(NULL, "seed-size", NULL, "Number of nucleotides in a seed");
   argtable[count++] = arg_int0(NULL, "max-intron-size", NULL, "Maximum intron size");
   argtable[count++] = arg_int0(NULL, "min-intron-size", NULL, "Minimum intron size");
-  argtable[count++] = arg_file0("c", "command", NULL, "Mapper command line");
-  argtable[count++] = arg_file0(NULL, "tmp", NULL, "Temporal output directory");
+  argtable[count++] = arg_file0("c", "command", NULL, "Mapper command line");  
   argtable[count++] = arg_file0(NULL, "tmp-input", NULL, "Temporal input directory");
-
   argtable[count++] = arg_lit0(NULL, "second-phase", "Enable second phase for improve alignments");
   argtable[count++] = arg_file0(NULL, "second-command", NULL, "Second mapper command line");
-  
+
+  argtable[count++] = arg_file0(NULL, "tmp-file", NULL, "Temporal output file name for mapper. Only the name!");
+  argtable[count++] = arg_file0(NULL, "tmp-path", NULL, "Temporal output path for mapper");
+  argtable[count++] = arg_file0(NULL, "second-tmp-file", NULL, "Temporal output file for second mapper. Only the name!");
+  argtable[count++] = arg_file0(NULL, "second-tmp-path", NULL, "Temporal output path for second mapper");
+
   argtable[num_options] = arg_end(count);
      
   return argtable;
@@ -615,11 +611,11 @@ options_t *read_CLI_options(void **argtable, options_t *options) {
   int count = -1;
 
   if (((struct arg_file*)argtable[++count])->count) { options->in_filename = strdup(*(((struct arg_file*)argtable[count])->filename)); }
-  if (((struct arg_file*)argtable[++count])->count) { 
-    options->pair_mode = 1;
-    options->in_filename2 = strdup(*(((struct arg_file*)argtable[count])->filename)); 
-  }
-  if (((struct arg_int*)argtable[++count])->count) { options->gzip = ((struct arg_int*)argtable[count])->count; }
+  //if (((struct arg_file*)argtable[++count])->count) { 
+  //options->pair_mode = 1;
+  //options->in_filename2 = strdup(*(((struct arg_file*)argtable[count])->filename)); 
+  //}
+
   if (((struct arg_file*)argtable[++count])->count) { options->bwt_dirname = strdup(*(((struct arg_file*)argtable[count])->filename)); }
   if (((struct arg_file*)argtable[++count])->count) { free(options->output_name); options->output_name = strdup(*(((struct arg_file*)argtable[count])->filename)); }  
   if (((struct arg_int*)argtable[++count])->count) { options->filter_read_mappings = *(((struct arg_int*)argtable[count])->ival); }
@@ -636,15 +632,12 @@ options_t *read_CLI_options(void **argtable, options_t *options) {
   if (((struct arg_dbl*)argtable[++count])->count) { options->gap_extend = *(((struct arg_dbl*)argtable[count])->dval); }
   if (((struct arg_int*)argtable[++count])->count) { options->min_score = *(((struct arg_int*)argtable[count])->ival); }
   //  if (((struct arg_int*)argtable[++count])->count) { options->pair_mode = *(((struct arg_int*)argtable[count])->ival); }
-  if (((struct arg_int*)argtable[++count])->count) { options->pair_min_distance = *(((struct arg_int*)argtable[count])->ival); }
-  if (((struct arg_int*)argtable[++count])->count) { options->pair_max_distance = *(((struct arg_int*)argtable[count])->ival); }
   if (((struct arg_int*)argtable[++count])->count) { options->report_best = (((struct arg_int*)argtable[count])->count); }
   if (((struct arg_file*)argtable[++count])->count) { options->report_all = (((struct arg_int *)argtable[count])->count); }
   if (((struct arg_int*)argtable[++count])->count) { options->report_n_best = *(((struct arg_int*)argtable[count])->ival); }
   if (((struct arg_int*)argtable[++count])->count) { options->report_n_hits = *(((struct arg_int*)argtable[count])->ival); }
   if (((struct arg_int*)argtable[++count])->count) { options->report_only_paired = (((struct arg_int*)argtable[count])->count); }
   if (((struct arg_str*)argtable[++count])->count) { options->prefix_name = strdup(*(((struct arg_str*)argtable[count])->sval)); }
-  if (((struct arg_file*)argtable[++count])->count) { options->log_level = *(((struct arg_int*)argtable[count])->ival); }
   if (((struct arg_int*)argtable[++count])->count) { options->help = ((struct arg_int*)argtable[count])->count; }
 
   if (((struct arg_int*)argtable[++count])->count) { 
@@ -652,11 +645,6 @@ options_t *read_CLI_options(void **argtable, options_t *options) {
     options->set_bam_format = 1;
   }
 
-  if (((struct arg_int*)argtable[++count])->count) { options->realignment = ((struct arg_int*)argtable[count])->count; }
-  if (((struct arg_int*)argtable[++count])->count) { options->recalibration = ((struct arg_int*)argtable[count])->count; }
-  if (((struct arg_str*)argtable[++count])->count) { options->adapter = strdup(*(((struct arg_str*)argtable[count])->sval)); }
-
-  if (options->adapter) options->adapter_length = strlen(options->adapter);
   if (((struct arg_int*)argtable[++count])->count) { options->version = ((struct arg_int*)argtable[count])->count; }
 
 
@@ -672,9 +660,6 @@ options_t *read_CLI_options(void **argtable, options_t *options) {
     options->command  = strdup(*(((struct arg_file*)argtable[count])->filename)); 
   }
 
-  if (((struct arg_file*)argtable[++count])->count) { 
-    options->tmp_output  = strdup(*(((struct arg_file*)argtable[count])->filename)); 
-  } 
 
   if (((struct arg_file*)argtable[++count])->count) { 
     options->tmp_input  = strdup(*(((struct arg_file*)argtable[count])->filename)); 
@@ -685,8 +670,23 @@ options_t *read_CLI_options(void **argtable, options_t *options) {
   if (((struct arg_file*)argtable[++count])->count) { 
     options->second_command  = strdup(*(((struct arg_file*)argtable[count])->filename)); 
   }
-  
-  
+
+  if (((struct arg_file*)argtable[++count])->count) { 
+    options->tmp_file  = strdup(*(((struct arg_file*)argtable[count])->filename)); 
+  } 
+
+  if (((struct arg_file*)argtable[++count])->count) { 
+    options->tmp_path  = strdup(*(((struct arg_file*)argtable[count])->filename)); 
+  } 
+
+  if (((struct arg_file*)argtable[++count])->count) { 
+    options->second_tmp_file  = strdup(*(((struct arg_file*)argtable[count])->filename)); 
+  } 
+
+  if (((struct arg_file*)argtable[++count])->count) { 
+    options->second_tmp_path  = strdup(*(((struct arg_file*)argtable[count])->filename)); 
+  } 
+
   return options;
 
 }
@@ -696,7 +696,7 @@ options_t *parse_options(int argc, char **argv) {
   //	struct arg_end *end = arg_end(10);
   //	void **argtable = argtable_options_get(argtable_options, end);
 
-  int mode, num_options = NUM_OPTIONS + NUM_RNA_OPTIONS;
+  int mode, num_options = NUM_OPTIONS;
 
   mode = RNA_MODE;
 

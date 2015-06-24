@@ -9,8 +9,8 @@ commons_path = '#lib/hpg-libs/common-libs'
 system_include = '/usr/include'
 system_libs = '/usr/lib' 
 
-extrae_include = '/home/hmartinez/opt/extrae-2.5.1/include'
-extrae_libs    = '/home/hmartinez/opt/extrae-2.5.1/lib'
+#extrae_include = '/home/hmartinez/opt/extrae-2.5.1/include'
+#extrae_libs    = '/home/hmartinez/opt/extrae-2.5.1/lib'
 
 other_libs = '/home/hmartinez/opt/lib/'
 other_include = '/home/hmartinez/opt/include/'
@@ -18,33 +18,35 @@ other_include = '/home/hmartinez/opt/include/'
 vars = Variables('buildvars.py')
 
 ############################################################
-check_install_include = "/home/castillo/HECTOR_BIO/appl.multi/hpg-aligner/check-install/include"
-check_install_lib = "/home/castillo/HECTOR_BIO/appl.multi/hpg-aligner/check-install/lib"
+#check_install_include = "/home/castillo/HECTOR_BIO/appl.multi/hpg-aligner/check-install/include"
+#check_install_lib = "/home/castillo/HECTOR_BIO/appl.multi/hpg-aligner/check-install/lib"
 ############################################################
 
 compiler = 'mpicc'
 
+#LIBS = ['xml2', 'm', 'z', 'curl', 'dl', 'bioinfo', 'common'],
+		  
 env = Environment(tools = ['default', 'packaging'],
       		  ENV = {'PATH' : os.environ['PATH']},
       		  CC = compiler,
                   variables = vars,
                   CFLAGS = '-std=c99 -D_XOPEN_SOURCE=600 -D_GNU_SOURCE -fopenmp -D_REENTRANT',
-                  CPPPATH = ['#', '#src', '#src/tools/bam', bioinfo_path, commons_path, "%s/commons/argtable" % commons_path, "%s/commons/config" % commons_path, system_include, '%s/libxml2' % system_include, check_install_include ],
-                  LIBPATH = [commons_path, bioinfo_path, system_libs, check_install_lib],
-                  LIBS = ['xml2', 'm', 'z', 'curl', 'dl', 'bioinfo', 'common'],
+                  CPPPATH = ['#', '#src', '#src/tools/bam', bioinfo_path, commons_path, "%s/commons/argtable" % commons_path, "%s/commons/config" % commons_path, system_include],
+                  LIBPATH = [commons_path, bioinfo_path, system_libs],
+		  LIBS = ['z', 'bioinfo', 'common'],
                   LINKFLAGS = ['-fopenmp'])
 
 compiler_index = ARGUMENTS.get('compiler', 'gcc')
-compiler_index = 'icc'
+#compiler_index = 'icc'
 
 env_index = Environment(tools = ['default', 'packaging'],
       		  ENV = {'PATH' : os.environ['PATH']},
       		  CC = compiler_index,
                   variables = vars,
                   CFLAGS = '-std=c99 -D_XOPEN_SOURCE=600 -D_GNU_SOURCE -fopenmp -D_REENTRANT',
-                  CPPPATH = ['#', '#src', '#src/tools/bam', bioinfo_path, commons_path, "%s/commons/argtable" % commons_path, "%s/commons/config" % commons_path, system_include, '%s/libxml2' % system_include, check_install_include ],
-                  LIBPATH = [commons_path, bioinfo_path, system_libs, check_install_lib],
-                  LIBS = ['xml2', 'm', 'z', 'curl', 'dl', 'bioinfo', 'common'],
+                  CPPPATH = ['#', '#src', '#src/tools/bam', bioinfo_path, commons_path, "%s/commons/argtable" % commons_path, "%s/commons/config" % commons_path, system_include],
+                  LIBPATH = [commons_path, bioinfo_path, system_libs],
+                  LIBS = ['z', 'bioinfo', 'common'],
                   LINKFLAGS = ['-fopenmp'])
 
 
