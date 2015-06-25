@@ -1317,7 +1317,7 @@ int hpg_multialigner_main(int argc, char *argv[]) {
   char *mapper_cli = strdup(options->command);
   char *file_input = strdup(options->in_filename);
   char *path_tmp;
-  char *second_path_tmp;
+  char *second_path_tmp = NULL;
   
   char pwd[2048];
   if (getcwd(pwd, sizeof(pwd)) == NULL) {
@@ -1908,46 +1908,46 @@ int hpg_multialigner_main(int argc, char *argv[]) {
   MPI_Comm_create(MPI_COMM_WORLD, new_group, &new_comm);   
   //--------------------------------------------------------------
 
+  size_t len_s = 1024;
+  if (second_path_tmp != NULL) {
+    len_s += strlen(second_path_tmp);
+  }
+  
+  char second_path_out_tmp[len_s];
+  char second_path_out_search[len_s];
 
-  char second_path_out_tmp[strlen(second_path_tmp) + 1024];
-  char second_path_out_search[strlen(second_path_tmp) + 1024];
-    
+  if (second_phase) {
+    if (rank != numprocs) {
+      //if (options->second_tmp_path) {
+      sprintf(second_path_out_tmp, "%s/%i.second.out/", path_tmp, rank);
+      sprintf(second_path_out_search, "%s/%i.second.out/", path_tmp, rank);
+
+      printf("::::::::::::::::::::::::SECOND PHASE ENABLE:::::::::::::::: %s\n", second_path_out_tmp);
+
+      char cmd[strlen(second_path_out_tmp) + 1024];
+      sprintf(cmd, "rm -rf %s", second_path_out_tmp);
+      system(cmd);
+
+      create_directory(second_path_out_tmp);
+
+      //} else {
+      //sprintf(second_path_out_tmp, "%s", second_path_tmp);
+      //}
+      //printf("Create path %s\n", second_path_out_tmp);
+
+    }
+  }
+
+  MPI_Barrier(MPI_COMM_WORLD);
+
+
   if (mapper_mode == RNA_MODE) {
     /////////////////////// FOR RNA SECOND PHASE //////////////////////////////////  
     if (second_phase) {
-      printf("SECOND PHASE ENABLE\n");
-
-
-      if (rank != numprocs) {
-	//if (options->second_tmp_path) {
-	sprintf(second_path_out_tmp, "%s/%i.second.out/", path_tmp, rank);
-	sprintf(second_path_out_search, "%s/%i.second.out/", path_tmp, rank);
-	/*
-	if (options->tmp_file) {
-	  sprintf(second_path_out_tmp, "%s/%i.second.out/%s", path_tmp, rank, options->tmp_file);
-	} else {
-	  sprintf(second_path_out_tmp, "%s/%i.second.out/", path_tmp, rank);
-	}
-	*/
-
-	char cmd[strlen(second_path_out_tmp) + 1024];
-	sprintf(cmd, "rm -rf %s", second_path_out_tmp);
-	system(cmd);
-	  
-	create_directory(second_path_out_tmp);
-	
-	//} else {
-	//sprintf(second_path_out_tmp, "%s", second_path_tmp);
-	//}
-	//printf("Create path %s\n", second_path_out_tmp);
-	
-      }
-
-      MPI_Barrier(MPI_COMM_WORLD);
-
+      
       char alig_second[strlen(second_path_out_tmp) + 1024];
       sprintf(alig_second, "%s/alig_second.sam", second_path_out_tmp);
-
+      
       if ((rank != numprocs)) {
 	if (hpg_enable) {
 	  printf("MERGE METAEXON\n");
@@ -2596,7 +2596,7 @@ int hpg_multialigner_main(int argc, char *argv[]) {
       // end of workflow management
       //--------------------------------------------------------------------------------------
     }
-  } else { 
+   } else { 
 
     /////////////////////// FOR DNA SECOND PHASE //////////////////////////////////
     
@@ -2705,23 +2705,25 @@ int hpg_multialigner_main(int argc, char *argv[]) {
     //printf("XXXXXX: %s\n", second_path_out_tmp);
 
     //if (options->tmp_path) {
-    if ((dir = opendir (second_path_out_search)) != NULL) {
-      while ((ent = readdir (dir)) != NULL) {
-	//printf ("\t%s\n", ent->d_name);
-	if (strstr(ent->d_name, "sam") != NULL) {
-	  array_list_insert(strdup(ent->d_name), files_found_2);
-	  array_list_insert(SAM_FILE, files_type_2);
-	} else if (strstr(ent->d_name, "bam") != NULL) {
-	  array_list_insert(strdup(ent->d_name), files_found_2);
-	  array_list_insert(BAM_FILE, files_type_2);
+    if (rank != numprocs) {
+      if ((dir = opendir (second_path_out_search)) != NULL) {
+	while ((ent = readdir (dir)) != NULL) {
+	  //printf ("\t%s\n", ent->d_name);
+	  if (strstr(ent->d_name, "sam") != NULL) {
+	    array_list_insert(strdup(ent->d_name), files_found_2);
+	    array_list_insert(SAM_FILE, files_type_2);
+	  } else if (strstr(ent->d_name, "bam") != NULL) {
+	    array_list_insert(strdup(ent->d_name), files_found_2);
+	    array_list_insert(BAM_FILE, files_type_2);
+	  }
 	}
+	closedir (dir);
+      } else {
+	printf("Directory not found\n");
+	exit(-1);
       }
-      closedir (dir);
-    } else {
-      printf("Directory not found\n");
-      exit(-1);
     }
-
+    
     /*
     //} else {
       if (strstr(path_tmp, "sam") != NULL) {
