@@ -1492,20 +1492,31 @@ int hpg_multialigner_main(int argc, char *argv[]) {
 
   }
     
+
   if (rank != numprocs) {
     char path_out_tmp[strlen(path_tmp) + 1024];
+
     if (options->tmp_path) {
-      sprintf(path_out_tmp, "%s/%i.out/", path_tmp, rank);
+      sprintf(path_out_tmp, "%s", path_tmp);
 
       char cmd[strlen(path_out_tmp) + 1024];
       sprintf(cmd, "rm -rf %s", path_out_tmp);
       system(cmd);
-      
-      create_directory(path_out_tmp);      
 
-    }     
-  }  
-  
+      create_directory(path_out_tmp);
+
+    }
+
+    sprintf(path_out_tmp, "%s/%i.out/", path_tmp, rank);
+
+    char cmd[strlen(path_out_tmp) + 1024];
+    sprintf(cmd, "rm -rf %s", path_out_tmp);
+    system(cmd);
+
+    create_directory(path_out_tmp);
+
+  }
+    
   
   //PROCESS FILES
   MPI_Barrier(MPI_COMM_WORLD);
@@ -1536,11 +1547,12 @@ int hpg_multialigner_main(int argc, char *argv[]) {
       sprintf(mapper_run, "%s %s %s %s/%i.tmp %s", cli_out, node_out, cli_in, tmp_input_path, rank, cli_end);
     }
 
-    
+    printf("==========================================================================\n");
     start_timer(time_start);
     system(mapper_run);
     stop_timer(time_start, time_stop, time_mapping);
-
+    printf("==========================================================================\n");
+    
     printf("@@@@ [%i] (%0.2f): %s\n", rank, time_mapping / 1000000, mapper_run);
     //====================================================================================//
   }
@@ -2580,11 +2592,11 @@ int hpg_multialigner_main(int argc, char *argv[]) {
 	      sprintf(mapper_run, "%s %s %s %s %s", cli_out, second_path_out_tmp, cli_in, buffer_path, cli_end);
 	    }
 
-	    printf("%s\n", mapper_run);
-	    //exit(-1);
-	  
+	    //printf("======================================================================\n");
+	    //printf("RNA :: %s\n", mapper_run);
 	    system(mapper_run);
-      
+      	    //printf("======================================================================\n");
+	    
 	  }
 	  //===========================================================================//               		
 	}
