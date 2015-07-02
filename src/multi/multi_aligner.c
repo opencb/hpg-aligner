@@ -1348,6 +1348,14 @@ int hpg_multialigner_main(int argc, char *argv[]) {
       second_path_tmp = strdup(path_output);
     }
   }
+
+  char *tmp_input_path;
+
+  if (options->tmp_input == NULL) {
+    tmp_input_path = strdup(TMP_PATH);
+  } else {
+    tmp_input_path = strdup(options->tmp_input);
+  }
   
   sprintf(file_output, "%s/%s", path_output, "alignments.sam");
   sprintf(exact_filename, "%s/%s", path_output, "SJ.bed");
@@ -1356,29 +1364,30 @@ int hpg_multialigner_main(int argc, char *argv[]) {
   FILE *fd_out;
   
   if (rank == 0) {
-    printf("=====================================================\n"); 
-    printf("START Multi Aligner in %s mode\n", mapper_mode == RNA_MODE ? "RNA" : "DNA"); 
-    printf("=====================================================\n"); 
-    printf("MAPPER COMMAND LINE :  '%s'\n", mapper_cli);
-    printf("INPUT  FILE         :  '%s'\n", file_input);
+    printf("============================================================================================\n"); 
+    printf("============================================================================================\n"); 
+    printf("MULTIALIGNER MODE       :   %s\n", mapper_mode == RNA_MODE ? "RNA" : "DNA"); 
+    printf("MAPPER COMMAND LINE     :  '%s'\n", mapper_cli);
+    printf("INPUT  FILE             :  '%s'\n", file_input);
+    printf("TEMPORAL FILES FOR READ :  '%s'\n", tmp_input_path);
 
     if (options->tmp_file) {
-      printf("TMP OUTPUT PATH     :  '%s/%s'\n", path_tmp, options->tmp_file);
+      printf("TMP OUTPUT PATH         :  '%s/%s'\n", path_tmp, options->tmp_file);
     } else {
-      printf("TMP OUTPUT FILE     :  '%s'\n", path_tmp);
+      printf("TMP OUTPUT FILE         :  '%s'\n", path_tmp);
     }
 
     if (second_phase) {
       if (options->second_tmp_file) {
-	printf("SECOND PHASE TMP OUTPUT PATH     :  '%s/%s'\n", second_path_tmp, options->second_tmp_file);
+	printf("SECOND PHASE TMP OUTPUT PATH :  '%s/%s'\n", second_path_tmp, options->second_tmp_file);
       } else {
-	printf("SECOND PHASE TMP OUTPUT FILE     :  '%s'\n", path_tmp);
+	printf("SECOND PHASE TMP OUTPUT FILE :  '%s'\n", path_tmp);
       }
     }    
+    printf("OUTPUT FILE             :  '%s' of node '%s'\n", file_output, processor_name);
+    printf("============================================================================================\n"); 
+    printf("============================================================================================\n"); 
 
-    printf("=====================================================\n");
-    printf("OUTPUT FILE         :  '%s' of node '%s'\n", file_output, processor_name);
-    printf("=====================================================\n"); 
   }
 
   //exit(-1);
@@ -1395,13 +1404,6 @@ int hpg_multialigner_main(int argc, char *argv[]) {
   char *cli_end;
   unsigned char first_in = 0;
 
-  char *tmp_input_path;
-
-  if (options->tmp_input == NULL) {
-    tmp_input_path = strdup(TMP_PATH);
-  } else {
-    tmp_input_path = strdup(options->tmp_input);
-  }
   
   //if (rank != numprocs) {    
   //================ First split input File ====================//
@@ -1485,11 +1487,10 @@ int hpg_multialigner_main(int argc, char *argv[]) {
 
   
   if (rank == 0) {
-    char cmd[strlen(path_output) + 1024];
-    sprintf(cmd, "rm -rf %s", path_output);
-    system(cmd);
+    //char cmd[strlen(path_output) + 1024];
+    //sprintf(cmd, "rm -rf %s", path_output);
+    //system(cmd);
     create_directory(path_output);  
-
   }
     
 
@@ -1499,9 +1500,9 @@ int hpg_multialigner_main(int argc, char *argv[]) {
     if (options->tmp_path) {
       sprintf(path_out_tmp, "%s", path_tmp);
 
-      char cmd[strlen(path_out_tmp) + 1024];
-      sprintf(cmd, "rm -rf %s", path_out_tmp);
-      system(cmd);
+      //char cmd[strlen(path_out_tmp) + 1024];
+      //sprintf(cmd, "rm -rf %s", path_out_tmp);
+      //system(cmd);
 
       create_directory(path_out_tmp);
 
@@ -1547,13 +1548,13 @@ int hpg_multialigner_main(int argc, char *argv[]) {
       sprintf(mapper_run, "%s %s %s %s/%i.tmp %s", cli_out, node_out, cli_in, tmp_input_path, rank, cli_end);
     }
 
-    printf("==========================================================================\n");
+    //printf("==========================================================================\n");
     start_timer(time_start);
     system(mapper_run);
     stop_timer(time_start, time_stop, time_mapping);
-    printf("==========================================================================\n");
+    //printf("==========================================================================\n");
     
-    printf("@@@@ [%i] (%0.2f): %s\n", rank, time_mapping / 1000000, mapper_run);
+    //printf("@@@@ [%i] (%0.2f): %s\n", rank, time_mapping / 1000000, mapper_run);
     //====================================================================================//
   }
 
@@ -1611,7 +1612,7 @@ int hpg_multialigner_main(int argc, char *argv[]) {
 
       if (hpg_enable) {
 	// genome parameters 
-	printf("HPG ENABLE LOADING GENOME...\n");
+	//printf("HPG ENABLE LOADING GENOME...\n");
 	if (!fast_mode) {
 	  //////////////// LOAD BWT INDEX //////////////////////    
 	  bwt_index = bwt_index_new(options->bwt_dirname, false);
@@ -1623,7 +1624,7 @@ int hpg_multialigner_main(int argc, char *argv[]) {
 	}
       }
     } else {
-      printf("Load dna...\n");
+      //printf("Load dna...\n");
       genome = genome_new("dna_compression.bin", options->bwt_dirname, BWT_MODE);  
     }
     
@@ -1684,7 +1685,7 @@ int hpg_multialigner_main(int argc, char *argv[]) {
   //}
 
   int head_found = 0;
-  printf("PROCESS FILE %s\n", path_tmp);
+  //printf("PROCESS FILE %s\n", path_tmp);
   if (rank == 0) {
     //First, search the head files
     for (int i = 0; i < array_list_size(files_found); i++) {
@@ -1753,7 +1754,7 @@ int hpg_multialigner_main(int argc, char *argv[]) {
   
   free(head_buffer);
   
-  printf("MERGE OUTPUT DONE! : %i\n", second_phase);
+  //printf("MERGE OUTPUT DONE! : %i\n", second_phase);
   
   //MPI_Barrier(MPI_COMM_WORLD);
   
@@ -1769,7 +1770,7 @@ int hpg_multialigner_main(int argc, char *argv[]) {
   char line[4096], line_strtok[4096], line_tmp[4096];
   linked_list_t *buffer_no_map = linked_list_new(COLLECTION_MODE_ASYNCHRONIZED);
   
-  printf("[%i]MERGE DATA, tmp %s\n", rank, buffer_path);
+  //printf("[%i]MERGE DATA, tmp %s\n", rank, buffer_path);
   
   size_t nlines = 0;  
   total_writes = 0;
@@ -1791,7 +1792,7 @@ int hpg_multialigner_main(int argc, char *argv[]) {
       FILE *fd = fopen(file_path, "r");
       char *point;      
       
-      printf("process file %s and type = %i, second_phase = %i\n", file_path, type, second_phase);
+      //printf("process file %s and type = %i, second_phase = %i\n", file_path, type, second_phase);
       
       if (type == SAM_FILE) {
 	int fend = 1;
@@ -1854,7 +1855,7 @@ int hpg_multialigner_main(int argc, char *argv[]) {
       }
     }
 
-    printf("Finished MERGE 1\n");
+    //printf("Finished MERGE 1\n");
     
     if (len_buffer) {
       MPI_Send(buffer, MAX_BUFFER, MPI_CHAR, w_rank, 1, MPI_COMM_WORLD);
@@ -1863,7 +1864,7 @@ int hpg_multialigner_main(int argc, char *argv[]) {
     strcpy(buffer, "END");
     MPI_Send(buffer, MAX_BUFFER, MPI_CHAR, w_rank, 1, MPI_COMM_WORLD);
     
-    printf("Finished MERGE\n");
+    //printf("Finished MERGE\n");
     
     fclose(fd_buffer);    
 
@@ -1895,7 +1896,7 @@ int hpg_multialigner_main(int argc, char *argv[]) {
   //exit(-1);
   
   //printf("CLOSE with %i lines\n", total_writes);
-  printf("END MERGE DATA OUTPUT : %i\n", second_phase);
+  //printf("END MERGE DATA OUTPUT : %i\n", second_phase);
 
   //MPI_Barrier(MPI_COMM_WORLD);
   
@@ -1934,7 +1935,7 @@ int hpg_multialigner_main(int argc, char *argv[]) {
       sprintf(second_path_out_tmp, "%s/%i.second.out/", path_tmp, rank);
       sprintf(second_path_out_search, "%s/%i.second.out/", path_tmp, rank);
 
-      printf("::::::::::::::::::::::::SECOND PHASE ENABLE:::::::::::::::: %s\n", second_path_out_tmp);
+      //printf("::::::::::::::::::::::::SECOND PHASE ENABLE:::::::::::::::: %s\n", second_path_out_tmp);
 
       char cmd[strlen(second_path_out_tmp) + 1024];
       sprintf(cmd, "rm -rf %s", second_path_out_tmp);
@@ -1962,7 +1963,7 @@ int hpg_multialigner_main(int argc, char *argv[]) {
       
       if ((rank != numprocs)) {
 	if (hpg_enable) {
-	  printf("MERGE METAEXON\n");
+	  //printf("MERGE METAEXON\n");
 	  if (numprocs >= 2) {
 	    //================================= MERGE METAEXON AND AVL ============================//             
 	    unsigned long num_sj;        
@@ -2148,7 +2149,7 @@ int hpg_multialigner_main(int argc, char *argv[]) {
 	      dec_r *= 2;
 	    }
 	
-	    printf("[%i]MERGE NODO 0 WORKFLOW 1 END...BROADCAST TO OTHER NODES\n", rank);
+	    //printf("[%i]MERGE NODO 0 WORKFLOW 1 END...BROADCAST TO OTHER NODES\n", rank);
 	
 	    //int num_sj;
 	    unsigned long recv_num_sj, recv_n_metaexons, recv_n_starts_ends;
@@ -2289,7 +2290,7 @@ int hpg_multialigner_main(int argc, char *argv[]) {
 	      }
 	    }
       
-	    printf("Frees merge\n");
+	    //printf("Frees merge\n");
 	    free(pack_send);
       
 	    //====                E N D    M E R G E                ====//
@@ -2427,14 +2428,14 @@ int hpg_multialigner_main(int argc, char *argv[]) {
 	    workflow_set_producer((workflow_producer_function_t *)file_reader_2, "Buffer reader", wf_hc);
 	    workflow_set_consumer((workflow_consumer_function_t *)sam_writer, "SAM writer", wf_hc);
 
-	    printf("[%i]BWT run workflow %s...\n", rank, buffer_path);
+	    //printf("[%i]BWT run workflow %s...\n", rank, buffer_path);
 	    workflow_run_with(options->num_cpu_threads, wf_input, wf);
-	    printf("W1 END \n");	  
+	    //printf("W1 END \n");	  
 	    rewind(f_sa);
 	    workflow_run_with(options->num_cpu_threads, wf_input_file, wf_last);
 	    rewind(f_hc);
 	    workflow_run_with(options->num_cpu_threads, wf_input_file_hc, wf_hc);
-	    printf("[%i]BWT run workflow end\n", rank);
+	    //printf("[%i]BWT run workflow end\n", rank);
 
 	    // free memory
 	    workflow_free(wf);
@@ -2486,11 +2487,11 @@ int hpg_multialigner_main(int argc, char *argv[]) {
 	    workflow_set_producer_SA((workflow_producer_function_SA_t *)sa_alignments_reader_rna, "FastQ reader", wf_last);      
 	    workflow_set_consumer_SA((workflow_consumer_function_SA_t *)write_to_file, "SAM writer", wf_last);
 
-	    printf("[%i]SA run workflow...\n", rank);
+	    //printf("[%i]SA run workflow...\n", rank);
 	    workflow_run_with_SA(options->num_cpu_threads, wf_input, wf);      
 	    rewind(f_sa);
 	    workflow_run_with_SA(options->num_cpu_threads, wf_input, wf_last);
-	    printf("[%i]SA run workflow end\n", rank);
+	    //printf("[%i]SA run workflow end\n", rank);
 	  
 	    // free memory
 	    sa_wf_input_free(wf_input);
@@ -2602,7 +2603,7 @@ int hpg_multialigner_main(int argc, char *argv[]) {
 	}
       }
        
-      printf("[%i]MERGE NODO 0 WORKFLOW 1 END...BROADCAST TO OTHER NODES\n", rank);
+      //printf("[%i]MERGE NODO 0 WORKFLOW 1 END...BROADCAST TO OTHER NODES\n", rank);
         
       //
       // end of workflow management
@@ -2614,7 +2615,7 @@ int hpg_multialigner_main(int argc, char *argv[]) {
     
     if (second_phase) {
       if (second_cli) {
-	printf("SECOND PHASE ENABLE\n");
+	//printf("SECOND PHASE ENABLE\n");
 	//================= SPLIT INPUT CLI AND TRANSFORM IT ==========================//
 	max_len_cli = strlen(second_cli) + strlen(path_output) + strlen(tmp_input_path) + 1024;
 	char *cli_tmp = (char *)malloc(sizeof(char)*max_len_cli);
@@ -2683,7 +2684,7 @@ int hpg_multialigner_main(int argc, char *argv[]) {
 	    sprintf(mapper_run, "%s %s %s %s %s", cli_out, second_path_out_tmp, cli_in, buffer_path, cli_end);
 	  }
 	
-	  printf("%s\n", mapper_run);
+	  //printf("%s\n", mapper_run);
 	  //exit(-1);
 	
 	  system(mapper_run);
@@ -2748,7 +2749,7 @@ int hpg_multialigner_main(int argc, char *argv[]) {
     }
     */
     
-    printf("************* [%i] After first loop\n", rank);
+    //printf("************* [%i] After first loop\n", rank);
     
     second_phase = 0;
     if (rank != numprocs) {
@@ -2763,7 +2764,7 @@ int hpg_multialigner_main(int argc, char *argv[]) {
 	FILE *fd = fopen(file_path, "r");
 	char *point;      
       
-	printf("process file %s and type = %i, second_phase = %i\n", file_path, type, second_phase);
+	//printf("process file %s and type = %i, second_phase = %i\n", file_path, type, second_phase);
       
 	if (type == SAM_FILE) {
 	  int fend = 1;
@@ -2826,7 +2827,7 @@ int hpg_multialigner_main(int argc, char *argv[]) {
 	}
       }
 
-      printf("Finished MERGE 1\n");
+      //printf("Finished MERGE 1\n");
     
       if (len_buffer) {
 	MPI_Send(buffer, MAX_BUFFER, MPI_CHAR, w_rank, 1, MPI_COMM_WORLD);
@@ -2835,7 +2836,7 @@ int hpg_multialigner_main(int argc, char *argv[]) {
       strcpy(buffer, "END");
       MPI_Send(buffer, MAX_BUFFER, MPI_CHAR, w_rank, 1, MPI_COMM_WORLD);
     
-      printf("Finished MERGE\n");
+      //printf("Finished MERGE\n");
     
       //fclose(fd_buffer);    
       
@@ -2858,7 +2859,7 @@ int hpg_multialigner_main(int argc, char *argv[]) {
   
   if (rank != numprocs) {    
     if (mapper_mode == RNA_MODE) {
-      printf("MERGE AVL\n");  
+      //printf("MERGE AVL\n");  
       //============================================================//
       //= M E R G E    M E T A E X O N - A V L    T O    W R I T E =//
       //============================================================//
@@ -2940,9 +2941,9 @@ int hpg_multialigner_main(int argc, char *argv[]) {
       }
     
       if (rank == 0) {
-	printf("WRITE AVL in %s\n", exact_filename);
+	//printf("WRITE AVL in %s\n", exact_filename);
 	write_chromosome_avls(NULL, exact_filename, num_chromosomes, avls_list);
-	printf("WRITE OK\n");
+	//printf("WRITE OK\n");
       }
 
     }    
@@ -2952,14 +2953,14 @@ int hpg_multialigner_main(int argc, char *argv[]) {
 
   
   MPI_Barrier(MPI_COMM_WORLD);
-  printf("FINISHHHH!! :)\n");
+  //printf("FINISHHHH!! :)\n");
   
   if (rank == 0) {
     stop_timer(total_start, total_stop, time_total);
     //stop_timer(time_start, time_stop, time_merge);    
     printf("============ T    I    M    I    N    G ===============\n");
     printf("Time Split : %0.2f\n", time_split / 1000000);
-    printf("Time Merge : %0.2f\n", time_merge / 1000000);
+    //printf("Time Merge : %0.2f\n", time_merge / 1000000);
     printf("Total Time : %0.2f\n", time_total / 1000000);
     printf("=======================================================\n");    
   }
