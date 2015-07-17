@@ -948,12 +948,16 @@ void rna_aligner(options_t *options) {
 
   FILE *f_sa, *f_hc;
 
-  f_sa = fopen("buffer_sa.tmp", "w+b");
+  char fd_tmp_path[2048];
+
+  sprintf(fd_tmp_path, "%s/%s", options->output_name, "buffer_sa.tmp");
+  f_sa = fopen(fd_tmp_path, "w+b");
   if (f_sa == NULL) {
     LOG_FATAL("Error opening file 'buffer_sa.tmp' \n");
   }
 
-  f_hc = fopen("buffer_hc.tmp", "w+b");
+  sprintf(fd_tmp_path, "%s/%s", options->output_name, "buffer_hc.tmp");
+  f_hc = fopen(fd_tmp_path, "w+b");
   if (f_hc == NULL) {
     LOG_FATAL("Error opening file 'buffer_hc.tmp' \n");
   }
@@ -1143,16 +1147,16 @@ void rna_aligner(options_t *options) {
     }
 
 
-    f_sa = fopen("buffer_sa.tmp", "w+b");
-    if (f_sa == NULL) {
-      LOG_FATAL("Error opening file 'buffer_sa.tmp' \n");
-    }
+    //f_sa = fopen("buffer_sa.tmp", "w+b");
+    //if (f_sa == NULL) {
+    //LOG_FATAL("Error opening file 'buffer_sa.tmp' \n");
+    //}
     
-    f_hc = fopen("buffer_hc.tmp", "w+b");
-    if (f_hc == NULL) {
-      LOG_FATAL("Error opening file 'buffer_hc.tmp' \n");
-    }
-
+    //f_hc = fopen("buffer_hc.tmp", "w+b");
+    //if (f_hc == NULL) {
+    //LOG_FATAL("Error opening file 'buffer_hc.tmp' \n");
+    //}
+  
     sw_input.f_sa = f_sa;
     sw_input.f_hc = f_hc;
 
