@@ -68,7 +68,7 @@ DOWNLOAD and BUILDING
 RUNING
 -------
 	
-  For run HPG Multi Aligner Framework , you must select first 'dna/rna' mode, next with '-c' command, select the command line of the mapper with '%I' for input file and '%O' for output file or output path. After that, select the input file with '-f' and output with '-o', if the mapper needs a temporal file to write the partial output, you can indicate it with the option '--tmp-file', and if you want to write the partial output in a temporal path (hard disk of the nodes) you can indicate it with the option '--tmp-path'. For RNA mode, you must indicate with '-i' option the path for BWT_INDEX or SA_INDEX of HPG Aligner.
+  For run HPG Multi Aligner Framework , you must select first 'dna/rna' mode, next with '-c' command, select the command line of the mapper with '%I' for input file and '%O' for output file or output path. After that, select the input file with '-f' and output with '-o', if the mapper needs a temporal file to write the partial output, you can indicate it with the option '--tmp-file', and if you want to write the partial output in a temporal path (hard disk of the nodes) you can indicate it with the option '--tmp-path'. For RNA mode, you must indicate with '-i' option the path for BWT INDEX or SA INDEX of HPG Aligner.
   
   Example, run with DNA, Bowtie and two nodes:
 
