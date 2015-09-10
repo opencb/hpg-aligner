@@ -14,7 +14,7 @@ CONTACT
 ------- 
   You can contact any of the following developers:
 
-    * Héctor Martínez (martih@neuji.es)
+    * Héctor Matínez (martneh@uji.es)
 
 
 DOWNLOAD and BUILDING
