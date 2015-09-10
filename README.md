@@ -72,35 +72,35 @@ RUNING
   
   Example, run with DNA, Bowtie and two nodes:
 
-    mpirun -np 3 -hosts compute-0,compute-1,compute-0 ./bin/hpg-multialigner dna -c "bowtie2 -p 16 -S %O -x /work/user/genomes/bowtie/hs.73 %I" -f /work/user/datasets/40M_300nt_r0.001.bwa.read1.fastq -o /work/user/final-ouput --tmp-path /tmp/patial-output --tmp-file partial-alignments.sam
+    $ mpirun -np 3 -hosts compute-0,compute-1,compute-0 ./bin/hpg-multialigner dna -c "bowtie2 -p 16 -S %O -x /work/user/genomes/bowtie/hs.73 %I" -f /work/user/datasets/40M_300nt_r0.001.bwa.read1.fastq -o /work/user/final-ouput --tmp-path /tmp/patial-output --tmp-file partial-alignments.sam
 
   Example, run with RNA, Tophat and two nodes:
 
-    mpirun -np 3 -hosts compute-0,compute-1,compute-0 ./bin/hpg-multialigner rna -c "tophat2 --no-convert-bam -p 16 --no-sort-bam -o %O /work/genomes/bowtie/hs.73 %I" -i /work/user/bwt-index/ -f /work/user/datasets/10M_100nt_r0.001.rna.fastq -o /work/user/tophat.out --tmp-path /work/user/partial-output
+    $ mpirun -np 3 -hosts compute-0,compute-1,compute-0 ./bin/hpg-multialigner rna -c "tophat2 --no-convert-bam -p 16 --no-sort-bam -o %O /work/genomes/bowtie/hs.73 %I" -i /work/user/bwt-index/ -f /work/user/datasets/10M_100nt_r0.001.rna.fastq -o /work/user/tophat.out --tmp-path /work/user/partial-output
 
   If you want process with the second phase to improve the alignments results, you can activate this with '--second-phase' option. The reads no mapped or incompleted mapped will be remapped with HPG Aligner, if you want other mapper you can indicate this with '--second-command' option.
 
   Example, run with RNA, Tophat, second phase and two nodes:
 
-    mpirun -np 3 -hosts compute-0,compute-1,compute-0 ./bin/hpg-multialigner rna -c "tophat2 --no-convert-bam -p 16 --no-sort-bam -o %O /work//genomes/bowtie/hs.73 %I" -i /work/user/bwt-index/ -f /work/user/datasets/10M_100nt_r0.001.rna.fastq -o /work/user/tophat.out --tmp-path /work/user/partial-output --second-phase
+    $ mpirun -np 3 -hosts compute-0,compute-1,compute-0 ./bin/hpg-multialigner rna -c "tophat2 --no-convert-bam -p 16 --no-sort-bam -o %O /work//genomes/bowtie/hs.73 %I" -i /work/user/bwt-index/ -f /work/user/datasets/10M_100nt_r0.001.rna.fastq -o /work/user/tophat.out --tmp-path /work/user/partial-output --second-phase
 
   Example, run with RNA, Tophat, second phase with other mapper and two nodes:
 
-    mpirun -np 3 -hosts compute-0,compute-1,compute-0 ./bin/hpg-multialigner rna -c "tophat2 --no-convert-bam -p 16 --no-sort-bam -o %O /work//genomes/bowtie/hs.73 %I" -i /work/user/bwt-index/ -f /work/user/datasets/10M_100nt_r0.001.rna.fastq -o /work/user/tophat.out --tmp-path /work/user/partial-output --second-phase --second-command "python mapsplice.py -c /work/user/gneomes/map_splice/ -x /work/user/genomes/map_splice/hs.73 -1 %I -p 16 -o %O" 
+    $ mpirun -np 3 -hosts compute-0,compute-1,compute-0 ./bin/hpg-multialigner rna -c "tophat2 --no-convert-bam -p 16 --no-sort-bam -o %O /work//genomes/bowtie/hs.73 %I" -i /work/user/bwt-index/ -f /work/user/datasets/10M_100nt_r0.001.rna.fastq -o /work/user/tophat.out --tmp-path /work/user/partial-output --second-phase --second-command "python mapsplice.py -c /work/user/gneomes/map_splice/ -x /work/user/genomes/map_splice/hs.73 -1 %I -p 16 -o %O" 
 
 
   For generate HPG SA Index:
 
-  $./bin/hpg-aligner build-sa-index -g /hpg/genome/human/GRCH_37_ens73.fa -i /tmp/sa-index-human73/ 
+    $ ./bin/hpg-aligner build-sa-index -g /hpg/genome/human/GRCH_37_ens73.fa -i /tmp/sa-index-human73/ 
 
   For generate HPG BWT Index:
 
-  $./bin/hpg-aligner build-bwt-index -g /home/user/Homo_sapiens.fa -i /home/user/INDEX/  -r 8
+    $ ./bin/hpg-aligner build-bwt-index -g /home/user/Homo_sapiens.fa -i /home/user/INDEX/  -r 8
 
 ATENTION: 
      Mvapich2 has an incompatibility with tcmalloc. You can install mvapich2 with "--disable-registration-cache" option or before you run HPG Aligner mpi do:
 
-     	 $ export MV2_USE_LAZY_MEM_UNREGISTER=0
+    $ export MV2_USE_LAZY_MEM_UNREGISTER=0
 
 
   If you compile MPI HPG Multi Aligner Framework without tcmalloc the perferomance will be degraded
