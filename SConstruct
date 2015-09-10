@@ -36,6 +36,10 @@ env = Environment(tools = ['default', 'packaging'],
 		  LIBS = ['m', 'z', 'bioinfo', 'common'],
                   LINKFLAGS = ['-fopenmp'])
 
+env['CPPPATH'] += ["/home/user/gperftools-2.4-icc/include/"]
+env['LIBPATH'] += ['/home/user/gperftools-2.4-icc/lib/']
+env['LIBS']    += ["tcmalloc"]
+
 compiler_index = ARGUMENTS.get('compiler', 'gcc')
 #compiler_index = 'icc'
 
