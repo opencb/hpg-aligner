@@ -2535,7 +2535,8 @@ int hpg_multialigner_main(int argc, char *argv[]) {
     
 	  size_t len_cli = 0;
 	  unsigned char find_mark = 0, first_out = 0;
-  
+	  first_in = 0;
+	  
 	  //if (rank == 0) {
 	  char *str = second_cli;
 	  char *pch;
@@ -2626,7 +2627,8 @@ int hpg_multialigner_main(int argc, char *argv[]) {
       
 	size_t len_cli = 0;
 	unsigned char find_mark = 0, first_out = 0;
-      
+	first_in = 0;
+	
 	//if (rank == 0) {
 	char *str = second_cli;
 	char *pch;
@@ -2856,6 +2858,8 @@ int hpg_multialigner_main(int argc, char *argv[]) {
       }
     }
   }
+
+  MPI_Barrier(MPI_COMM_WORLD);
   
   if (rank != numprocs) {    
     if (mapper_mode == RNA_MODE) {
