@@ -481,12 +481,6 @@ int split_input_file(char *fq_str, char *tmp_path, int numprocs) {
   FILE *fq_file = fopen(fq_str, "r");
   if (!fq_file) { printf("ERROR opening file\n"); exit(-1); }
 
-  //Prepare PATH tmp files
-  char cmd[2048];
-  sprintf(cmd, "rm -rf %s", tmp_path);
-  system(cmd);  
-  create_directory(tmp_path);
-
   //Calculate the number of reads per file
   int reads_split;
   size_t reads_positions[numprocs + 1];
@@ -1482,7 +1476,15 @@ int hpg_multialigner_main(int argc, char *argv[]) {
   int nfiles;  
   int ntasks, extra_tasks;
 
-  size_t read_positions[numprocs];
+  size_t read_positions[numprocs + 1];
+
+  if (rank == 0) {
+    //Prepare PATH tmp files
+    char cmd[2048];
+    sprintf(cmd, "rm -rf %s", tmp_input_path);
+    system(cmd);  
+    create_directory(tmp_input_path);
+  }
   
   if (enable_fifo) {
     
@@ -1523,7 +1525,7 @@ int hpg_multialigner_main(int argc, char *argv[]) {
       
     } //rank == 0
 
-    MPI_Bcast(read_positions, sizeof(size_t)*numprocs, MPI_CHAR, 0, MPI_COMM_WORLD);
+    MPI_Bcast(read_positions, sizeof(size_t)*(numprocs + 1), MPI_CHAR, 0, MPI_COMM_WORLD);
     
   } else {
     if (rank == 0) {
