@@ -1747,7 +1747,7 @@ int hpg_multialigner_main(int argc, char *argv[]) {
   sa_wf_input_t *sa_wf_input;      
   FILE *f_sa, *f_hc;
   batch_t *batch;
-  int tag;
+  int tag = 1;
   //batch_buffer_t *data_out;      
   sa_rna_input_t sa_rna;
   
