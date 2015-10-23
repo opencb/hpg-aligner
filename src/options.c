@@ -13,6 +13,7 @@ options_t *options_new(void) {
   size_t num_cores = 0;
   
   //======================= COMMON OPTIONS ====================
+  options->reader_fifo = 0;
   options->version = 0;
   options->in_filename = NULL;
   options->in_filename2 = NULL;
@@ -559,7 +560,8 @@ void** argtable_options_new(int mode) {
   argtable[count++] = arg_file0(NULL, "tmp-path", NULL, "Temporal output path for mapper");
   argtable[count++] = arg_file0(NULL, "second-tmp-file", NULL, "Temporal output file for second mapper. Only the name!");
   argtable[count++] = arg_file0(NULL, "second-tmp-path", NULL, "Temporal output path for second mapper");
-
+  argtable[count++] = arg_lit0(NULL, "fifo-enable", "Enable FIFO input mode to improve the performance");
+  
   argtable[num_options] = arg_end(count);
      
   return argtable;
@@ -687,6 +689,8 @@ options_t *read_CLI_options(void **argtable, options_t *options) {
     options->second_tmp_path  = strdup(*(((struct arg_file*)argtable[count])->filename)); 
   } 
 
+  if (((struct arg_int*)argtable[++count])->count) { options->reader_fifo = ((struct arg_int*)argtable[count])->count; }
+  
   return options;
 
 }

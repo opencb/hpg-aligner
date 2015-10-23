@@ -62,7 +62,7 @@
 //========================================================================
 
 
-#define NUM_OPTIONS			35
+#define NUM_OPTIONS			36
 #define NUM_RNA_OPTIONS			 5
 #define NUM_DNA_OPTIONS			 1
 
@@ -117,6 +117,7 @@ typedef struct options {
   int set_bam_format;
   int adapter_length;
   int set_cal;
+  int reader_fifo;
   double min_score;
   double match;
   double mismatch;

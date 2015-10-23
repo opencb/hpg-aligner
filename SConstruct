@@ -36,9 +36,9 @@ env = Environment(tools = ['default', 'packaging'],
 		  LIBS = ['m', 'z', 'bioinfo', 'common'],
                   LINKFLAGS = ['-fopenmp'])
 
-env['CPPPATH'] += ["/home/user/gperftools-2.4-icc/include/"]
-env['LIBPATH'] += ['/home/user/gperftools-2.4-icc/lib/']
-env['LIBS']    += ["tcmalloc"]
+#env['CPPPATH'] += ["/home/user/gperftools-2.4-icc/include/"]
+#env['LIBPATH'] += ['/home/user/gperftools-2.4-icc/lib/']
+#env['LIBS']    += ["tcmalloc"]
 
 compiler_index = ARGUMENTS.get('compiler', 'gcc')
 #compiler_index = 'icc'
@@ -55,8 +55,9 @@ env_index = Environment(tools = ['default', 'packaging'],
 
 
 env['CFLAGS']  += ' -D_MPI'
-#env['LIBS']    += ["tcmalloc_minimal"]
-#env['LIBPATH'] += ['/home/hmartinez/gperftools-install/lib/']
+env['CPPPATH'] += ['/home/castillo/HECTOR_BIO/Software/gperftools-install/include/']
+env['LIBS']    += ["tcmalloc_minimal"]
+env['LIBPATH'] += ['/home/castillo/HECTOR_BIO/Software/gperftools-install/lib/']
    
 
 

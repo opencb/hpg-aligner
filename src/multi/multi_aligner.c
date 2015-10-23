@@ -1091,6 +1091,75 @@ void genome_fasta(char *path) {
 */
 
 
+typedef struct th_data {
+  int    numprocs;
+  char   file_in[1024];
+  char   FIFO_name[1024];
+  size_t start_pos;
+  size_t end_pos;
+} th_data_t;
+
+
+void producer_fifo(void *data) {  
+
+  //printf("open file\n");
+  th_data_t *th = (th_data_t *)data;
+  
+  char *FIFO_name   = (char *)th->FIFO_name;
+  char *file_in     = (char *)th->file_in;
+  size_t start_seek = th->start_pos;
+  size_t end_seek   = th->end_pos;
+  
+  FILE *fd_in = fopen(file_in, "r");
+  int fd_fifo = open(FIFO_name, O_WRONLY);  
+
+  //Start read pointer for this rank
+  fseek(fd_in, start_seek, SEEK_SET);
+  
+  char str[MAX_READ_ID_LENGTH];
+  size_t str_len;
+
+  //Reader File  
+  while ((start_seek < end_seek) &&
+	 (fgets(str, MAX_READ_ID_LENGTH, fd_in) != NULL)) {    
+
+    //Header
+    str_len = strlen(str);
+    //printf("%s", str);
+    write(fd_fifo, str, str_len);
+    start_seek += str_len;
+
+    //Sequence
+    fgets(str, MAX_READ_ID_LENGTH, fd_in);
+    //printf("%s", str);
+    str_len = strlen(str);
+    write(fd_fifo, str, str_len);
+    start_seek += str_len;
+
+    //Header
+    fgets(str, MAX_READ_ID_LENGTH, fd_in);
+    //printf("%s", str);
+    str_len = strlen(str);
+    write(fd_fifo, str, str_len);
+    start_seek += str_len;
+
+    //Quality
+    fgets(str, MAX_READ_ID_LENGTH, fd_in);
+    //printf("%s", str);
+    str_len = strlen(str);
+    write(fd_fifo, str, str_len);
+    start_seek += str_len;
+
+  }
+
+  printf("End File\n");
+  
+  close(fd_fifo);
+  fclose(fd_in);
+  
+}
+
+
 int hpg_multialigner_main(int argc, char *argv[]) {
 
   int numprocs;
@@ -1224,7 +1293,6 @@ int hpg_multialigner_main(int argc, char *argv[]) {
     }
   }
 
-
   if (!options->in_filename) {
     if (rank == 0) {
       printf("Filename input is missing. Please, insert it with option '-f FILENAME'.\n");
@@ -1349,6 +1417,8 @@ int hpg_multialigner_main(int argc, char *argv[]) {
     }
   }
 
+  int enable_fifo = options->reader_fifo;
+  
   char *tmp_input_path;
 
   if (options->tmp_input == NULL) {
@@ -1366,7 +1436,8 @@ int hpg_multialigner_main(int argc, char *argv[]) {
   if (rank == 0) {
     printf("============================================================================================\n"); 
     printf("============================================================================================\n"); 
-    printf("MULTIALIGNER MODE       :   %s\n", mapper_mode == RNA_MODE ? "RNA" : "DNA"); 
+    printf("INPUT MODE              :   %s\n",  enable_fifo == 0 ? "NORMAL" : "FIFO");
+    printf("MULTIALIGNER MODE       :   %s\n",  mapper_mode == RNA_MODE ? "RNA" : "DNA"); 
     printf("MAPPER COMMAND LINE     :  '%s'\n", mapper_cli);
     printf("INPUT  FILE             :  '%s'\n", file_input);
     printf("TEMPORAL FILES FOR READ :  '%s'\n", tmp_input_path);
@@ -1404,27 +1475,73 @@ int hpg_multialigner_main(int argc, char *argv[]) {
   char *cli_end;
   unsigned char first_in = 0;
 
+  char FIFO_name[strlen(tmp_input_path) + 1024];
   
   //if (rank != numprocs) {    
   //================ First split input File ====================//
   int nfiles;  
   int ntasks, extra_tasks;
+
+  size_t read_positions[numprocs];
   
-  if (rank == 0) {
-    start_timer(time_start);
-    printf("[%i] Spliting input file...\n", rank);
-    nfiles = split_input_file(file_input, tmp_input_path, numprocs);
-    stop_timer(time_start, time_stop, time_split);
-    printf("[%i] Spliting END! (%0.2f s)\n", rank, time_split);
-  }
+  if (enable_fifo) {
+    
+    if (rank == 0) {
+      
+      FILE *fd_tmp = fopen(file_input, "r");
+      if (!fd_tmp) { printf("ERROR opening file\n"); exit(-1); }
+
+      fseek(fd_tmp, 0L, SEEK_END);
+      size_t fd_total_bytes = ftell(fd_tmp);
+      fseek(fd_tmp, 0L, SEEK_SET);
+
+      int i;
+      size_t seek_bytes = 0;
+      //printf("%lu / %lu\n", fd_total_bytes, numprocs);
+      
+      size_t inc_bytes = fd_total_bytes / (numprocs); //Change if more process were created
+      size_t offset;
+      char line[2048];
+
+      for (i = 0; i < numprocs; i++) {
+	offset = 0;
+	fseek(fd_tmp, seek_bytes, SEEK_SET);
+	fgets(line, 2048, fd_tmp);
+	while (line[0] != '@') {
+	  offset += strlen(line);
+	  fgets(line, 2048, fd_tmp);
+	}
+	seek_bytes += offset;
+	read_positions[i] = seek_bytes;
+	seek_bytes += inc_bytes;
+      }
+      read_positions[i] = fd_total_bytes;
+      fclose(fd_tmp);
+      //===================================================================//
+      //                                                                   //
+      //===================================================================//
+      
+    } //rank == 0
+
+    MPI_Bcast(read_positions, sizeof(size_t)*numprocs, MPI_CHAR, 0, MPI_COMM_WORLD);
+    
+  } else {
+    if (rank == 0) {
+      start_timer(time_start);
+      printf("[%i] Spliting input file...\n", rank);
+      nfiles = split_input_file(file_input, tmp_input_path, numprocs);
+      stop_timer(time_start, time_stop, time_split);
+      printf("[%i] Spliting END! (%0.2f s)\n", rank, time_split);
+    }
   
-  MPI_Bcast(&nfiles, 1, MPI_INT, 0, MPI_COMM_WORLD);
-  
-  ntasks = nfiles / numprocs;
-  extra_tasks = nfiles % numprocs;
-  
-  if (rank < extra_tasks) {
-    ntasks++;
+    MPI_Bcast(&nfiles, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    
+    ntasks = nfiles / numprocs;
+    extra_tasks = nfiles % numprocs;
+    
+    if (rank < extra_tasks) {
+      ntasks++;
+    }
   }
   //============================================================//
 
@@ -1507,7 +1624,7 @@ int hpg_multialigner_main(int argc, char *argv[]) {
       create_directory(path_out_tmp);
 
     }
-
+    
     sprintf(path_out_tmp, "%s/%i.out/", path_tmp, rank);
 
     char cmd[strlen(path_out_tmp) + 1024];
@@ -1548,16 +1665,72 @@ int hpg_multialigner_main(int argc, char *argv[]) {
       sprintf(mapper_run, "%s %s %s %s/%i.tmp %s", cli_out, node_out, cli_in, tmp_input_path, rank, cli_end);
     }
 
-    //printf("==========================================================================\n");
-    start_timer(time_start);
-    system(mapper_run);
-    stop_timer(time_start, time_stop, time_mapping);
-    //printf("==========================================================================\n");
+
+    if (enable_fifo) {
+      ////////////////// ULTRA FAST MODE (WITH FIFO) //////////////////////////////
+
+      sprintf(FIFO_name, "%s/%i.tmp", tmp_input_path, rank);
+      mkfifo(FIFO_name, 0666);
+
+      th_data_t th;      
+      th.numprocs = numprocs;
+      strcpy(th.file_in, file_input);
+      strcpy(th.FIFO_name, FIFO_name);
+      th.start_pos = read_positions[rank];
+      th.end_pos   = read_positions[rank + 1];
+      
+      pthread_t thread;
+      pthread_attr_t attr;
+      int ret;
+      
+      pthread_attr_init(&attr);
+      pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+      
+      if (ret = pthread_create(&thread, &attr, producer_fifo, (void *)&th)) {
+	printf("ERROR; return code from pthread_create() is %d\n", ret);
+	exit(-1);
+      }
+      
+      //int fd_read = open(FIFO_name, O_RDONLY);
+      //printf("%s\n", mapper_run);
+      system(mapper_run);
+      //close(fd_read);
+
+      //char buf[1024];
+      //read(fd_read, buf, 1024);
+      //printf("Received: %s\n", buf);
+      //
+      //char buf[2048];
+      //int r;
+      //while ((r = read(fd_read, buf, 2048)) > 0) {
+      //printf("%s", buf);
+      //}
+            
+      void *status;
+      pthread_attr_destroy(&attr);
+      if (ret = pthread_join(thread, &status)) {
+	printf("ERROR; return code from pthread_join() is %d\n", ret);
+	exit(-1);     
+      }
+      
+      unlink(FIFO_name);      
+      
+    } else {    
+      ////////////////// NORMAL MODE (WITHOUT FIFO) //////////////////////////////      
+      start_timer(time_start);
+      system(mapper_run);
+      stop_timer(time_start, time_stop, time_mapping);
+    }
     
-    //printf("@@@@ [%i] (%0.2f): %s\n", rank, time_mapping / 1000000, mapper_run);
-    //====================================================================================//
   }
 
+  //MPI_Barrier(MPI_COMM_WORLD);
+  //printf("END Process\n");
+  //MPI_Barrier(MPI_COMM_WORLD);
+  //exit(-1);
+  
+  //-------------------------------------------------------------------------------------------->
+  
   int num_chromosomes;
   metaexons_t *metaexons = NULL;
   avls_list_t* avls_list = NULL;
