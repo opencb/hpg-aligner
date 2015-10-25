@@ -62,7 +62,7 @@
 //========================================================================
 
 
-#define NUM_OPTIONS			36
+#define NUM_OPTIONS			37
 #define NUM_RNA_OPTIONS			 5
 #define NUM_DNA_OPTIONS			 1
 
@@ -118,13 +118,14 @@ typedef struct options {
   int adapter_length;
   int set_cal;
   int reader_fifo;
+  int second_phase;
+  int fast_merge;
   double min_score;
   double match;
   double mismatch;
   double gap_open;
   double gap_extend;  
   char str_mode[32];
-  int second_phase;
   char* prefix_name;
   char* in_filename;
   char* in_filename2;

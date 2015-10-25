@@ -3,6 +3,7 @@
 #define TMP_PATH     "TMP_FILES"
 #define OUTPUT_PATH  "MPI_output"
 
+#define NONE_FILE -1
 #define SAM_FILE 1
 #define BAM_FILE 2
 
@@ -57,7 +58,7 @@ int mapper_mode;
 
 
 void sa_index3_parallel_genome_new(char *sa_index_dirname, int num_threads,
-				   sa_index3_t **sa_index_out, genome_t **genome_out) {  
+				   sa_index3_t **sa_index_out) {  
 
   float load_progress = 0.0;
 
@@ -357,6 +358,7 @@ void sa_index3_parallel_genome_new(char *sa_index_dirname, int num_threads,
 
 	pthread_mutex_unlock(&mutex_sp);
 
+	/*
 	genome_ = genome_new("dna_compression.bin", sa_index_dirname, SA_MODE);	
 
 	genome_->num_chromosomes = num_chroms;
@@ -371,7 +373,7 @@ void sa_index3_parallel_genome_new(char *sa_index_dirname, int num_threads,
 	  genome_->chr_offset[c] = offset;
 	  offset += genome_->chr_size[c];
 	}
-	
+	*/
 	pthread_mutex_lock(&mutex_sp);
 	load_progress += 3.5;
 
@@ -402,7 +404,7 @@ void sa_index3_parallel_genome_new(char *sa_index_dirname, int num_threads,
     p->genome = genome;
     
     *sa_index_out = p;
-    *genome_out = genome_;
+    //*genome_out = genome_;
     
     return;
     
@@ -799,8 +801,8 @@ int align_to_file(int line_format, char *align_str, char *align_tmp, FILE *fd_bu
 	  }
 
 	  //if (report) {
-	  //printf("Insert SJ\n");
-	
+	  //printf("Insert SJ: %lu - %lu\n", sj_start, sj_end);
+	  
 	  allocate_start_node(chromosome - 1,
 			      sj_strand,
 			      sj_start,
@@ -817,7 +819,13 @@ int align_to_file(int line_format, char *align_str, char *align_tmp, FILE *fd_bu
 	  exon_start = exons_array[pos] + 1;
 	  exon_end = sj_start - 1;
 	  //printf("Meta-L: %lu - %lu\n", exon_start, exon_end);
-	
+
+	  if (exon_end < exon_start) {
+	    printf("%s", align_tmp);
+	    printf("META-ERR: %lu - %lu\n", exon_start, exon_end);
+	    exit(-1);
+	  }
+
 	  metaexon_insert(strand, chromosome - 1,
 			  exon_start, exon_end, 40,
 			  METAEXON_RIGHT_END, node_avl_start,
@@ -828,7 +836,11 @@ int align_to_file(int line_format, char *align_str, char *align_tmp, FILE *fd_bu
 	  exon_end   = exons_array[pos + 3];
 	  //printf("Meta-R: %lu - %lu\n", exon_start, exon_end);
 	
-	  
+	  if (exon_end < exon_start) {
+	    printf("%s", align_tmp);
+	    printf("META-ERR: %lu - %lu\n", exon_start, exon_end);
+	    exit(-1);
+	  }	  
 	  metaexon_insert(strand, chromosome - 1,
 			  exon_start, exon_end, 40,
 			  METAEXON_LEFT_END, node_avl_end,
@@ -1093,7 +1105,6 @@ typedef struct th_data {
   size_t end_pos;
 } th_data_t;
 
-
 void producer_fifo(void *data) {  
 
   //printf("open file\n");
@@ -1153,6 +1164,189 @@ void producer_fifo(void *data) {
   
 }
 
+//---------------------------------------------------
+
+typedef struct merge_partial {
+  pthread_mutex_t mutex;
+  int end_process;
+  int second_phase;
+  int w_rank;
+  FILE *fd_buffer;
+  avls_list_t *avls_list;
+  metaexons_t *metaexons;
+  genome_t *genome;
+  char buffer_node_out[2048];
+} merge_partial_t;
+
+
+void partial_results_merge(void *data) {
+  //Search files in path
+  merge_partial_t *merge_p = (merge_partial_t *)data;
+  int err_exit = 0;
+  DIR *dir;
+  struct dirent *ent;
+  array_list_t *files_found  = array_list_new(10, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
+  array_list_t *files_type   = array_list_new(10, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
+  
+  //Buffer MPI
+  char line[4096];
+  char line_tmp[4096];
+  char line_strtok[4096];
+  
+  FILE *fd_buffer  = merge_p->fd_buffer;
+  int second_phase = merge_p->second_phase; 
+  avls_list_t *avls_list = merge_p->avls_list;
+  metaexons_t *metaexons = merge_p->metaexons;
+  genome_t *genome = merge_p->genome;
+  int w_rank = merge_p->w_rank;
+  
+  //------- Buffer MPI -------//
+  size_t len_buffer = 0;
+  char *buffer = (char *)malloc(MAX_BUFFER*sizeof(char));
+  //------- Buffer MPI -------//
+  
+  while ((dir = opendir(merge_p->buffer_node_out)) == NULL) {
+    
+    sleep(1);
+    
+    pthread_mutex_lock(&merge_p->mutex);
+    if (merge_p->end_process) {
+      err_exit = 1;
+    }
+    pthread_mutex_unlock(&merge_p->mutex);
+    
+    if (err_exit) {
+      printf("PATH OF PARTIAL RESULTS NOT FOUND\n");
+      exit(-1);
+    }    
+  }
+  
+  printf("THREAD MERGE CAN OPEN RESULTS DIR\n");
+  int itr = -1;
+  while (1) {
+    //close dir and open dir each iteration ???
+    itr++;
+    while ((ent = readdir (dir)) != NULL) {
+      int type;
+
+      //printf ("\t[%i] %s, type = %i\n", itr, ent->d_name, type);
+      
+      if (strstr(ent->d_name, "sam") != NULL) {
+	type = SAM_FILE;
+      } else if (strstr(ent->d_name, "bam") != NULL) {
+	type = BAM_FILE;
+      } else {
+	type = NONE_FILE;	
+      }
+
+      if (type == SAM_FILE) {
+	int insert = 1;
+	for (int j = 0; j < array_list_size(files_found); j++) {
+	  char *name = array_list_get(j, files_found);	
+	  if (strcmp(ent->d_name, name) == 0) {
+	    insert = 0;
+	    break;
+	  }
+	}
+	
+	if (insert) {
+	  array_list_insert(strdup(ent->d_name), files_found);
+	  //READ FILE AND MERGE
+	  char file_path[strlen(ent->d_name) + strlen(merge_p->buffer_node_out) + 1024];
+	  sprintf(file_path, "%s/%s", merge_p->buffer_node_out, ent->d_name);
+	  
+	  printf("//-------------------> Reading %s file and merge...\n", file_path);
+	  
+	  FILE *fd = fopen(file_path, "r");
+	  size_t fd_total_bytes = 0;
+	  int br = 0;
+	  int seek_activated = 0;
+	  while (!fd_total_bytes) {
+	    fseek(fd, 0L, SEEK_END);
+	    fd_total_bytes = ftell(fd);
+	  }
+	  fseek(fd, 0L, SEEK_SET);
+	  printf("File contains somthing!\n");
+	  
+	  while (1) {
+	    if (fgets(line, 4096, fd) != NULL) {
+	      if (line[0] != '@') {
+
+		if (seek_activated) {
+		  printf("LINE: %s", line);
+		  seek_activated = 0;
+		}
+		
+		if (line[strlen(line) - 1] != '\n') {
+		  printf("ERROR READING: %s\n", line);
+		  fseek(fd, -1*strlen(line), SEEK_CUR);
+		  seek_activated = 1;
+		  sleep(2);
+		  continue;
+		}
+		
+		strcpy(line_strtok, line);
+		strcpy(line_tmp, line);
+	      
+		if (align_to_file(SAM_FILE, line_strtok, line_tmp, fd_buffer, second_phase,
+				  avls_list, metaexons, genome, NULL, NULL, NULL)) {
+		  if (len_buffer + strlen(line) >= MAX_BUFFER) {
+		    MPI_Send(buffer, MAX_BUFFER, MPI_CHAR, w_rank, 1, MPI_COMM_WORLD);
+		    len_buffer = 0;
+		  }
+		  strcpy(&buffer[len_buffer], line);
+		  len_buffer += strlen(line);	  
+		}
+	      }
+	    }
+
+	    pthread_mutex_lock(&merge_p->mutex);
+	    if (merge_p->end_process && feof(fd)) {
+	      br = 1;
+	    }
+	    pthread_mutex_unlock(&merge_p->mutex);
+
+	    if (br) { break; }
+	    
+	  }
+	  
+	  printf("\nFINISHED READ\n");
+	  
+	}	
+      }
+    } //Loop files in Dir...
+
+    //printf("Out files in dir...\n");
+    pthread_mutex_lock(&merge_p->mutex);
+    if (merge_p->end_process) {
+      printf("THREAD MERGE END\n");
+      closedir(dir);
+      break;
+    }
+    pthread_mutex_unlock(&merge_p->mutex);    
+
+    closedir(dir); 
+    if ((dir = opendir(merge_p->buffer_node_out)) == NULL) {
+      printf("ERROR OPENING RESULTS DIRECTORY\n");
+      exit(-1);
+    }
+
+  } //Close While(1)
+  
+  
+  if (len_buffer) {
+    MPI_Send(buffer, MAX_BUFFER, MPI_CHAR, w_rank, 1, MPI_COMM_WORLD);
+  }
+  
+  strcpy(buffer, "END");
+  MPI_Send(buffer, MAX_BUFFER, MPI_CHAR, w_rank, 1, MPI_COMM_WORLD);  
+      
+  fclose(fd_buffer);    
+  
+  
+}
+
+
 
 int hpg_multialigner_main(int argc, char *argv[]) {
 
@@ -1172,13 +1366,37 @@ int hpg_multialigner_main(int argc, char *argv[]) {
   double time_mapping = 0.0;
   double time_merge   = 0.0;
   double time_total   = 0.0;  
-
+  
   MPI_Init(&argc, &argv);
   
   MPI_Comm_size(MPI_COMM_WORLD, &numprocs);
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Get_processor_name(processor_name, &name_len);  
-  
+
+
+  int num_chromosomes;
+  metaexons_t *metaexons = NULL;
+  avls_list_t* avls_list = NULL;
+  int fast_mode;
+  bwt_index_t *bwt_index = NULL;
+  sa_index3_t *sa_index = NULL;
+  genome_t *genome = NULL;
+  sa_wf_batch_t *sa_wf_batch;      
+  workflow_t *wf;          
+  workflow_SA_t *sa_wf;
+  wf_input_t *wf_input;
+  sa_wf_input_t *sa_wf_input;      
+  FILE *f_sa, *f_hc;
+  batch_t *batch;
+  int tag = 1;
+  //batch_buffer_t *data_out;      
+  sa_rna_input_t sa_rna;
+
+    
+  //printf("[%i]MERGE DATA, tmp %s\n", rank, buffer_path);
+    
+  size_t nlines = 0;  
+
   //printf("[%i/%i] %s\n", rank, numprocs, processor_name);
 
   ////////////////////////////////// MULTI ALIGNER VALIDATE //////////////////////////////////////////
@@ -1412,6 +1630,7 @@ int hpg_multialigner_main(int argc, char *argv[]) {
   }
 
   int enable_fifo = options->reader_fifo;
+  int fast_merge  = options->fast_merge;
   
   char *tmp_input_path;
 
@@ -1423,14 +1642,23 @@ int hpg_multialigner_main(int argc, char *argv[]) {
   
   sprintf(file_output, "%s/%s", path_output, "alignments.sam");
   sprintf(exact_filename, "%s/%s", path_output, "SJ.bed");
-  
+
+  char buffer_node_out[strlen(path_tmp) + 1024];
+  char *buffer = (char *)malloc(sizeof(char)*MAX_BUFFER);
+  size_t len_buffer = 0;
+  FILE *fd_buffer;
+  char buffer_path[strlen(buffer_node_out) + 1024];
+  char line[4096], line_strtok[4096], line_tmp[4096];
+  linked_list_t *buffer_no_map = linked_list_new(COLLECTION_MODE_ASYNCHRONIZED);
+
 
   FILE *fd_out;
   
   if (rank == 0) {
     printf("============================================================================================\n"); 
     printf("============================================================================================\n"); 
-    printf("INPUT MODE              :   %s\n",  enable_fifo == 0 ? "NORMAL" : "FIFO");
+    printf("INPUT ALIGNERS MODE     :   %s\n",  enable_fifo == 0 ? "NORMAL" : "FIFO");
+    printf("MERGE RESULTS MODE      :   %s\n",  fast_merge == 0 ? "NORMAL" : "FAST");
     printf("MULTIALIGNER MODE       :   %s\n",  mapper_mode == RNA_MODE ? "RNA" : "DNA"); 
     printf("MAPPER COMMAND LINE     :  '%s'\n", mapper_cli);
     printf("INPUT  FILE             :  '%s'\n", file_input);
@@ -1482,14 +1710,14 @@ int hpg_multialigner_main(int argc, char *argv[]) {
     //Prepare PATH tmp files
     char cmd[2048];
     sprintf(cmd, "rm -rf %s", tmp_input_path);
-    system(cmd);  
+    system(cmd);
+    
     create_directory(tmp_input_path);
+    printf("create tmp path %s...\n", tmp_input_path);
   }
   
-  if (enable_fifo) {
-    
-    if (rank == 0) {
-      
+  if (enable_fifo) {    
+    if (rank == 0) {      
       FILE *fd_tmp = fopen(file_input, "r");
       if (!fd_tmp) { printf("ERROR opening file\n"); exit(-1); }
 
@@ -1547,6 +1775,34 @@ int hpg_multialigner_main(int argc, char *argv[]) {
   }
   //============================================================//
 
+
+  if ((rank != numprocs) && (mapper_mode == RNA_MODE)) {
+    printf("LOAD METAEXON FOR RNA...\n");
+    //*********** M E T A E X O N    B U I L D ***************//
+    //convert ASCII fill
+    convert_ASCII['a'] = 'T';
+    convert_ASCII['A'] = 'T';
+    
+    convert_ASCII['c'] = 'G';
+    convert_ASCII['C'] = 'G';
+    
+    convert_ASCII['g'] = 'C';
+    convert_ASCII['G'] = 'C';
+    
+    convert_ASCII['t'] = 'a';
+    convert_ASCII['T'] = 'A';
+    
+    convert_ASCII['n'] = 'N';
+    convert_ASCII['N'] = 'N';
+    
+    genome = genome_new("dna_compression.bin", options->bwt_dirname, BWT_MODE);      
+    num_chromosomes = genome->num_chromosomes;    
+    avls_list = avls_list_new(num_chromosomes);
+    metaexons = metaexons_new(num_chromosomes,
+			      genome->chr_size);
+  }
+  
+  
 
   //================= SPLIT INPUT CLI AND TRANSFORM IT ==========================//
   max_len_cli = strlen(mapper_cli) + strlen(path_output) + strlen(tmp_input_path) + 1024;
@@ -1611,7 +1867,7 @@ int hpg_multialigner_main(int argc, char *argv[]) {
     //system(cmd);
     create_directory(path_output);  
   }
-    
+  
 
   if (rank != numprocs) {
     char path_out_tmp[strlen(path_tmp) + 1024];
@@ -1619,9 +1875,9 @@ int hpg_multialigner_main(int argc, char *argv[]) {
     if (options->tmp_path) {
       sprintf(path_out_tmp, "%s", path_tmp);
 
-      //char cmd[strlen(path_out_tmp) + 1024];
-      //sprintf(cmd, "rm -rf %s", path_out_tmp);
-      //system(cmd);
+      char cmd[strlen(path_out_tmp) + 1024];
+      sprintf(cmd, "rm -rf %s", path_out_tmp);
+      system(cmd);
 
       create_directory(path_out_tmp);
 
@@ -1639,16 +1895,23 @@ int hpg_multialigner_main(int argc, char *argv[]) {
     
   
   //PROCESS FILES
-  MPI_Barrier(MPI_COMM_WORLD);
-  
-  
-  if (rank == numprocs) {
+  //MPI_Barrier(MPI_COMM_WORLD);
+
+  if (rank == 0) {
     fd_out = fopen(file_output, "w");
+    //=========== First write Header to file ===================//
+    fprintf(fd_out, "@PG\tID:HPG-Aligner\tVN:1.0\n");
+    for (int i = 0; i < genome->num_chromosomes; i++) {
+      fprintf(fd_out, "@SQ\tSN:%s\tLN:%lu\n", genome->chr_name[i], genome->chr_size[i] + 1);
+    }
+    fclose(fd_out);
   }
 
   MPI_Barrier(MPI_COMM_WORLD);
 
-  char buffer_node_out[strlen(path_tmp) + 1024];
+  if (rank == numprocs) {
+    fd_out = fopen(file_output, "a");
+  }
   
   if (rank != numprocs) {
     char *mapper_run = (char *)malloc(sizeof(char)*max_len_cli);
@@ -1660,6 +1923,7 @@ int hpg_multialigner_main(int argc, char *argv[]) {
     }
 
     sprintf(buffer_node_out, "%s/%i.out/", path_tmp, rank);
+    sprintf(buffer_path, "%s/reads_buffer.fq", buffer_node_out);
     
     if (first_in) {
       sprintf(mapper_run, "%s %s/%i.tmp %s %s %s", cli_in, tmp_input_path, rank, cli_out, node_out, cli_end);
@@ -1667,10 +1931,36 @@ int hpg_multialigner_main(int argc, char *argv[]) {
       sprintf(mapper_run, "%s %s %s %s/%i.tmp %s", cli_out, node_out, cli_in, tmp_input_path, rank, cli_end);
     }
 
+    
+    ////////////////// FAST MERGE ENABLE //////////////////////////////
+    pthread_t thread_merge;
+    pthread_attr_t attr_merge;
+    int ret_merge;
+    merge_partial_t merge_p;
+    
+    if (fast_merge) {
+      pthread_mutex_init(&merge_p.mutex, NULL);
+      merge_p.end_process = 0;
+      merge_p.w_rank = w_rank;
+      strcpy(merge_p.buffer_node_out, buffer_node_out);
+      merge_p.fd_buffer  = fopen(buffer_path, "w");
+      merge_p.second_phase = second_phase; 
+      merge_p.avls_list = avls_list;
+      merge_p.metaexons = metaexons;
+      merge_p.genome = genome;
 
+      pthread_attr_init(&attr_merge);
+      pthread_attr_setdetachstate(&attr_merge, PTHREAD_CREATE_JOINABLE);
+      
+      if (ret_merge = pthread_create(&thread_merge, &attr_merge, partial_results_merge, (void *)&merge_p)) {
+	printf("ERROR; return code from pthread_create() is %d\n", ret_merge);
+	exit(-1);
+      }      
+    }
+    ////////////////// FAST MERGE ENABLE //////////////////////////////
+
+    ////////////////// ULTRA FAST MODE (WITH FIFO) //////////////////////////////
     if (enable_fifo) {
-      ////////////////// ULTRA FAST MODE (WITH FIFO) //////////////////////////////
-
       sprintf(FIFO_name, "%s/%i.tmp", tmp_input_path, rank);
       mkfifo(FIFO_name, 0666);
 
@@ -1693,20 +1983,7 @@ int hpg_multialigner_main(int argc, char *argv[]) {
 	exit(-1);
       }
       
-      //int fd_read = open(FIFO_name, O_RDONLY);
-      //printf("%s\n", mapper_run);
       system(mapper_run);
-      //close(fd_read);
-
-      //char buf[1024];
-      //read(fd_read, buf, 1024);
-      //printf("Received: %s\n", buf);
-      //
-      //char buf[2048];
-      //int r;
-      //while ((r = read(fd_read, buf, 2048)) > 0) {
-      //printf("%s", buf);
-      //}
             
       void *status;
       pthread_attr_destroy(&attr);
@@ -1715,335 +1992,33 @@ int hpg_multialigner_main(int argc, char *argv[]) {
 	exit(-1);     
       }
       
-      unlink(FIFO_name);      
+      unlink(FIFO_name);
       
-    } else {    
+    } else { 
       ////////////////// NORMAL MODE (WITHOUT FIFO) //////////////////////////////      
       start_timer(time_start);
       system(mapper_run);
       stop_timer(time_start, time_stop, time_mapping);
+      ////////////////// NORMAL MODE (WITHOUT FIFO) ////////////////////////////// 
     }
-    
-  }
 
-  //MPI_Barrier(MPI_COMM_WORLD);
-  //printf("END Process\n");
-  //MPI_Barrier(MPI_COMM_WORLD);
-  //exit(-1);
-  
-  //-------------------------------------------------------------------------------------------->
-  
-  int num_chromosomes;
-  metaexons_t *metaexons = NULL;
-  avls_list_t* avls_list = NULL;
-  int fast_mode;
-  bwt_index_t *bwt_index = NULL;
-  sa_index3_t *sa_index = NULL;
-  genome_t *genome = NULL;
-  sa_wf_batch_t *sa_wf_batch;      
-  workflow_t *wf;          
-  workflow_SA_t *sa_wf;
-  wf_input_t *wf_input;
-  sa_wf_input_t *sa_wf_input;      
-  FILE *f_sa, *f_hc;
-  batch_t *batch;
-  int tag = 1;
-  //batch_buffer_t *data_out;      
-  sa_rna_input_t sa_rna;
-  
-  if ((rank != numprocs) && (mapper_mode == RNA_MODE)) {
-    printf("LOAD GENOME...\n");
-    //First, search the head files
-    //*************************** S E C O N D    P H A S E *******************************//
-    //convert ASCII fill
-    convert_ASCII['a'] = 'T';
-    convert_ASCII['A'] = 'T';
+    ////////////////// FAST MERGE ENABLE DESTROY THREAD //////////////////////////////
+    if (fast_merge) {
+      pthread_mutex_lock(&merge_p.mutex);
+      merge_p.end_process = 1;
+      pthread_mutex_unlock(&merge_p.mutex);
       
-    convert_ASCII['c'] = 'G';
-    convert_ASCII['C'] = 'G';
-      
-    convert_ASCII['g'] = 'C';
-    convert_ASCII['G'] = 'C';
-      
-    convert_ASCII['t'] = 'a';
-    convert_ASCII['T'] = 'A';
-      
-    convert_ASCII['n'] = 'N';
-    convert_ASCII['N'] = 'N';
-    
-    if (second_phase && !second_cli) {
-      //printf("Second\n");
-      
-      char filename_tab[strlen(options->bwt_dirname) + 1024];  
-      sprintf(filename_tab, "%s/params.info", options->bwt_dirname);
-      FILE *fd = fopen(filename_tab, "r");      
-
-      if (fd) { 
-	fast_mode = 1; 
-	fclose(fd);
-      } else { 
-	fast_mode = 0; 
-      }
-
-      if (hpg_enable) {
-	// genome parameters 
-	//printf("HPG ENABLE LOADING GENOME...\n");
-	if (!fast_mode) {
-	  //////////////// LOAD BWT INDEX //////////////////////    
-	  bwt_index = bwt_index_new(options->bwt_dirname, false);
-	  genome = genome_new("dna_compression.bin", options->bwt_dirname, BWT_MODE);  
-	  //////////////////////////////////////////////////////
-	} else {    
-	  ///////////////// LOAD SA INDEX ////////////////////// 
-	  sa_index3_parallel_genome_new(options->bwt_dirname, options->num_cpu_threads, &sa_index, &genome);	
-	}
-      }
-    } else {
-      //printf("Load dna...\n");
-      genome = genome_new("dna_compression.bin", options->bwt_dirname, BWT_MODE);  
-    }
-    
-    num_chromosomes = genome->num_chromosomes;
-      
-    //************************* M E T A E X O N    B U I L D *******************************//
-    avls_list = avls_list_new(num_chromosomes);
-    //if (options->transcriptome_filename != NULL) {
-    //load_transcriptome(options->transcriptome_filename, genome, avls_list, metaexons);
-    //}
-
-    //You can obtain the chr_size array reading fastq file header
-    metaexons = metaexons_new(num_chromosomes,
-			      genome->chr_size);
-    //**************************************************************************************//
-  }
-    
-  //====================================================================================//
-  // READ OUTPUT SAM
-  //printf("%s:\n", node_out);
-  if (rank != numprocs) {
-    DIR *dir;
-    struct dirent *ent;
-    files_found  = array_list_new(10, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
-    files_type   = array_list_new(10, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
-  
-    if ((dir = opendir (buffer_node_out)) != NULL) {
-      while ((ent = readdir (dir)) != NULL) {
-	//printf ("\t%s\n", ent->d_name);
-	if (strstr(ent->d_name, "sam") != NULL) {
-	  array_list_insert(strdup(ent->d_name), files_found);
-	  array_list_insert(SAM_FILE, files_type);
-	} else if (strstr(ent->d_name, "bam") != NULL) {
-	  array_list_insert(strdup(ent->d_name), files_found);
-	  array_list_insert(BAM_FILE, files_type);
-	}
-      }
-      closedir (dir);
-    } else {
-      printf("Directory not found\n");
-      exit(-1);
-    }
-  }
-  
-    /*
-      } else {
-      printf("Aqui file\n");
-      if (strstr(path_tmp, "sam") != NULL) {
-      printf("SAM file\n");
-      array_list_insert(strdup(path_tmp), files_found);
-      array_list_insert(SAM_FILE, files_type);
-      } else if (strstr(path_tmp, "bam") != NULL) {
-      array_list_insert(strdup(path_tmp), files_found);
-      array_list_insert(BAM_FILE, files_type);
-      }
-      }
-    */
-  //}
-
-  int head_found = 0;
-  //printf("PROCESS FILE %s\n", path_tmp);
-  if (rank == 0) {
-    //First, search the head files
-    for (int i = 0; i < array_list_size(files_found); i++) {
-      char *file = array_list_get(i, files_found);
-      int type   = array_list_get(i, files_type);
-      
-      char file_path[strlen(file) + strlen(node_out) + 1024];
-      sprintf(file_path, "%s/%s", buffer_node_out, file);
-      
-      char line[4096];
-      char *point;
-      size_t nlines = 0;
-      
-      if (type == SAM_FILE) {
-	FILE *fd = fopen(file_path, "r");
-	while (fgets(line, 4096, fd)) {
-	  if (line[0] == '@') {
-	    if (line[1] == 'S' && line[2]  == 'Q') {
-	      num_chromosomes_header++;
-	    }
-	    head_found = 1;
-	    strcpy(&head_buffer[len_head_buffer], line);
-	    len_head_buffer += strlen(line);
-	    if (len_head_buffer >= MAX_HEAD_BUFFER) {
-	      printf("ERROR MAX HEAD BUFFER OVERFLOW\n");
-	      exit(-1);
-	    }
-	  } else {
-	    break;
-	  }
-	  ///free(str);
-	} // End while
-	fclose(fd);
-      } else 	if (type == BAM_FILE) { 
-	//Read BAM
-	bam_file_t* bam_file_p =  bam_fopen(file_path);
-	
-	if (bam_file_p->bam_header_p->text[0] == '@') {
-	  head_found = 1;
-	  if (bam_file_p->bam_header_p->l_text >= MAX_HEAD_BUFFER) {
-	    printf("ERROR MAX HEAD BUFFER OVERFLOW\n");
-	    exit(-1);
-	  }
-	  strcpy(head_buffer, bam_file_p->bam_header_p->text);	    
-	}
-	
-	bam_fclose(bam_file_p);
-	
-      } //End if
-      
-      if (head_found) { break; }
-      
-    }
-    
-    if (head_found) {
-      MPI_Send(head_buffer, MAX_HEAD_BUFFER, MPI_CHAR, w_rank, 1, MPI_COMM_WORLD);
-    } else  {
-      printf("ERROR Not head found\n");
-      exit(-1);
-    }
-    
-  } else if (rank == numprocs) { //rank == numprocs is the writer
-    MPI_Recv(head_buffer, MAX_HEAD_BUFFER, MPI_CHAR, MPI_ANY_SOURCE, 1, MPI_COMM_WORLD, &status);
-    fwrite(head_buffer, strlen(head_buffer), sizeof(char), fd_out);
-  }
-  
-  free(head_buffer);
-  
-  //printf("MERGE OUTPUT DONE! : %i\n", second_phase);
-  
-  //MPI_Barrier(MPI_COMM_WORLD);
-  
-  if (rank == 0) {
-    start_timer(time_start);
-  }
-
-  char *buffer = (char *)malloc(sizeof(char)*MAX_BUFFER);
-  size_t len_buffer = 0;
-  FILE *fd_buffer;
-  char buffer_path[strlen(buffer_node_out) + 1024];
-  sprintf(buffer_path, "%s/reads_buffer.fq", buffer_node_out);    
-  char line[4096], line_strtok[4096], line_tmp[4096];
-  linked_list_t *buffer_no_map = linked_list_new(COLLECTION_MODE_ASYNCHRONIZED);
-  
-  //printf("[%i]MERGE DATA, tmp %s\n", rank, buffer_path);
-  
-  size_t nlines = 0;  
-  total_writes = 0;
-
-  MPI_Barrier(MPI_COMM_WORLD);
-  
-  //if (!second_phase) {
-  if (rank != numprocs) {
-    //First, search the head files
-    fd_buffer = fopen(buffer_path, "w");
-    
-    for (int i = 0; i < array_list_size(files_found); i++) {
-      char *file = array_list_get(i, files_found);
-      int type   = array_list_get(i, files_type);
-      
-      char file_path[strlen(file) + strlen(node_out) + 1024];
-      sprintf(file_path, "%s/%s", buffer_node_out, file);
-      
-      FILE *fd = fopen(file_path, "r");
-      char *point;      
-      
-      //printf("process file %s and type = %i, second_phase = %i\n", file_path, type, second_phase);
-      
-      if (type == SAM_FILE) {
-	int fend = 1;
-	while (fgets(line, 4096, fd)) {
-	  if (line[0] != '@') { fend = 0; break; }
-	}
-
-	if (!fend) {	
-	  nlines++;
-	  strcpy(line_strtok, line);
-	  strcpy(line_tmp, line);
-	  
-	  if (align_to_file(SAM_FILE, line_strtok, line_tmp, fd_buffer, second_phase,
-			    avls_list, metaexons, genome, NULL, NULL, NULL)) {
-	    //Update metaexon and AVL
-	    strcpy(&buffer[len_buffer], line);
-	    len_buffer += strlen(line);
-	  }
-	
-	  while (fgets(line, 4096, fd)) {
-	    nlines++;
-	    strcpy(line_strtok, line);
-	    strcpy(line_tmp, line);
-
-	    if (align_to_file(SAM_FILE, line_strtok, line_tmp, fd_buffer, second_phase,
-			      avls_list, metaexons, genome, NULL, NULL, NULL)) {
-	      if (len_buffer + strlen(line) >= MAX_BUFFER) {
-		MPI_Send(buffer, MAX_BUFFER, MPI_CHAR, w_rank, 1, MPI_COMM_WORLD);
-		len_buffer = 0;
-	      }
-	      strcpy(&buffer[len_buffer], line);
-	      len_buffer += strlen(line);	  
-	    }
-	  }
-	} 
-      } else if (type == BAM_FILE) { 
-	//TODO: Read BAM	  
-	bam_file_t* bam_file_p =  bam_fopen(file_path);
-	int read_bytes;
-	char *id_aux;
-	bam1_t* bam_line = bam_init1();
-	char SAM_line[4096];
-	bam_header_t* bam_header = bam_file_p->bam_header_p;
-	size_t nlines = 0;
-	while ((read_bytes = bam_read1(bam_file_p->bam_fd, bam_line)) > 0) {
-	  nlines++;
-	  
-	  if (align_to_file(BAM_FILE, line_strtok, line_tmp, fd_buffer, second_phase,
-			    avls_list, metaexons, genome, bam_line, bam_header, SAM_line)) {
-	    
-	    if (len_buffer + strlen(line) >= MAX_BUFFER) {
-	      MPI_Send(buffer, MAX_BUFFER, MPI_CHAR, w_rank, 1, MPI_COMM_WORLD);
-	      len_buffer = 0;
-	    } 
-	    strcpy(&buffer[len_buffer], SAM_line);
-	    len_buffer += strlen(SAM_line);	  
-	  }
-	  
-	}
+      void *status_merge;
+      pthread_attr_destroy(&attr_merge);
+      if (ret_merge = pthread_join(thread_merge, &status_merge)) {
+	printf("ERROR; return code from pthread_join() is %d\n", ret_merge);
+	exit(-1);
       }
     }
-
-    //printf("Finished MERGE 1\n");
+    ////////////////// FAST MERGE ENABLE DESTROY THREAD //////////////////////////////
     
-    if (len_buffer) {
-      MPI_Send(buffer, MAX_BUFFER, MPI_CHAR, w_rank, 1, MPI_COMM_WORLD);
-    }
-    
-    strcpy(buffer, "END");
-    MPI_Send(buffer, MAX_BUFFER, MPI_CHAR, w_rank, 1, MPI_COMM_WORLD);
-    
-    //printf("Finished MERGE\n");
-    
-    fclose(fd_buffer);    
-
-  } else { //rank == numprocs is the writer
+  } else {        
+    //============= WRITER ===================//
     int numprocs_end = 0;
     while (1) {
       MPI_Recv(buffer, MAX_BUFFER, MPI_CHAR, MPI_ANY_SOURCE, 1, MPI_COMM_WORLD, &status);
@@ -2056,18 +2031,201 @@ int hpg_multialigner_main(int argc, char *argv[]) {
 	//printf("Write %lu\n", strlen(buffer));
 	fwrite(buffer, strlen(buffer), sizeof(char), fd_out);
       }
-    }  
+    }
+    //============= WRITER ===================//
+  }
+
+  //MPI_Barrier(MPI_COMM_WORLD);
+  //printf("END Process\n");
+  //MPI_Barrier(MPI_COMM_WORLD);
+  //exit(-1);  
+  //-------------------------------------------------------------------------------------------->  
+
+  //printf("[%i]HEADER...\n", rank);  
+  //========================== NO FAST MERGE ENABLE ====================================
+
+  if (rank == 0) {
+    start_timer(time_start);
   }
   
+  if (!fast_merge) {
+    // READ OUTPUT SAM
+    //printf("%s:\n", node_out);
+    if (rank != numprocs) {
+      DIR *dir;
+      struct dirent *ent;
+      files_found  = array_list_new(10, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
+      files_type   = array_list_new(10, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
+      
+      if ((dir = opendir (buffer_node_out)) != NULL) {
+	while ((ent = readdir (dir)) != NULL) {
+	  //printf ("\t%s\n", ent->d_name);
+	  if (strstr(ent->d_name, "sam") != NULL) {
+	    array_list_insert(strdup(ent->d_name), files_found);
+	    array_list_insert(SAM_FILE, files_type);
+	  } else if (strstr(ent->d_name, "bam") != NULL) {
+	    array_list_insert(strdup(ent->d_name), files_found);
+	    array_list_insert(BAM_FILE, files_type);
+	  }
+	}
+	closedir (dir);
+      } else {
+	printf("Directory not found\n");
+	exit(-1);
+      }
+    }
+    
+    total_writes = 0;
+   
+    //MPI_Barrier(MPI_COMM_WORLD);
+
+    printf("[%i]MERGE RESULTS...\n", rank);
+    
+    //if (!second_phase) {
+    if (rank != numprocs) {
+      //First, search the head files
+      fd_buffer = fopen(buffer_path, "w");
+    
+      for (int i = 0; i < array_list_size(files_found); i++) {
+	char *file = array_list_get(i, files_found);
+	int type   = array_list_get(i, files_type);
+	
+	char file_path[strlen(file) + strlen(node_out) + 1024];
+	sprintf(file_path, "%s/%s", buffer_node_out, file);
+	
+	FILE *fd = fopen(file_path, "r");
+	char *point;      
+	
+	//printf("process file %s and type = %i, second_phase = %i\n", file_path, type, second_phase);
+	
+	if (type == SAM_FILE) {
+	  int fend = 1;
+	  while (fgets(line, 4096, fd)) {
+	    if (line[0] != '@') { fend = 0; break; }
+	  }
+	  
+	  if (!fend) {	
+	    nlines++;
+	    strcpy(line_strtok, line);
+	    strcpy(line_tmp, line);
+	    
+	    if (align_to_file(SAM_FILE, line_strtok, line_tmp, fd_buffer, second_phase,
+			      avls_list, metaexons, genome, NULL, NULL, NULL)) {
+	      //Update metaexon and AVL
+	      strcpy(&buffer[len_buffer], line);
+	      len_buffer += strlen(line);
+	    }
+	    
+	    while (fgets(line, 4096, fd)) {
+	      nlines++;
+	      strcpy(line_strtok, line);
+	      strcpy(line_tmp, line);
+	      
+	      if (align_to_file(SAM_FILE, line_strtok, line_tmp, fd_buffer, second_phase,
+				avls_list, metaexons, genome, NULL, NULL, NULL)) {
+		if (len_buffer + strlen(line) >= MAX_BUFFER) {
+		  MPI_Send(buffer, MAX_BUFFER, MPI_CHAR, w_rank, 1, MPI_COMM_WORLD);
+		  len_buffer = 0;
+		}
+		strcpy(&buffer[len_buffer], line);
+		len_buffer += strlen(line);	  
+	      }
+	    }
+	  } 
+	} else if (type == BAM_FILE) { 
+	  //TODO: Read BAM	  
+	  bam_file_t* bam_file_p =  bam_fopen(file_path);
+	  int read_bytes;
+	  char *id_aux;
+	  bam1_t* bam_line = bam_init1();
+	  char SAM_line[4096];
+	  bam_header_t* bam_header = bam_file_p->bam_header_p;
+	  size_t nlines = 0;
+	  while ((read_bytes = bam_read1(bam_file_p->bam_fd, bam_line)) > 0) {
+	    nlines++;
+	    
+	    if (align_to_file(BAM_FILE, line_strtok, line_tmp, fd_buffer, second_phase,
+			      avls_list, metaexons, genome, bam_line, bam_header, SAM_line)) {
+	      
+	      if (len_buffer + strlen(line) >= MAX_BUFFER) {
+		MPI_Send(buffer, MAX_BUFFER, MPI_CHAR, w_rank, 1, MPI_COMM_WORLD);
+		len_buffer = 0;
+	      } 
+	      strcpy(&buffer[len_buffer], SAM_line);
+	      len_buffer += strlen(SAM_line);	  
+	    }
+	    
+	  }
+	}
+      }
+      
+      //printf("Finished MERGE 1\n");
+      
+      if (len_buffer) {
+	MPI_Send(buffer, MAX_BUFFER, MPI_CHAR, w_rank, 1, MPI_COMM_WORLD);
+      }
+      
+      strcpy(buffer, "END");
+      MPI_Send(buffer, MAX_BUFFER, MPI_CHAR, w_rank, 1, MPI_COMM_WORLD);
+    
+      //printf("Finished MERGE\n");
+      
+      fclose(fd_buffer);    
+
+    } //else { //rank == numprocs is the writer
+      //int numprocs_end = 0;
+      //while (1) {
+    //MPI_Recv(buffer, MAX_BUFFER, MPI_CHAR, MPI_ANY_SOURCE, 1, MPI_COMM_WORLD, &status);
+    //if (strcmp("END", buffer) == 0) {
+    //numprocs_end++;
+    //	  if (numprocs_end == numprocs) {
+    //	    break;
+    //	  }
+    //	} else {
+	  //printf("Write %lu\n", strlen(buffer));
+    //	  fwrite(buffer, strlen(buffer), sizeof(char), fd_out);
+    //	}
+    //}  
+    //}
+  } //NOT fast Merge envirorment END!
+  //==============================================================
   
   if (rank == 0) {
     time_merge = 0;
     stop_timer(time_start, time_stop, time_merge);
   }
-
   
+
+  if ((rank != numprocs) && hpg_enable) {
+    // genome parameters 
+    //printf("HPG ENABLE LOADING GENOME...\n");
+    char filename_tab[strlen(options->bwt_dirname) + 1024];  
+    sprintf(filename_tab, "%s/params.info", options->bwt_dirname);
+    FILE *fd = fopen(filename_tab, "r");      
+    
+    if (fd) { 
+      fast_mode = 1; 
+      fclose(fd);
+    } else { 
+      fast_mode = 0; 
+    }
+    
+    if (!fast_mode) {
+      //////////////// LOAD BWT INDEX //////////////////////    
+      bwt_index = bwt_index_new(options->bwt_dirname, false);
+      //genome = genome_new("dna_compression.bin", options->bwt_dirname, BWT_MODE);  
+      //////////////////////////////////////////////////////
+    } else {    
+      ///////////////// LOAD SA INDEX ////////////////////// 
+      sa_index3_parallel_genome_new(options->bwt_dirname, options->num_cpu_threads, &sa_index);	
+    }  
+  }
+
+
   //fclose(fd_buffer);
+  printf("[%i]MERGE END\n", rank);
   MPI_Barrier(MPI_COMM_WORLD);
+  
   //exit(-1);
   
   //printf("CLOSE with %i lines\n", total_writes);
@@ -2128,7 +2286,7 @@ int hpg_multialigner_main(int argc, char *argv[]) {
 
   MPI_Barrier(MPI_COMM_WORLD);
 
-
+  printf("[%i]START SECOND PHASE MERGE META...\n", rank);
   if (mapper_mode == RNA_MODE) {
     /////////////////////// FOR RNA SECOND PHASE //////////////////////////////////  
     if (second_phase) {
@@ -2570,7 +2728,9 @@ int hpg_multialigner_main(int argc, char *argv[]) {
       
 	  sw_input.f_sa = f_sa;
 	  sw_input.f_hc = f_hc;
-      
+	  
+	  printf("[%i]BWT MODE...\n", rank);
+	  
 	  if (!fast_mode) {
 	    ///////////////// BWT INDEX WORKFLOW //////////////////////
 	    //===================================================================================
@@ -2769,10 +2929,10 @@ int hpg_multialigner_main(int argc, char *argv[]) {
 	      sprintf(mapper_run, "%s %s %s %s %s", cli_out, second_path_out_tmp, cli_in, buffer_path, cli_end);
 	    }
 
-	    //printf("======================================================================\n");
-	    //printf("RNA :: %s\n", mapper_run);
+	    printf("======================================================================\n");
+	    printf("RNA :: %s\n", mapper_run);
 	    system(mapper_run);
-      	    //printf("======================================================================\n");
+      	    printf("======================================================================\n");
 	    
 	  }
 	  //===========================================================================//               		
@@ -3139,7 +3299,7 @@ int hpg_multialigner_main(int argc, char *argv[]) {
     //stop_timer(time_start, time_stop, time_merge);    
     printf("============ T    I    M    I    N    G ===============\n");
     printf("Time Split : %0.2f\n", time_split / 1000000);
-    //printf("Time Merge : %0.2f\n", time_merge / 1000000);
+    printf("Time Merge : %0.2f\n", time_merge / 1000000);
     printf("Total Time : %0.2f\n", time_total / 1000000);
     printf("=======================================================\n");    
   }
@@ -3165,6 +3325,83 @@ int hpg_multialigner_main(int argc, char *argv[]) {
   return 1;
   
 }
+
+
+
+    /*
+    int head_found = 0;
+    //printf("PROCESS FILE %s\n", path_tmp);
+    if (rank == 0) {
+      //First, search the head files
+      for (int i = 0; i < array_list_size(files_found); i++) {
+	char *file = array_list_get(i, files_found);
+	int type   = array_list_get(i, files_type);
+	
+	char file_path[strlen(file) + strlen(node_out) + 1024];
+	sprintf(file_path, "%s/%s", buffer_node_out, file);
+	
+	char line[4096];
+	char *point;
+	size_t nlines = 0;
+	
+	if (type == SAM_FILE) {
+	  FILE *fd = fopen(file_path, "r");
+	  while (fgets(line, 4096, fd)) {
+	    if (line[0] == '@') {
+	      if (line[1] == 'S' && line[2]  == 'Q') {
+		num_chromosomes_header++;
+	      }
+	      head_found = 1;
+	      strcpy(&head_buffer[len_head_buffer], line);
+	      len_head_buffer += strlen(line);
+	      if (len_head_buffer >= MAX_HEAD_BUFFER) {
+		printf("ERROR MAX HEAD BUFFER OVERFLOW\n");
+		exit(-1);
+	      }
+	    } else {
+	      break;
+	    }
+	    ///free(str);
+	  } // End while
+	  fclose(fd);
+	} else 	if (type == BAM_FILE) { 
+	  //Read BAM
+	  bam_file_t* bam_file_p =  bam_fopen(file_path);
+	  
+	  if (bam_file_p->bam_header_p->text[0] == '@') {
+	    head_found = 1;
+	    if (bam_file_p->bam_header_p->l_text >= MAX_HEAD_BUFFER) {
+	      printf("ERROR MAX HEAD BUFFER OVERFLOW\n");
+	      exit(-1);
+	  }
+	    strcpy(head_buffer, bam_file_p->bam_header_p->text);	    
+	  }
+	  
+	  bam_fclose(bam_file_p);
+	  
+	} //End if
+	
+	if (head_found) { break; }
+	
+      }
+      
+      if (head_found) {
+	MPI_Send(head_buffer, MAX_HEAD_BUFFER, MPI_CHAR, w_rank, 1, MPI_COMM_WORLD);
+      } else  {
+	printf("ERROR Not head found\n");
+	exit(-1);
+      }
+      
+    } else if (rank == numprocs) { //rank == numprocs is the writer
+      MPI_Recv(head_buffer, MAX_HEAD_BUFFER, MPI_CHAR, MPI_ANY_SOURCE, 1, MPI_COMM_WORLD, &status);
+      fwrite(head_buffer, strlen(head_buffer), sizeof(char), fd_out);
+    }
+    
+    free(head_buffer);
+    */
+    //printf("MERGE OUTPUT DONE! : %i\n", second_phase);
+    
+    //MPI_Barrier(MPI_COMM_WORLD);
 
 
 

@@ -14,6 +14,8 @@ options_t *options_new(void) {
   
   //======================= COMMON OPTIONS ====================
   options->reader_fifo = 0;
+  options->fast_merge = 0;
+  //-----------------------------------------------------------
   options->version = 0;
   options->in_filename = NULL;
   options->in_filename2 = NULL;
@@ -561,6 +563,7 @@ void** argtable_options_new(int mode) {
   argtable[count++] = arg_file0(NULL, "second-tmp-file", NULL, "Temporal output file for second mapper. Only the name!");
   argtable[count++] = arg_file0(NULL, "second-tmp-path", NULL, "Temporal output path for second mapper");
   argtable[count++] = arg_lit0(NULL, "fifo-enable", "Enable FIFO input mode to improve the performance");
+  argtable[count++] = arg_lit0(NULL, "fast-merge", "Enable fast mode to merge output results");
   
   argtable[num_options] = arg_end(count);
      
@@ -690,6 +693,8 @@ options_t *read_CLI_options(void **argtable, options_t *options) {
   } 
 
   if (((struct arg_int*)argtable[++count])->count) { options->reader_fifo = ((struct arg_int*)argtable[count])->count; }
+
+  if (((struct arg_int*)argtable[++count])->count) { options->fast_merge = ((struct arg_int*)argtable[count])->count; }
   
   return options;
 
