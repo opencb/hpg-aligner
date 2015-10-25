@@ -820,11 +820,11 @@ int align_to_file(int line_format, char *align_str, char *align_tmp, FILE *fd_bu
 	  exon_end = sj_start - 1;
 	  //printf("Meta-L: %lu - %lu\n", exon_start, exon_end);
 
-	  if (exon_end < exon_start) {
-	    printf("%s", align_tmp);
-	    printf("META-ERR: %lu - %lu\n", exon_start, exon_end);
-	    exit(-1);
-	  }
+	  //if (exon_end < exon_start) {
+	  //printf("%s", align_tmp);
+	  //printf("META-ERR: %lu - %lu\n", exon_start, exon_end);
+	  //exit(-1);
+	  //}
 
 	  metaexon_insert(strand, chromosome - 1,
 			  exon_start, exon_end, 40,
@@ -836,11 +836,11 @@ int align_to_file(int line_format, char *align_str, char *align_tmp, FILE *fd_bu
 	  exon_end   = exons_array[pos + 3];
 	  //printf("Meta-R: %lu - %lu\n", exon_start, exon_end);
 	
-	  if (exon_end < exon_start) {
-	    printf("%s", align_tmp);
-	    printf("META-ERR: %lu - %lu\n", exon_start, exon_end);
-	    exit(-1);
-	  }	  
+	  //if (exon_end < exon_start) {
+	  //printf("%s", align_tmp);
+	  //printf("META-ERR: %lu - %lu\n", exon_start, exon_end);
+	  //exit(-1);
+	  //}	  
 	  metaexon_insert(strand, chromosome - 1,
 			  exon_start, exon_end, 40,
 			  METAEXON_LEFT_END, node_avl_end,
@@ -1157,7 +1157,7 @@ void producer_fifo(void *data) {
 
   }
 
-  printf("End File\n");
+  //printf("End File\n");
   
   close(fd_fifo);
   fclose(fd_in);
@@ -1221,7 +1221,7 @@ void partial_results_merge(void *data) {
     }    
   }
   
-  printf("THREAD MERGE CAN OPEN RESULTS DIR\n");
+  //printf("THREAD MERGE CAN OPEN RESULTS DIR\n");
   int itr = -1;
   while (1) {
     //close dir and open dir each iteration ???
@@ -1255,32 +1255,32 @@ void partial_results_merge(void *data) {
 	  char file_path[strlen(ent->d_name) + strlen(merge_p->buffer_node_out) + 1024];
 	  sprintf(file_path, "%s/%s", merge_p->buffer_node_out, ent->d_name);
 	  
-	  printf("//-------------------> Reading %s file and merge...\n", file_path);
+	  //printf("//-------------------> Reading %s file and merge...\n", file_path);
 	  
 	  FILE *fd = fopen(file_path, "r");
 	  size_t fd_total_bytes = 0;
 	  int br = 0;
-	  int seek_activated = 0;
+	  //int seek_activated = 0;
 	  while (!fd_total_bytes) {
 	    fseek(fd, 0L, SEEK_END);
 	    fd_total_bytes = ftell(fd);
 	  }
 	  fseek(fd, 0L, SEEK_SET);
-	  printf("File contains somthing!\n");
+	  //printf("File contains somthing!\n");
 	  
 	  while (1) {
 	    if (fgets(line, 4096, fd) != NULL) {
 	      if (line[0] != '@') {
 
-		if (seek_activated) {
-		  printf("LINE: %s", line);
-		  seek_activated = 0;
-		}
+		//if (seek_activated) {
+		  //printf("LINE: %s", line);
+		  //seek_activated = 0;
+		//}
 		
 		if (line[strlen(line) - 1] != '\n') {
-		  printf("ERROR READING: %s\n", line);
+		  //printf("ERROR READING: %s\n", line);
 		  fseek(fd, -1*strlen(line), SEEK_CUR);
-		  seek_activated = 1;
+		  //seek_activated = 1;
 		  sleep(2);
 		  continue;
 		}
@@ -1310,7 +1310,7 @@ void partial_results_merge(void *data) {
 	    
 	  }
 	  
-	  printf("\nFINISHED READ\n");
+	  //printf("\nFINISHED READ\n");
 	  
 	}	
       }
@@ -1319,7 +1319,7 @@ void partial_results_merge(void *data) {
     //printf("Out files in dir...\n");
     pthread_mutex_lock(&merge_p->mutex);
     if (merge_p->end_process) {
-      printf("THREAD MERGE END\n");
+      //printf("THREAD MERGE END\n");
       closedir(dir);
       break;
     }
