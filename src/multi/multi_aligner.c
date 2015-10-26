@@ -1180,13 +1180,13 @@ typedef struct merge_partial {
 
 
 void *partial_results_merge(void *data) {
-  //Search files in path
+  //Search files in path  
   merge_partial_t *merge_p = (merge_partial_t *)data;
   int err_exit = 0;
+  int finish = 0;
   DIR *dir;
   struct dirent *ent;
   array_list_t *files_found  = array_list_new(10, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
-  //array_list_t *files_type   = array_list_new(10, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
   
   //Buffer MPI
   char line[4096];
@@ -1207,7 +1207,7 @@ void *partial_results_merge(void *data) {
   
   while ((dir = opendir(merge_p->buffer_node_out)) == NULL) {
     
-    sleep(1);
+    sleep(1); //wait a moment, free CPU for other threads
     
     pthread_mutex_lock(&merge_p->mutex);
     if (merge_p->end_process) {
@@ -1218,28 +1218,16 @@ void *partial_results_merge(void *data) {
     if (err_exit) {
       printf("PATH OF PARTIAL RESULTS NOT FOUND\n");
       exit(-1);
-    }    
+    }
+
   }
   
-  //printf("THREAD MERGE CAN OPEN RESULTS DIR\n");
-  int itr = -1;
+
   while (1) {
-    //close dir and open dir each iteration ???
-    itr++;
-    while ((ent = readdir (dir)) != NULL) {
-      int type;
+    
+    while ((ent = readdir (dir)) != NULL) {      
 
-      //printf ("\t[%i] %s, type = %i\n", itr, ent->d_name, type);
-      
       if (strstr(ent->d_name, "sam") != NULL) {
-	type = SAM_FILE;
-      } else if (strstr(ent->d_name, "bam") != NULL) {
-	type = BAM_FILE;
-      } else {
-	type = NONE_FILE;	
-      }
-
-      if (type == SAM_FILE) {
 	int insert = 1;
 	for (int j = 0; j < array_list_size(files_found); j++) {
 	  char *name = array_list_get(j, files_found);	
@@ -1255,33 +1243,22 @@ void *partial_results_merge(void *data) {
 	  char file_path[strlen(ent->d_name) + strlen(merge_p->buffer_node_out) + 1024];
 	  sprintf(file_path, "%s/%s", merge_p->buffer_node_out, ent->d_name);
 	  
-	  //printf("//-------------------> Reading %s file and merge...\n", file_path);
-	  
 	  FILE *fd = fopen(file_path, "r");
 	  size_t fd_total_bytes = 0;
 	  int br = 0;
-	  //int seek_activated = 0;
+	  
 	  while (!fd_total_bytes) {
 	    fseek(fd, 0L, SEEK_END);
 	    fd_total_bytes = ftell(fd);
 	  }
 	  fseek(fd, 0L, SEEK_SET);
-	  //printf("File contains somthing!\n");
 	  
 	  while (1) {
 	    if (fgets(line, 4096, fd) != NULL) {
 	      if (line[0] != '@') {
-
-		//if (seek_activated) {
-		  //printf("LINE: %s", line);
-		  //seek_activated = 0;
-		//}
-		
 		if (line[strlen(line) - 1] != '\n') {
-		  //printf("ERROR READING: %s\n", line);
+		  //Line truncated...
 		  fseek(fd, -1*strlen(line), SEEK_CUR);
-		  //seek_activated = 1;
-		  sleep(2);
 		  continue;
 		}
 		
@@ -1305,26 +1282,26 @@ void *partial_results_merge(void *data) {
 	      br = 1;
 	    }
 	    pthread_mutex_unlock(&merge_p->mutex);
-
+	    
 	    if (br) { break; }
 	    
 	  }
-	  
-	  //printf("\nFINISHED READ\n");
-	  
 	}	
       }
+      
     } //Loop files in Dir...
-
-    //printf("Out files in dir...\n");
+    
     pthread_mutex_lock(&merge_p->mutex);
     if (merge_p->end_process) {
-      //printf("THREAD MERGE END\n");
-      closedir(dir);
-      break;
+      finish = 1;
     }
     pthread_mutex_unlock(&merge_p->mutex);    
 
+    if (finish) {
+      closedir(dir);
+      break;
+    }
+    
     closedir(dir); 
     if ((dir = opendir(merge_p->buffer_node_out)) == NULL) {
       printf("ERROR OPENING RESULTS DIRECTORY\n");
@@ -1340,9 +1317,9 @@ void *partial_results_merge(void *data) {
   
   strcpy(buffer, "END");
   MPI_Send(buffer, MAX_BUFFER, MPI_CHAR, w_rank, 1, MPI_COMM_WORLD);  
-      
-  fclose(fd_buffer);    
-  //array_
+
+  free(buffer);
+  array_list_free(files_found, (void *)free);
   
 }
 
@@ -2007,13 +1984,18 @@ int hpg_multialigner_main(int argc, char *argv[]) {
       pthread_mutex_lock(&merge_p.mutex);
       merge_p.end_process = 1;
       pthread_mutex_unlock(&merge_p.mutex);
-      
+
       void *status_merge;
       pthread_attr_destroy(&attr_merge);
       if (ret_merge = pthread_join(thread_merge, &status_merge)) {
 	printf("ERROR; return code from pthread_join() is %d\n", ret_merge);
 	exit(-1);
       }
+
+      if (merge_p.fd_buffer) {
+	fclose(merge_p.fd_buffer);
+      }
+
     }
     ////////////////// FAST MERGE ENABLE DESTROY THREAD //////////////////////////////
     
