@@ -1105,7 +1105,7 @@ typedef struct th_data {
   size_t end_pos;
 } th_data_t;
 
-void producer_fifo(void *data) {  
+void *producer_fifo(void *data) {  
 
   //printf("open file\n");
   th_data_t *th = (th_data_t *)data;
@@ -1179,14 +1179,14 @@ typedef struct merge_partial {
 } merge_partial_t;
 
 
-void partial_results_merge(void *data) {
+void *partial_results_merge(void *data) {
   //Search files in path
   merge_partial_t *merge_p = (merge_partial_t *)data;
   int err_exit = 0;
   DIR *dir;
   struct dirent *ent;
   array_list_t *files_found  = array_list_new(10, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
-  array_list_t *files_type   = array_list_new(10, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
+  //array_list_t *files_type   = array_list_new(10, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
   
   //Buffer MPI
   char line[4096];
@@ -1342,7 +1342,7 @@ void partial_results_merge(void *data) {
   MPI_Send(buffer, MAX_BUFFER, MPI_CHAR, w_rank, 1, MPI_COMM_WORLD);  
       
   fclose(fd_buffer);    
-  
+  //array_
   
 }
 
