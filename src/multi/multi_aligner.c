@@ -704,9 +704,11 @@ int align_to_file(int line_format, char *align_str, char *align_tmp, FILE *fd_bu
       //if (!br) { update_meta = 1; }    
     
     } else {
-      cigar_null = 1;
+      //cigar_null = 1;
       to_file = 0;
-      no_map = 1;
+      
+      return to_file;
+      //no_map = 1;
     }
   
   
@@ -1984,7 +1986,7 @@ int hpg_multialigner_main(int argc, char *argv[]) {
       pthread_mutex_lock(&merge_p.mutex);
       merge_p.end_process = 1;
       pthread_mutex_unlock(&merge_p.mutex);
-
+      
       void *status_merge;
       pthread_attr_destroy(&attr_merge);
       if (ret_merge = pthread_join(thread_merge, &status_merge)) {
