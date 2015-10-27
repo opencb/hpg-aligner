@@ -1786,9 +1786,9 @@ int hpg_multialigner_main(int argc, char *argv[]) {
     printf("TEMPORAL FILES FOR READ :  '%s'\n", tmp_input_path);
 
     if (options->tmp_file) {
-      printf("TMP OUTPUT PATH         :  '%s/%s'\n", path_tmp, options->tmp_file);
+      printf("TMP OUTPUT FILE         :  '%s'\n", options->tmp_file);
     } else {
-      printf("TMP OUTPUT FILE         :  '%s'\n", path_tmp);
+      printf("TMP OUTPUT PATH         :  '%s'\n", path_tmp);
     }
 
     if (second_phase) {
@@ -1836,7 +1836,40 @@ int hpg_multialigner_main(int argc, char *argv[]) {
     create_directory(tmp_input_path);
     printf("create tmp path %s...\n", tmp_input_path);
   }
+
+  char path_out_tmp[strlen(path_tmp) + 1024];  
+  if (rank == 0) {
+    //char cmd[strlen(path_output) + 1024];
+    //sprintf(cmd, "rm -rf %s", path_output);
+    //system(cmd);
+    create_directory(path_output);  
+
+    if (options->tmp_path) {
+      sprintf(path_out_tmp, "%s", path_tmp);
+
+      char cmd[strlen(path_out_tmp) + 1024];
+      sprintf(cmd, "rm -rf %s", path_out_tmp);
+      system(cmd);
+
+      create_directory(path_out_tmp);
+
+    }
+  }
   
+  MPI_Barrier(MPI_COMM_WORLD);
+
+  if (rank != numprocs) {    
+    sprintf(path_out_tmp, "%s/%i.out/", path_tmp, rank);
+
+    char cmd[strlen(path_out_tmp) + 1024];
+    sprintf(cmd, "rm -rf %s", path_out_tmp);
+    system(cmd);
+
+    create_directory(path_out_tmp);
+
+  }
+    
+    
   if (enable_fifo) {    
     if (rank == 0) {      
       FILE *fd_tmp = fopen(file_input, "r");
@@ -1981,39 +2014,7 @@ int hpg_multialigner_main(int argc, char *argv[]) {
   //================================ MPI PROCESS =======================================//
   //COMMON OUTPUT PATH 
 
-  char path_out_tmp[strlen(path_tmp) + 1024];  
-  if (rank == 0) {
-    //char cmd[strlen(path_output) + 1024];
-    //sprintf(cmd, "rm -rf %s", path_output);
-    //system(cmd);
-    create_directory(path_output);  
 
-    if (options->tmp_path) {
-      sprintf(path_out_tmp, "%s", path_tmp);
-
-      char cmd[strlen(path_out_tmp) + 1024];
-      sprintf(cmd, "rm -rf %s", path_out_tmp);
-      system(cmd);
-
-      create_directory(path_out_tmp);
-
-    }
-  }
-  
-  MPI_Barrier(MPI_COMM_WORLD);
-
-  if (rank != numprocs) {    
-    sprintf(path_out_tmp, "%s/%i.out/", path_tmp, rank);
-
-    char cmd[strlen(path_out_tmp) + 1024];
-    sprintf(cmd, "rm -rf %s", path_out_tmp);
-    system(cmd);
-
-    create_directory(path_out_tmp);
-
-  }
-    
-  
   //PROCESS FILES
   //MPI_Barrier(MPI_COMM_WORLD);
 
