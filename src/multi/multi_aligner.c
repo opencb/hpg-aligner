@@ -1173,14 +1173,156 @@ typedef struct merge_partial {
   int end_process;
   int second_phase;
   int w_rank;
-  FILE *fd_buffer;
+  //FILE *fd_buffer;
   avls_list_t *avls_list;
   metaexons_t *metaexons;
   genome_t *genome;
   char buffer_node_out[2048];
+  char buffer_reads[2048];
 } merge_partial_t;
 
+void *partial_results_merge(void *data) {
+  // Search files in path  
+  merge_partial_t *merge_p = (merge_partial_t *)data;
+  int err_exit = 0;
+  int dir_loops_after_end_process = 0;
+  DIR *dir;
+  struct dirent *ent;
+  array_list_t *files_found  = array_list_new(10, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
 
+  char line[4096];
+  char line_tmp[4096];
+  char line_strtok[4096];
+
+  int second_phase = merge_p->second_phase; 
+  avls_list_t *avls_list = merge_p->avls_list;
+  metaexons_t *metaexons = merge_p->metaexons;
+  genome_t *genome = merge_p->genome;
+  int w_rank = merge_p->w_rank;
+
+  //------- Buffer MPI -------//
+  size_t len_buffer = 0;
+  char *buffer = (char *)malloc(MAX_BUFFER*sizeof(char));
+  //------- Buffer MPI -------//
+
+  while ((dir = opendir(merge_p->buffer_node_out)) == NULL) {
+    sleep(1); // wait for a second, free CPU for other threads
+    pthread_mutex_lock(&merge_p->mutex);
+    if (merge_p->end_process) {
+      err_exit = 1;
+    }
+    pthread_mutex_unlock(&merge_p->mutex);
+    if (err_exit) {
+      printf("PATH OF PARTIAL RESULTS NOT FOUND\n");
+      exit(-1);
+    }
+  }
+
+  //open file
+  FILE *fd_buffer  = fopen(merge_p->buffer_reads, "w");
+
+  while (1) {
+    // Loop over files on dir
+    while ((ent = readdir (dir)) != NULL) {      
+      // Get next file if the current one has not 'sam' on it
+      if (strstr(ent->d_name, "sam") == NULL) continue;
+            
+      // Check if the file has been already processed
+      int insert = 1;
+      for (int j = 0; j < array_list_size(files_found); j++) {
+	char *name = array_list_get(j, files_found);    
+	if (strcmp(ent->d_name, name) == 0) {
+	  insert = 0;
+	  break;
+	}
+      }
+
+      // If the file has not been yet processed, read and merge it
+      if (insert) {
+	array_list_insert(strdup(ent->d_name), files_found);
+	char file_path[strlen(merge_p->buffer_node_out) + strlen(ent->d_name) + 2];
+	sprintf(file_path, "%s/%s", merge_p->buffer_node_out, ent->d_name);
+	FILE *fd = fopen(file_path, "r");
+	size_t fd_total_bytes = 0;
+	int br = 0;
+                
+	// Wait till there is something on the file
+	while (!fd_total_bytes) {
+	  fseek(fd, 0L, SEEK_END);
+	  fd_total_bytes = ftell(fd);
+	}
+	fseek(fd, 0L, SEEK_SET);
+
+	while (1) {
+	  // Read a line or until and EOF is found
+	  if (fgets(line, 4096, fd) != NULL) {
+	    // Read again if the last character is not a \n
+	    if (line[strlen(line) - 1] != '\n') {
+	      fseek(fd, -1*strlen(line), SEEK_CUR);
+	      continue;
+	    }
+	    // Read again if the line is a commentary
+	    if (line[0] == '@') continue;
+	    // Process the line
+	    strcpy(line_strtok, line);
+	    strcpy(line_tmp, line);
+	    if (align_to_file(SAM_FILE, line_strtok, line_tmp, fd_buffer, second_phase,
+			      avls_list, metaexons, genome, NULL, NULL, NULL)) {
+	      if (len_buffer + strlen(line) >= MAX_BUFFER) {
+		MPI_Send(buffer, MAX_BUFFER, MPI_CHAR, w_rank, 1, MPI_COMM_WORLD);
+		len_buffer = 0;
+	      }
+	      strcpy(&buffer[len_buffer], line);
+	      len_buffer += strlen(line);   
+	    }
+	  }
+	  // End the reading of the file when the aligner has finished and an EOF is found
+	  pthread_mutex_lock(&merge_p->mutex);
+	  if (merge_p->end_process && feof(fd)) {
+	    br = 1;
+	  }
+	  pthread_mutex_unlock(&merge_p->mutex);
+	  if (br) { break; }
+	} // Read file
+      } // if (insert)   
+    } // Loop files in dir...
+
+    // If the process have finished, increment dir_loops_after_end_process
+    pthread_mutex_lock(&merge_p->mutex);
+    if (merge_p->end_process) {
+      dir_loops_after_end_process += 1;
+    }
+    pthread_mutex_unlock(&merge_p->mutex);
+    // End reading files in dir after doing a second loop to find unprocessed files
+    // (due to race condition between the opening of the directory and the creation of
+    //  the sam files by the aligner process)
+    if (dir_loops_after_end_process == 2) {
+      closedir(dir);
+      break;
+    }
+    // Close dir and open it for the next round
+    closedir(dir);
+    if ((dir = opendir(merge_p->buffer_node_out)) == NULL) {
+      printf("ERROR OPENING RESULTS DIRECTORY\n");
+      exit(-1);
+    }
+
+  } // Close While(1)
+
+    // Send last part of the buffer and clean up
+  if (len_buffer) {
+    MPI_Send(buffer, MAX_BUFFER, MPI_CHAR, w_rank, 1, MPI_COMM_WORLD);
+  }
+  strcpy(buffer, "END");
+  MPI_Send(buffer, MAX_BUFFER, MPI_CHAR, w_rank, 1, MPI_COMM_WORLD);  
+
+  free(buffer);
+  array_list_free(files_found, (void *)free);
+  fclose(fd_buffer);
+
+}
+
+/*
 void *partial_results_merge(void *data) {
   //Search files in path  
   merge_partial_t *merge_p = (merge_partial_t *)data;
@@ -1324,7 +1466,7 @@ void *partial_results_merge(void *data) {
   array_list_free(files_found, (void *)free);
   
 }
-
+*/
 
 
 int hpg_multialigner_main(int argc, char *argv[]) {
@@ -1839,17 +1981,12 @@ int hpg_multialigner_main(int argc, char *argv[]) {
   //================================ MPI PROCESS =======================================//
   //COMMON OUTPUT PATH 
 
-  
+  char path_out_tmp[strlen(path_tmp) + 1024];  
   if (rank == 0) {
     //char cmd[strlen(path_output) + 1024];
     //sprintf(cmd, "rm -rf %s", path_output);
     //system(cmd);
     create_directory(path_output);  
-  }
-  
-
-  if (rank != numprocs) {
-    char path_out_tmp[strlen(path_tmp) + 1024];
 
     if (options->tmp_path) {
       sprintf(path_out_tmp, "%s", path_tmp);
@@ -1861,7 +1998,11 @@ int hpg_multialigner_main(int argc, char *argv[]) {
       create_directory(path_out_tmp);
 
     }
-    
+  }
+  
+  MPI_Barrier(MPI_COMM_WORLD);
+
+  if (rank != numprocs) {    
     sprintf(path_out_tmp, "%s/%i.out/", path_tmp, rank);
 
     char cmd[strlen(path_out_tmp) + 1024];
@@ -1922,7 +2063,8 @@ int hpg_multialigner_main(int argc, char *argv[]) {
       merge_p.end_process = 0;
       merge_p.w_rank = w_rank;
       strcpy(merge_p.buffer_node_out, buffer_node_out);
-      merge_p.fd_buffer  = fopen(buffer_path, "w");
+      strcpy(merge_p.buffer_reads, buffer_path);
+
       merge_p.second_phase = second_phase; 
       merge_p.avls_list = avls_list;
       merge_p.metaexons = metaexons;
@@ -1994,9 +2136,9 @@ int hpg_multialigner_main(int argc, char *argv[]) {
 	exit(-1);
       }
 
-      if (merge_p.fd_buffer) {
-	fclose(merge_p.fd_buffer);
-      }
+      //if (merge_p.fd_buffer) {
+      //fclose(merge_p.fd_buffer);
+      //}
 
     }
     ////////////////// FAST MERGE ENABLE DESTROY THREAD //////////////////////////////

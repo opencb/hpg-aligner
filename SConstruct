@@ -55,9 +55,9 @@ env_index = Environment(tools = ['default', 'packaging'],
 
 
 env['CFLAGS']  += ' -D_MPI'
-env['CPPPATH'] += ['/home/castillo/HECTOR_BIO/Software/gperftools-install/include/']
 env['LIBS']    += ["tcmalloc_minimal"]
-env['LIBPATH'] += ['/home/castillo/HECTOR_BIO/Software/gperftools-install/lib/']
+env['CPPPATH'] += ['/home/hmartinez/gperftools-install/include/'] #change path tcmalloc
+env['LIBPATH'] += ['/home/hmartinez/gperftools-install/lib/'] #change path tcmalloc 
    
 
 
