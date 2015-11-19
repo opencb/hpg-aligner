@@ -531,8 +531,8 @@ void sa_index3_parallel_genome_new(char *sa_index_dirname, int num_threads,
 	//	     num_suffixes, filename_tab,
 	//	     (stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);      
 	//fclose(f_tab);
-
-
+	
+	
 	pthread_mutex_lock(&mutex_sp);
 	load_progress += 9.6;
 	print_load_progress(load_progress, 0);
