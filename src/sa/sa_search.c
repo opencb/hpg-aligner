@@ -179,10 +179,76 @@ size_t search_suffix(char *seq, uint len, int max_num_suffixes,
     #endif
   }
 
-  //  printf("\t\tnum_prefixes = %i, (num_suffixes = %i, length = %i)\n",
-  //	 num_prefixes, num_suffixes, *suffix_len);
+  
   return num_suffixes;
+
 }
 
 //--------------------------------------------------------------------
+
+size_t search_suffix_rna(char *seq, uint len, int max_num_suffixes,
+			 sa_index3_t *sa_index,  size_t *low, size_t *high, 
+			 size_t *suffix_len, genome_t *genome) {
+  
+  int display = 1;
+  char *ref, *query;
+  size_t num_suffixes = 0;
+  uint matched, max_matched = 0;
+  size_t num_prefixes = search_prefix(seq, low, high, sa_index, display);
+  
+  *suffix_len = 0;
+  num_suffixes = num_prefixes;
+  
+  if (num_prefixes && num_prefixes < max_num_suffixes) {   
+    
+    size_t first = *low, last = *low;
+    
+    if (num_prefixes == 1) {
+      query = seq + sa_index->k_value;
+      ref = &sa_index->genome->S[sa_index->SA[*low]] + sa_index->k_value;
+      matched = 0;
+      while (query[matched] == ref[matched]) {
+	matched++;
+      }
+      *high = *low;
+      *suffix_len = matched + sa_index->k_value;
+      num_suffixes = num_prefixes;
+    } else {
+      for (size_t i = *low; i < *high; i++) {
+	query = seq + sa_index->k_value;
+	ref = &sa_index->genome->S[sa_index->SA[i]] + sa_index->k_value;
+	matched = 0;
+	while (query[matched] == ref[matched]) {
+	  matched++;
+	}
+	if (matched > max_matched) {
+	  first = i;
+	  last = i;
+	  max_matched = matched;
+	  //	break;
+	} else if (matched == max_matched) {
+	  last = i;
+	} else {
+	  break;
+	}
+      }
+      
+      
+      if (first <= last) {
+	*low = first;
+	*high = last;
+	*suffix_len = max_matched + sa_index->k_value;
+	num_suffixes = last - first + 1;
+      }
+    }
+  }
+  
+  
+  return num_suffixes;
+  
+}
+
+
 //--------------------------------------------------------------------
+//--------------------------------------------------------------------
+

@@ -75,11 +75,13 @@ int w3_end;
 
 size_t total_reads_w2, total_reads_w3;
 size_t reads_w2, reads_w3;
+double time_sa;
 
 //--------------------------------------------------------------------
 // main parameters support
 //--------------------------------------------------------------------
 int main(int argc, char* argv[]) {
+  time_sa = 0;
   redirect_stdout = 0;
   gziped_fileds = 0;
 
