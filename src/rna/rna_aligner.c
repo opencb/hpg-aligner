@@ -510,6 +510,7 @@ void sa_index3_parallel_genome_new(char *sa_index_dirname, int num_threads,
 
 
 	// read CHROM table from file
+	/*
 	sprintf(filename_tab, "%s/%s.CHROM", sa_index_dirname, prefix);
 	f_tab = fopen(filename_tab, "rb");
 	if (f_tab == NULL) {
@@ -532,7 +533,7 @@ void sa_index3_parallel_genome_new(char *sa_index_dirname, int num_threads,
 	//	     num_suffixes, filename_tab,
 	//	     (stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);      
 	fclose(f_tab);
-	
+	*/
 	
 	pthread_mutex_lock(&mutex_sp);
 	load_progress += 9.6;
@@ -1384,27 +1385,27 @@ void rna_aligner(options_t *options) {
 	  }
       }
 
-      /*
+      
       printf("\nMapping Status (Second Phase)\n");
       #pragma omp parallel sections num_threads(2) 
       {
           #pragma omp section
-          {
+	  {
 	    start_timer(time_s2);
 	    rewind(f_sa);
-	    //workflow_run_with_SA(options->num_cpu_threads, wf_input, wf_last);      
+	    workflow_run_with_SA(options->num_cpu_threads, wf_input, wf_last);      
 	    stop_timer(time_s2, time_e2, time_total_2);      
 	    //printf("= = = = T I M I N G    W O R K F L O W    '2' = = = =\n");
 	    //workflow_display_timing(wf_last);
 	    //printf("= = = = - - - - - - - - - - - - - - - - - - - = = = =\n\n");
 	  }
-          #pragma omp section
-	  {
-	    display_progress_2();
-	  }
+      #pragma omp section
+      {
+	display_progress_2();
+      }
       }
       printf("\n");
-      */
+
 
       // free memory
       sa_wf_input_free(wf_input);
