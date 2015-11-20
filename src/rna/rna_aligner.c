@@ -382,6 +382,7 @@ void sa_index3_parallel_genome_new(char *sa_index_dirname, int num_threads,
 	char filename_tab[strlen(sa_index_dirname) + 1024];
 
 	// read S from file
+	/*
 	sprintf(filename_tab, "%s/%s.S", sa_index_dirname, prefix);
 	f_tab = fopen(filename_tab, "rb");
 	if (f_tab == NULL) {
@@ -404,15 +405,15 @@ void sa_index3_parallel_genome_new(char *sa_index_dirname, int num_threads,
 	//	     genome_len, filename_tab,
 	//	     (stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);      
 	fclose(f_tab);
-      
+	*/
 	genome = sa_genome3_new(genome_len, num_chroms, 
 				chrom_lengths, chrom_names, S);
       
-	for (size_t i = 0; i < genome->length; i++) {
-	  if (genome->S[i] == 'N' || genome->S[i] == 'n') {
-	    genome->S[i] = 'A';
-	  }
-	}
+	//for (size_t i = 0; i < genome->length; i++) {
+	//if (genome->S[i] == 'N' || genome->S[i] == 'n') {
+	//  genome->S[i] = 'A';
+	//}
+	//}
 
 	pthread_mutex_lock(&mutex_sp);
 	load_progress += 10;
@@ -604,7 +605,8 @@ void sa_index3_parallel_genome_new(char *sa_index_dirname, int num_threads,
 	  genome_->chr_offset[c] = offset;
 	  offset += genome_->chr_size[c];
 	}
-	
+	genome_->genome_length = offset;
+
 	pthread_mutex_lock(&mutex_sp);
 	load_progress += 3.5;
 	print_load_progress(load_progress, 0);
@@ -1817,7 +1819,7 @@ void load_transcriptome(char *filename, genome_t *genome,
 					  &genome_start, &genome_end, genome);     
 
 	sj_ref[2] = '-';
-
+	
 	genome_start = exon2->start - 2;
 	genome_end   = genome_start + 1;
 	genome_read_sequence_by_chr_index(&sj_ref[3], 0, exon1->chr,

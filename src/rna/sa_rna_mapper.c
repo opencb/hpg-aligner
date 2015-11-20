@@ -2142,9 +2142,9 @@ int sa_generate_cals(fastq_read_t *read,
     }
     
     while (read_pos + sa_index->k_value < read->length) {
-      num_suffixes = search_suffix(&query[read_pos], sa_index->k_value, 
-				   MAX_NUM_SUFFIXES, sa_index, 
-				   &low, &high, &suffix_len);
+      num_suffixes = search_suffix_rna(&query[read_pos], sa_index->k_value, 
+				       MAX_NUM_SUFFIXES, sa_index, 
+				       &low, &high, &suffix_len, genome);
       
       
       if (suffix_len && num_suffixes) {
@@ -2191,9 +2191,9 @@ int sa_generate_cals(fastq_read_t *read,
 
     if (read->length - 1 != read_pos) {
       read_pos = read->length - sa_index->k_value - 1;
-      num_suffixes = search_suffix(&query[read_pos], sa_index->k_value, 
-				   MAX_NUM_SUFFIXES, sa_index, 
-				   &low, &high, &suffix_len);	      
+      num_suffixes = search_suffix_rna(&query[read_pos], sa_index->k_value, 
+				       MAX_NUM_SUFFIXES, sa_index, 
+				       &low, &high, &suffix_len, genome);	      
 	
       if (suffix_len && num_suffixes) {
 	//Storage Mappings
@@ -3987,14 +3987,14 @@ int sa_rna_mapper_last(void *data) {
     if (!array_list_size(alignments_list_aux)) {
       //continue;
       //Search strand(+)
-      num_suffixes_p = search_suffix(&seq[0], sa_index->k_value, 
-				     MAX_NUM_SUFFIXES, sa_index, 
-				     &low_p, &high_p, &suffix_len_p);
+      num_suffixes_p = search_suffix_rna(&seq[0], sa_index->k_value, 
+					 MAX_NUM_SUFFIXES, sa_index, 
+					 &low_p, &high_p, &suffix_len_p, genome);
       
       //Search strand(-)
-      num_suffixes_n = search_suffix(&seq_revcomp[0], sa_index->k_value, 
-				     MAX_NUM_SUFFIXES, sa_index, 
-				     &low_n, &high_n, &suffix_len_n);
+      num_suffixes_n = search_suffix_rna(&seq_revcomp[0], sa_index->k_value, 
+					 MAX_NUM_SUFFIXES, sa_index, 
+					 &low_n, &high_n, &suffix_len_n, genome);
 
       if (suffix_len_p && num_suffixes_p) {
 	//Report Exact Maps! (+)
@@ -4234,9 +4234,9 @@ int sa_rna_mapper_last(void *data) {
 	}
 	
 	while (read_pos + sa_index->k_value < read->length) {
-	  num_suffixes = search_suffix(&query[read_pos], sa_index->k_value, 
-				       MAX_NUM_SUFFIXES, sa_index, 
-				       &low, &high, &suffix_len);
+	  num_suffixes = search_suffix_rna(&query[read_pos], sa_index->k_value, 
+					   MAX_NUM_SUFFIXES, sa_index, 
+					   &low, &high, &suffix_len, genome);
 	  
 	  //printf("(%c)============= Seed (%i + %i), %i ===========\n", s == 0 ? '+' : '-', read_pos, read_pos + sa_index->k_value, suffix_len);
 	  
@@ -4283,9 +4283,9 @@ int sa_rna_mapper_last(void *data) {
 	
 	if (read->length - 1 != read_pos) {
 	  read_pos = read->length - sa_index->k_value - 1;
-	  num_suffixes = search_suffix(&query[read_pos], sa_index->k_value, 
-				       MAX_NUM_SUFFIXES, sa_index, 
-				       &low, &high, &suffix_len);	      
+	  num_suffixes = search_suffix_rna(&query[read_pos], sa_index->k_value, 
+					   MAX_NUM_SUFFIXES, sa_index, 
+					   &low, &high, &suffix_len, genome);	      
 
 	  //printf("L.(%c)============= Seed (%i + %i), %i ===========\n", s == 0 ? '+' : '-', read_pos, read_pos + sa_index->k_value, suffix_len);
 

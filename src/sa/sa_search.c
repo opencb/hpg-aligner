@@ -191,7 +191,7 @@ size_t search_suffix_rna(char *seq, uint len, int max_num_suffixes,
 			 size_t *suffix_len, genome_t *genome) {
   
   int display = 1;
-  char *ref, *query;
+  char *query;
   size_t num_suffixes = 0;
   uint matched, max_matched = 0;
   size_t num_prefixes = search_prefix(seq, low, high, sa_index, display);
@@ -205,7 +205,12 @@ size_t search_suffix_rna(char *seq, uint len, int max_num_suffixes,
     
     if (num_prefixes == 1) {
       query = seq + sa_index->k_value;
-      ref = &sa_index->genome->S[sa_index->SA[*low]] + sa_index->k_value;
+      char ref[strlen(seq)];
+      size_t start_g = sa_index->SA[*low] + sa_index->k_value;
+      size_t end_g = start_g + strlen(seq);
+      genome_read_sequence_sa(ref, &start_g, &end_g, genome);
+
+      //ref = &sa_index->genome->S[sa_index->SA[*low]] + sa_index->k_value;
       matched = 0;
       while (query[matched] == ref[matched]) {
 	matched++;
@@ -216,7 +221,23 @@ size_t search_suffix_rna(char *seq, uint len, int max_num_suffixes,
     } else {
       for (size_t i = *low; i < *high; i++) {
 	query = seq + sa_index->k_value;
-	ref = &sa_index->genome->S[sa_index->SA[i]] + sa_index->k_value;
+	//ref = &sa_index->genome->S[sa_index->SA[i]] + sa_index->k_value;
+	//char old_ref[strlen(seq)];
+
+	char ref[strlen(seq)];
+	size_t start_g = sa_index->SA[i] + sa_index->k_value;
+	size_t end_g = start_g + strlen(seq);
+	genome_read_sequence_sa(ref, &start_g, &end_g, genome);
+
+	//printf("GET genome %lu - %lu\n", start_g, end_g);
+	//printf("strcpy\n");
+	//strncpy(old_ref, &sa_index->genome->S[sa_index->SA[i]] + sa_index->k_value, strlen(seq));
+	
+	//printf("NEW: %s\n", new_ref);
+	//printf("OLD: %s\n", old_ref);
+
+	//exit(-1);
+
 	matched = 0;
 	while (query[matched] == ref[matched]) {
 	  matched++;

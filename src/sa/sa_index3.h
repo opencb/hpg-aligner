@@ -32,8 +32,8 @@ typedef struct sa_genome3 {
 } sa_genome3_t;
 
 static inline sa_genome3_t *sa_genome3_new(size_t length, size_t num_chroms,
-				    size_t *chrom_lengths,
-				    char **chrom_names, char *S) {
+					   size_t *chrom_lengths,
+					   char **chrom_names, char *S) {
   sa_genome3_t *p = (sa_genome3_t *) calloc(1, sizeof(sa_genome3_t));
   p->length = length;
   p->num_chroms = num_chroms;
