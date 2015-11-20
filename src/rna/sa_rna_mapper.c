@@ -2005,16 +2005,16 @@ int sa_mapped_exact_reads(fastq_read_t *read,
     
     size_t suff = low_p;
     for (size_t a = 0; a < n_alig; a++, suff++) {
-      //chrom = sa_index->CHROM[suff];	
+      chrom = sa_index->CHROM[suff];	
       sa_suff = sa_index->SA[suff];
       
       for (int c = 0; c < genome->num_chromosomes; c++) {
 	if (sa_suff >= genome->chr_offset[c]) {
-	  chrom = c;
+	  new_chrom = c;
 	}
       }
 
-      //if (chrom != new_chrom) { printf("ERROR: Chrom = %i != new Chrom = %i\n", chrom, new_chrom); exit(-1); }
+      if (chrom != new_chrom) { printf("ERROR: Chrom = %i != new Chrom = %i\n", chrom, new_chrom); exit(-1); }
       
       g_start = sa_suff - sa_index->genome->chrom_offsets[chrom];
       
@@ -2056,16 +2056,16 @@ int sa_mapped_exact_reads(fastq_read_t *read,
     
     size_t suff = low_n;
     for (size_t a = 0; a < n_alig; a++, suff++) {
-      //chrom = sa_index->CHROM[suff];
+      chrom = sa_index->CHROM[suff];
       sa_suff = sa_index->SA[suff];
             
       for (int c = 0; c < genome->num_chromosomes; c++) {
 	if (sa_suff >= genome->chr_offset[c]) {
-	  chrom = c;
+	  new_chrom = c;
 	}
       }
       
-      //if (chrom != new_chrom) { printf("ERROR: Chrom = %i != new Chrom = %i\n", chrom, new_chrom); exit(-1); }
+      if (chrom != new_chrom) { printf("ERROR: Chrom = %i != new Chrom = %i\n", chrom, new_chrom); exit(-1); }
       
       g_start = sa_suff - sa_index->genome->chrom_offsets[chrom];
       

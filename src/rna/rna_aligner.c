@@ -508,29 +508,30 @@ void sa_index3_parallel_genome_new(char *sa_index_dirname, int num_threads,
 	print_load_progress(load_progress, 0);
 	pthread_mutex_unlock(&mutex_sp);
 
+
 	// read CHROM table from file
-	//sprintf(filename_tab, "%s/%s.CHROM", sa_index_dirname, prefix);
-	//f_tab = fopen(filename_tab, "rb");
-	//if (f_tab == NULL) {
-	//printf("Error: could not open %s to write\n", filename_tab);
-	//exit(-1);
-	//}
-	//      printf("CHROM: filename %s, num_suffixes = %lu\n", filename_tab, num_suffixes);
-	//CHROM = (char *) malloc(num_suffixes * sizeof(char));
+	sprintf(filename_tab, "%s/%s.CHROM", sa_index_dirname, prefix);
+	f_tab = fopen(filename_tab, "rb");
+	if (f_tab == NULL) {
+	printf("Error: could not open %s to write\n", filename_tab);
+	exit(-1);
+	}
+	//printf("CHROM: filename %s, num_suffixes = %lu\n", filename_tab, num_suffixes);
+	CHROM = (char *) malloc(num_suffixes * sizeof(char));
       
 	//      printf("\nreading CHROM table from file %s...\n", filename_tab);
-	//gettimeofday(&start, NULL);
-	//num_items = fread(CHROM, sizeof(char), num_suffixes, f_tab);
-	//if (num_items != num_suffixes) {
-	//printf("Error: (%s) mismatch num_items = %i vs num_suffixes = %i\n", 
-	//	 filename_tab, num_items, num_suffixes);
-	//exit(-1);
-	//}
-	//gettimeofday(&stop, NULL);
+	gettimeofday(&start, NULL);
+	num_items = fread(CHROM, sizeof(char), num_suffixes, f_tab);
+	if (num_items != num_suffixes) {
+	printf("Error: (%s) mismatch num_items = %i vs num_suffixes = %i\n", 
+		 filename_tab, num_items, num_suffixes);
+	exit(-1);
+	}
+	gettimeofday(&stop, NULL);
 	//      printf("end of reading CHROM table (%lu num_suffixes) from file %s in %0.2f s\n", 
 	//	     num_suffixes, filename_tab,
 	//	     (stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);      
-	//fclose(f_tab);
+	fclose(f_tab);
 	
 	
 	pthread_mutex_lock(&mutex_sp);
