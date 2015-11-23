@@ -2123,7 +2123,7 @@ int sa_generate_cals(fastq_read_t *read,
   linked_list_item_t *item;
   size_t num_suffixes;
   size_t g_start;
-  int chrom;
+  int chrom = 0;
   cal_t *cal_prev, *cal_next;
   char *query;
   linked_list_t *cal_list;
