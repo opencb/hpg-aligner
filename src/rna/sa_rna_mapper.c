@@ -4216,7 +4216,8 @@ int sa_rna_mapper_last(void *data) {
 
       cal_t *cal_prev, *cal_next, *cal;
 
-      int seed_size = 18;
+      int seed_size = sa_index->k_value;
+      //int seed_size = 18;
       int seed_inc  = seed_size / 2;
       int read_pos;
       size_t num_suffixes, low, high, suffix_len, id_seed = 0;
