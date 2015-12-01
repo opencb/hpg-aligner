@@ -205,7 +205,9 @@ size_t search_suffix_rna(char *seq, uint len, int max_num_suffixes,
     
     if (num_prefixes == 1) {
       query = seq + sa_index->k_value;
-      char ref[strlen(seq)];
+      
+      //char *ref;
+      char ref[strlen(seq)];      
       size_t start_g = sa_index->SA[*low] + sa_index->k_value;
       size_t end_g = start_g + strlen(seq);
       genome_read_sequence_sa(ref, &start_g, &end_g, genome);
