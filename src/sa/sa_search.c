@@ -185,6 +185,78 @@ size_t search_suffix(char *seq, uint len, int max_num_suffixes,
 }
 
 //--------------------------------------------------------------------
+      //char *ref_x = &sa_index->genome->S[sa_index->SA[*low]] + sa_index->k_value;
+
+      ////////////////////////////////////////
+      //-----------------------------------------------------------------------------------
+      /*
+      size_t s, e;
+      
+      s = start_g;
+      e = end_g;
+      
+      size_t group_start = s/4;
+      size_t group_end   = e/4;
+      
+      size_t nucleotide_start = s%4;
+      size_t nucleotide_end   = e%4;
+      
+      unsigned int seq_pos = 0;
+      char *str_tmp;
+      
+      printf("%lu - %lu, %lu - %lu, %lu, %lu\n", group_start, group_end, nucleotide_start, nucleotide_end, strlen(seq), end_g - start_g);
+      
+      //printf("Get sequence 1\n");
+      str_tmp = genome->code_table[genome->X[group_start]];
+      for(unsigned int i = nucleotide_start; i < 4; i++){
+	sequence[seq_pos++] = str_tmp[i];
+      }
+      group_start++;
+      
+      //printf("Get sequence 2\n");
+      while (group_start < group_end) {
+	str_tmp = genome->code_table[genome->X[group_start]];
+	sequence[seq_pos++] = str_tmp[0];
+	sequence[seq_pos++] = str_tmp[1];
+	sequence[seq_pos++] = str_tmp[2];
+	sequence[seq_pos++] = str_tmp[3];
+	group_start++;
+      }
+      
+      //printf("Get sequence 3\n");
+      if (group_start <= group_end) {  
+	str_tmp = genome->code_table[genome->X[group_start]];
+	for(unsigned int i = 0; i <= nucleotide_end; i++){
+	  sequence[seq_pos++] = str_tmp[i];
+	}
+      }
+      
+      printf("%i\n", seq_pos);
+      sequence[seq_pos] = '\0';
+
+      //-----------------------------------------------------------------------------------
+
+      char *ref_n = &sa_index->genome->S[sa_index->SA[*low]] + sa_index->k_value;
+      char r[1024];
+      strncpy(r, ref_n, strlen(seq) + 1);
+      r[strlen(seq) + 1] = '\0';
+
+      int chrom;
+      for (int c = 0; c < genome->num_chromosomes; c++) {
+	if (start_g >= genome->chr_offset[c]) {
+	  chrom = c;
+	}
+      }
+      
+      size_t g_start = start_g - sa_index->genome->chrom_offsets[chrom];
+      
+      if (strcmp(sequence, r) != 0) {
+	printf("[%i]%lu - %lu : %s\n", chrom, g_start, g_start + strlen(seq), sequence);
+	printf("[%i]%lu - %lu : %s\n", chrom, g_start, g_start + strlen(seq), r);
+	exit(-1);
+      }
+      */
+      ///////////////////////////////////////////
 
 size_t search_suffix_rna(char *seq, uint len, int max_num_suffixes,
 			 sa_index3_t *sa_index,  size_t *low, size_t *high, 
@@ -206,44 +278,122 @@ size_t search_suffix_rna(char *seq, uint len, int max_num_suffixes,
     if (num_prefixes == 1) {
       query = seq + sa_index->k_value;
       
-      //char *ref;
-      char ref[strlen(seq)];      
+      //char ref[strlen(seq)];      
       size_t start_g = sa_index->SA[*low] + sa_index->k_value;
       size_t end_g = start_g + strlen(seq);
-      genome_read_sequence_sa(ref, &start_g, &end_g, genome);
+      //genome_read_sequence_sa(ref, &start_g, &end_g, genome);
 
-      //ref = &sa_index->genome->S[sa_index->SA[*low]] + sa_index->k_value;
+      size_t group_start = start_g/4;
+      size_t group_end   = end_g/4;
+
+      size_t nucleotide_start = start_g%4;
+      size_t nucleotide_end   = end_g%4;
+
+      unsigned int seq_pos = 0;
+      char *str_tmp;
+
       matched = 0;
-      while (query[matched] == ref[matched]) {
-	matched++;
+      int mismatch = 0;
+      str_tmp = genome->code_table[genome->X[group_start]];
+      for(unsigned int i = nucleotide_start; i < 4; i++){
+	if (str_tmp[i] == query[matched]) { matched++; }
+	else { mismatch = 1; break; }
       }
+      group_start++;
+
+      if (!mismatch) {	
+	while (group_start < group_end) {
+	  str_tmp = genome->code_table[genome->X[group_start]];
+	  if (str_tmp[0] == query[matched]) { matched++; }
+	  else { mismatch = 1; break; }
+	  if (str_tmp[1] == query[matched]) { matched++; }
+	  else { mismatch = 1; break; }
+	  if (str_tmp[2] == query[matched]) { matched++; }
+	  else { mismatch = 1; break; }
+	  if (str_tmp[3] == query[matched]) { matched++; }
+	  else { mismatch = 1; break; }
+	  
+	  group_start++;
+	}
+      }
+
+      if (!mismatch) {
+	if (group_start <= group_end) {  
+	  str_tmp = genome->code_table[genome->X[group_start]];
+	  for(unsigned int i = 0; i <= nucleotide_end; i++){
+	    if (str_tmp[i] == query[matched]) { matched++; }
+	    else { mismatch = 1; break; }
+	  }
+	}
+      }
+
+      //ref = &sa_index->genome->S[sa_index->SA[*low]] + sa_index->k_value;      
+      //matched = 0;
+      //while (query[matched] == ref[matched]) {
+      //matched++;
+      //}
+
       *high = *low;
       *suffix_len = matched + sa_index->k_value;
       num_suffixes = num_prefixes;
+
     } else {
       for (size_t i = *low; i < *high; i++) {
 	query = seq + sa_index->k_value;
-	//ref = &sa_index->genome->S[sa_index->SA[i]] + sa_index->k_value;
-	//char old_ref[strlen(seq)];
 
-	char ref[strlen(seq)];
+	//char ref[strlen(seq)];
 	size_t start_g = sa_index->SA[i] + sa_index->k_value;
 	size_t end_g = start_g + strlen(seq);
-	genome_read_sequence_sa(ref, &start_g, &end_g, genome);
-
-	//printf("GET genome %lu - %lu\n", start_g, end_g);
-	//printf("strcpy\n");
-	//strncpy(old_ref, &sa_index->genome->S[sa_index->SA[i]] + sa_index->k_value, strlen(seq));
 	
-	//printf("NEW: %s\n", new_ref);
-	//printf("OLD: %s\n", old_ref);
+	size_t group_start = start_g/4;
+	size_t group_end   = end_g/4;
+	
+	size_t nucleotide_start = start_g%4;
+	size_t nucleotide_end   = end_g%4;
 
-	//exit(-1);
+	unsigned int seq_pos = 0;
+	//genome_read_sequence_sa(ref, &start_g, &end_g, genome);
 
 	matched = 0;
-	while (query[matched] == ref[matched]) {
-	  matched++;
+	int mismatch = 0;
+	char *str_tmp = genome->code_table[genome->X[group_start]];
+	for(unsigned int i = nucleotide_start; i < 4; i++){
+	  if (str_tmp[i] == query[matched]) { matched++; }
+	  else { mismatch = 1; break; }
 	}
+	group_start++;
+	
+	if (!mismatch) {	
+	  while (group_start < group_end) {
+	    str_tmp = genome->code_table[genome->X[group_start]];
+	    if (str_tmp[0] == query[matched]) { matched++; }
+	    else { mismatch = 1; break; }
+	    if (str_tmp[1] == query[matched]) { matched++; }
+	    else { mismatch = 1; break; }
+	    if (str_tmp[2] == query[matched]) { matched++; }
+	    else { mismatch = 1; break; }
+	    if (str_tmp[3] == query[matched]) { matched++; }
+	    else { mismatch = 1; break; }
+	    
+	    group_start++;
+	  }
+	}
+	
+	if (!mismatch) {
+	  if (group_start <= group_end) {  
+	    str_tmp = genome->code_table[genome->X[group_start]];
+	    for(unsigned int i = 0; i <= nucleotide_end; i++){
+	      if (str_tmp[i] == query[matched]) { matched++; }
+	      else { mismatch = 1; break; }
+	    }
+	  }
+	}
+
+	//matched = 0;
+	//while (query[matched] == ref[matched]) {
+	//matched++;
+	//}
+
 	if (matched > max_matched) {
 	  first = i;
 	  last = i;
@@ -266,6 +416,7 @@ size_t search_suffix_rna(char *seq, uint len, int max_num_suffixes,
     }
   }
   
+
   
   return num_suffixes;
   

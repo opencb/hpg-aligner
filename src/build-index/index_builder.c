@@ -173,13 +173,14 @@ void run_index_builder(int argc, char **argv, char *mode_str) {
     char binary_filename[strlen(options->index_filename) + 128];
     sprintf(binary_filename, "%s/dna_compression.bin", options->index_filename);
     printf("Generating SA Index...\n");
-    sa_index3_build_k18(options->ref_genome, prefix_value, options->index_filename);
-    generate_codes(binary_filename, options->ref_genome);
+    //sa_index3_build_k18(options->ref_genome, prefix_value, options->index_filename);
+    //generate_codes(binary_filename, options->ref_genome);
     printf("SA Index generated!\n");
 
-    LOG_DEBUG("Compressing reference genome...\n");
-    generate_codes(binary_filename, options->ref_genome);
-    LOG_DEBUG("...done !\n");
+    //LOG_DEBUG("Compressing reference genome...\n");
+    generate_codes_4_chunk(binary_filename, options->ref_genome);
+    printf("End\n");
+    //LOG_DEBUG("...done !\n");
 
   } else {
     char binary_filename[strlen(options->index_filename) + 128];

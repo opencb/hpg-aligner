@@ -382,30 +382,30 @@ void sa_index3_parallel_genome_new(char *sa_index_dirname, int num_threads,
 	char filename_tab[strlen(sa_index_dirname) + 1024];
 
 	// read S from file
-	/*
-	sprintf(filename_tab, "%s/%s.S", sa_index_dirname, prefix);
-	f_tab = fopen(filename_tab, "rb");
-	if (f_tab == NULL) {
-	  printf("Error: could not open %s to write\n", filename_tab);
-	  exit(-1);
-	}
+
+	//sprintf(filename_tab, "%s/%s.S", sa_index_dirname, prefix);
+	//f_tab = fopen(filename_tab, "rb");
+	//if (f_tab == NULL) {
+	//printf("Error: could not open %s to write\n", filename_tab);
+	//exit(-1);
+	//}
 	//  printf("genome: filename %s, length = %lu\n", filename_tab, genome_len);
-	S = (char *) malloc(genome_len);
+	//S = (char *) malloc(genome_len);
   
 	//printf("\nreading S from file %s...\n", filename_tab);
-	gettimeofday(&start, NULL);
-	num_items = fread(S, sizeof(char), genome_len, f_tab);
-	if (num_items != genome_len) {
-	  printf("Error: (%s) mismatch num_items = %i vs length = %i\n", 
-		 filename_tab, num_items, genome_len);
-	  exit(-1);
-	}
-	gettimeofday(&stop, NULL);
+	//gettimeofday(&start, NULL);
+	//num_items = fread(S, sizeof(char), genome_len, f_tab);
+	//if (num_items != genome_len) {
+	//printf("Error: (%s) mismatch num_items = %i vs length = %i\n", 
+	//	 filename_tab, num_items, genome_len);
+	//exit(-1);
+	//}
+	//gettimeofday(&stop, NULL);
 	//printf("end of reading S (%lu len) from file %s in %0.2f s\n", 
 	//	     genome_len, filename_tab,
 	//	     (stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0f);      
-	fclose(f_tab);
-	*/
+	//fclose(f_tab);
+
 	genome = sa_genome3_new(genome_len, num_chroms, 
 				chrom_lengths, chrom_names, S);
       
