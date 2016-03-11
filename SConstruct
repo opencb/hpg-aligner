@@ -36,9 +36,6 @@ env = Environment(tools = ['default', 'packaging'],
 		  LIBS = ['m', 'z', 'bioinfo', 'common'],
                   LINKFLAGS = ['-fopenmp'])
 
-#env['CPPPATH'] += ["/home/user/gperftools-2.4-icc/include/"]
-#env['LIBPATH'] += ['/home/user/gperftools-2.4-icc/lib/']
-#env['LIBS']    += ["tcmalloc"]
 
 compiler_index = ARGUMENTS.get('compiler', 'gcc')
 #compiler_index = 'icc'
@@ -55,9 +52,9 @@ env_index = Environment(tools = ['default', 'packaging'],
 
 
 env['CFLAGS']  += ' -D_MPI'
-env['LIBS']    += ["tcmalloc_minimal"]
-env['CPPPATH'] += ['/home/hmartinez/gperftools-install/include/'] #change path tcmalloc
-env['LIBPATH'] += ['/home/hmartinez/gperftools-install/lib/'] #change path tcmalloc 
+env['LIBS']    += ["tcmalloc"]
+env['CPPPATH'] += ['/user/include/']  #change path tcmalloc here (absolute path)
+env['LIBPATH'] += ['/usr/lib/']      #change path tcmalloc here (absolute path)
    
 
 

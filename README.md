@@ -40,27 +40,22 @@ DOWNLOAD and BUILDING
     Resolving deltas: 100% (4430/4430), done.
     Submodule path 'lib/hpg-libs': checked out '962f531ef0ffa2a6a665ae6fba8bc2337c4351a9'
 
-  For the most recent HPG Aligner version, choose the 'develop-multi' Git branch (both for the hpg-libs and the HPG Aligner):
-
     $ cd lib/hpg-libs
-    $ git checkout develop-multi
+    $ git checkout develop-multi-fifo-output
     $ cd ../..
-    $ git checkout develop-multi
+    $ git checkout develop-multi-fifo-output
 
-  For build HPG Aligner yo need Git, GCC, Scons and Tcmalloc library. If some of they are not install in your system, you can try for Ubuntu and Debian:
+  For building HPG Aligner you need Git, GCC, Scons and Tcmalloc library. If some of them are not install in your system, you can try for Ubuntu and Debian:
 
-    $ apt-get install git 
-    $ apt-get install gcc
-    $ apt-get install scons
-    $ Tcmalloc library, http://code.google.com/p/gperftools/
+    $ sudo apt-get install gcc scons
 	
   And you can try for Centos and Fedora:
     
-    $ yum install git 
-    $ yum install gcc
-    $ yum install scons
-    $ Tcmalloc library, http://code.google.com/p/gperftools/
-    
+    $ sudo yum install gcc scons
+
+  By other hand, you need install Tcmalloc library with the link http://code.google.com/p/gperftools/. Once installed, you need change Tcmalloc path in SConstruct
+  by the correct.
+  
   Finally, use Scons to build the HPG Aligner application:
 
     $ scons
@@ -78,7 +73,7 @@ RUNING
 
     $ mpirun -np 3 -hosts compute-0,compute-1,compute-0 ./bin/hpg-multialigner rna -c "tophat2 --no-convert-bam -p 16 --no-sort-bam -o %O /work/genomes/bowtie/hs.73 %I" -i /work/user/bwt-index/ -f /work/user/datasets/10M_100nt_r0.001.rna.fastq -o /work/user/tophat.out --tmp-path /work/user/partial-output
 
-  If you want process with the second phase to improve the alignments results, you can activate this with '--second-phase' option. The reads no mapped or incompleted mapped will be remapped with HPG Aligner, if you want other mapper you can indicate this with '--second-command' option.
+  If you want execute with the second phase to improve the alignments results, you can activate this with '--second-phase' option. By default, the reads no mapped or incompletedly mapped will be remapped with HPG Aligner, if you want other mapper you can indicate this with '--second-command' option.
 
   Example, run with RNA, Tophat, second phase and two nodes:
 
