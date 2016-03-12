@@ -53,9 +53,9 @@ env_index = Environment(tools = ['default', 'packaging'],
 
 env['CFLAGS']  += ' -D_MPI'
 env['LIBS']    += ["tcmalloc"]
-env['CPPPATH'] += ['/user/include/']  #change path tcmalloc here (absolute path)
-env['LIBPATH'] += ['/usr/lib/']      #change path tcmalloc here (absolute path)
-   
+
+env['CPPPATH'] += ['/user/include/']  # tcmalloc include absolute path
+env['LIBPATH'] += ['/usr/lib/']      # tcmalloc library absolute path
 
 
 if int(ARGUMENTS.get('debug', '0')) == 1:
