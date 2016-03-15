@@ -19,43 +19,6 @@ int total_writes;
 
 int mapper_mode;
 
-    /*
-    char* optional_fields = (char*) bam1_aux(bam_line);
-    int i = 0;
-    printf("Size %i: ", bam_line->l_aux);
-    while (i < bam_line->l_aux) {
-        printf("%c", optional_fields[i++]);
-	printf("%c:%c: ", optional_fields[i++], optional_fields[i++]);
-    }
-    printf("\n");
-    */
-    
-    /*
-    char rnext[4] = "*\0";    
-    int pnext = 0, tlen = 0;
-    
-    convert_to_quality_string_length(qual_tmp, bam1_qual(bam_line), bam_line->core.l_qseq, 33);
-    BAM_convert_to_sequence(seq_tmp, bam1_seq(bam_line), bam_line->core.l_qseq);
-
-    
-    sprintf(SAM_line_out, "%s\t%i\t%s\t%i\t%i\t%s\t%s\t%i\t%i\t%s\t%s\t%s\n", 
-	    bam1_qname(bam_line), 
-	    bam_line->core.flag,
-	    bam_header->target_name[bam_line->core.tid],
-	    bam_line->core.pos + 1,
-	    bam_line->core.qual,
-	    cigar,
-	    rnext,
-	    pnext,
-	    tlen,
-	    seq_tmp,
-	    qual_tmp,
-	    op_tmp);
-    */
-    
-    //printf("%s\n", SAM_line_out);
-    //exit(-1);
-
 
 void sa_index3_parallel_genome_new(char *sa_index_dirname, int num_threads,
 				   sa_index3_t **sa_index_out) {  
@@ -411,71 +374,6 @@ void sa_index3_parallel_genome_new(char *sa_index_dirname, int num_threads,
   }
 }
 
-//--------------------------------------------------------------------------------------
-
-/*
-//Return TMP_PATH name
-int split_input_file(char *fq_str, char *tmp_path, int numprocs) {
-
-  FILE *tmp_fd;
-  FILE *fq_file = fopen(fq_str, "r");
-
-  //Prepare PATH tmp files
-  create_directory(tmp_path);
-  
-  int count;
-  char header1[MAX_READ_ID_LENGTH];
-  char sequence[MAX_READ_SEQUENCE_LENGTH];
-  char header2[MAX_READ_ID_LENGTH];
-  char qualities[MAX_READ_SEQUENCE_LENGTH];
-
-  char *res;
-
-  char tmp_file[1024];
-  int file_id = 0;
-
-  int reads_split = ;
-  
-  res = fgets(header1, MAX_READ_ID_LENGTH, fq_file);
-  
-  while (res) {    
-    sprintf(tmp_file, "%s/%i.tmp", tmp_path, file_id);
-    tmp_fd = fopen(tmp_file, "w");
-    count = 0;
-    
-    while (count < reads_split) {      
-      res = fgets(sequence, MAX_READ_SEQUENCE_LENGTH, fq_file);
-      res = fgets(header2, MAX_READ_ID_LENGTH, fq_file);
-      res = fgets(qualities, MAX_READ_SEQUENCE_LENGTH, fq_file);
-
-      fputs(header1, tmp_fd);
-      fputs(sequence, tmp_fd);
-      fputs(header2, tmp_fd);
-      fputs(qualities, tmp_fd);
-      
-      count++;
-
-      res = fgets(header1, MAX_READ_ID_LENGTH, fq_file);
-      if (!res) break;
-    }
-    
-    fclose(tmp_fd);   
-    //if (!res) break;    
-    file_id++;    
-    
-  }
-  
-  
-  
-  fclose(fq_file);
-
-  //file_id++;
-  //printf("Split file in %i\n", file_id);
-  
-  return file_id;
-  
-}
-*/
 
 
 int split_input_file(char *fq_str, char *tmp_path, int numprocs) {
@@ -503,8 +401,8 @@ int split_input_file(char *fq_str, char *tmp_path, int numprocs) {
     fgets(line, 2048, fq_file);
     while (line[0] != '@') {
       offset += strlen(line);
-      fgets(line, 2048, fq_file);
-    }      
+      if (fgets(line, 2048, fq_file) == NULL) { break; }
+    }
     seek_bytes += offset;
     reads_positions[i] = seek_bytes;
     seek_bytes += inc_bytes;
@@ -950,155 +848,6 @@ int align_to_file(int line_format, char *align_str, char *align_tmp, FILE *fd_bu
 
 
 
-/*
-void *multialigner_second_phase_reader(void *input) {
-  wf_input_t *wf_input = (wf_input_t *) input;
-  batch_t *new_batch = NULL;
-  batch_t *batch = wf_input->batch;
-  fastq_batch_reader_input_t *fq_reader_input = wf_input->fq_reader_input;
-
-  const int MAX_READS = 200;
-  array_list_t *reads = array_list_new(MAX_READS, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
-  int n_reads = 0;
-  
-  FILE *fd = fq_reader_input.file1;
-
-  while (fgets(line, 4096, fd)) {
-    if (line[0] == '@') { continue; }
-
-    n_reads++;
-    if (n_reads >= MAX_READS) { break; }
-  }
-  
-  strcpy(line_strtok, line);
-  strcpy(line_tmp, line);
-  if (is_correct_or_to_buffer(line_strtok, line_tmp, second_phase, avls_list, metaexons, genome)) {
-    //Update metaexon and AVL
-	strcpy(&buffer[len_buffer], line);
-	len_buffer += strlen(line);	  
-  }
-  
-  while (fgets(line, 4096, fd)) {
-    strcpy(line_strtok, line);
-    strcpy(line_tmp, line);
-    if (is_correct_or_to_buffer(line_strtok, line_tmp, second_phase, avls_list, metaexons, genome)) {	    
-      if (len_buffer + strlen(line) >= MAX_BUFFER) {
-	MPI_Send(buffer, MAX_BUFFER, MPI_CHAR, w_rank, 1, MPI_COMM_WORLD);
-	len_buffer = 0;
-      }
-      strcpy(&buffer[len_buffer], line);
-      len_buffer += strlen(line);
-    }
-  }
-  
-
-     size_t num_reads = array_list_size(reads);
-
-     if (num_reads == 0) {
-	  array_list_free(reads, (void *)fastq_read_free);
-     } else {
-	  mapping_batch_t *mapping_batch = mapping_batch_new(reads, 
-							     batch->pair_input->pair_mng);
-
-	  new_batch = batch_new(batch->bwt_input, batch->region_input, batch->cal_input, 
-				batch->pair_input, batch->preprocess_rna, batch->sw_input, batch->writer_input, 
-				batch->mapping_mode, mapping_batch, batch->data_out);
-     }
-
-     //if (time_on) { stop_timer(start, end, time); timing_add(time, FASTQ_READER, timing); }
-     //printf("Read batch %i\n", num_reads);
-     
-     return new_batch;
-
-  for (int i = 0; i < array_list_size(files_found); i++) {
-    char *file = array_list_get(i, files_found);
-    int type   = array_list_get(i, files_type);
-      
-    char file_path[strlen(file) + strlen(node_out) + 1024];
-    sprintf(file_path, "%s/%s", node_out, file);
-      
-    FILE *fd = fopen(file_path, "r");
-    char line[4096], line_strtok[4096], line_tmp[4096];
-    char *point;
-    size_t nlines = 0;
-      
-    if (type == 1) {
-	
-    } else if (type == 2) { 
-      //TODO: Read BAM
-      continue;
-    }
-      
-  } //end for
-  
-}
-*/
-
-/*
-void genome_fasta(char *path) {
-
-  DIR *dir;
-  struct dirent *ent;
-  int n_files = 0;
-  char *file_name;
-  
-  if ((dir = opendir (path)) != NULL) {
-    while ((ent = readdir (dir)) != NULL) {
-      //printf ("\t%s\n", ent->d_name);
-      if (strstr(ent->d_name, "fa") != NULL) {
-	if (n_files == 1) {
-	  printf("Error more than one fasta files found\n");
-	  exit(-1);
-	}
-	file_name = strdup(ent->d_name);
-	n_files++;
-      }
-    }
-    closedir (dir);
-  } else {
-    printf("Directory not found\n");
-    exit(-1);
-  }
-
-  char path_fa[strlen(path) + strlen(file_name) + 1024];
-  sprintf(path_fa, "%s/%s", path, file_name);
-
-
-  FILE *fd = fopen(path_fa, "r");
-  const int MAXLINE = 4096;
-  size_t max_len_genome = 3200000000; //3GB aprox.
-  size_t max_chr = 30;
-  
-  char *genome = (char *)calloc(max_len_genome, sizeof(char));
-  size_t *chr_offset = (size_t *)malloc(sizeof(size_t)*max_chr);
-  char   **chr_name   = (char **)malloc(sizeof(char *)*max_chr);
-
-  
-  char line[MAXLINE];
-  char chr_name[256];
-  int i, j;
-  
-  while (fgets(line, MAXLINE, fd)) {
-    if (line[0] == '>') {
-      //Line start with >
-      i = 1;
-      j = 0;
-      while (line[i] != ' ') {
-	chr_name[j++] = line[i];
-      }
-      chr_name[j] = '\0';
-    } else {
-      strcpy(genome, line);
-    }
-    
-  }
-    fclose(fd);
-
-  
-}
-*/
-
-
 typedef struct th_data {
   int    numprocs;
   char   file_in[1024];
@@ -1180,6 +929,7 @@ typedef struct merge_partial {
   char buffer_node_out[2048];
   char buffer_reads[2048];
 } merge_partial_t;
+
 
 void *partial_results_merge(void *data) {
   // Search files in path  
@@ -1321,152 +1071,6 @@ void *partial_results_merge(void *data) {
   fclose(fd_buffer);
 
 }
-
-/*
-void *partial_results_merge(void *data) {
-  //Search files in path  
-  merge_partial_t *merge_p = (merge_partial_t *)data;
-  int err_exit = 0;
-  int finish = 0;
-  DIR *dir;
-  struct dirent *ent;
-  array_list_t *files_found  = array_list_new(10, 1.25f, COLLECTION_MODE_ASYNCHRONIZED);
-  
-  //Buffer MPI
-  char line[4096];
-  char line_tmp[4096];
-  char line_strtok[4096];
-  
-  FILE *fd_buffer  = merge_p->fd_buffer;
-  int second_phase = merge_p->second_phase; 
-  avls_list_t *avls_list = merge_p->avls_list;
-  metaexons_t *metaexons = merge_p->metaexons;
-  genome_t *genome = merge_p->genome;
-  int w_rank = merge_p->w_rank;
-  
-  //------- Buffer MPI -------//
-  size_t len_buffer = 0;
-  char *buffer = (char *)malloc(MAX_BUFFER*sizeof(char));
-  //------- Buffer MPI -------//
-  
-  while ((dir = opendir(merge_p->buffer_node_out)) == NULL) {
-    
-    sleep(1); //wait a moment, free CPU for other threads
-    
-    pthread_mutex_lock(&merge_p->mutex);
-    if (merge_p->end_process) {
-      err_exit = 1;
-    }
-    pthread_mutex_unlock(&merge_p->mutex);
-    
-    if (err_exit) {
-      printf("PATH OF PARTIAL RESULTS NOT FOUND\n");
-      exit(-1);
-    }
-
-  }
-  
-
-  while (1) {
-    
-    while ((ent = readdir (dir)) != NULL) {      
-
-      if (strstr(ent->d_name, "sam") != NULL) {
-	int insert = 1;
-	for (int j = 0; j < array_list_size(files_found); j++) {
-	  char *name = array_list_get(j, files_found);	
-	  if (strcmp(ent->d_name, name) == 0) {
-	    insert = 0;
-	    break;
-	  }
-	}
-	
-	if (insert) {
-	  array_list_insert(strdup(ent->d_name), files_found);
-	  //READ FILE AND MERGE
-	  char file_path[strlen(ent->d_name) + strlen(merge_p->buffer_node_out) + 1024];
-	  sprintf(file_path, "%s/%s", merge_p->buffer_node_out, ent->d_name);
-	  
-	  FILE *fd = fopen(file_path, "r");
-	  size_t fd_total_bytes = 0;
-	  int br = 0;
-	  
-	  while (!fd_total_bytes) {
-	    fseek(fd, 0L, SEEK_END);
-	    fd_total_bytes = ftell(fd);
-	  }
-	  fseek(fd, 0L, SEEK_SET);
-	  
-	  while (1) {
-	    if (fgets(line, 4096, fd) != NULL) {
-	      if (line[0] != '@') {
-		if (line[strlen(line) - 1] != '\n') {
-		  //Line truncated...
-		  fseek(fd, -1*strlen(line), SEEK_CUR);
-		  continue;
-		}
-		
-		strcpy(line_strtok, line);
-		strcpy(line_tmp, line);
-	      
-		if (align_to_file(SAM_FILE, line_strtok, line_tmp, fd_buffer, second_phase,
-				  avls_list, metaexons, genome, NULL, NULL, NULL)) {
-		  if (len_buffer + strlen(line) >= MAX_BUFFER) {
-		    MPI_Send(buffer, MAX_BUFFER, MPI_CHAR, w_rank, 1, MPI_COMM_WORLD);
-		    len_buffer = 0;
-		  }
-		  strcpy(&buffer[len_buffer], line);
-		  len_buffer += strlen(line);	  
-		}
-	      }
-	    }
-
-	    pthread_mutex_lock(&merge_p->mutex);
-	    if (merge_p->end_process && feof(fd)) {
-	      br = 1;
-	    }
-	    pthread_mutex_unlock(&merge_p->mutex);
-	    
-	    if (br) { break; }
-	    
-	  }
-	}	
-      }
-      
-    } //Loop files in Dir...
-    
-    pthread_mutex_lock(&merge_p->mutex);
-    if (merge_p->end_process) {
-      finish = 1;
-    }
-    pthread_mutex_unlock(&merge_p->mutex);    
-
-    if (finish) {
-      closedir(dir);
-      break;
-    }
-    
-    closedir(dir); 
-    if ((dir = opendir(merge_p->buffer_node_out)) == NULL) {
-      printf("ERROR OPENING RESULTS DIRECTORY\n");
-      exit(-1);
-    }
-
-  } //Close While(1)
-  
-  
-  if (len_buffer) {
-    MPI_Send(buffer, MAX_BUFFER, MPI_CHAR, w_rank, 1, MPI_COMM_WORLD);
-  }
-  
-  strcpy(buffer, "END");
-  MPI_Send(buffer, MAX_BUFFER, MPI_CHAR, w_rank, 1, MPI_COMM_WORLD);  
-
-  free(buffer);
-  array_list_free(files_found, (void *)free);
-  
-}
-*/
 
 
 int hpg_multialigner_main(int argc, char *argv[]) {
@@ -2427,7 +2031,7 @@ int hpg_multialigner_main(int argc, char *argv[]) {
 	  if (numprocs >= 2) {
 	    //================================= MERGE METAEXON AND AVL ============================//             
 	    unsigned long num_sj;        
-	    int numprocs_merge = numprocs - 1;
+	    int numprocs_merge = numprocs;
 	    int dec_s = 1;
 	    int dec_r = 2;
 	    int send, recv;
@@ -3331,7 +2935,7 @@ int hpg_multialigner_main(int argc, char *argv[]) {
       //============================================================//
       //== Package structures ==//    
       unsigned long num_sj;        
-      int numprocs_merge = numprocs - 1;
+      int numprocs_merge = numprocs;
       int dec_s = 1;
       int dec_r = 2;
       int send, recv;

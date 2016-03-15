@@ -1,102 +1,145 @@
-HPG Aligner README
+MPI HPG Aligner generic framework README
+========================================
 
-Welcome to HPG Aligner !
+Welcome to MPI HPG Aligner generic framework!
 
-HPG Aligner is an ultrafast and highly sensitive Next-Generation Sequencing (NGS) read mapping.
+HPG Aligner is an ultra fast and highly sensitive Next-Generation
+Sequencing (NGS) DNA-Seq and RNA-Seq aligner. MPI HPG Aligner generic
+framework is an alignment framework that can be leveraged to
+coordinately run any *single-node* DNA-Seq or RNA-Seq aligner, taking
+advantage of the resources of a cluster, without having to modify any
+portion of the original software.
 
-COMPONENTS
+
+Components
 ----------
 
- hpg-aligner - The executable file to map DNA/RNA sequences
+* ``hpg-aligner`` - An ultra fast and highly sensitive NGS DNA-Seq and
+  RNA-Seq aligner.
+* ``hpg-multialigner`` - An MPI generic-aligner framework.
 
 
-CONTACT
-------- 
-  You can contact any of the following developers:
+Contact
+-------
 
-    * Héctor Matínez (martneh@uji.es)
+If required, please contact Héctor Martínez <martineh@uji.es> for
+assistance.
 
 
-DOWNLOAD and BUILDING
----------------------
+Installation
+------------
 
-  HPG Aligner has been opened to the community and released in GitHub, so you can download by invoking the following commands:
+HPG Aligner is open source and can be freely downloaded from
+GitHub. To download the MPI HPG Aligner generic framework with
+overlapped input and output version, please issue the following
+commands:
 
     $ git clone https://github.com/opencb/hpg-aligner.git
-    Cloning into 'hpg-aligner'...
-    remote: Reusing existing pack: 1441, done.
-    remote: Total 1441 (delta 0), reused 0 (delta 0)
-    Receiving objects: 100% (1441/1441), 1.85 MiB | 122 KiB/s, done.
-    Resolving deltas: 100% (882/882), done.
-
     $ cd hpg-aligner
-
     $ git submodule update --init
-    Submodule 'lib/hpg-libs' (https://github.com/opencb/hpg-libs.git) registered for path 'lib/hpg-libs'
-    Cloning into 'lib/hpg-libs'...
-    remote: Reusing existing pack: 7735, done.
-    remote: Total 7735 (delta 0), reused 0 (delta 0)
-    Receiving objects: 100% (7735/7735), 26.82 MiB | 79 KiB/s, done.
-    Resolving deltas: 100% (4430/4430), done.
-    Submodule path 'lib/hpg-libs': checked out '962f531ef0ffa2a6a665ae6fba8bc2337c4351a9'
-
     $ cd lib/hpg-libs
     $ git checkout develop-multi-fifo-output
     $ cd ../..
     $ git checkout develop-multi-fifo-output
 
-  For building HPG Aligner you need Git, GCC, Scons and Tcmalloc library. If some of them are not install in your system, you can try for Ubuntu and Debian:
+To build MPI HPG Aligner generic framework, the next software should
+be installed first: GCC, Scons, and the TCMALLOC library. To install
+GCC and Scons on Ubuntu and Debian, please use:
 
     $ sudo apt-get install gcc scons
 	
-  And you can try for Centos and Fedora:
+On CentOs and Fedora:
     
     $ sudo yum install gcc scons
 
-  By other hand, you need install Tcmalloc library with the link http://code.google.com/p/gperftools/. Once installed, you need change Tcmalloc path in SConstruct
-  by the correct.
-  
-  Finally, use Scons to build the HPG Aligner application:
+To install the TCMALLOC library, please follow the instructions at
+<https://github.com/gperftools/gperftools/>. Once installed, please
+update the TCMALLOC include and library absolute paths defined in the
+``hpg-aligner/SConstruct`` file.
+
+Once GCC, Scons, and TCMALLOC are installed, MPI HPG Aligner generic
+framework can be built using the following command on the
+``hpg-aligner`` directory:
 
     $ scons
-  
-RUNING
--------
-	
-  For run HPG Multi Aligner Framework , you must select first 'dna/rna' mode, next with '-c' command, select the command line of the mapper with '%I' for input file and '%O' for output file or output path. After that, select the input file with '-f' and output with '-o', if the mapper needs a temporal file to write the partial output, you can indicate it with the option '--tmp-file', and if you want to write the partial output in a temporal path (hard disk of the nodes) you can indicate it with the option '--tmp-path'. For RNA mode, you must indicate with '-i' option the path for BWT INDEX or SA INDEX of HPG Aligner.
-  
-  Example, run with DNA, Bowtie and two nodes:
+
+
+Usage
+-----
+
+For running the MPI HPG Aligner generic framework, you must use
+``mpirun`` to execute ``/bin/hpg-multialigner`` with the following
+options:
+
+1. Which kind of sequencing should be performed: ``dna`` or ``rna``.
+
+2. The command line of the mapper to be used on the first phase
+   (``-c`` option).The mapper command line must use ``%I`` for the
+   input file and ``%O`` for the output file or path.
+
+3. A temporary file path, if the mapper requires
+   one (``--tmp-file`` option).
+
+4. Select the input file (``-f`` option).
+
+5. Select the output (``-o`` option).
+
+6. Optionally, a path to the temporary nodes output (``--tmp-path``
+   option). For increased performance, this path should be local to the
+   nodes.
+
+7. Optionally, a second phase that will try to map those reads no
+   mapped by the aligner called on the first phase can be activated
+   (``--second-phase`` option). By default, ``hpg-aligner`` will be
+   used on this second phase.
+
+8. The BWT INDEX or SA INDEX path must be indicated (`-i` option).
+
+9. In case a different aligner is to be used on the second phase, its
+   command line should be indicated (``--second-command`` option).
+
+
+### Usage examples
+
+DNA-Seq, Bowtie, two nodes:
 
     $ mpirun -np 3 -hosts compute-0,compute-1,compute-0 ./bin/hpg-multialigner dna -c "bowtie2 -p 16 -S %O -x /work/user/genomes/bowtie/hs.73 %I" -f /work/user/datasets/40M_300nt_r0.001.bwa.read1.fastq -o /work/user/final-ouput --tmp-path /tmp/patial-output --tmp-file partial-alignments.sam
 
-  Example, run with RNA, Tophat and two nodes:
+
+RNA-Seq, Tophat, two nodes:
 
     $ mpirun -np 3 -hosts compute-0,compute-1,compute-0 ./bin/hpg-multialigner rna -c "tophat2 --no-convert-bam -p 16 --no-sort-bam -o %O /work/genomes/bowtie/hs.73 %I" -i /work/user/bwt-index/ -f /work/user/datasets/10M_100nt_r0.001.rna.fastq -o /work/user/tophat.out --tmp-path /work/user/partial-output
 
-  If you want execute with the second phase to improve the alignments results, you can activate this with '--second-phase' option. By default, the reads no mapped or incompletedly mapped will be remapped with HPG Aligner, if you want other mapper you can indicate this with '--second-command' option.
 
-  Example, run with RNA, Tophat, second phase and two nodes:
+RNA-Seq, Tophat first, HPG Aligner next, two nodes:
 
     $ mpirun -np 3 -hosts compute-0,compute-1,compute-0 ./bin/hpg-multialigner rna -c "tophat2 --no-convert-bam -p 16 --no-sort-bam -o %O /work//genomes/bowtie/hs.73 %I" -i /work/user/bwt-index/ -f /work/user/datasets/10M_100nt_r0.001.rna.fastq -o /work/user/tophat.out --tmp-path /work/user/partial-output --second-phase
 
-  Example, run with RNA, Tophat, second phase with other mapper and two nodes:
+
+RNA-Seq, Tophat first, MapSplice next, two nodes:
 
     $ mpirun -np 3 -hosts compute-0,compute-1,compute-0 ./bin/hpg-multialigner rna -c "tophat2 --no-convert-bam -p 16 --no-sort-bam -o %O /work//genomes/bowtie/hs.73 %I" -i /work/user/bwt-index/ -f /work/user/datasets/10M_100nt_r0.001.rna.fastq -o /work/user/tophat.out --tmp-path /work/user/partial-output --second-phase --second-command "python mapsplice.py -c /work/user/gneomes/map_splice/ -x /work/user/genomes/map_splice/hs.73 -1 %I -p 16 -o %O" 
 
 
-  For generate HPG SA Index:
+Generate HPG SA Index:
 
     $ ./bin/hpg-aligner build-sa-index -g /hpg/genome/human/GRCH_37_ens73.fa -i /tmp/sa-index-human73/ 
 
-  For generate HPG BWT Index:
+
+Generate HPG BWT Index:
 
     $ ./bin/hpg-aligner build-bwt-index -g /home/user/Homo_sapiens.fa -i /home/user/INDEX/  -r 8
 
-ATENTION: 
-     Mvapich2 has an incompatibility with tcmalloc. You can install mvapich2 with "--disable-registration-cache" option or before you run HPG Aligner mpi do:
 
-    $ export MV2_USE_LAZY_MEM_UNREGISTER=0
+MVAPICH2 considerations
+-----------------------
 
+Please, be aware that MVAPICH2 and TCMALLOC does not play nice
+together by default. In order to use MVAPICH2 with MPI HPG Aligner
+generic framework, that relies on TCMALLOC, either install MVAPICH2
+with the ``--disable-registration-cache`` option, or execute the
+following command before calling ``mpirun``:
 
-  If you compile MPI HPG Multi Aligner Framework without tcmalloc the perferomance will be degraded
+	$ export MV2_USE_LAZY_MEM_UNREGISTER=0
 
+Not doing any of the previous could lead to inconsistent results.
