@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import argparse
 import os
 import filecmp
@@ -64,9 +66,15 @@ def run_hpg_aligner():
 #------------------------------------------------
 
 def run_tests(id):
-    outdir = args.outdir + "/" + id
+    if id is None:
+        outdir = args.outdir
+    else:
+        outdir = args.outdir + "/" + args.branch + "/" + id
+
     if not os.path.exists(outdir):
         os.makedirs(outdir)
+
+    print "output results will be stored at folder: " + outdir
 
     # run simultated dataset #1
     print "running tests for simulated dataset #1:"
@@ -89,24 +97,43 @@ def run_tests(id):
     return;
 
 #------------------------------------------------
+# get_commit_id
+#------------------------------------------------
+
+def get_commit_id(name):
+    res = None
+    last_id_filename = args.outdir + "/" + name + "/last.id"
+    curr_id_filename = args.outdir + "/" + name + "/curr.id"
+
+    # get the last commit ID
+    os.system('cd ' + args.hpgdir + '; git log | head -1 | cut -d " " -f2 > ' + last_id_filename)
+
+    # compare the last ID to the current ID
+    cmp = filecmp.cmp(curr_id_filename, last_id_filename) 
+    if cmp:
+        res = None
+    else:
+        # save the last ID and run the benchmarking
+        os.system('cp ' + last_id_filename + ' ' + curr_id_filename)
+        res = (open(last_id_filename)).readline().split('\n', 1)[0]
+    
+    return res;
+
+#------------------------------------------------
 # main function
 #------------------------------------------------
 
-last_id_filename = "/tmp/last.id"
-curr_id_filename = "/tmp/curr.id"
+id = None;
 
-# get the last commit ID
-os.system('cd ~/appl/hpg-aligner; git log | head -1 | cut -d " " -f2 > ' + last_id_filename)
-
-# compare the last ID to the current ID
-cmp = filecmp.cmp(curr_id_filename, last_id_filename) 
-if cmp:
-    print "same commit IDs, nothing to do"
+if args.branch:
+    id = get_commit_i(args.branch)
+    if (id is None):
+        print "no changes for the branch '" + args.branch + "' (same commit IDs): nothing to do"
+    else:
+        print "new commit for branch '" + args.branch + "' (different commit IDs): save the last commit ID and run benchmarking"
+        run_tests(id)
 else:
-    # save the last ID and run the benchmarking
-    os.system('cp ' + last_id_filename + ' ' + curr_id_filename)
-    id = (open(last_id_filename)).readline().split('\n', 1)[0]
-    print "different commit IDs, save the last ID and run benchmarking in folder " + id
+    print "run benchmarking directly (without branch specified)"
     run_tests(id)
-    
+
 print "done!"
