@@ -80,7 +80,7 @@ aligner = envprogram.Program('#bin/hpg-aligner',
 	               Glob('src/sa/*.c'),
 		       "%s/sam_opts.o" % third_party_samtools_path,
 		       "%s/bam_sort.o" % third_party_samtools_path,
-		       "%s/bam_index.o" % third_party_samtools_path,
+#		       "%s/bam_index.o" % third_party_samtools_path,
                       "%s/build/libhpg.a" % hpglib_path,
                       "%s/libbam.a" % third_party_samtools_path,
                       "%s/libhts.a" % third_party_hts_path

@@ -49,6 +49,7 @@ def run_bwa_mem(outdir, fq1, fq2, sam):
     cmd = args.bwadir + "/bwa mem"
     cmd += " -t " + args.cores
     cmd += " " + args.bwaindex + " " + fq1 + " " + fq2 + " > " + outdir + "/" + sam
+    print "Running BWA MEM: " + cmd
     os.system(cmd)
     #time ~/soft/bwa/bwa mem -t 8 ~/data/GRCh38/bwa-index/Homo_sapiens.GRCh38.dna.fa ~/data/GRCh38/sim-datasets/pair1.1M.125nt.fa  ~/data/GRCh38/sim-datasets/pair2.1M.125nt.fa  > out/out.1M.125nt.sam
     return;
@@ -57,8 +58,16 @@ def run_bwa_mem(outdir, fq1, fq2, sam):
 # run HPG Aligner
 #------------------------------------------------
 
-def run_hpg_aligner():
+def run_hpg_aligner(outdir, fq1, fq2, sam):
     print "\trunning HPG Aligner"
+    out = outdir + "/hpg-aligner"
+    os.system("mkdir " + out)
+    cmd = args.hpgdir + "/bin/hpg-aligner dna --report-best"
+    cmd += " -t " + args.cores
+    cmd += " -i " + args.hpgindex + " -f " + fq1 + " -j " + fq2 + " -o " + out
+    print "Running HPG Aligner: " + cmd
+    os.system(cmd)
+    os.system("cp " + out + "/alignments.sam " + outdir + "/" + sam)
     return;
 
 #------------------------------------------------
@@ -78,9 +87,9 @@ def run_tests(id):
 
     # run simultated dataset #1
     print "running tests for simulated dataset #1:"
-    run_bwa_mem(outdir, args.fqdir + "/sim1.pair1.fq", args.fqdir + "/sim1.pair2.fq", "bwamem.sim1.sam")
-    run_hpg_aligner()
-    plot_results(outdir + "/bwamem.sim1.sam", outdir + "/bwamem.sim1.sam", outdir + "/sim1.pdf", "Simulated 1")
+    #run_bwa_mem(outdir, args.fqdir + "/sim1.pair1.fq", args.fqdir + "/sim1.pair2.fq", "bwamem.sim1.sam")
+    run_hpg_aligner(outdir, args.fqdir + "/sim1.pair1.fq", args.fqdir + "/sim1.pair2.fq", "hpgaligner.sim1.sam")
+    plot_results(outdir + "/bwamem.sim1.sam", outdir + "/hpgaligner.sim1.sam", outdir + "/sim1.pdf", "Simulated 1")
 
     # run real dataset #1
 #    print "running tests for real dataset #1:"
