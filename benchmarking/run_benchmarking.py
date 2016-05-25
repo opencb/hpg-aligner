@@ -87,8 +87,8 @@ def run_tests(id):
 
     # run simultated dataset #1
     print "running tests for simulated dataset #1:"
-    #run_bwa_mem(outdir, args.fqdir + "/sim1.pair1.fq", args.fqdir + "/sim1.pair2.fq", "bwamem.sim1.sam")
     run_hpg_aligner(outdir, args.fqdir + "/sim1.pair1.fq", args.fqdir + "/sim1.pair2.fq", "hpgaligner.sim1.sam")
+    run_bwa_mem(outdir, args.fqdir + "/sim1.pair1.fq", args.fqdir + "/sim1.pair2.fq", "bwamem.sim1.sam")
     plot_results(outdir + "/bwamem.sim1.sam", outdir + "/hpgaligner.sim1.sam", outdir + "/sim1.pdf", "Simulated 1")
 
     # run real dataset #1
@@ -111,11 +111,19 @@ def run_tests(id):
 
 def get_commit_id(name):
     res = None
-    last_id_filename = args.outdir + "/" + name + "/last.id"
-    curr_id_filename = args.outdir + "/" + name + "/curr.id"
+    fixed_dir = args.outdir + "/" + name
+    #fixed_dir = args.outdir + "/" + name.replace("/", "-")
+    last_id_filename =  fixed_dir + "/last.id"
+    curr_id_filename = fixed_dir + "/curr.id"
+
+    if not os.path.exists(fixed_dir):
+        os.makedirs(fixed_dir)
+
+    if not os.path.exists(curr_id_filename):
+        open(curr_id_filename, 'a').close()
 
     # get the last commit ID
-    os.system('cd ' + args.hpgdir + '; git log | head -1 | cut -d " " -f2 > ' + last_id_filename)
+    os.system('cd ' + args.hpgdir + '; git checkout ' + name + '; git log | head -1 | cut -d " " -f2 > ' + last_id_filename)
 
     # compare the last ID to the current ID
     cmp = filecmp.cmp(curr_id_filename, last_id_filename) 
@@ -123,6 +131,7 @@ def get_commit_id(name):
         res = None
     else:
         # save the last ID and run the benchmarking
+        os.system('cd ' + args.hpgdir + '; scons')
         os.system('cp ' + last_id_filename + ' ' + curr_id_filename)
         res = (open(last_id_filename)).readline().split('\n', 1)[0]
     
@@ -135,7 +144,7 @@ def get_commit_id(name):
 id = None;
 
 if args.branch:
-    id = get_commit_i(args.branch)
+    id = get_commit_id(args.branch)
     if (id is None):
         print "no changes for the branch '" + args.branch + "' (same commit IDs): nothing to do"
     else:
