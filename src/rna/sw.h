@@ -17,7 +17,7 @@
 #include "aligners/sw/sse.h"
 #include "aligners/sw/emboss.h"
 
-#ifdef __AVX__
+#ifdef __AVX2__
 #define SIMD_DEPTH 8
 #define SIMD_ALIGN 32
 #else

@@ -257,7 +257,13 @@ void sw_simd_context_free(sw_simd_context_t* context_p) {
 void smith_waterman_simd(sw_simd_input_t* input, sw_simd_output_t* output, 
 			 sw_simd_context_t* context) {
 
-  int simd_depth = 4, num_queries = input->depth;
+#ifdef __AVX2__
+  int simd_depth = 8;
+#else
+  int simd_depth = 4;
+#endif // __AVX2__
+
+  int num_queries = input->depth;
   int max_q_len = 0, max_r_len = 0;
 
   //float gap_open = context->gap_open;
@@ -297,11 +303,19 @@ void smith_waterman_simd(sw_simd_input_t* input, sw_simd_output_t* output,
 		    &context->F_size, &context->F, 
 		    &context->aux_size, &context->q_aux, &context->r_aux);
 
-  sse_matrix(num_queries, 
-	     input->seq_p, (int *)input->seq_len_p, max_q_len, 
-	     input->ref_p, (int *)input->ref_len_p, max_r_len, 
+#ifdef __AVX2__
+  avx2_matrix(num_queries, 
+	      input->seq_p, (int *)input->seq_len_p, max_q_len, 
+	      input->ref_p, (int *)input->ref_len_p, max_r_len, 
 	      context->matrix, context->gap_open, context->gap_extend, 
 	      context->H, context->F, context->C, output->score_p);
+#else
+  sse_matrix(num_queries, 
+             input->seq_p, (int *)input->seq_len_p, max_q_len, 
+             input->ref_p, (int *)input->ref_len_p, max_r_len, 
+             context->matrix, context->gap_open, context->gap_extend, 
+	     context->H, context->F, context->C, output->score_p);
+#endif // __AVX2__
   
   simd_traceback(simd_depth, num_queries, 
 		  input->seq_p, (int *)input->seq_len_p, max_q_len, 

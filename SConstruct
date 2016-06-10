@@ -15,6 +15,7 @@ third_party_samtools_path = '#/lib/hpg-libs/third_party/samtools'
 #other_libs = '/home/hmartinez/opt/lib/'
 #other_include = '/home/hmartinez/opt/include/'
 
+simd = ARGUMENTS.get('simd', 'avx2')
 compiler = ARGUMENTS.get('compiler', 'gcc')
 build_tools = [ 'default', 'packaging' ]
 
@@ -26,6 +27,16 @@ env = Environment(tools = build_tools,
                   LIBS = ['curl', 'dl', 'gsl', 'gslcblas', 'm', 'xml2', 'z'],
                   LINKFLAGS = ['-fopenmp'])
 
+if compiler == 'intel':
+   if simd == 'sse':
+	env['CFLAGS'] += ' -msse4.2 -openmp '
+   else:
+	env['CFLAGS'] += ' -march=core-avx2 -ipo -no-prec-div -openmp '
+else:
+   if simd == 'sse':
+	env['CFLAGS'] += ' -msse4.2 -fopenmp '
+   else:
+	env['CFLAGS'] += ' -mavx2 -fopenmp '
 
 if os.environ.has_key('C_INCLUDE_PATH'):
    for dir in os.getenv('C_INCLUDE_PATH').split(':'):
@@ -64,7 +75,7 @@ SConscript(['lib/hpg-libs/SConstruct'])
 #            ], exports = ['env', 'debug', 'compiler'])
 
 envprogram = env.Clone()
-envprogram['CFLAGS'] += ' -DNODEBUG -mssse3 -DD_TIME_DEBUG'
+envprogram['CFLAGS'] += ' -DNODEBUG -DD_TIME_DEBUG'
 
 aligner = envprogram.Program('#bin/hpg-aligner',
              source = [Glob('src/*.c'),
