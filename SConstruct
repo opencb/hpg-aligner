@@ -78,33 +78,34 @@ aligner = envprogram.Program('#bin/hpg-aligner',
 	               Glob('src/rna/*.c'),
 	               Glob('src/bs/*.c'),
 	               Glob('src/sa/*.c'),
-		       "%s/bam_sort.o" % third_party_samtools_path,
-		       "%s/bam_index.o" % third_party_samtools_path,
-                      "%s/build/libhpg.a" % hpglib_path,
-                      "%s/libbam.a" % third_party_samtools_path,
-                      "%s/libhts.a" % third_party_hts_path
-                      ]
-           )
-
-bam  = envprogram.Program('#bin/hpg-bam',
-             source = [Glob('src/tools/bam/*.c'), 
-	     	       Glob('src/tools/bam/aux/*.c'),
-	     	       Glob('src/tools/bam/bfwork/*.c'),
-	     	       Glob('src/tools/bam/recalibrate/*.c'),
-	     	       Glob('src/tools/bam/aligner/*.c'),
-		       "%s/bam_sort.o" % third_party_samtools_path,
-		       "%s/bam_index.o" % third_party_samtools_path,
-                       "%s/build/libhpg.a" % hpglib_path,
-                       "%s/libbam.a" % third_party_samtools_path,
-                       "%s/libhts.a" % third_party_hts_path
-                      ]
-           )
-
-fastq = envprogram.Program('#bin/hpg-fastq',
-             source = [Glob('src/tools/fastq/*.c'), 
                        "%s/build/libhpg.a" % hpglib_path
+#		       "%s/bam_sort.o" % third_party_samtools_path,
+#		       "%s/bam_index.o" % third_party_samtools_path,
+#                      "%s/build/libhpg.a" % hpglib_path,
+#                      "%s/libbam.a" % third_party_samtools_path,
+#                      "%s/libhts.a" % third_party_hts_path
                       ]
            )
+
+#bam  = envprogram.Program('#bin/hpg-bam',
+#             source = [Glob('src/tools/bam/*.c'), 
+#	     	       Glob('src/tools/bam/aux/*.c'),
+#	     	       Glob('src/tools/bam/bfwork/*.c'),
+#	     	       Glob('src/tools/bam/recalibrate/*.c'),
+#	     	       Glob('src/tools/bam/aligner/*.c'),
+#		       "%s/bam_sort.o" % third_party_samtools_path,
+#		       "%s/bam_index.o" % third_party_samtools_path,
+#                      "%s/build/libhpg.a" % hpglib_path,
+#                       "%s/libbam.a" % third_party_samtools_path,
+#                       "%s/libhts.a" % third_party_hts_path
+#                      ]
+#           )
+
+#fastq = envprogram.Program('#bin/hpg-fastq',
+#             source = [Glob('src/tools/fastq/*.c'), 
+#                       "%s/build/libhpg.a" % hpglib_path
+#                      ]
+#           )
 
 #Depends(aligner, bam, fastq)
 

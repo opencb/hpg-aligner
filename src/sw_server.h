@@ -10,6 +10,7 @@
 #include "commons/system_utils.h"
 #include "containers/list.h"
 
+#include "aligners/sw/sw_commons.h"
 #include "aligners/sw/smith_waterman.h"
 #include "aligners/bwt/genome.h"
 
