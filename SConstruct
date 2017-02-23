@@ -7,7 +7,7 @@ commons_path = '#lib/hpg-libs/common-libs'
 #math_path = '#libs/math'
 
 system_include = '/usr/include'
-system_libs = '/usr/lib' 
+system_libs = '/usr/lib64' 
 
 extrae_include = '/home/hmartinez/opt/extrae-2.5.1/include'
 extrae_libs    = '/home/hmartinez/opt/extrae-2.5.1/lib'
@@ -36,8 +36,10 @@ env = Environment(tools = ['default', 'packaging'],
 
 if compiler == "mpicc":
    env['CFLAGS'] += ' -D_MPI'
-   env['LIBS']   += ["tcmalloc"]
+   env['LIBS']   += ["tcmalloc_minimal"]
 
+   env['LIBPATH']  += ["/state/partition1/soft/gnu/gperftools-at8_0-release/lib/"]
+   env['CPPPATH']  += ["/state/partition1/soft/gnu/gperftools-at8_0-release/include/"]	   
 
 if int(ARGUMENTS.get('debug', '0')) == 1:
     debug = 1

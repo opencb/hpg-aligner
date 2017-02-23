@@ -25,6 +25,10 @@
 #define KILL_TH            4
 
 
+#define MPI_TAG            1
+#define MPI_TAG_MNG        2
+#define MPI_TAG_SEEK       3
+
 MPI_Request request_send[TOTAL_BUFFERS];
 int id_send;
 
@@ -1224,12 +1228,115 @@ void *write_sam_header_BWT(genome_t *genome, FILE *f);
 
 
 
+void manager_function(char *file_name) {
+  
+  //MALLEABLE VARIABLE FOR SPLIT FILE
+  int tag_mng  = MPI_TAG_MNG;
+  int tag_seek = MPI_TAG_SEEK;
 
+  size_t split_factor = 10; // Configurable (input parameter?)
+  size_t read_positions[split_factor + 1];
+  
+  //===================================================================//
+  //                               O M P                               //
+  //===================================================================//
+  //                S P L I T    I N P U T    F I L E                  //
+  //===================================================================//
+  
+  FILE *fd = fopen(file_name, "r");
+  if (!fd) { printf("ERROR opening file\n"); exit(-1); }
+    
+  fseek(fd, 0L, SEEK_END);
+  size_t fd_total_bytes = ftell(fd);
+  fseek(fd, 0L, SEEK_SET);
+    
+  int i;
+  size_t seek_bytes = 0;
+  
+  size_t inc_bytes = fd_total_bytes / split_factor;
+    
+  size_t offset;
+  char line[2048];
+    
+  for (i = 0; i < split_factor; i++) {
+    offset = 0;
+    fseek(fd, seek_bytes, SEEK_SET);
+    fgets(line, 2048, fd);
+    while (line[0] != '@') {
+      offset += strlen(line);
+      fgets(line, 2048, fd);
+    }      
+    seek_bytes += offset;
+    read_positions[i] = seek_bytes;
+    seek_bytes += inc_bytes;
+  }
+    
+  read_positions[i] = fd_total_bytes;
+  fclose(fd);
+  
+  //===================================================================//
+  //                                                                   //
+  //===================================================================//    
+
+  size_t actual_tsk = 0;
+  int petition;
+  size_t s_positions[2];
+
+  MPI_Status status;
+
+  //printf("");
+  while (actual_tsk < split_factor) {
+    
+    MPI_Recv(&petition, 1, MPI_INT, MPI_ANY_SOURCE, tag_mng, MPI_COMM_WORLD, &status);
+    
+    s_positions[0] = read_positions[actual_tsk];
+    s_positions[1] = read_positions[actual_tsk + 1];
+    
+    MPI_Send(s_positions, 2*sizeof(size_t), MPI_CHAR, status.MPI_SOURCE, tag_seek, MPI_COMM_WORLD);
+    
+    actual_tsk++;
+
+  }
+  
+  
+  //MPI_Recv & MPI_Send not more work
+  int numprocs;
+  int actual_proc = 0;
+  MPI_Comm_size(MPI_COMM_WORLD, &numprocs);  
+  while (actual_proc < numprocs - 2) {
+    
+    MPI_Recv(&petition, 1, MPI_INT, MPI_ANY_SOURCE, tag_mng, MPI_COMM_WORLD, &status);
+
+    s_positions[0] = -1;
+    s_positions[1] = -1;
+
+    MPI_Send(s_positions, 2*sizeof(size_t), MPI_CHAR, status.MPI_SOURCE, tag_seek, MPI_COMM_WORLD);
+
+    actual_proc++;
+  }
+  
+
+  printf("MANAGER FINISH!\n");
+
+}
+
+
+/*****************************************************************/
+/*****************************************************************/
+// N MPI PROCESS
+// N - 1 : MPI WRITER PRCOESS
+// N - 2 : MPI MANAGER PRCOESS
+/*****************************************************************/
+/*****************************************************************/
 
 void rna_aligner_mpi(options_t *options, int argc, char *argv[]) {
   //MPI Process Files  in the nodes
   FILE* fd_out;
-  int tag = 1;
+
+  int tag = MPI_TAG;
+  int tag_mng  = MPI_TAG_MNG;
+  int tag_seek = MPI_TAG_SEEK;
+
   MPI_Status status;
   int numprocs;
   int rank;
@@ -1312,9 +1419,6 @@ void rna_aligner_mpi(options_t *options, int argc, char *argv[]) {
   t_file = 0;
   //-------------------------------------------//
 
-
-  
-  
   
   //========================= F I L E S    P A T H S ==========================//
   //End fill 
@@ -1342,8 +1446,6 @@ void rna_aligner_mpi(options_t *options, int argc, char *argv[]) {
   sprintf(filename_tab, "%s/params.info", options->bwt_dirname);
   FILE *fd = fopen(filename_tab, "r");
 
-  size_t read_positions[numprocs];
-  
   if (fd) { 
     options->fast_mode = 1; 
     fclose(fd);
@@ -1392,7 +1494,7 @@ void rna_aligner_mpi(options_t *options, int argc, char *argv[]) {
 
   char *file1 = options->in_filename;
 
-  if (rank != numprocs - 1) {    
+  if (rank < numprocs - 2) {    
     printf("[%i] Load genome...\n", rank);
     if (!options->fast_mode) {
       //===================================================================//
@@ -1411,63 +1513,27 @@ void rna_aligner_mpi(options_t *options, int argc, char *argv[]) {
     printf("[%i] Load done!\n", rank);
     
     num_chromosomes = genome->num_chromosomes;
+    
     // Metaexons structure
     metaexons = metaexons_new(genome->num_chromosomes, 
 			      genome->chr_size);    
   }
   
   MPI_Barrier(MPI_COMM_WORLD);
-  
+
+
+
   if (rank == 0) {
-    //printf("Split files...\n");
-    start_timer(start_total);    
+    //TODO: MOVE CORRECT POSITION
+    create_directory(TMP_PATH_BUFFERS);  
 
-    //==== S P L I T    I N P U T    F I L E ====//
-    create_directory(TMP_PATH_BUFFERS);
-    //===================================================================//
-    //                               O M P                               //
-    //===================================================================//
-    //                S P L I T    I N P U T    F I L E                  //
-    //===================================================================//
-    //int total_files = split_input_file(file1, TMP_PATH_FILES, READS_SPLIT);
-    
-    fd = fopen(file1, "r");
-    if (!fd) { printf("ERROR opening file\n"); exit(-1); }
-
-    fseek(fd, 0L, SEEK_END);
-    size_t fd_total_bytes = ftell(fd);
-    fseek(fd, 0L, SEEK_SET);
-    
-    int i;
-    size_t seek_bytes = 0;
-    size_t inc_bytes = fd_total_bytes / (numprocs - 1);
-    size_t offset;
-    char line[2048];
-    
-    for (i = 0; i < numprocs - 1; i++) {
-      offset = 0;
-      fseek(fd, seek_bytes, SEEK_SET);
-      fgets(line, 2048, fd);
-      while (line[0] != '@') {
-	offset += strlen(line);
-	fgets(line, 2048, fd);
-      }      
-      seek_bytes += offset;
-      read_positions[i] = seek_bytes;
-      seek_bytes += inc_bytes;
-    }
-    read_positions[i] = fd_total_bytes;
-    fclose(fd);
-    //===================================================================//
-    //                                                                   //
-    //===================================================================//    
     FILE* fd_p = fopen(output_filename, "w");
     write_sam_header_BWT(genome, (FILE *) fd_p);
     fclose(fd_p);
-    
-  } 
+  }
+   
 
-  MPI_Bcast(read_positions, sizeof(size_t)*numprocs, MPI_CHAR, 0, MPI_COMM_WORLD);
+  //MPI_Bcast(read_positions, sizeof(size_t)*numprocs, MPI_CHAR, 0, MPI_COMM_WORLD);
 
   if (rank == 0) { printf("START PROCESS...\n"); }
   
@@ -1506,7 +1572,7 @@ void rna_aligner_mpi(options_t *options, int argc, char *argv[]) {
   size_t msj_1, msj_2, msj_3;
   size_t mmeta_1, mmeta_2, mmeta_3;
   
-  if (rank != numprocs - 1) {
+  if (rank < numprocs - 2) {
     //==== T A S K S    I N S E R T S ====//
     //int item = init_id;
     //for (int it = 0; it < total_tasks; it++) {
@@ -1670,7 +1736,7 @@ void rna_aligner_mpi(options_t *options, int argc, char *argv[]) {
     }
   }
   
-  MPI_Barrier(MPI_COMM_WORLD);
+  //MPI_Barrier(MPI_COMM_WORLD);
   
   //if (rank == 0) {
   //printf("\t START MAPPING...\n");
@@ -1691,6 +1757,8 @@ void rna_aligner_mpi(options_t *options, int argc, char *argv[]) {
     start_timer(wx_start);
   }
   
+
+  
   //create new communicator
   //--------------------------------------------------------------  
   MPI_Comm new_comm; 
@@ -1699,18 +1767,52 @@ void rna_aligner_mpi(options_t *options, int argc, char *argv[]) {
   
   /* Divide tasks into two distinct groups based upon rank */ 
   //if (rank != numprocs -1) {
-  int ranks_group[numprocs - 1];
-  for (int i = 0; i < numprocs - 1; i++) {
+  int ranks_group[numprocs - 2];
+  for (int i = 0; i < numprocs - 2; i++) {
     ranks_group[i] = i;
   }
-  MPI_Group_incl(orig_group, numprocs - 1, ranks_group, &new_group);
+  MPI_Group_incl(orig_group, numprocs - 2, ranks_group, &new_group);
   
   /* Create new communicator and then perform collective communications */
   MPI_Comm_create(MPI_COMM_WORLD, new_group, &new_comm); 
   
   //--------------------------------------------------------------
-  
-  if (rank != numprocs - 1) {     
+
+  //-> CALL MANAGER
+  if (rank == numprocs - 2) {
+    manager_function(file1);
+  } else if (rank < numprocs - 2) {     
+
+    //===================================================================//
+    //**********************      NEW MPI      **************************//
+    //===================================================================//
+
+    size_t s_positions[2];
+    int petition = 1;
+    MPI_Status status;
+    while (1) {
+      
+      MPI_Send(&petition, 1, MPI_INT, numprocs - 2, tag_mng, MPI_COMM_WORLD);   
+      MPI_Recv(s_positions, 2*sizeof(size_t), MPI_CHAR, numprocs - 2, tag_seek, MPI_COMM_WORLD, &status);
+      
+      size_t start_seek = s_positions[0];
+      size_t end_seek   = s_positions[1];
+
+      printf("[%i]SEEK: %lld - %lld\n", rank, start_seek, end_seek);
+      sleep(1);
+      
+      if ((start_seek == -1) && (end_seek == -1)) { break; }
+
+      
+    }
+
+    printf("[%i]WORKER FINISH!\n", rank);
+
+    //===================================================================//
+    //*******************************************************************//
+    //===================================================================//
+
+    /*
     size_t num_cpus = get_optimal_cpu_num_threads();    
     //==== C R E A T E    P O L L I N G    T H R E A D ====//    
     //=============================//
@@ -1724,8 +1826,15 @@ void rna_aligner_mpi(options_t *options, int argc, char *argv[]) {
     struct timeval start_task, stop_task, start_send, stop_send;
     int w1_tasks = 0;
     
+
+    //==============-----> START loop
+
+    //TODO: MPI Send -> 
+    //TODO: MPI Recv <-
+
     //====       W O R K E R    P R O C E S S    F I L E       ====//
     //=============================================================//
+    
     char file_path[1024];
     char buffer_hc_path[1024];
     
@@ -1787,14 +1896,20 @@ void rna_aligner_mpi(options_t *options, int argc, char *argv[]) {
     }
 
     fclose(f_hc); 
+
+    //==============-----> END loop
     
-    //Send Batches to Write      
     fastq_fclose(reader_input.fq_file1);    
         
     batch_out_t *b = array_list_get(1, data_out->buffer);    
+    //Send Batches to Write      
     MPI_Send(b->data, MAX_BUFFER, MPI_CHAR, numprocs - 1, 1, MPI_COMM_WORLD);
     b->len = 0;
 
+
+
+
+    
 
     //==========================================================================//
     //= M E R G E    M E T A E X O N - A V L     T O    2nd    W O R K F L O W =//
@@ -1802,30 +1917,6 @@ void rna_aligner_mpi(options_t *options, int argc, char *argv[]) {
     printf("[%i]Start merge...\n", rank);
     MPI_Barrier(new_comm);
 
-    //////////////////////////////////////////////////////////////////
-    /*
-    {
-      unsigned long num_sj = get_total_items(num_chromosomes, avls_list);
-      //SEND METAEXON
-      unsigned long num_meta = 0;
-      unsigned long num_left_breaks = 0, num_right_breaks = 0;
-      for (int c = 0; c < metaexons->num_chromosomes; c++) {
-	linked_list_t *metaexon_list = metaexons->metaexons_list[c];
-	linked_list_item_t *item;
-	for (item = metaexon_list->first; item != NULL; item = item->next) {
-	  metaexon_t *metaexon = item->item;
-	  num_left_breaks  += array_list_size(metaexon->left_breaks);
-	  num_right_breaks += array_list_size(metaexon->right_breaks);
-	  num_meta++;	      
-	}
-      }
-      //printf("[%i]num_sj = %lu, num_meta = %lu\n", rank, num_sj, num_meta);      
-      msj_1 = num_sj;
-      mmeta_1 = num_meta;
-    }
-    MPI_Barrier(new_comm);
-    */
-    //////////////////////////////////////////////////////////////////
 
     struct timeval start_BWT, stop_BWT;
     start_timer(start_BWT);
@@ -2178,7 +2269,7 @@ void rna_aligner_mpi(options_t *options, int argc, char *argv[]) {
     //if (rank == 0) {
     //printf("Merge 1 time: %0.2f\n", t_BWT / 1000000);
     //}
-    
+    */
     //End Writer
     char *end = (char *)malloc(sizeof(char)*MAX_BUFFER);
     strcpy(end, "END\0");    
@@ -2205,13 +2296,15 @@ void rna_aligner_mpi(options_t *options, int argc, char *argv[]) {
 	MPI_Recv(recv_buff, MAX_BUFFER, MPI_CHAR, MPI_ANY_SOURCE, 1, MPI_COMM_WORLD, &status);
 	if (strcmp("END", recv_buff) == 0) {
 	  numprocs_end++;
-	  if (numprocs_end == numprocs - 1) {
+	  if (numprocs_end == numprocs - 2) {
 	    break;
 	  }
 	} else {
 	  fwrite(recv_buff, strlen(recv_buff), sizeof(char), fd_out);
 	}    
       }
+
+    printf("WRITER FINISH!\n");
 
     } else {
       
@@ -2280,6 +2373,13 @@ void rna_aligner_mpi(options_t *options, int argc, char *argv[]) {
     }    
     
   }
+
+  //TODO: END WORK, DELETE THIS //
+  MPI_Barrier(MPI_COMM_WORLD);
+  MPI_Finalize();  
+
+  return;
+
   /*
   if (rank == 0) {
     stop_timer(wx_start, wx_stop, wx_time);
@@ -2288,6 +2388,7 @@ void rna_aligner_mpi(options_t *options, int argc, char *argv[]) {
     start_timer(wx_start);
   }
   */
+
   if (options->fast_mode) { goto fast_mode_skip; }
 
   double t_task = 0, t_send = 0;
