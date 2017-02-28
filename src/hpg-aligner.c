@@ -87,6 +87,7 @@ double time_search;
 // main parameters support
 //--------------------------------------------------------------------
 int main(int argc, char* argv[]) {
+  
   pthread_mutex_init(&mtx, NULL);
   time_search = 0;
   
@@ -199,7 +200,7 @@ int main(int argc, char* argv[]) {
   if (MPI_mode) {
     // RNA MPI mode
     #ifdef _MPI
-    rna_aligner_mpi(options, argc, argv);
+    rna_aligner_main_mpi(options, argc, argv);
     //rna_aligner_mpi_work_stealing(options, argc, argv);
     #endif
   } else {  

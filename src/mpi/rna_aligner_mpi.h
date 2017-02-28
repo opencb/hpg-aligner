@@ -43,9 +43,9 @@
 #include "bioformats/fastq/fastq_batch_reader.h"
 #include "aligners/sw/smith_waterman.h"
 
-void rna_aligner_mpi(options_t *options, int argc, char *argv[]);
-//void rna_aligner_mpi_work_stealing(options_t *options, int argc, char *argv[]);
+void rna_aligner_mpi(options_t *options, int argc, char *argv[], size_t *read_positions, size_t split_factor, size_t cnt);
 
+void rna_aligner_main_mpi(options_t *options, int argc, char *argv[]);
 
 size_t MPI_fastq_fread_bytes_se(array_list_t *reads, size_t bytes, fastq_file_t *fq_file);
 void* SA_MPI_producer(void *input);

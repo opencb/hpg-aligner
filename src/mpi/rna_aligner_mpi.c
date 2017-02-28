@@ -1227,37 +1227,32 @@ void *write_sam_header_BWT(genome_t *genome, FILE *f);
 */
 
 
-
-void manager_function(char *file_name) {
-  
-  //MALLEABLE VARIABLE FOR SPLIT FILE
-  int tag_mng  = MPI_TAG_MNG;
-  int tag_seek = MPI_TAG_SEEK;
-
-  size_t split_factor = 10; // Configurable (input parameter?)
-  size_t read_positions[split_factor + 1];
+size_t *split_file_by_chunks(char *file_name) {
   
   //===================================================================//
-  //                               O M P                               //
+  //                              O M P                                //
   //===================================================================//
   //                S P L I T    I N P U T    F I L E                  //
   //===================================================================//
+
+  size_t split_factor = 10; // Configurable (input parameter?)
+  size_t *read_positions = (size_t)malloc((split_factor + 1) * sizeof(size_t));
   
   FILE *fd = fopen(file_name, "r");
   if (!fd) { printf("ERROR opening file\n"); exit(-1); }
-    
+  
   fseek(fd, 0L, SEEK_END);
   size_t fd_total_bytes = ftell(fd);
   fseek(fd, 0L, SEEK_SET);
-    
+  
   int i;
   size_t seek_bytes = 0;
   
   size_t inc_bytes = fd_total_bytes / split_factor;
-    
+  
   size_t offset;
   char line[2048];
-    
+  
   for (i = 0; i < split_factor; i++) {
     offset = 0;
     fseek(fd, seek_bytes, SEEK_SET);
@@ -1270,40 +1265,57 @@ void manager_function(char *file_name) {
     read_positions[i] = seek_bytes;
     seek_bytes += inc_bytes;
   }
-    
+  
   read_positions[i] = fd_total_bytes;
   fclose(fd);
-  
+    
   //===================================================================//
   //                                                                   //
   //===================================================================//    
+ 
+  return read_positions;
+  
+}
 
-  size_t actual_tsk = 0;
+
+
+void manager_function(size_t *read_positions, size_t split_factor, size_t cnt) {
+
+  //MALLEABLE VARIABLE FOR SPLIT FILE
+  int tag_mng  = MPI_TAG_MNG;
+  int tag_seek = MPI_TAG_SEEK;
+
+  //size_t split_factor = 10; // Configurable (input parameter?)
+  //int cnt = 2;
+  
+  //FILE *fd = fopen("BUFFER_READER.txt", "r");
+
+  size_t current_tsk = 0;
   int petition;
   size_t s_positions[2];
-
+  
   MPI_Status status;
 
+
   //printf("");
-  while (actual_tsk < split_factor) {
+  while (current_tsk < cnt) {
     
     MPI_Recv(&petition, 1, MPI_INT, MPI_ANY_SOURCE, tag_mng, MPI_COMM_WORLD, &status);
     
-    s_positions[0] = read_positions[actual_tsk];
-    s_positions[1] = read_positions[actual_tsk + 1];
+    s_positions[0] = read_positions[current_tsk];
+    s_positions[1] = read_positions[current_tsk + 1];
     
     MPI_Send(s_positions, 2*sizeof(size_t), MPI_CHAR, status.MPI_SOURCE, tag_seek, MPI_COMM_WORLD);
     
-    actual_tsk++;
-
+    current_tsk++;
   }
+
   
-  
-  //MPI_Recv & MPI_Send not more work
+  //Write status work for reconfiguration
   int numprocs;
-  int actual_proc = 0;
+  int current_proc = 0;
   MPI_Comm_size(MPI_COMM_WORLD, &numprocs);  
-  while (actual_proc < numprocs - 2) {
+  while (current_proc < numprocs - 2) {
     
     MPI_Recv(&petition, 1, MPI_INT, MPI_ANY_SOURCE, tag_mng, MPI_COMM_WORLD, &status);
 
@@ -1312,13 +1324,17 @@ void manager_function(char *file_name) {
 
     MPI_Send(s_positions, 2*sizeof(size_t), MPI_CHAR, status.MPI_SOURCE, tag_seek, MPI_COMM_WORLD);
 
-    actual_proc++;
+    current_proc++;
   }
   
+  //MPI_Recv & MPI_Send not more work
 
+  
   printf("MANAGER FINISH!\n");
 
 }
+
+
 
 
 /*****************************************************************/
@@ -1328,8 +1344,24 @@ void manager_function(char *file_name) {
 // N - 2 : MPI MANAGER PRCOESS
 /*****************************************************************/
 /*****************************************************************/
+void rna_aligner_main_mpi(options_t *options, int argc, char *argv[]) {
+  
+  size_t *read_positions = split_file_by_chunks(options->in_filename);
+  size_t split_factor = 10; // Configurable (input parameter?)
+  size_t cnt = 2;
+  
+  MPI_Init(&argc, &argv);
+  
+  rna_aligner_mpi(options, argc, argv, read_positions, split_factor, cnt);
+  
+  MPI_Barrier(MPI_COMM_WORLD);
+  //CALL To DMR
 
-void rna_aligner_mpi(options_t *options, int argc, char *argv[]) {
+  MPI_Finalize();  
+  
+}
+
+void rna_aligner_mpi(options_t *options, int argc, char *argv[], size_t *read_positions, size_t split_factor, size_t cnt) {
   //MPI Process Files  in the nodes
   FILE* fd_out;
 
@@ -1379,7 +1411,6 @@ void rna_aligner_mpi(options_t *options, int argc, char *argv[]) {
   argc += 1;
   argv -= 1;
   
-  MPI_Init(&argc,&argv);
   int provided;
   //MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &provided);
   //MPI_Init_thread(&argc, &argv, MPI_THREAD_SERIALIZED, &provided);
@@ -1761,11 +1792,12 @@ void rna_aligner_mpi(options_t *options, int argc, char *argv[]) {
   
   //create new communicator
   //--------------------------------------------------------------  
+  
   MPI_Comm new_comm; 
   MPI_Group orig_group, new_group;
   MPI_Comm_group(MPI_COMM_WORLD, &orig_group); 
   
-  /* Divide tasks into two distinct groups based upon rank */ 
+  // Divide tasks into two distinct groups based upon rank 
   //if (rank != numprocs -1) {
   int ranks_group[numprocs - 2];
   for (int i = 0; i < numprocs - 2; i++) {
@@ -1773,14 +1805,15 @@ void rna_aligner_mpi(options_t *options, int argc, char *argv[]) {
   }
   MPI_Group_incl(orig_group, numprocs - 2, ranks_group, &new_group);
   
-  /* Create new communicator and then perform collective communications */
+  //Create new communicator and then perform collective communications 
   MPI_Comm_create(MPI_COMM_WORLD, new_group, &new_comm); 
   
   //--------------------------------------------------------------
 
+
   //-> CALL MANAGER
   if (rank == numprocs - 2) {
-    manager_function(file1);
+    manager_function(read_positions, split_factor, cnt);
   } else if (rank < numprocs - 2) {     
 
     //===================================================================//
@@ -1790,6 +1823,8 @@ void rna_aligner_mpi(options_t *options, int argc, char *argv[]) {
     size_t s_positions[2];
     int petition = 1;
     MPI_Status status;
+    int cnt = 0;
+
     while (1) {
       
       MPI_Send(&petition, 1, MPI_INT, numprocs - 2, tag_mng, MPI_COMM_WORLD);   
@@ -1798,12 +1833,11 @@ void rna_aligner_mpi(options_t *options, int argc, char *argv[]) {
       size_t start_seek = s_positions[0];
       size_t end_seek   = s_positions[1];
 
-      printf("[%i]SEEK: %lld - %lld\n", rank, start_seek, end_seek);
-      sleep(1);
-      
       if ((start_seek == -1) && (end_seek == -1)) { break; }
 
-      
+      printf("[%i]SEEK: %lld - %lld\n", rank, start_seek, end_seek);
+      sleep(1); //Workflow HPG Aligner
+
     }
 
     printf("[%i]WORKER FINISH!\n", rank);
@@ -2306,7 +2340,7 @@ void rna_aligner_mpi(options_t *options, int argc, char *argv[]) {
 
     printf("WRITER FINISH!\n");
 
-    } else {
+    } /*else {
       
       linked_list_t *writer_list = linked_list_new(COLLECTION_MODE_ASYNCHRONIZED);
       pthread_cond_t writer_cond;
@@ -2371,14 +2405,18 @@ void rna_aligner_mpi(options_t *options, int argc, char *argv[]) {
 	  }
       }
     }    
-    
+      */
   }
-
+  
   //TODO: END WORK, DELETE THIS //
-  MPI_Barrier(MPI_COMM_WORLD);
-  MPI_Finalize();  
+  //MPI_Barrier(MPI_COMM_WORLD);
 
   return;
+
+
+
+
+
 
   /*
   if (rank == 0) {
